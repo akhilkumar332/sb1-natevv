@@ -1,10 +1,9 @@
-import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
-import DonorLogin from './pages/auth/DonorLogin';
+import { DonorLogin } from './pages/auth/DonorLogin';
 import HospitalLogin from './pages/auth/HospitalLogin';
 import NgoLogin from './pages/auth/NgoLogin';
 import AdminLogin from './pages/auth/AdminLogin';
