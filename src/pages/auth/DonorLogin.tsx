@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, LogIn } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import toast from 'react-hot-toast';
 
-function DonorLogin() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+interface LoginFormData {
+  email: string;
+  password: string;
+}
+
+export function DonorLogin() {
+  const [formData, setFormData] = useState<LoginFormData>({
+    email: '',
+    password: '',
+  });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { login, loginWithGoogle } = useAuth();
@@ -16,11 +22,11 @@ function DonorLogin() {
     setLoading(true);
 
     try {
-      await login(email, password);
-      toast.success('Successfully logged in!');
+      await login(formData.email, formData.password);
+      toast.success('Login successful!');
       navigate('/donor/dashboard');
     } catch (error) {
-      toast.error('Failed to log in. Please check your credentials.');
+      toast.error('Failed to login. Please check your credentials.');
     } finally {
       setLoading(false);
     }
