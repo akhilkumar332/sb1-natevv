@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Droplet, Users, Hospital } from 'lucide-react';
+import { Heart, Droplet, Users, Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 function Home() {
@@ -60,7 +60,7 @@ function Home() {
               description="Search our database of registered blood donors"
             />
             <FeatureCard
-              icon={<Hospital className="w-12 h-12 text-red-500" />}
+              icon={<Building2 className="w-12 h-12 text-red-500" />}
               title="Hospital Network"
               description="Connect with our network of partner hospitals"
             />
