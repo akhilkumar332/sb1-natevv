@@ -3,8 +3,74 @@ import { Link } from 'react-router-dom';
 import { Menu, X, Droplet } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-function Navbar() {
-  const [isOpen, setIsOpen] = useState(false);
+interface NavLinkProps {
+  to: string;
+  children: React.ReactNode;
+}
+
+// Move interfaces to the top for better organization
+interface UserMenuProps {
+  // Add any props needed for UserMenu
+}
+
+interface MobileUserMenuProps {
+  // Add any props needed for MobileUserMenu
+}
+
+function NavLink({ to, children }: NavLinkProps) {
+  return (
+    <Link
+      to={to}
+      className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function MobileNavLink({ to, children }: NavLinkProps) {
+  return (
+    <Link
+      to={to}
+      className="text-gray-600 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function UserMenu({}: UserMenuProps) {
+  const { logout } = useAuth();
+  return (
+    <div>
+      {/* Add user menu implementation */}
+      <button 
+        onClick={logout}
+        className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+      >
+        Logout
+      </button>
+    </div>
+  );
+}
+
+function MobileUserMenu({}: MobileUserMenuProps) {
+  const { logout } = useAuth();
+  return (
+    <div>
+      {/* Add mobile user menu implementation */}
+      <button 
+        onClick={logout}
+        className="text-gray-600 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
+      >
+        Logout
+      </button>
+    </div>
+  );
+}
+
+const Navbar: React.FC = () => {
+  const [isOpen, setIsOpen] = useState<boolean>(false);
   const { user } = useAuth();
 
   return (
@@ -82,38 +148,6 @@ function Navbar() {
       )}
     </nav>
   );
-}
-
-function NavLink({ to, children }) {
-  return (
-    <Link
-      to={to}
-      className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-    >
-      {children}
-    </Link>
-  );
-}
-
-function MobileNavLink({ to, children }) {
-  return (
-    <Link
-      to={to}
-      className="text-gray-600 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
-    >
-      {children}
-    </Link>
-  );
-}
-
-function UserMenu() {
-  // Implement user menu dropdown here
-  return null;
-}
-
-function MobileUserMenu() {
-  // Implement mobile user menu here
-  return null;
-}
+};
 
 export default Navbar;

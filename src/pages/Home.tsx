@@ -71,7 +71,13 @@ function Home() {
   );
 }
 
-function FeatureCard({ icon, title, description }) {
+interface FeatureCardProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}
+
+function FeatureCard({ icon, title, description }: FeatureCardProps) {
   return (
     <div className="p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition border border-gray-100">
       <div className="mb-4">{icon}</div>
