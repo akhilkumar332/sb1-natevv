@@ -70,7 +70,7 @@ function ForgotPassword() {
 
         <div className="text-sm text-center">
           <Link
-            to="/login"
+            to="/donor/login"
             className="font-medium text-red-600 hover:text-red-500 flex items-center justify-center"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
