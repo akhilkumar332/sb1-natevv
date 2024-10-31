@@ -8,6 +8,7 @@ import Loading from './components/Loading';
 import { AuthProvider } from './contexts/AuthContext';
 import { LoadingProvider } from './contexts/LoadingContext'; // Add this import
 
+
 // Helper function for lazy loading with delay
 const lazyLoad = (importPromise: Promise<any>) => {
   return Promise.all([
