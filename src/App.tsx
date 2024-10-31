@@ -8,6 +8,11 @@ import HospitalLogin from './pages/auth/HospitalLogin';
 import NgoLogin from './pages/auth/NgoLogin';
 import AdminLogin from './pages/auth/AdminLogin';
 import { AuthProvider } from './contexts/AuthContext';
+import FindDonors from './pages/FindDonors';
+import RequestBlood from './pages/RequestBlood';
+import About from './pages/About';
+import Contact from './pages/Contact';
+import DonorRegister from './pages/DonorRegister';
 
 function App() {
   return (
@@ -18,6 +23,11 @@ function App() {
           <main className="flex-grow">
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/donors" element={<FindDonors />} />
+              <Route path="/request-blood" element={<RequestBlood />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/donor/register" element={<DonorRegister />} />
               <Route path="/donor/login" element={<DonorLogin />} />
               <Route path="/hospital/login" element={<HospitalLogin />} />
               <Route path="/ngo/login" element={<NgoLogin />} />
