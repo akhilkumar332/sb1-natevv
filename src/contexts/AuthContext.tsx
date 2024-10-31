@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
 import {
   onAuthStateChanged,
@@ -10,6 +11,17 @@ import {
 import { AuthContextType, User } from '../types';
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+// In your AuthProvider component
+const resetPassword = (email: string) => {
+  return sendPasswordResetEmail(auth, email);
+};
+
+// Include this in the context value
+const value = {
+  // ... other auth-related values and functions
+  resetPassword,
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser ] = useState<User | null>(null);
