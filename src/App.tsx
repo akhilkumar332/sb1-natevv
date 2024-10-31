@@ -14,6 +14,7 @@ import About from './pages/About';
 import Contact from './pages/Contact';
 import DonorRegister from './pages/DonorRegister';
 import NotFound from './pages/NotFound';
+import ForgotPassword from './pages/ForgotPassword';
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
               <Route path="/hospital/login" element={<HospitalLogin />} />
               <Route path="/ngo/login" element={<NgoLogin />} />
               <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
               {/* 404 Route - Must be last */}
               <Route path="*" element={<NotFound />} />
             </Routes>
