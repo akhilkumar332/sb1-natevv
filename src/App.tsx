@@ -13,6 +13,7 @@ import RequestBlood from './pages/RequestBlood';
 import About from './pages/About';
 import Contact from './pages/Contact';
 import DonorRegister from './pages/DonorRegister';
+import NotFound from './pages/NotFound';
 
 function App() {
   return (
@@ -32,6 +33,8 @@ function App() {
               <Route path="/hospital/login" element={<HospitalLogin />} />
               <Route path="/ngo/login" element={<NgoLogin />} />
               <Route path="/admin/login" element={<AdminLogin />} />
+              {/* 404 Route - Must be last */}
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
           <Footer />
