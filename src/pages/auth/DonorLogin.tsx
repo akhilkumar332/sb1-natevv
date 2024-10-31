@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Mail, Lock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
-import { Mail, Lock } from 'lucide-react';
 
 interface LoginFormData {
   email: string;
@@ -10,20 +10,24 @@ interface LoginFormData {
 }
 
 export function DonorLogin() {
-  const [formData, setFormData] = React.useState<LoginFormData>({
+  const [formData, setFormData] = useState<LoginFormData>({
     email: '',
     password: '',
   });
-  const [loading, setLoading] = React.useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { login, loginWithGoogle } = useAuth();
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.email || !formData.password) {
-      toast.error('Please fill in all fields');
-      return;
-    }
     setLoading(true);
 
     try {
@@ -31,30 +35,19 @@ export function DonorLogin() {
       toast.success('Login successful!');
       navigate('/donor/dashboard');
     } catch (error) {
-      if (error instanceof Error) {
-        toast.error(`Failed to login: ${error.message}`);
-      } else {
-        toast.error('An unexpected error occurred');
-      }
+      toast.error('Failed to login. Please check your credentials.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
-    setLoading(true);
     try {
       await loginWithGoogle();
       toast.success('Successfully logged in with Google!');
       navigate('/donor/dashboard');
     } catch (error) {
-      if (error instanceof Error) {
-        toast.error(`Failed to log in with Google: ${error.message}`);
-      } else {
-        toast.error('An unexpected error occurred');
-      }
-    } finally {
-      setLoading(false);
+      toast.error('Failed to log in with Google.');
     }
   };
 
@@ -77,10 +70,9 @@ export function DonorLogin() {
                   id="email"
                   name="email"
                   type="email"
-                  placeholder="Enter your email address"
                   required
                   value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  onChange={handleChange}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500"
                 />
                 <Mail className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
@@ -96,10 +88,9 @@ export function DonorLogin() {
                   id="password"
                   name="password"
                   type="password"
-                  placeholder="Enter your password"
                   required
                   value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  onChange={handleChange}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500"
                 />
                 <Lock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
@@ -137,9 +128,7 @@ export function DonorLogin() {
           <button
             type="button"
             onClick={handleGoogleLogin}
-            disabled={loading}
-            aria-label="Sign in with Google"
-            className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
           >
             <img
               className="h-5 w-5 mr-2"
@@ -160,3 +149,5 @@ export function DonorLogin() {
     </div>
   );
 }
+
+export default DonorLogin;
