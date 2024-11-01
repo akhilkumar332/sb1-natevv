@@ -1,12 +1,17 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
+
 import { 
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
   onAuthStateChanged,
   User as FirebaseUser,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  ConfirmationResult,
 } from 'firebase/auth';
 import { 
   doc, 
@@ -43,6 +48,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  loginWithPhone: (phoneNumber: string) => Promise<ConfirmationResult>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (data: Partial<User>) => Promise<void>;
@@ -146,6 +152,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const setupRecaptcha = (elementId: string) => {
+    const recaptchaVerifier = new RecaptchaVerifier(auth, elementId, {
+      'size': 'invisible',
+      'callback': () => {
+        // reCAPTCHA solved, allow signInWithPhoneNumber.
+      },
+      'expired-callback': () => {
+        // Response expired. Ask user to solve reCAPTCHA again.
+        toast.error('reCAPTCHA expired. Please try again.');
+      }
+    });
+    return recaptchaVerifier;
+  };
+
+  const loginWithPhone = async (phoneNumber: string): Promise<ConfirmationResult> => {
+    try {
+      // Create container for reCAPTCHA if it doesn't exist
+      if (!document.getElementById('recaptcha-container')) {
+        const container = document.createElement('div');
+        container.id = 'recaptcha-container';
+        document.body.appendChild(container);
+      }
+
+      const recaptchaVerifier = setupRecaptcha('recaptcha-container');
+      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+      
+      // Clean up reCAPTCHA container
+      const container = document.getElementById('recaptcha-container');
+      if (container) {
+        container.remove();
+      }
+
+      return confirmation;
+    } catch (error) {
+      console.error('Phone login error:', error);
+      throw error;
+    }
+  };
+
   const loginWithGoogle = async (): Promise<void> => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
@@ -198,6 +243,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     login,
     loginWithGoogle,
+    loginWithPhone,
     logout,
     resetPassword,
     updateUserProfile,
