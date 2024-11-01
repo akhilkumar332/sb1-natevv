@@ -61,26 +61,19 @@ const convertTimestampToDate = (timestamp: any): Date | undefined => {
   return timestamp ? new Date(timestamp.seconds * 1000) : undefined;
 };
 
-// Helper function to convert FirebaseUser to our User type
-//const _createUserObject = (firebaseUser: FirebaseUser, additionalData?: Partial<User>): User => {
-//  return {
-//    uid: firebaseUser.uid,
-//    email: firebaseUser.email,
-//    displayName: firebaseUser.displayName,
-//    photoURL: firebaseUser.photoURL,
-//    phoneNumber: firebaseUser.phoneNumber,
-//    ...additionalData
-//  };
-//};
-
 // Helper function to add or update user in Firestore
 const addUserToFirestore = async (
   firebaseUser: FirebaseUser, 
   additionalData?: Partial<User>
-): Promise<User> => {
+): Promise<User | null> => {
   const userRef: DocumentReference = doc(db, 'users', firebaseUser.uid);
   const userDoc: DocumentSnapshot = await getDoc(userRef);
   
+  if (!userDoc.exists()) {
+    // User is not registered in the database
+    return null;
+  }
+
   const userData: Partial<User> = {
     uid: firebaseUser.uid,
     email: firebaseUser.email,
@@ -91,18 +84,10 @@ const addUserToFirestore = async (
     ...additionalData
   };
 
-  // If user doesn't exist, add createdAt timestamp
-  if (!userDoc.exists()) {
-    userData.createdAt = new Date();
-    userData.role = 'donor'; // Default role
-    userData.isAvailable = true; // Default availability
-  }
-
   // Merge with existing data
   await setDoc(userRef, {
     ...userData,
     lastLoginAt: serverTimestamp(),
-    createdAt: userData.createdAt ? serverTimestamp() : userDoc.data()?.createdAt,
   }, { merge: true });
 
   // Get the updated user data
@@ -127,7 +112,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (firebaseUser) {
           // Get user data from Firestore
           const userData = await addUserToFirestore(firebaseUser);
-          setUser(userData);
+          if (userData) {
+            setUser(userData);
+          } else {
+            // User is not registered, sign them out
+            await signOut(auth);
+            setUser(null);
+            toast.error('User not registered. Please register first.');
+          }
         } else {
           setUser(null);
         }
@@ -145,9 +137,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<void> => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      await addUserToFirestore(userCredential.user);
+      const userData = await addUserToFirestore(userCredential.user);
+      if (!userData) {
+        throw new Error('User not registered');
+      }
     } catch (error) {
       console.error('Login error:', error);
+      if (error instanceof Error && error.message === 'User not registered') {
+        toast.error('User not registered. Please register first.');
+      }
       throw error;
     }
   };
@@ -193,10 +191,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithGoogle = async (): Promise<void> => {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      await addUserToFirestore(result.user);
+      // Configure auth to use popup
+      auth.useDeviceLanguage();
+      
+      const result = await signInWithPopup(auth, googleProvider)
+        .catch((error) => {
+          if (error.code === 'auth/popup-closed-by-user') {
+            throw new Error('Sign-in popup was closed before completing the sign-in process.');
+          }
+          if (error.code === 'auth/popup-blocked') {
+            throw new Error('Sign-in popup was blocked by the browser. Please allow popups for this site.');
+          }
+          throw error;
+        });
+  
+      if (!result) {
+        throw new Error('Failed to get sign-in result');
+      }
+  
+      const userData = await addUserToFirestore(result.user);
+      if (!userData) {
+        throw new Error('User not registered');
+      }
     } catch (error) {
       console.error('Google login error:', error);
+      if (error instanceof Error) {
+        if (error.message === 'User not registered') {
+          toast.error('User not registered. Please register first.');
+        } else {
+          toast.error(error.message);
+        }
+      }
       throw error;
     }
   };
@@ -227,7 +252,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userRef = doc(db, 'users', user.uid);
       await setDoc(userRef, {
         ...data,
-        updatedAt: serverTimestamp(),
+        updatedAt: serverTimestamp (),
       }, { merge: true });
 
       // Update local user state
