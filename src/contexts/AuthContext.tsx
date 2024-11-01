@@ -118,7 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // User is not registered, sign them out
             await signOut(auth);
             setUser(null);
-            toast.error('User not registered. Please register first.');
+            //toast.error('User not registered. Please register first.');
           }
         } else {
           setUser(null);
@@ -144,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Login error:', error);
       if (error instanceof Error && error.message === 'User not registered') {
-        toast.error('User not registered. Please register first.');
+        //toast.error('User not registered. Please register first.');
       }
       throw error;
     }
@@ -217,7 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Google login error:', error);
       if (error instanceof Error) {
         if (error.message === 'User not registered') {
-          toast.error('User not registered. Please register first.');
+          //toast.error('User not registered. Please register first.');
         } else {
           toast.error(error.message);
         }
