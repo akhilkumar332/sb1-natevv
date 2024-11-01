@@ -27,3 +27,6 @@ dist-ssr
 .firebase/
 .firebaserc
 firebase-debug.log
+
+#env ignore
+.env
