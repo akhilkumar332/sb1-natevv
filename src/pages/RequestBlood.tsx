@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, User, Phone, MapPin, Calendar, Droplet, AlertCircle } from 'lucide-react';
+import { Droplet, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 
