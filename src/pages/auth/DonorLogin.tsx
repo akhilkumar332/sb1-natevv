@@ -57,7 +57,8 @@ export function DonorLogin() {
       setConfirmationResult(confirmation);
       toast.success('OTP sent successfully!');
     } catch (error) {
-      toast.error('Failed to send OTP. Please try again.');
+      // Show only one error message
+      toast.error('Please register as a donor first before signing in.');
     } finally {
       setLoading(false);
     }
@@ -85,7 +86,8 @@ export function DonorLogin() {
       toast.success('Login successful!');
       navigate('/donor/dashboard');
     } catch (error) {
-      toast.error('Failed to login. Please check your credentials.');
+      // Show only one error message
+      toast.error('Invalid Credentials or User Not Registered');
     } finally {
       setLoading(false);
     }
@@ -98,12 +100,8 @@ export function DonorLogin() {
       toast.success('Successfully logged in with Google!');
       navigate('/donor/dashboard');
     } catch (error) {
-      if (error instanceof Error) {
-        // Show specific error message
-        toast.error(error.message);
-      } else {
-        toast.error('Failed to log in with Google. Please try again.');
-      }
+      // Show only one error message
+      toast.error('Please register as a donor first before signing in.');
     } finally {
       setLoading(false);
     }
