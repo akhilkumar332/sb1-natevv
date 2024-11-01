@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, MapPin, Filter, Droplet, Phone, Mail, AlertCircle, Loader } from 'lucide-react';
+import { Search, MapPin, Filter, Droplet, Phone, Mail, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Donor {
@@ -23,8 +23,6 @@ function FindDonors() {
   const [selectedGender, setSelectedGender] = useState('');
   const [lastDonationDate, setLastDonationDate] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Mock data - replace with actual API call
   const donors: Donor[] = [
@@ -101,16 +99,6 @@ function FindDonors() {
            matchesAvailability && matchesGender && matchesLastDonation;
   });
 
-  if (error) {
-    return (
-      <div className="text-center py-8">
-        <AlertCircle className="mx-auto h-16 w-16 text-red-500" />
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Error</h2>
-        <p className="text-gray-600">{error}</p>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4">
@@ -182,10 +170,9 @@ function FindDonors() {
                 </select>
               </div>
               
-
               {/* Availability Filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Availability
                 </label>
                 <select
@@ -234,69 +221,62 @@ function FindDonors() {
         </div>
 
         {/* Results Section */}
-        {isLoading ? (
-          <div className="text-center py-8">
-            <Loader className="mx-auto h-8 w-8 text-red-500 animate-spin" />
-            <p className="mt-2 text-gray -600">Loading...</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredDonors.map(donor => (
-              <div key={donor.id} className="bg-white rounded-lg shadow-sm p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{donor.name}</h3>
-                    <div className="flex items-center text-gray-600 mt-1">
-                      <MapPin className="h-4 w-4 mr-1" />
-                      <span className="text-sm">{donor.location} ({donor.distance} km)</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <Droplet className="h-5 w-5 text-red-500 mr-1" />
-                    <span className="font-semibold text-red-500">{donor.bloodType}</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredDonors.map(donor => (
+            <div key={donor.id} className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">{donor.name}</h3>
+                  <div className="flex items-center text-gray-600 mt-1">
+                    <MapPin className="h-4 w-4 mr-1" />
+                    <span className="text-sm">{donor.location} ({donor.distance} km)</span>
                   </div>
                 </div>
-
-                <div className="border-t border-gray-100 pt-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-500">Last Donation</p>
-                      <p className="font-medium">{new Date(donor.lastDonation).toLocaleDateString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Status</p>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        donor.availability === 'Available' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {donor.availability}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-2">
-                  <button
-                    onClick={() => handleCallDonor(donor)}
-                    className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
-                  >
-                    <Phone className="h-4 w-4 mr-2" />
-                    Call Donor
-                  </button>
-                  <button
-                    onClick={() => handleMessageDonor(donor)}
-                    className="w-full flex items-center justify-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-600 hover:text-red-500"
-                  >
-                    <Mail className="h-4 w-4 mr-2" />
-                    Send Message
-                  </button>
+                <div className="flex items-center">
+                  <Droplet className="h-5 w-5 text-red-500 mr-1" />
+                  <span className="font-semibold text-red-500">{donor.bloodType}</span>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+
+              <div className="border-t border-gray-100 pt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Last Donation</p>
+                    <p className="font-medium">{new Date(donor.lastDonation).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Status</p>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      donor.availability === 'Available' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {donor.availability}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <button
+                  onClick={() => handleCallDonor(donor)}
+                  className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+                >
+                  <Phone className="h-4 w-4 mr-2" />
+                  Call Donor
+                </button>
+                <button
+                  onClick={() => handleMessageDonor(donor)}
+                  className="w-full flex items-center justify-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-600 hover:text-red-500"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Message
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
 
         {/* No Results Found */}
-        {filteredDonors.length === 0 && !isLoading && (
+        {filteredDonors.length === 0 && (
           <div className="text-center py-8">
             <AlertCircle className="mx-auto h-16 w-16 text-red-500" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">No Donors Found</h2>
