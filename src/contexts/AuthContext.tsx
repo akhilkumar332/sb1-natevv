@@ -1,14 +1,15 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { sendPasswordResetEmail, User as FirebaseUser } from 'firebase/auth';
-import { auth } from '../firebase';
-import {
-  onAuthStateChanged,
+import { 
   signInWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
   signOut,
+  onAuthStateChanged,
+  User as FirebaseUser,
+  sendPasswordResetEmail
 } from 'firebase/auth';
+import { auth } from '../firebase';
 import { AuthContextType, User } from '../types';
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -57,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login,
     loginWithGoogle,
     logout,
-    resetPassword, // Now TypeScript knows this is a valid property
+    resetPassword,
   };
 
   return (
