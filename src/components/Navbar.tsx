@@ -1,6 +1,7 @@
+// src/components/Navbar.tsx
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Menu, X, Droplet } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Menu, X, Droplet, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface NavLinkProps {
@@ -8,20 +9,16 @@ interface NavLinkProps {
   children: React.ReactNode;
 }
 
-// Move interfaces to the top for better organization
-interface UserMenuProps {
-  // Add any props needed for UserMenu
-}
-
-interface MobileUserMenuProps {
-  // Add any props needed for MobileUserMenu
-}
-
-function NavLink({ to, children }: NavLinkProps) {
+function DesktopNavLink({ to, children }: NavLinkProps) {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+  
   return (
     <Link
       to={to}
-      className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+      className={`text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium ${
+        isActive ? 'text-red-600 hover:text-red-700' : ''
+      }`}
     >
       {children}
     </Link>
@@ -29,40 +26,131 @@ function NavLink({ to, children }: NavLinkProps) {
 }
 
 function MobileNavLink({ to, children }: NavLinkProps) {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+  
   return (
     <Link
       to={to}
-      className="text-gray-600 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
+      className={`block px-3 py-2 rounded-md text-base font-medium ${
+        isActive 
+          ? 'text-red-600 hover:text-red-700 bg-red-50' 
+          : 'text-gray-600 hover:text-gray-900'
+      }`}
     >
       {children}
     </Link>
   );
 }
 
-function UserMenu({}: UserMenuProps) {
-  const { logout } = useAuth();
+function UserMenu() {
+  const { user, logout } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  console.log('User object:', user); // Log user object for debugging
+
   return (
-    <div>
-      {/* Add user menu implementation */}
-      <button 
-        onClick={logout}
-        className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center space-x-2 focus:outline-none"
       >
-        Logout
+        {user?.photoURL ? (
+          <img
+            src={user.photoURL}
+            alt={user?.displayName || 'User'}
+            className="w-8 h-8 rounded-full object-cover border-2 border-red-500"
+            onError={(e) => {
+              console.error('Error loading profile image:', e);
+              e.currentTarget.src = `https://ui-avatars.com/api/?background=dc2626&color=fff&name=${encodeURIComponent(user?.displayName || user?.email || 'User')}`;
+            }}
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white font-bold">
+            {(user?.displayName || user?.email || 'U')[0].toUpperCase()}
+          </div>
+        )}
+        <span className="hidden md:inline text-gray-700">
+          {user?.displayName || user?.email?.split('@')[0] || 'User'}
+        </span>
       </button>
+      
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-100">
+          <Link
+            to="/profile"
+            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            onClick={() => setIsOpen(false)}
+          >
+            Profile
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+          >
+            <LogOut className="inline-block w-4 h-4 mr-2" />
+            Logout
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function MobileUserMenu({}: MobileUserMenuProps) {
-  const { logout } = useAuth();
+function MobileUserMenu() {
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  console.log('User object:', user); // Log user object for debugging
+
   return (
-    <div>
-      {/* Add mobile user menu implementation */}
-      <button 
-        onClick={logout}
-        className="text-gray-600 hover:text-gray-900 block px-3 py-2 rounded-md text-base font-medium"
+    <div className="space-y-2 border-t border-gray-200 pt-4">
+      <div className="flex items-center space-x-2 px-3 py-2">
+        {user?.photoURL ? (
+          <img
+            src={user.photoURL}
+            alt={user?.displayName || 'User'}
+            className="w-8 h-8 rounded-full object-cover border-2 border-red-500"
+            onError={(e) => {
+              console.error('Error loading profile image:', e);
+              e.currentTarget.src = `https://ui-avatars.com/api/?background=dc2626&color=fff&name=${encodeURIComponent(user?.displayName || user?.email || 'User')}`;
+            }}
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white font-bold">
+            {(user?.displayName || user?.email || 'U')[0].toUpperCase()}
+          </div>
+        )}
+        <span className="text-gray-700">
+          {user?.displayName || user?.email?.split('@')[0] || 'User'}
+        </span>
+      </div>
+      <Link
+        to="/profile"
+        className="block px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
       >
+        Profile
+      </Link>
+      <button
+        onClick={handleLogout}
+        className="flex items-center w-full px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+      >
+        <LogOut className="w-4 h-4 mr-2" />
         Logout
       </button>
     </div>
@@ -86,10 +174,10 @@ const Navbar: React.FC = () => {
 
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-8">
-            <NavLink to="/donors">Find Donors</NavLink>
-            <NavLink to="/request-blood">Request Blood</NavLink>
-            <NavLink to="/about">About</NavLink>
-            <NavLink to="/contact">Contact</NavLink>
+            <DesktopNavLink to="/donors">Find Donors</DesktopNavLink>
+            <DesktopNavLink to="/request-blood">Request Blood</DesktopNavLink>
+            <DesktopNavLink to="/about">About</DesktopNavLink>
+            <DesktopNavLink to="/contact">Contact</DesktopNavLink>
             
             {!user ? (
               <div className="flex items-center space-x-4">
@@ -103,7 +191,7 @@ const Navbar: React.FC = () => {
                   to="/donor/register"
                   className="bg-red-600 text-white px-4 py-2 rounded-full hover:bg-red-700 transition"
                 >
-                  Register as Donor
+                  Register
                 </Link>
               </div>
             ) : (
@@ -111,41 +199,46 @@ const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Mobile menu button */}
+           {/* Mobile Menu */}
           <div className="md:hidden flex items-center">
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="text-gray-500 hover:text-gray-600"
+              className="flex items-center justify-center w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full"
             >
-              {isOpen ? (
-                <X className="w-6 h-6" />
-              ) : (
-                <Menu className="w-6 h-6" />
-              )}
+              {isOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Mobile Menu */}
-      {isOpen && (
-        <div className="md:hidden">
-          <div className="px-2 pt-2 pb-3 space-y-1">
+        {/* Mobile Menu Content */}
+        {isOpen && (
+          <div className="md:hidden bg-white shadow-md rounded-md py-2">
             <MobileNavLink to="/donors">Find Donors</MobileNavLink>
             <MobileNavLink to="/request-blood">Request Blood</MobileNavLink>
             <MobileNavLink to="/about">About</MobileNavLink>
             <MobileNavLink to="/contact">Contact</MobileNavLink>
+            
             {!user ? (
-              <>
-                <MobileNavLink to="/donor/login">Login</MobileNavLink>
-                <MobileNavLink to="/donor/register">Register as Donor</MobileNavLink>
-              </>
+              <div className="flex flex-col space-y-2">
+                <Link
+                  to="/donor/login"
+                  className="block w-full text-left px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/donor/register"
+                  className="block w-full text-left px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                >
+                  Register
+                </Link>
+              </div>
             ) : (
               <MobileUserMenu />
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </nav>
   );
 };
