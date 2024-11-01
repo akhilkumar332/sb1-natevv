@@ -3,7 +3,6 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   signInWithEmailAndPassword,
   signInWithPopup,
-  GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
   User as FirebaseUser
@@ -55,16 +54,16 @@ const convertTimestampToDate = (timestamp: any): Date | undefined => {
 };
 
 // Helper function to convert FirebaseUser to our User type
-const createUserObject = (firebaseUser: FirebaseUser, additionalData?: Partial<User>): User => {
-  return {
-    uid: firebaseUser.uid,
-    email: firebaseUser.email,
-    displayName: firebaseUser.displayName,
-    photoURL: firebaseUser.photoURL,
-    phoneNumber: firebaseUser.phoneNumber,
-    ...additionalData
-  };
-};
+//const _createUserObject = (firebaseUser: FirebaseUser, additionalData?: Partial<User>): User => {
+//  return {
+//    uid: firebaseUser.uid,
+//    email: firebaseUser.email,
+//    displayName: firebaseUser.displayName,
+//    photoURL: firebaseUser.photoURL,
+//    phoneNumber: firebaseUser.phoneNumber,
+//    ...additionalData
+//  };
+//};
 
 // Helper function to add or update user in Firestore
 const addUserToFirestore = async (
