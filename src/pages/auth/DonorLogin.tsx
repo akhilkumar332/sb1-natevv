@@ -39,6 +39,8 @@ export function DonorLogin() {
       setLoginMethod('email');
     } else if (value.match(/^\+?[\d\s-]{8,}$/)) {
       setLoginMethod('phone');
+    } else {
+      setLoginMethod('initial');
     }
   };
 
@@ -51,6 +53,10 @@ export function DonorLogin() {
   };
 
   const handlePhoneNumberSubmit = async () => {
+    if (!formData.identifier) {
+      toast.error('Please enter a valid phone number.');
+      return;
+    }
     try {
       setLoading(true);
       const confirmation = await loginWithPhone(formData.identifier);
@@ -65,6 +71,10 @@ export function DonorLogin() {
   };
 
   const handleOTPSubmit = async () => {
+    if (!formData.otp) {
+      toast.error('Please enter the OTP.');
+      return;
+    }
     try {
       setLoading(true);
       await confirmationResult.confirm(formData.otp);
@@ -79,6 +89,10 @@ export function DonorLogin() {
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.identifier || !formData.password) {
+      toast.error('Please enter both email and password.');
+      return;
+    }
     setLoading(true);
 
     try {
@@ -175,7 +189,7 @@ export function DonorLogin() {
       <button
         type="button"
         onClick={loginMethod === 'email' ? handleEmailSubmit : handlePhoneNumberSubmit}
-        disabled={loading}
+        disabled={loading || !formData.identifier || (loginMethod === 'email' && !formData.password)}
         className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700"
       >
         {loading ? 'Processing...' : loginMethod === 'email' ? 'Sign in' : 'Send OTP'}
