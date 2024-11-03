@@ -28,16 +28,39 @@ export function DonorLogin() {
   const { login, loginWithGoogle, loginWithPhone } = useAuth();
 
   const handleIdentifierChange = (value: string) => {
+    // First check if it's an email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isEmail = emailRegex.test(value);
+  
+    if (isEmail) {
+      setFormData(prev => ({
+        ...prev,
+        identifier: value
+      }));
+      setLoginMethod('email');
+      return;
+    }
+  
+    // Handle phone number
+    // Remove any non-digit characters for validation
+    const digitsOnly = value.replace(/\D/g, '');
+    let formattedValue = value;
+  
+    // Check if it's a valid 10-digit number (excluding country code)
+    const isValidPhoneNumber = digitsOnly.length === 10 || 
+      (digitsOnly.startsWith('91') && digitsOnly.length === 12);
+  
+    // Only add +91 prefix if it's a 10-digit number and doesn't already have a country code
+    if (isValidPhoneNumber && !value.startsWith('+') && !value.startsWith('91')) {
+      formattedValue = `+91${digitsOnly}`;
+    }
+  
     setFormData(prev => ({
       ...prev,
-      identifier: value
+      identifier: formattedValue
     }));
-
-    // Determine if input is email or phone
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (emailRegex.test(value)) {
-      setLoginMethod('email');
-    } else if (value.match(/^\+?[\d\s-]{8,}$/)) {
+  
+    if (isValidPhoneNumber) {
       setLoginMethod('phone');
     } else {
       setLoginMethod('initial');
@@ -53,17 +76,24 @@ export function DonorLogin() {
   };
 
   const handlePhoneNumberSubmit = async () => {
-    if (!formData.identifier) {
-      toast.error('Please enter a valid phone number.');
+    // Remove any non-digit characters for validation
+    const digitsOnly = formData.identifier.replace(/\D/g, '');
+    
+    // Check if it's exactly 10 digits (excluding country code)
+    const isValid10Digits = digitsOnly.length === 10 || 
+      (digitsOnly.startsWith('91') && digitsOnly.length === 12);
+  
+    if (!isValid10Digits) {
+      toast.error('Please enter a valid 10-digit phone number.');
       return;
     }
+  
     try {
       setLoading(true);
       const confirmation = await loginWithPhone(formData.identifier);
       setConfirmationResult(confirmation);
       toast.success('OTP sent successfully!');
     } catch (error) {
-      // Show only one error message
       toast.error('Please register as a donor first before signing in.');
     } finally {
       setLoading(false);
@@ -132,6 +162,7 @@ export function DonorLogin() {
             <PhoneInput
               international
               defaultCountry="IN"
+              countryCallingCodeEditable={false}
               value={formData.identifier}
               onChange={(value) => handleIdentifierChange(value || '')}
               className="block w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -189,8 +220,14 @@ export function DonorLogin() {
       <button
         type="button"
         onClick={loginMethod === 'email' ? handleEmailSubmit : handlePhoneNumberSubmit}
-        disabled={loading || !formData.identifier || (loginMethod === 'email' && !formData.password)}
-        className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700"
+        disabled={
+          loading || 
+          !formData.identifier || 
+          (loginMethod === 'email' && !formData.password) ||
+          (loginMethod === 'phone' && formData.identifier.replace(/\D/g, '').length !== 10 &&
+          formData.identifier.replace(/\D/g, '').length !== 12)
+        }
+        className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? 'Processing...' : loginMethod === 'email' ? 'Sign in' : 'Send OTP'}
       </button>

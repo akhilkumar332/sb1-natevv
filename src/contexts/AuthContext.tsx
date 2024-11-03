@@ -23,6 +23,12 @@ import {
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 
+declare global {
+  interface Window {
+    recaptchaVerifier?: any;
+  }
+}
+
 // Define User interface with additional Firestore fields
 interface User {
   uid: string;
@@ -150,40 +156,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const setupRecaptcha = (elementId: string) => {
-    const recaptchaVerifier = new RecaptchaVerifier(auth, elementId, {
-      'size': 'invisible',
-      'callback': () => {
-        // reCAPTCHA solved, allow signInWithPhoneNumber.
-      },
-      'expired-callback': () => {
-        // Response expired. Ask user to solve reCAPTCHA again.
-        toast.error('reCAPTCHA expired. Please try again.');
-      }
-    });
-    return recaptchaVerifier;
-  };
-
   const loginWithPhone = async (phoneNumber: string): Promise<ConfirmationResult> => {
     try {
-      // Create container for reCAPTCHA if it doesn't exist
-      if (!document.getElementById('recaptcha-container')) {
-        const container = document.createElement('div');
-        container.id = 'recaptcha-container';
-        document.body.appendChild(container);
+      // First, remove any existing recaptcha containers
+      const existingContainer = document.getElementById('recaptcha-container');
+      if (existingContainer) {
+        existingContainer.remove();
       }
-
-      const recaptchaVerifier = setupRecaptcha('recaptcha-container');
+  
+      // Create new container
+      const container = document.createElement('div');
+      container.id = 'recaptcha-container';
+      document.body.appendChild(container);
+  
+      // Clear any existing reCAPTCHA widgets
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+        window.recaptchaVerifier = undefined;
+      }
+  
+      // Create new reCAPTCHA verifier
+      const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'invisible',
+        'callback': () => {
+          // reCAPTCHA solved, allow signInWithPhoneNumber.
+        },
+        'expired-callback': () => {
+          // Response expired. Ask user to solve reCAPTCHA again.
+          toast.error('reCAPTCHA expired. Please try again.');
+        }
+      });
+  
+      // Store verifier instance globally
+      window.recaptchaVerifier = recaptchaVerifier;
+  
       const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
       
-      // Clean up reCAPTCHA container
+      // Clean up after successful confirmation
+      if (container) {
+        container.remove();
+      }
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+        window.recaptchaVerifier = undefined;
+      }
+  
+      return confirmation;
+    } catch (error) {
+      // Clean up on error
       const container = document.getElementById('recaptcha-container');
       if (container) {
         container.remove();
       }
-
-      return confirmation;
-    } catch (error) {
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+        window.recaptchaVerifier = undefined;
+      }
       console.error('Phone login error:', error);
       throw error;
     }
