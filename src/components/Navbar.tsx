@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Droplet, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+
 
 interface NavLinkProps {
   to: string;
@@ -46,13 +48,10 @@ function MobileNavLink({ to, children }: NavLinkProps) {
 function UserMenu() {
   const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+    await logout(navigate);
   };
 
   console.log('User object:', user); // Log user object for debugging
@@ -107,13 +106,10 @@ function UserMenu() {
 
 function MobileUserMenu() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+    await logout(navigate);
   };
 
   console.log('User object:', user); // Log user object for debugging
