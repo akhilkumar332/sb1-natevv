@@ -150,17 +150,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string): Promise<void> => {
     try {
+      setAuthLoading(true);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userData = await addUserToFirestore(userCredential.user);
-      if (!userData) {
-        throw new Error('User not registered');
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      
+      if (!userDoc.exists()) {
+        // User exists in Firebase Auth but not in Firestore
+        await signOut(auth);
+        throw new Error('User not registered in the system. Please contact support.');
       }
+  
+      const userData = userDoc.data() as User;
+      setUser(userData);
+      toast.success('Successfully logged in!');
     } catch (error) {
       console.error('Login error:', error);
-      if (error instanceof Error && error.message === 'User not registered') {
-        //toast.error('User not registered. Please register first.');
+      if (error instanceof Error) {
+        if (error.message.includes('auth/user-not-found') || error.message.includes('auth/wrong-password')) {
+          toast.error('Invalid email or password. Please try again.');
+        } else if (error.message.includes('User not registered')) {
+          toast.error(error.message);
+        } else {
+          toast.error('An error occurred during login. Please try again.');
+        }
       }
       throw error;
+    } finally {
+      setAuthLoading(false);
     }
   };
 
