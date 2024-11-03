@@ -3,17 +3,15 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { User as UserIcon, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 export function UserMenu() {
   const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+    await logout(navigate);
   };
 
   return (
@@ -62,13 +60,10 @@ export function UserMenu() {
 
 export function MobileUserMenu() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+    await logout(navigate);
   };
 
   return (

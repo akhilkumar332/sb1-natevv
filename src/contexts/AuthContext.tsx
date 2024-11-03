@@ -1,7 +1,7 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-
+import { NavigateFunction } from 'react-router-dom';
 import { 
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -55,7 +55,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithPhone: (phoneNumber: string) => Promise<ConfirmationResult>;
-  logout: () => Promise<void>;
+  logout: (navigate: NavigateFunction) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (data: Partial<User>) => Promise<void>;
 }
@@ -254,15 +254,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = async (): Promise<void> => {
+  const logout = async (navigate: NavigateFunction): Promise<void> => {
     try {
       await signOut(auth);
       setUser(null);
+      
+      localStorage.removeItem('authToken');
+      sessionStorage.clear();
+
+      toast.success('You have been successfully logged out');
+
+      navigate('/donor/login');
     } catch (error) {
       console.error('Logout error:', error);
-      throw error;
+      toast.error('An error occurred during logout. Please try again.');
     }
   };
+
 
   const resetPassword = async (email: string): Promise<void> => {
     try {
