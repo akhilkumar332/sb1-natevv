@@ -52,12 +52,15 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  authLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithPhone: (phoneNumber: string) => Promise<ConfirmationResult>;
   logout: (navigate: NavigateFunction) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (data: Partial<User>) => Promise<void>;
+  loginLoading: boolean;
+  setLoginLoading: (loading: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -111,10 +114,12 @@ const addUserToFirestore = async (
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       try {
+        setAuthLoading(true);
         if (firebaseUser) {
           // Get user data from Firestore
           const userData = await addUserToFirestore(firebaseUser);
@@ -133,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('Error in auth state change:', error);
         setUser(null);
       } finally {
+        setAuthLoading(false);
         setLoading(false);
       }
     });
@@ -156,8 +162,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const [loginLoading, setLoginLoading] = useState(false);
+
   const loginWithPhone = async (phoneNumber: string): Promise<ConfirmationResult> => {
+    setLoginLoading(true);
     try {
+      setAuthLoading(true); 
       // First, remove any existing recaptcha containers
       const existingContainer = document.getElementById('recaptcha-container');
       if (existingContainer) {
@@ -214,6 +224,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       console.error('Phone login error:', error);
       throw error;
+    } finally {
+      setLoginLoading(false);
+      setAuthLoading(false);
     }
   };
 
@@ -302,12 +315,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextType = {
     user,
     loading,
+    authLoading,
     login,
     loginWithGoogle,
     loginWithPhone,
     logout,
     resetPassword,
     updateUserProfile,
+    loginLoading, 
+    setLoginLoading,
   };
 
   return (

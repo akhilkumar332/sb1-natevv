@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 export function UserMenu() {
-  const { user, logout } = useAuth();
+  const { user, authLoading, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -14,48 +14,50 @@ export function UserMenu() {
     await logout(navigate);
   };
 
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 focus:outline-none"
-      >
-        {user?.photoURL ? (
-          <img
-            src={user.photoURL}
-            alt={user.displayName || 'User'}
-            className="w-8 h-8 rounded-full object-cover border-2 border-red-500"
-          />
-        ) : (
-          <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
-            <UserIcon className="w-5 h-5 text-white" />
+  if(authLoading) {
+    return (
+      <div className="relative">
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="flex items-center space-x-2 focus:outline-none"
+        >
+          {user?.photoURL ? (
+            <img
+              src={user.photoURL}
+              alt={user.displayName || 'User'}
+              className="w-8 h-8 rounded-full object-cover border-2 border-red-500"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
+              <UserIcon className="w-5 h-5 text-white" />
+            </div>
+          )}
+          <span className="hidden md:inline text-gray-700">
+            {user?.displayName || 'User'}
+          </span>
+        </button>
+        
+        {isOpen && (
+          <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-100">
+            <Link
+              to="/profile"
+              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              onClick={() => setIsOpen(false)}
+            >
+              Profile
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            >
+              <LogOut className="inline-block w-4 h-4 mr-2" />
+              Logout
+            </button>
           </div>
         )}
-        <span className="hidden md:inline text-gray-700">
-          {user?.displayName || 'User'}
-        </span>
-      </button>
-      
-      {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-100">
-          <Link
-            to="/profile"
-            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            onClick={() => setIsOpen(false)}
-          >
-            Profile
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-          >
-            <LogOut className="inline-block w-4 h-4 mr-2" />
-            Logout
-          </button>
-        </div>
-      )}
-    </div>
-  );
+      </div>
+    );
+  }  
 }
 
 export function MobileUserMenu() {
