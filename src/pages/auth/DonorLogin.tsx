@@ -1,5 +1,5 @@
 // src/pages/auth/DonorLogin.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, Phone } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -25,7 +25,13 @@ export function DonorLogin() {
   const [loading, setLoading] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const navigate = useNavigate();
-  const { login, loginWithGoogle, loginWithPhone } = useAuth();
+  const { login, loginWithGoogle, loginWithPhone, verifyOTP, user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/donor/dashboard');
+    }
+  }, [user, navigate]);
 
   const handleIdentifierChange = (value: string) => {
     // First check if it's an email
@@ -107,15 +113,16 @@ export function DonorLogin() {
     }
     try {
       setLoading(true);
-      await confirmationResult.confirm(formData.otp);
+      await verifyOTP(confirmationResult, formData.otp);
       toast.success('Login successful!');
-      navigate('/donor/dashboard');
+      // Navigation will be handled by the useEffect hook
     } catch (error) {
       toast.error('Invalid OTP. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+  
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
