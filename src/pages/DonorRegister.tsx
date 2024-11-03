@@ -32,7 +32,7 @@ function DonorRegister() {
     privacyPolicyAgreed: 'false',
     termsOfServiceAgreed: 'false',
   });
-
+  
   function generateUniqueId(): string {
     const prefix = "BH";
     const randomDigits = Math.floor(1000000 + Math.random() * 9000000).toString().slice(0, 7);
