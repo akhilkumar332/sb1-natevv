@@ -131,14 +131,13 @@ export function DonorLogin() {
       return;
     }
     setLoading(true);
-
+  
     try {
       await login(formData.identifier, formData.password);
-      toast.success('Login successful!');
-      navigate('/donor/dashboard');
+      // Navigation should be handled by the useEffect hook that watches the user state
     } catch (error) {
-      // Show only one error message
-      toast.error('Invalid Credentials or User Not Registered');
+      // The error messages are now handled in the login function, so we don't need to do anything here
+      console.error('Login error:', error);
     } finally {
       setLoading(false);
     }
