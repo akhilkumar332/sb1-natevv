@@ -6,7 +6,9 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Loading from './components/Loading';
 import { AuthProvider } from './contexts/AuthContext';
-import { LoadingProvider } from './contexts/LoadingContext'; // Add this import
+import { LoadingProvider } from './contexts/LoadingContext';
+import ProtectedRoute from './components/ProtectedRoute';
+
 
 
 // Helper function for lazy loading with delay
@@ -30,6 +32,7 @@ const Contact = lazy(() => lazyLoad(import('./pages/Contact')));
 const DonorRegister = lazy(() => lazyLoad(import('./pages/DonorRegister')));
 const NotFound = lazy(() => lazyLoad(import('./pages/NotFound')));
 const ForgotPassword = lazy(() => lazyLoad(import('./pages/ForgotPassword')));
+const DonorDashboard = lazy(() => lazyLoad(import('./pages/donor/DonorDashboard')));
 
 function App() {
   return (
@@ -52,6 +55,10 @@ function App() {
                   <Route path="/ngo/login" element={<NgoLogin />} />
                   <Route path="/admin/login" element={<AdminLogin />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route element={<ProtectedRoute />}>
+                  <Route path="/donor/dashboard" element={<DonorDashboard />} />
+                  {/* Add other protected routes here */}
+                  </Route>
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>
