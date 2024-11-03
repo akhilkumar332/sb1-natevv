@@ -1,5 +1,5 @@
 // src/components/Navbar.tsx
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Droplet, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -155,7 +155,15 @@ function MobileUserMenu() {
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
-  const { user } = useAuth();
+  const { user, authLoading } = useAuth();
+
+  const LoadingFallback = () => (
+    <div className="flex items-center space-x-2">
+      <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse"></div>
+      <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+    </div>
+  );
+
 
   return (
     <nav className="bg-white shadow-sm border-b border-gray-100">
@@ -175,7 +183,9 @@ const Navbar: React.FC = () => {
             <DesktopNavLink to="/about">About</DesktopNavLink>
             <DesktopNavLink to="/contact">Contact</DesktopNavLink>
             
-            {!user ? (
+            {authLoading ? (
+              <LoadingFallback />
+            ) : !user ? (
               <div className="flex items-center space-x-4">
                 <Link
                   to="/donor/login"
@@ -191,7 +201,9 @@ const Navbar: React.FC = () => {
                 </Link>
               </div>
             ) : (
-              <UserMenu />
+              <Suspense fallback={<LoadingFallback />}>
+                <UserMenu />
+              </Suspense>
             )}
           </div>
 
@@ -214,7 +226,9 @@ const Navbar: React.FC = () => {
             <MobileNavLink to="/about">About</MobileNavLink>
             <MobileNavLink to="/contact">Contact</MobileNavLink>
             
-            {!user ? (
+            {authLoading ? (
+              <LoadingFallback />
+            ) : !user ? (
               <div className="flex flex-col space-y-2">
                 <Link
                   to="/donor/login"
@@ -230,7 +244,9 @@ const Navbar: React.FC = () => {
                 </Link>
               </div>
             ) : (
-              <MobileUserMenu />
+              <Suspense fallback={<LoadingFallback />}>
+                <MobileUserMenu />
+              </Suspense>
             )}
           </div>
         )}
