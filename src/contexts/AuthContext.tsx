@@ -61,7 +61,9 @@ interface AuthContextType {
   updateUserProfile: (data: Partial<User>) => Promise<void>;
   loginLoading: boolean;
   setLoginLoading: (loading: boolean) => void;
+  verifyOTP: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
 }
+
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -230,6 +232,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const verifyOTP = async (confirmationResult: ConfirmationResult, otp: string): Promise<void> => {
+    try {
+      const userCredential = await confirmationResult.confirm(otp);
+      const userData = await addUserToFirestore(userCredential.user);
+      if (!userData) {
+        throw new Error('User not registered');
+      }
+      setUser(userData);
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      throw error;
+    }
+  };
+
   const loginWithGoogle = async (): Promise<void> => {
     try {
       // Configure auth to use popup
@@ -324,6 +340,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updateUserProfile,
     loginLoading, 
     setLoginLoading,
+    verifyOTP,
   };
 
   return (
