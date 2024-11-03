@@ -12,6 +12,7 @@ import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
   ConfirmationResult,
+  fetchSignInMethodsForEmail,
 } from 'firebase/auth';
 import { 
   doc, 
@@ -62,6 +63,7 @@ interface AuthContextType {
   loginLoading: boolean;
   setLoginLoading: (loading: boolean) => void;
   verifyOTP: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
+  checkUserExists: (email: string) => Promise<boolean>;
 }
 
 
@@ -147,6 +149,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => unsubscribe();
   }, []);
+
+  const checkUserExists = async (email: string): Promise<boolean> => {
+    try {
+      const methods = await fetchSignInMethodsForEmail(auth, email);
+      return methods.length > 0;
+    } catch (error) {
+      console.error('Error checking user existence:', error);
+      throw error;
+    }
+  };
+
 
   const login = async (email: string, password: string): Promise<void> => {
     try {
@@ -357,6 +370,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loginLoading, 
     setLoginLoading,
     verifyOTP,
+    checkUserExists,
   };
 
   return (

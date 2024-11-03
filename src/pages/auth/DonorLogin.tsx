@@ -24,8 +24,10 @@ export function DonorLogin() {
   });
   const [loading, setLoading] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [userExists, setUserExists] = useState(false);
   const navigate = useNavigate();
-  const { login, loginWithGoogle, loginWithPhone, verifyOTP, user } = useAuth();
+  const { login, loginWithGoogle, loginWithPhone, verifyOTP, user, checkUserExists } = useAuth();
 
   useEffect(() => {
     if (user) {
@@ -33,8 +35,7 @@ export function DonorLogin() {
     }
   }, [user, navigate]);
 
-  const handleIdentifierChange = (value: string) => {
-    // First check if it's an email
+  const handleIdentifierChange = async (value: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const isEmail = emailRegex.test(value);
   
@@ -44,6 +45,23 @@ export function DonorLogin() {
         identifier: value
       }));
       setLoginMethod('email');
+      
+      try {
+        setLoading(true);
+        const exists = await checkUserExists(value);
+        setUserExists(exists);
+        if (!exists) {
+          toast.error('User not found. Please register first.');
+          setShowPassword(false);
+        } else {
+          setShowPassword(true);
+        }
+      } catch (error) {
+        console.error('Error checking user:', error);
+        toast.error('Error checking user status');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
   
@@ -126,22 +144,34 @@ export function DonorLogin() {
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.identifier || !formData.password) {
-      toast.error('Please enter both email and password.');
+    if (!formData.identifier) {
+      toast.error('Please enter your email.');
       return;
     }
+
+    if (!userExists) {
+      toast.error('Please register as a donor first before signing in.');
+      return;
+    }
+
+    if (!formData.password) {
+      toast.error('Please enter your password.');
+      return;
+    }
+
     setLoading(true);
-  
+
     try {
       await login(formData.identifier, formData.password);
-      // Navigation should be handled by the useEffect hook that watches the user state
+      toast.success('Login successful!');
+      navigate('/donor/dashboard');
     } catch (error) {
-      // The error messages are now handled in the login function, so we don't need to do anything here
-      console.error('Login error:', error);
+      toast.error('Invalid credentials');
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleGoogleLogin = async () => {
     try {
@@ -193,7 +223,7 @@ export function DonorLogin() {
         </div>
       </div>
 
-      {loginMethod === 'email' && (
+      {showPassword && loginMethod === 'email' && (
         <div>
           <label htmlFor="password" className="block text-sm font-medium text-gray-700">
             Password
@@ -211,7 +241,7 @@ export function DonorLogin() {
             <Lock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
           </div>
           <div className="mt-4">
-          <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
               <div className="text-sm">
                 <Link to="/forgot-password" className="font-medium text-red-600 hover:text-red-500">
                   Forgot your password?
@@ -220,7 +250,6 @@ export function DonorLogin() {
             </div>
           </div>
         </div>
-        
       )}
 
       <button
@@ -229,13 +258,14 @@ export function DonorLogin() {
         disabled={
           loading || 
           !formData.identifier || 
-          (loginMethod === 'email' && !formData.password) ||
+          (loginMethod === 'email' && showPassword && !formData.password) ||
           (loginMethod === 'phone' && formData.identifier.replace(/\D/g, '').length !== 10 &&
           formData.identifier.replace(/\D/g, '').length !== 12)
         }
         className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? 'Processing...' : loginMethod === 'email' ? 'Sign in' : 'Send OTP'}
+        {loading ? 'Processing...' : loginMethod === 'email' ? 
+          (showPassword ? 'Sign in' : 'Continue') : 'Send OTP'}
       </button>
     </div>
   );
