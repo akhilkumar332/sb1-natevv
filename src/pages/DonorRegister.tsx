@@ -3,10 +3,14 @@ import { Mail, User, Phone, MapPin, Calendar, Droplet, Heart, Lock, AlertCircle,
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
+
 
 function DonorRegister() {
   const [formData, setFormData] = useState({
     name: '',
+    preferredName: '',
     email: '',
     phone: '',
     dateOfBirth: '',
@@ -29,8 +33,15 @@ function DonorRegister() {
     termsOfServiceAgreed: 'false',
   });
 
+  function generateUniqueId(): string {
+    const prefix = "BH";
+    const randomDigits = Math.floor(1000000 + Math.random() * 9000000).toString().slice(0, 7);
+    return `${prefix}${randomDigits}`;
+  }
+
   const [loading, setLoading] = useState(false);
   const { register, loginWithGoogle } = useAuth();
+  const [donorId, setDonorId] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -43,16 +54,19 @@ function DonorRegister() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
+  
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match');
       setLoading(false);
       return;
     }
-
+  
+    const uniqueDonorId = generateUniqueId();
+  
     try {
-      await register(formData.email, formData.password, formData);
-      toast.success('Registration successful!');
+      // Include the uniqueDonorId in the registration data
+      await register(formData.email, formData.password, { ...formData, donorId: uniqueDonorId });
+      toast.success('Registration successful! Your Donor ID is: ' + uniqueDonorId);
     } catch (error) {
       toast.error('Failed to register. Please try again.');
     } finally {
@@ -80,6 +94,13 @@ function DonorRegister() {
           <h1 className="mt-6 text-3xl font-extrabold text-gray-900">Become a Lifesaver</h1>
           <p className="mt-2 text-sm text-gray-600">Join our community of blood donors and help save lives</p>
         </div>
+
+        {donorId && (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <strong className="font-bold">Registration Successful!</strong>
+            <span className="block sm:inline"> Your Donor ID is: {donorId}</span>
+          </div>
+        )}
 
         {/* Google Sign Up Button */}
         <div className="flex flex-col items-center">
@@ -155,12 +176,12 @@ function DonorRegister() {
                 <div>
                   <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Phone Number</label>
                   <div className="mt-1 relative rounded-md shadow-sm">
-                    <input
-                      type="tel"
-                      id="phone"
-                      name="phone"
+                    <PhoneInput
+                      international
+                      defaultCountry="IN"
+                      countryCallingCodeEditable={false}
                       value={formData.phone}
-                      onChange={handleChange}
+                      onChange={(value) => setFormData({ ...formData, phone: value || '' })}
                       className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
                       required
                     />
@@ -361,9 +382,8 @@ function DonorRegister() {
                     >
                       <option value="">Select Language</option>
                       <option value="English">English</option>
-                      <option value="Spanish">Spanish</option>
-                      <option value="French">French</option>
-                      <option value="Arabic">Arabic</option>
+                      <option value="Spanish">Hindi</option>
+                      <option value="French">Telugu</option>
                     </select>
                     <Globe className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
                   </div>
