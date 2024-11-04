@@ -23,9 +23,11 @@ export function DonorLogin() {
     otp: ''
   });
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [otpResendTimer, setOtpResendTimer] = useState(0);
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [userExists, setUserExists] = useState(false);
+  const [userExists] = useState(false);
   const navigate = useNavigate();
   const { login, loginWithGoogle, loginWithPhone, verifyOTP, user, checkUserExists } = useAuth();
 
@@ -34,6 +36,12 @@ export function DonorLogin() {
       navigate('/donor/dashboard');
     }
   }, [user, navigate]);
+
+  useEffect(() => {
+    if (confirmationResult) {
+      startResendTimer();
+    }
+  }, [confirmationResult]);
 
   const handleIdentifierChange = async (value: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -45,20 +53,21 @@ export function DonorLogin() {
         identifier: value
       }));
       setLoginMethod('email');
+      setShowPassword(false); // Hide password initially
       
       try {
         setLoading(true);
-        const exists = await checkUserExists(value);
-        setUserExists(exists);
+        const { exists, isGoogleUser } = await checkUserExists(value);
         if (!exists) {
           toast.error('User not found. Please register first.');
-          setShowPassword(false);
+        } else if (isGoogleUser) {
+          toast.error('This account uses Google Sign-In. Please use the Google Sign-In button.');
         } else {
           setShowPassword(true);
         }
       } catch (error) {
         console.error('Error checking user:', error);
-        toast.error('Error checking user status');
+        toast.error('Error checking user status. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -141,6 +150,33 @@ export function DonorLogin() {
     }
   };
   
+  const startResendTimer = () => {
+    setOtpResendTimer(30);
+    const timer = setInterval(() => {
+      setOtpResendTimer((prevTime) => {
+        if (prevTime <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prevTime - 1;
+      });
+    }, 1000);
+  };
+  
+  const handleResendOTP = async () => {
+    try {
+      setLoading(true);
+      const confirmation = await loginWithPhone(formData.identifier);
+      setConfirmationResult(confirmation);
+      toast.success('OTP resent successfully!');
+      startResendTimer();
+    } catch (error) {
+      toast.error('Failed to resend OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,15 +211,14 @@ export function DonorLogin() {
 
   const handleGoogleLogin = async () => {
     try {
-      setLoading(true);
+      setGoogleLoading(true);
       await loginWithGoogle();
       toast.success('Successfully logged in with Google!');
       navigate('/donor/dashboard');
     } catch (error) {
-      // Show only one error message
       toast.error('Please register as a donor first before signing in.');
     } finally {
-      setLoading(false);
+      setGoogleLoading(false);
     }
   };
 
@@ -294,10 +329,25 @@ export function DonorLogin() {
         type="button"
         onClick={handleOTPSubmit}
         disabled={loading}
-        className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700"
+        className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
       >
         {loading ? 'Verifying...' : 'Verify OTP'}
       </button>
+  
+      <div className="text-center">
+        {otpResendTimer > 0 ? (
+          <p className="text-sm text-gray-500">Resend OTP in {otpResendTimer} seconds</p>
+        ) : (
+          <button
+            type="button"
+            onClick={handleResendOTP}
+            disabled={loading}
+            className="text-sm text-red-600 hover:text-red-500"
+          >
+            Resend OTP
+          </button>
+        )}
+      </div>
     </div>
   );
 
@@ -322,31 +372,31 @@ export function DonorLogin() {
               </div>
             </div>
             <div className="mt-4">
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={loading}
-                className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
-              >
-                {loading ? (
-                  <span className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Signing in...
-                  </span>
-                ) : (
-                  <>
-                    <img
-                      className="h-5 w-5 mr-2"
-                      src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                      alt="Google logo"
-                    />
-                    Sign in with Google
-                  </>
-                )}
-              </button>
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={loading || googleLoading}
+              className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+            >
+              {googleLoading ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Signing in...
+                </span>
+              ) : (
+                <>
+                  <img
+                    className="h-5 w-5 mr-2"
+                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                    alt="Google logo"
+                  />
+                  Sign in with Google
+                </>
+              )}
+            </button>
             </div>
           </div>
 
