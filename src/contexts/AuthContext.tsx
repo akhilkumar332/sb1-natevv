@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { NavigateFunction } from 'react-router-dom';
+import { FirebaseError } from 'firebase/app';
 import { 
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -15,6 +16,10 @@ import {
   fetchSignInMethodsForEmail,
 } from 'firebase/auth';
 import { 
+  collection,
+  query,
+  where,
+  getDocs,
   doc, 
   setDoc, 
   getDoc,
@@ -63,7 +68,7 @@ interface AuthContextType {
   loginLoading: boolean;
   setLoginLoading: (loading: boolean) => void;
   verifyOTP: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
-  checkUserExists: (email: string) => Promise<boolean>;
+  checkUserExists: (email: string) => Promise<{ exists: boolean, isGoogleUser: boolean }>;
 }
 
 
@@ -150,10 +155,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const checkUserExists = async (email: string): Promise<boolean> => {
+  const checkUserExists = async (email: string): Promise<{ exists: boolean, isGoogleUser: boolean }> => {
     try {
+      // First check Firebase Auth sign-in methods
       const methods = await fetchSignInMethodsForEmail(auth, email);
-      return methods.length > 0;
+      const isGoogleUser = methods.includes('google.com');
+      
+      if (methods.length > 0) {
+        // If user exists in Firebase Auth, check Firestore
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('email', '==', email));
+        const querySnapshot = await getDocs(q);
+        
+        // User must exist in both Firebase Auth and Firestore
+        const exists = !querySnapshot.empty;
+        
+        return { 
+          exists, 
+          isGoogleUser 
+        };
+      }
+      
+      return { 
+        exists: false, 
+        isGoogleUser: false 
+      };
     } catch (error) {
       console.error('Error checking user existence:', error);
       throw error;
@@ -164,27 +190,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<void> => {
     try {
       setAuthLoading(true);
+      const { exists, isGoogleUser } = await checkUserExists(email);
+      
+      if (!exists) {
+        throw new Error('User not found. Please register first.');
+      }
+      
+      if (isGoogleUser) {
+        throw new Error('This account uses Google Sign-In. Please use the Google Sign-In button.');
+      }
+      
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
       
       if (!userDoc.exists()) {
-        // User exists in Firebase Auth but not in Firestore
         await signOut(auth);
-        throw new Error('User not registered in the system. Please contact support.');
+        throw new Error('User account not properly set up. Please contact support.');
       }
   
       const userData = userDoc.data() as User;
       setUser(userData);
       toast.success('Successfully logged in!');
     } catch (error) {
-      console.error('Login error:', error);
-      if (error instanceof Error) {
-        if (error.message.includes('auth/user-not-found') || error.message.includes('auth/wrong-password')) {
-          toast.error('Invalid email or password. Please try again.');
-        } else if (error.message.includes('User not registered')) {
-          toast.error(error.message);
-        } else {
-          toast.error('An error occurred during login. Please try again.');
+      if (error instanceof FirebaseError) {
+        switch (error.code) {
+          case 'auth/wrong-password':
+            throw new Error('Invalid password. Please try again.');
+          case 'auth/too-many-requests':
+            throw new Error('Too many failed attempts. Please try again later.');
+          case 'auth/user-not-found':
+            throw new Error('User not found. Please register first.');
+          default:
+            throw new Error('An error occurred during login. Please try again.');
         }
       }
       throw error;
@@ -232,28 +269,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.recaptchaVerifier = recaptchaVerifier;
   
       const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
-      
+    
       // Clean up after successful confirmation
-      if (container) {
-        container.remove();
-      }
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-        window.recaptchaVerifier = undefined;
-      }
-  
+      cleanupRecaptcha();
+      
       return confirmation;
     } catch (error) {
-      // Clean up on error
-      const container = document.getElementById('recaptcha-container');
-      if (container) {
-        container.remove();
+      cleanupRecaptcha();
+      
+      if (error instanceof FirebaseError) {
+        switch (error.code) {
+          case 'auth/invalid-phone-number':
+            throw new Error('Invalid phone number format.');
+          case 'auth/too-many-requests':
+            throw new Error('Too many attempts. Please try again later.');
+          default:
+            throw new Error('Failed to send OTP. Please try again.');
+        }
       }
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-        window.recaptchaVerifier = undefined;
-      }
-      console.error('Phone login error:', error);
       throw error;
     } finally {
       setLoginLoading(false);
@@ -261,54 +294,87 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Add this helper function for cleanup
+  const cleanupRecaptcha = () => {
+    const container = document.getElementById('recaptcha-container');
+    if (container) {
+      container.remove();
+    }
+    if (window.recaptchaVerifier) {
+      window.recaptchaVerifier.clear();
+      window.recaptchaVerifier = undefined;
+    }
+  };
+
   const verifyOTP = async (confirmationResult: ConfirmationResult, otp: string): Promise<void> => {
     try {
       const userCredential = await confirmationResult.confirm(otp);
+      
+      // Check if user exists in Firestore
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      if (!userDoc.exists()) {
+        await signOut(auth);
+        throw new Error('Please register as a donor first before signing in.');
+      }
+  
       const userData = await addUserToFirestore(userCredential.user);
       if (!userData) {
-        throw new Error('User not registered');
+        throw new Error('Failed to retrieve user data');
       }
+      
       setUser(userData);
     } catch (error) {
-      console.error('OTP verification error:', error);
-      throw error;
+      if (error instanceof FirebaseError) {
+        if (error.code === 'auth/invalid-verification-code') {
+          throw new Error('Invalid OTP. Please try again.');
+        }
+        if (error.code === 'auth/code-expired') {
+          throw new Error('OTP has expired. Please request a new one.');
+        }
+      }
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Failed to verify OTP');
     }
   };
 
   const loginWithGoogle = async (): Promise<void> => {
     try {
-      // Configure auth to use popup
       auth.useDeviceLanguage();
       
-      const result = await signInWithPopup(auth, googleProvider)
-        .catch((error) => {
-          if (error.code === 'auth/popup-closed-by-user') {
-            throw new Error('Sign-in popup was closed before completing the sign-in process.');
-          }
-          if (error.code === 'auth/popup-blocked') {
-            throw new Error('Sign-in popup was blocked by the browser. Please allow popups for this site.');
-          }
-          throw error;
-        });
-  
+      const result = await signInWithPopup(auth, googleProvider);
       if (!result) {
-        throw new Error('Failed to get sign-in result');
+        throw new Error('Failed to complete Google sign-in');
+      }
+  
+      // Check if user exists in Firestore
+      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
+      if (!userDoc.exists()) {
+        await signOut(auth);
+        throw new Error('Please register as a donor first before signing in.');
       }
   
       const userData = await addUserToFirestore(result.user);
       if (!userData) {
-        throw new Error('User not registered');
+        throw new Error('Failed to retrieve user data');
       }
+      
+      setUser(userData);
     } catch (error) {
-      console.error('Google login error:', error);
-      if (error instanceof Error) {
-        if (error.message === 'User not registered') {
-          //toast.error('User not registered. Please register first.');
-        } else {
-          toast.error(error.message);
+      if (error instanceof FirebaseError) {
+        if (error.code === 'auth/popup-closed-by-user') {
+          // Don't show error for user-cancelled operation
+          return;
+        }
+        if (error.code === 'auth/popup-blocked') {
+          throw new Error('Sign-in popup was blocked. Please allow popups for this site.');
         }
       }
-      throw error;
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('An unexpected error occurred');
     }
   };
 
