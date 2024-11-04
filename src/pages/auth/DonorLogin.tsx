@@ -48,13 +48,10 @@ export function DonorLogin() {
       
       try {
         setLoading(true);
-        const { exists, isGoogleUser } = await checkUserExists(value);
+        const exists = await checkUserExists(value);
         setUserExists(exists);
         if (!exists) {
           toast.error('User not found. Please register first.');
-          setShowPassword(false);
-        } else if (isGoogleUser) {
-          toast.error('User is registered using Google login. Please use Google sign-in.');
           setShowPassword(false);
         } else {
           setShowPassword(true);
@@ -151,29 +148,25 @@ export function DonorLogin() {
       toast.error('Please enter your email.');
       return;
     }
-  
+
     if (!userExists) {
       toast.error('Please register as a donor first before signing in.');
       return;
     }
-  
+
     if (!formData.password) {
       toast.error('Please enter your password.');
       return;
     }
-  
+
     setLoading(true);
-  
+
     try {
       await login(formData.identifier, formData.password);
       toast.success('Login successful!');
       navigate('/donor/dashboard');
     } catch (error) {
-      if (error instanceof Error && error.message.includes('auth/wrong-password')) {
-        toast.error('Invalid password. Please try again.');
-      } else {
-        toast.error('An error occurred during login. Please try again.');
-      }
+      toast.error('Invalid credentials');
     } finally {
       setLoading(false);
     }
