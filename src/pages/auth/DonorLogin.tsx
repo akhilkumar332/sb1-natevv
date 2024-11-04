@@ -58,10 +58,12 @@ export function DonorLogin() {
       try {
         setLoading(true);
         const { exists, isGoogleUser } = await checkUserExists(value);
+        
         if (!exists) {
           toast.error('User not found. Please register first.');
         } else if (isGoogleUser) {
-          toast.error('This account uses Google Sign-In. Please use the Google Sign-In button.');
+          toast.error('This email is registered with Google. Please use the Google Sign-In button.');
+          setShowPassword(false);
         } else {
           setShowPassword(true);
         }
@@ -216,7 +218,11 @@ export function DonorLogin() {
       toast.success('Successfully logged in with Google!');
       navigate('/donor/dashboard');
     } catch (error) {
-      toast.error('Please register as a donor first before signing in.');
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error('Failed to sign in with Google. Please try again.');
+      }
     } finally {
       setGoogleLoading(false);
     }
