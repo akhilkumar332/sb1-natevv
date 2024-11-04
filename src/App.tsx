@@ -11,6 +11,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 
 
+
 // Helper function for lazy loading with delay
 const lazyLoad = (importPromise: Promise<any>) => {
   return Promise.all([
@@ -37,37 +38,37 @@ const DonorDashboard = lazy(() => lazyLoad(import('./pages/donor/DonorDashboard'
 function App() {
   return (
     <AuthProvider>
-      <LoadingProvider>
-        <BrowserRouter>
-          <div className="min-h-screen flex flex-col bg-gray-50">
-            <Navbar />
-            <Suspense fallback={<Loading />}>
-              <main className="flex-grow">
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/donors" element={<FindDonors />} />
-                  <Route path="/request-blood" element={<RequestBlood />} />
-                  <Route path="/about" element={<About />} />
-                  <Route path="/contact" element={<Contact />} />
-                  <Route path="/donor/register" element={<DonorRegister />} />
-                  <Route path="/donor/login" element={<DonorLogin />} />
-                  <Route path="/hospital/login" element={<HospitalLogin />} />
-                  <Route path="/ngo/login" element={<NgoLogin />} />
-                  <Route path="/admin/login" element={<AdminLogin />} />
-                  <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route element={<ProtectedRoute />}>
-                  <Route path="/donor/dashboard" element={<DonorDashboard />} />
-                  {/* Add other protected routes here */}
-                  </Route>
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </main>
-            </Suspense>
-            <Footer />
-            <Toaster position="top-right" />
-          </div>
-        </BrowserRouter>
-      </LoadingProvider>
+        <LoadingProvider>
+          <BrowserRouter>
+            <div className="min-h-screen flex flex-col bg-gray-50">
+              <Navbar />
+              <Suspense fallback={<Loading />}>
+                <main className="flex-grow">
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/donors" element={<FindDonors />} />
+                    <Route path="/request-blood" element={<RequestBlood />} />
+                    <Route path="/about" element={<About />} />
+                    <Route path="/contact" element={<Contact />} />
+                    <Route path="/donor/register" element={<DonorRegister />} />
+                    <Route path="/donor/login" element={<DonorLogin />} />
+                    <Route path="/hospital/login" element={<HospitalLogin />} />
+                    <Route path="/ngo/login" element={<NgoLogin />} />
+                    <Route path="/admin/login" element={<AdminLogin />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route element={<ProtectedRoute />}>
+                    <Route path="/donor/dashboard" element={<DonorDashboard />} />
+                    {/* Add other protected routes here */}
+                    </Route>
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </main>
+              </Suspense>
+              <Footer />
+              <Toaster position="top-right" />
+            </div>
+          </BrowserRouter>
+        </LoadingProvider>
     </AuthProvider>
   );
 }
