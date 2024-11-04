@@ -30,6 +30,11 @@ declare global {
   }
 }
 
+interface UserAuthInfo {
+  exists: boolean;
+  isGoogleUser: boolean;
+}
+
 // Define User interface with additional Firestore fields
 interface User {
   uid: string;
@@ -150,14 +155,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const checkUserExists = async (email: string): Promise<{ exists: boolean; isGoogleUser: boolean }> => {
+  const checkUserExists = async (email: string): Promise<UserAuthInfo> => {
     try {
       const methods = await fetchSignInMethodsForEmail(auth, email);
-      const exists = methods.length > 0;
-      const isGoogleUser = methods.includes('google.com');
-      return { exists, isGoogleUser };
+      return {
+        exists: methods.length > 0,
+        isGoogleUser: methods.includes('google.com')
+      };
     } catch (error) {
-      console.error('Error checking user existence:', error);
+      console.error('Error checking user:', error);
       throw error;
     }
   };
@@ -166,13 +172,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<void> => {
     try {
       setAuthLoading(true);
+      const { exists, isGoogleUser } = await checkUserExists(email);
+      
+      if (!exists) {
+        throw new Error('USER_NOT_FOUND');
+      }
+      
+      if (isGoogleUser) {
+        throw new Error('GOOGLE_USER');
+      }
+  
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
       
       if (!userDoc.exists()) {
-        // User exists in Firebase Auth but not in Firestore
         await signOut(auth);
-        throw new Error('User not registered in the system. Please contact support.');
+        throw new Error('USER_NOT_REGISTERED');
       }
   
       const userData = userDoc.data() as User;
@@ -181,12 +196,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Login error:', error);
       if (error instanceof Error) {
-        if (error.message.includes('auth/user-not-found') || error.message.includes('auth/wrong-password')) {
-          toast.error('Invalid email or password. Please try again.');
-        } else if (error.message.includes('User not registered')) {
-          toast.error(error.message);
-        } else {
-          toast.error('An error occurred during login. Please try again.');
+        switch (error.message) {
+          case 'GOOGLE_USER':
+            toast.error('This email is registered with Google. Please use the Google Sign-In button.');
+            break;
+          case 'USER_NOT_FOUND':
+            toast.error('User not found. Please register first.');
+            break;
+          case 'USER_NOT_REGISTERED':
+            toast.error('User not registered in the system. Please contact support.');
+            break;
+          case 'auth/wrong-password':
+            toast.error('Invalid password. Please try again.');
+            break;
+          default:
+            toast.error('An error occurred during login. Please try again.');
         }
       }
       throw error;
