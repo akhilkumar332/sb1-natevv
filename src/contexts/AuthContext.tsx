@@ -3,16 +3,13 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { NavigateFunction } from 'react-router-dom';
 import { 
-  signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
   onAuthStateChanged,
   User as FirebaseUser,
-  sendPasswordResetEmail,
   RecaptchaVerifier,
   signInWithPhoneNumber,
   ConfirmationResult,
-  fetchSignInMethodsForEmail,
 } from 'firebase/auth';
 import { 
   doc, 
@@ -28,11 +25,6 @@ declare global {
   interface Window {
     recaptchaVerifier?: any;
   }
-}
-
-interface UserAuthInfo {
-  exists: boolean;
-  isGoogleUser: boolean;
 }
 
 // Define User interface with additional Firestore fields
@@ -59,18 +51,14 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   authLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithPhone: (phoneNumber: string) => Promise<ConfirmationResult>;
   logout: (navigate: NavigateFunction) => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (data: Partial<User>) => Promise<void>;
   loginLoading: boolean;
   setLoginLoading: (loading: boolean) => void;
   verifyOTP: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
-  checkUserExists: (email: string) => Promise<{ exists: boolean; isGoogleUser: boolean }>;
 }
-
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -88,7 +76,6 @@ const addUserToFirestore = async (
   const userDoc: DocumentSnapshot = await getDoc(userRef);
   
   if (!userDoc.exists()) {
-    // User is not registered in the database
     return null;
   }
 
@@ -102,13 +89,11 @@ const addUserToFirestore = async (
     ...additionalData
   };
 
-  // Merge with existing data
   await setDoc(userRef, {
     ...userData,
     lastLoginAt: serverTimestamp(),
   }, { merge: true });
 
-  // Get the updated user data
   const updatedUserDoc = await getDoc(userRef);
   const updatedUserData = updatedUserDoc.data();
 
@@ -124,21 +109,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       try {
         setAuthLoading(true);
         if (firebaseUser) {
-          // Get user data from Firestore
           const userData = await addUserToFirestore(firebaseUser);
           if (userData) {
             setUser(userData);
           } else {
-            // User is not registered, sign them out
             await signOut(auth);
             setUser(null);
-            //toast.error('User not registered. Please register first.');
           }
         } else {
           setUser(null);
@@ -155,111 +138,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const checkUserExists = async (email: string): Promise<UserAuthInfo> => {
-    try {
-      const methods = await fetchSignInMethodsForEmail(auth, email);
-      return {
-        exists: methods.length > 0,
-        isGoogleUser: methods.includes('google.com')
-      };
-    } catch (error) {
-      console.error('Error checking user:', error);
-      throw error;
-    }
-  };
-
-
-  const login = async (email: string, password: string): Promise<void> => {
-    try {
-      setAuthLoading(true);
-      const { exists, isGoogleUser } = await checkUserExists(email);
-      
-      if (!exists) {
-        throw new Error('USER_NOT_FOUND');
-      }
-      
-      if (isGoogleUser) {
-        throw new Error('GOOGLE_USER');
-      }
-  
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-      
-      if (!userDoc.exists()) {
-        await signOut(auth);
-        throw new Error('USER_NOT_REGISTERED');
-      }
-  
-      const userData = userDoc.data() as User;
-      setUser(userData);
-      toast.success('Successfully logged in!');
-    } catch (error) {
-      console.error('Login error:', error);
-      if (error instanceof Error) {
-        switch (error.message) {
-          case 'GOOGLE_USER':
-            toast.error('This email is registered with Google. Please use the Google Sign-In button.');
-            break;
-          case 'USER_NOT_FOUND':
-            toast.error('User not found. Please register first.');
-            break;
-          case 'USER_NOT_REGISTERED':
-            toast.error('User not registered in the system. Please contact support.');
-            break;
-          case 'auth/wrong-password':
-            toast.error('Invalid password. Please try again.');
-            break;
-          default:
-            toast.error('An error occurred during login. Please try again.');
-        }
-      }
-      throw error;
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const [loginLoading, setLoginLoading] = useState(false);
-
   const loginWithPhone = async (phoneNumber: string): Promise<ConfirmationResult> => {
     setLoginLoading(true);
     try {
-      setAuthLoading(true); 
-      // First, remove any existing recaptcha containers
+      setAuthLoading(true);
       const existingContainer = document.getElementById('recaptcha-container');
       if (existingContainer) {
         existingContainer.remove();
       }
   
-      // Create new container
       const container = document.createElement('div');
       container.id = 'recaptcha-container';
       document.body.appendChild(container);
   
-      // Clear any existing reCAPTCHA widgets
       if (window.recaptchaVerifier) {
         window.recaptchaVerifier.clear();
         window.recaptchaVerifier = undefined;
       }
   
-      // Create new reCAPTCHA verifier
       const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         'size': 'invisible',
-        'callback': () => {
-          // reCAPTCHA solved, allow signInWithPhoneNumber.
-        },
+        'callback': () => {},
         'expired-callback': () => {
-          // Response expired. Ask user to solve reCAPTCHA again.
           toast.error('reCAPTCHA expired. Please try again.');
         }
       });
   
-      // Store verifier instance globally
       window.recaptchaVerifier = recaptchaVerifier;
   
       const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
       
-      // Clean up after successful confirmation
       if (container) {
         container.remove();
       }
@@ -270,7 +178,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
       return confirmation;
     } catch (error) {
-      // Clean up on error
       const container = document.getElementById('recaptcha-container');
       if (container) {
         container.remove();
@@ -303,7 +210,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithGoogle = async (): Promise<void> => {
     try {
-      // Configure auth to use popup
       auth.useDeviceLanguage();
       
       const result = await signInWithPopup(auth, googleProvider)
@@ -321,18 +227,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Failed to get sign-in result');
       }
   
-      const userData = await addUserToFirestore(result.user);
+      const userData = await addUserToFirestore(result .user);
       if (!userData) {
-        throw new Error('User not registered');
+        throw new Error('User  not registered');
       }
     } catch (error) {
       console.error('Google login error:', error);
       if (error instanceof Error) {
-        if (error.message === 'User not registered') {
-          //toast.error('User not registered. Please register first.');
-        } else {
-          toast.error(error.message);
-        }
+        toast.error(error.message);
       }
       throw error;
     }
@@ -341,27 +243,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async (navigate: NavigateFunction): Promise<void> => {
     try {
       await signOut(auth);
-      setUser(null);
-      
+      setUser (null);
       localStorage.removeItem('authToken');
       sessionStorage.clear();
-
       toast.success('You have been successfully logged out');
-
       navigate('/donor/login');
     } catch (error) {
       console.error('Logout error:', error);
       toast.error('An error occurred during logout. Please try again.');
-    }
-  };
-
-
-  const resetPassword = async (email: string): Promise<void> => {
-    try {
-      await sendPasswordResetEmail(auth, email);
-    } catch (error) {
-      console.error('Password reset error:', error);
-      throw error;
     }
   };
 
@@ -372,11 +261,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userRef = doc(db, 'users', user.uid);
       await setDoc(userRef, {
         ...data,
-        updatedAt: serverTimestamp (),
+        updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      // Update local user state
-      setUser(prev => prev ? { ...prev, ...data } : null);
+      setUser (prev => prev ? { ...prev, ...data } : null);
     } catch (error) {
       console.error('Profile update error:', error);
       throw error;
@@ -387,16 +275,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     loading,
     authLoading,
-    login,
     loginWithGoogle,
     loginWithPhone,
     logout,
-    resetPassword,
     updateUserProfile,
     loginLoading, 
     setLoginLoading,
     verifyOTP,
-    checkUserExists,
   };
 
   return (

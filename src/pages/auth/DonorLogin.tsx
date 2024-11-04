@@ -1,35 +1,28 @@
 // src/pages/auth/DonorLogin.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, Phone } from 'lucide-react';
+import { Phone } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 
-type LoginMethod = 'initial' | 'email' | 'phone';
-
 interface LoginFormData {
-  identifier: string; // can be email or phone
-  password: string;
+  identifier: string;
   otp: string;
 }
 
 export function DonorLogin() {
-  const [loginMethod, setLoginMethod] = useState<LoginMethod>('initial');
   const [formData, setFormData] = useState<LoginFormData>({
     identifier: '',
-    password: '',
     otp: ''
   });
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [otpResendTimer, setOtpResendTimer] = useState(0);
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [userExists] = useState(false);
   const navigate = useNavigate();
-  const { login, loginWithGoogle, loginWithPhone, verifyOTP, user, checkUserExists } = useAuth();
+  const { loginWithGoogle, loginWithPhone, verifyOTP, user } = useAuth();
 
   useEffect(() => {
     if (user) {
@@ -43,63 +36,11 @@ export function DonorLogin() {
     }
   }, [confirmationResult]);
 
-  const handleIdentifierChange = async (value: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const isEmail = emailRegex.test(value);
-  
-    if (isEmail) {
-      setFormData(prev => ({
-        ...prev,
-        identifier: value
-      }));
-      setLoginMethod('email');
-      setShowPassword(false); // Hide password initially
-      
-      try {
-        setLoading(true);
-        const { exists, isGoogleUser } = await checkUserExists(value);
-        
-        if (!exists) {
-          toast.error('User not found. Please register first.');
-        } else if (isGoogleUser) {
-          toast.error('This email is registered with Google. Please use the Google Sign-In button.');
-          setShowPassword(false);
-        } else {
-          setShowPassword(true);
-        }
-      } catch (error) {
-        console.error('Error checking user:', error);
-        toast.error('Error checking user status. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-  
-    // Handle phone number
-    // Remove any non-digit characters for validation
-    const digitsOnly = value.replace(/\D/g, '');
-    let formattedValue = value;
-  
-    // Check if it's a valid 10-digit number (excluding country code)
-    const isValidPhoneNumber = digitsOnly.length === 10 || 
-      (digitsOnly.startsWith('91') && digitsOnly.length === 12);
-  
-    // Only add +91 prefix if it's a 10-digit number and doesn't already have a country code
-    if (isValidPhoneNumber && !value.startsWith('+') && !value.startsWith('91')) {
-      formattedValue = `+91${digitsOnly}`;
-    }
-  
+  const handleIdentifierChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
-      identifier: formattedValue
+      identifier: value
     }));
-  
-    if (isValidPhoneNumber) {
-      setLoginMethod('phone');
-    } else {
-      setLoginMethod('initial');
-    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,10 +52,7 @@ export function DonorLogin() {
   };
 
   const handlePhoneNumberSubmit = async () => {
-    // Remove any non-digit characters for validation
     const digitsOnly = formData.identifier.replace(/\D/g, '');
-    
-    // Check if it's exactly 10 digits (excluding country code)
     const isValid10Digits = digitsOnly.length === 10 || 
       (digitsOnly.startsWith('91') && digitsOnly.length === 12);
   
@@ -144,7 +82,6 @@ export function DonorLogin() {
       setLoading(true);
       await verifyOTP(confirmationResult, formData.otp);
       toast.success('Login successful!');
-      // Navigation will be handled by the useEffect hook
     } catch (error) {
       toast.error('Invalid OTP. Please try again.');
     } finally {
@@ -178,38 +115,6 @@ export function DonorLogin() {
       setLoading(false);
     }
   };
-  
-
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.identifier) {
-      toast.error('Please enter your email.');
-      return;
-    }
-
-    if (!userExists) {
-      toast.error('Please register as a donor first before signing in.');
-      return;
-    }
-
-    if (!formData.password) {
-      toast.error('Please enter your password.');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      await login(formData.identifier, formData.password);
-      toast.success('Login successful!');
-      navigate('/donor/dashboard');
-    } catch (error) {
-      toast.error('Invalid credentials');
-    } finally {
-      setLoading(false);
-    }
-  };
-
 
   const handleGoogleLogin = async () => {
     try {
@@ -232,81 +137,29 @@ export function DonorLogin() {
     <div className="space-y-4">
       <div>
         <label htmlFor="identifier" className="block text-sm font-medium text-gray-700">
-          Email or Phone Number
+          Phone Number
         </label>
         <div className="mt-1 relative">
-          {loginMethod === 'phone' ? (
-            <PhoneInput
-              international
-              defaultCountry="IN"
-              countryCallingCodeEditable={false}
-              value={formData.identifier}
-              onChange={(value) => handleIdentifierChange(value || '')}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-          ) : (
-            <input
-              id="identifier"
-              name="identifier"
-              type="text"
-              required
-              value={formData.identifier}
-              onChange={(e) => handleIdentifierChange(e.target.value)}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md"
-              placeholder="Enter email or phone number"
-            />
-          )}
-          {loginMethod === 'email' ? (
-            <Mail className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-          ) : (
-            <Phone className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-          )}
+          <PhoneInput
+            international
+            defaultCountry="IN"
+            countryCallingCodeEditable={false}
+            value={formData.identifier}
+            onChange={(value) => handleIdentifierChange(value || '')}
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md"
+          />
+          <Phone className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
         </div>
       </div>
 
-      {showPassword && loginMethod === 'email' && (
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-            Password
-          </label>
-          <div className="mt-1 relative">
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              value={formData.password}
-              onChange={handleChange}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-            <Lock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-          </div>
-          <div className="mt-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm">
-                <Link to="/forgot-password" className="font-medium text-red-600 hover:text-red-500">
-                  Forgot your password?
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       <button
         type="button"
-        onClick={loginMethod === 'email' ? handleEmailSubmit : handlePhoneNumberSubmit}
-        disabled={
-          loading || 
-          !formData.identifier || 
-          (loginMethod === 'email' && showPassword && !formData.password) ||
-          (loginMethod === 'phone' && formData.identifier.replace(/\D/g, '').length !== 10 &&
-          formData.identifier.replace(/\D/g, '').length !== 12)
-        }
+        onClick={handlePhoneNumberSubmit}
+        disabled={loading || formData.identifier.replace(/\D/g, '').length !== 10 &&
+                   formData.identifier.replace(/\D/g, '').length !== 12}
         className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? 'Processing...' : loginMethod === 'email' ? 
-          (showPassword ? 'Sign in' : 'Continue') : 'Send OTP'}
+        {loading ? 'Processing...' : 'Send OTP'}
       </button>
     </div>
   );
@@ -378,31 +231,31 @@ export function DonorLogin() {
               </div>
             </div>
             <div className="mt-4">
-            <button
-              type="button"
-              onClick={handleGoogleLogin}
-              disabled={loading || googleLoading}
-              className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
-            >
-              {googleLoading ? (
-                <span className="flex items-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Signing in...
-                </span>
-              ) : (
-                <>
-                  <img
-                    className="h-5 w-5 mr-2"
-                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                    alt="Google logo"
-                  />
-                  Sign in with Google
-                </>
-              )}
-            </button>
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={loading || googleLoading}
+                className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+              >
+                {googleLoading ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Signing in...
+                  </span>
+                ) : (
+                  <>
+                    <img
+                      className="h-5 w-5 mr-2"
+                      src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                      alt="Google logo"
+                    />
+                    Sign in with Google
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
