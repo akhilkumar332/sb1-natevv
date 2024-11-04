@@ -63,7 +63,7 @@ interface AuthContextType {
   loginLoading: boolean;
   setLoginLoading: (loading: boolean) => void;
   verifyOTP: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
-  checkUserExists: (email: string) => Promise<boolean>;
+  checkUserExists: (email: string) => Promise<{ exists: boolean; isGoogleUser: boolean }>;
 }
 
 
@@ -150,10 +150,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const checkUserExists = async (email: string): Promise<boolean> => {
+  const checkUserExists = async (email: string): Promise<{ exists: boolean; isGoogleUser: boolean }> => {
     try {
       const methods = await fetchSignInMethodsForEmail(auth, email);
-      return methods.length > 0;
+      const exists = methods.length > 0;
+      const isGoogleUser = methods.includes('google.com');
+      return { exists, isGoogleUser };
     } catch (error) {
       console.error('Error checking user existence:', error);
       throw error;
