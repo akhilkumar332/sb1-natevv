@@ -124,7 +124,7 @@ export function DonorLogin() {
       navigate('/donor/dashboard');
     } catch (error) {
       if (error instanceof Error) {
-        toast.error(error.message);
+        //toast.error(error.message);
       } else {
         toast.error('Failed to sign in with Google. Please try again.');
       }

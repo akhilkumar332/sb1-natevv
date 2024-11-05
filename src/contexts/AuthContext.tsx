@@ -1,7 +1,7 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import toast from 'react-hot-toast';
 import { NavigateFunction } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { 
   signInWithPopup,
   signOut,
@@ -21,6 +21,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 
+// Define window recaptcha type
 declare global {
   interface Window {
     recaptchaVerifier?: any;
@@ -142,20 +143,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoginLoading(true);
     try {
       setAuthLoading(true);
+      // Clean up existing recaptcha
       const existingContainer = document.getElementById('recaptcha-container');
       if (existingContainer) {
         existingContainer.remove();
       }
   
+      // Create new recaptcha container
       const container = document.createElement('div');
       container.id = 'recaptcha-container';
       document.body.appendChild(container);
   
+      // Clear existing verifier
       if (window.recaptchaVerifier) {
         window.recaptchaVerifier.clear();
         window.recaptchaVerifier = undefined;
       }
   
+      // Create new recaptcha verifier
       const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         'size': 'invisible',
         'callback': () => {},
@@ -166,8 +171,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
       window.recaptchaVerifier = recaptchaVerifier;
   
+      // Send OTP
       const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
       
+      // Clean up after successful send
       if (container) {
         container.remove();
       }
@@ -178,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
       return confirmation;
     } catch (error) {
+      // Clean up on error
       const container = document.getElementById('recaptcha-container');
       if (container) {
         container.remove();
@@ -229,7 +237,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
       const userData = await addUserToFirestore(result .user);
       if (!userData) {
-        throw new Error('User  not registered');
+        throw new Error('User not registered');
       }
     } catch (error) {
       console.error('Google login error:', error);
@@ -243,60 +251,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async (navigate: NavigateFunction): Promise<void> => {
     try {
       await signOut(auth);
-      setUser (null);
-      localStorage.removeItem('authToken');
-      sessionStorage.clear();
-      toast.success('You have been successfully logged out');
+      setUser(null);
+      localStorage.removeItem('authToken'); // Clear any stored auth tokens
+      sessionStorage.clear(); // Clear session storage
+      toast.success('Successfully logged out!'); // Add success toast
       navigate('/donor/login');
     } catch (error) {
       console.error('Logout error:', error);
-      toast.error('An error occurred during logout. Please try again.');
+      toast.error('Failed to log out. Please try again.');
     }
   };
 
   const updateUserProfile = async (data: Partial<User>): Promise<void> => {
-    if (!user?.uid) throw new Error('No user logged in');
-    
+    if (!user) return;
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await setDoc(userRef, {
-        ...data,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-
-      setUser (prev => prev ? { ...prev, ...data } : null);
+      await setDoc(doc(db, 'users', user.uid), data, { merge: true });
+      setUser (prev => ({ ...prev, ...data } as User));
     } catch (error) {
-      console.error('Profile update error:', error);
-      throw error;
+      console.error('Error updating user profile:', error);
+      toast.error('Failed to update profile. Please try again.');
     }
   };
 
-  const value: AuthContextType = {
-    user,
-    loading,
-    authLoading,
-    loginWithGoogle,
-    loginWithPhone,
-    logout,
-    updateUserProfile,
-    loginLoading, 
-    setLoginLoading,
-    verifyOTP,
-  };
-
   return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
+    <AuthContext.Provider value={{ user, loading, authLoading, loginWithGoogle, loginWithPhone, logout, updateUserProfile, loginLoading, setLoginLoading, verifyOTP }}>
+      {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth(): AuthContextType {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};
 
 export type { User, AuthContextType };
