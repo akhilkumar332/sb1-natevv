@@ -59,6 +59,7 @@ interface AuthContextType {
   loginLoading: boolean;
   setLoginLoading: (loading: boolean) => void;
   verifyOTP: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
+  setAuthLoading: (loading: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -284,7 +285,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updateUserProfile, 
       loginLoading, 
       setLoginLoading, 
-      verifyOTP 
+      verifyOTP,
+      setAuthLoading
     }}>
       {children}
     </AuthContext.Provider>
