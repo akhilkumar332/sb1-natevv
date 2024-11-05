@@ -47,11 +47,22 @@ export default defineConfig(({ command, mode }) => {
     server: {
       port: 5180,
       proxy: {
-        '/api': {
-          target: API_CONFIG.LOCAL_API_URL,
+        '^/api/.*': {
+          target: 'http://localhost:5001',
           changeOrigin: true,
           secure: false,
-          rewrite: (path) => path.replace(/^\/api/, '')
+          rewrite: (path) => path.replace(/^\/api/, ''),
+          configure: (proxy, _options) => {
+            proxy.on('error', (err, _req, _res) => {
+              console.log('proxy error', err);
+            });
+            proxy.on('proxyReq', (proxyReq, req, _res) => {
+              console.log('Sending Request to:', proxyReq.path);
+            });
+            proxy.on('proxyRes', (proxyRes, req, _res) => {
+              console.log('Received Response from:', req.url);
+            });
+          },
         }
       }
     }

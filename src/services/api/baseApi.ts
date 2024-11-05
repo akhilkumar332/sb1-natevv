@@ -37,6 +37,12 @@ export class BaseApiClient {
 
   protected handleError(error: any): never {
     if (axios.isAxiosError(error)) {
+      console.error('API Error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+  
       const apiError: ApiError = {
         message: error.response?.data?.message || error.message,
         status: error.response?.status,
@@ -44,6 +50,7 @@ export class BaseApiClient {
       };
       throw apiError;
     }
+    console.error('Unexpected error:', error);
     throw new Error('An unexpected error occurred');
   }
 

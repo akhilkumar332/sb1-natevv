@@ -1,8 +1,10 @@
 // src/services/api/config.ts
 
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.VITE_API_BASE_URL,
+  //BASE_URL: import.meta.env.VITE_API_BASE_URL,
+  BASE_URL: '/api',
     ENDPOINTS: {
+      HEALTH: '/v1/health',
       AUTH: {
         PHONE_LOGIN: '/auth/login/phone',
         VERIFY_OTP: '/auth/verify-otp',
