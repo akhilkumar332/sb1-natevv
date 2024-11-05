@@ -18,6 +18,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const allowedOrigins = [
     'http://localhost:5180',
+    'http://localhost:5001',
     'https://bloodhubindia.netlify.app'
 ];
 
@@ -33,7 +34,27 @@ admin.initializeApp({
 // Initialize Express app
 const app = express();
 
+// Your test health endpoint should match the API configuration
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    message: 'API is running'
+  });
+});
+
 // Middleware
+app.use((err, req, res, next) => {
+  console.error('Error occurred:', err);
+  res.status(500).json({
+    error: 'Internal Server Error',
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
+
+
+// Update CORS configuration
 app.use(cors({ origin: true }));
 app.use(cors());
 app.use(express.json());
@@ -206,17 +227,42 @@ app.post('/api/v1/blood-requests', async (req, res) => {
   res.status(201).json({ message: 'Blood request created successfully' });
 });
 
+// Add this before your routes
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  next();
+});
+
+// Add this after your routes but before error handling
+app.use((req, res, next) => {
+  res.status(404).json({ message: 'Route not found' });
+});
+
 // Sample route
 app.get('/', (req, res) => {
     res.send('Welcome to the Blood Donation API');
 });
 
-if (process.env.NODE_ENV === 'development') {
-    app.use((err, req, res, next) => {
-      console.error(err.stack);
-      res.status(500).send(err.message);
-    });
-}
+// Error handling for 404
+app.use((req, res) => {
+  console.log('404 Not Found:', req.originalUrl);
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Route ${req.originalUrl} not found`,
+    availableRoutes: [
+      '/health',
+      '/auth/login',
+      '/donors'
+    ]
+  });
+});
+
 
 // Export the Express app as a Firebase Cloud Function
-export const api = functions.https.onRequest(app);
+//export const api = functions.https.onRequest(app);
+export const api = functions.https.onRequest((req, res) => {
+  if (!req.path) {
+    req.url = `/${req.url}`; // prepend '/' to keep query params if any
+  }
+  return app(req, res);
+});
