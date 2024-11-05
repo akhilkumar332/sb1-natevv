@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { authStorage } from '../utils/authStorage';
 
 interface LoginFormData {
   identifier: string;
@@ -94,14 +95,23 @@ export const useLogin = () => {
     }
   };
 
+  const handleLoginSuccess = (token: string) => {
+    authStorage.setAuthToken(token);
+  };
+
   const handleGoogleLogin = async () => {
     try {
       setGoogleLoading(true);
-      await loginWithGoogle();
-      toast.success('Successfully logged in with Google!');
-      navigate('/donor/dashboard');
+      const result = await loginWithGoogle();
+      if (result?.token) {
+        handleLoginSuccess(result.token);
+        toast.success('Successfully logged in with Google!');
+        navigate('/donor/dashboard');
+      } else {
+        throw new Error('No token received');
+      }
     } catch (error) {
-      //toast.error('Failed to sign in with Google. Please try again.');
+      toast.error('Failed to sign in with Google. Please try again.');
     } finally {
       setGoogleLoading(false);
     }

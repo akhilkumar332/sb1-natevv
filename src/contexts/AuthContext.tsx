@@ -52,7 +52,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   authLoading: boolean;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: () => Promise<LoginResponse>;
   loginWithPhone: (phoneNumber: string) => Promise<ConfirmationResult>;
   logout: (navigate: NavigateFunction) => Promise<void>;
   updateUserProfile: (data: Partial<User>) => Promise<void>;
@@ -60,6 +60,11 @@ interface AuthContextType {
   setLoginLoading: (loading: boolean) => void;
   verifyOTP: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
   setAuthLoading: (loading: boolean) => void;
+}
+
+interface LoginResponse {
+  token: string;
+  user: User;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -112,6 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
+  const logoutChannel = new BroadcastChannel('auth_logout');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -138,6 +144,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    // Listen for logout events from other tabs
+    const handleLogoutEvent = (event: MessageEvent) => {
+      if (event.data === 'logout') {
+        handleLogout();
+      }
+    };
+
+    logoutChannel.addEventListener('message', handleLogoutEvent);
+
+    // Cleanup listener on unmount
+    return () => {
+      logoutChannel.removeEventListener('message', handleLogoutEvent);
+      logoutChannel.close();
+    };
   }, []);
 
   const loginWithPhone = async (phoneNumber: string): Promise<ConfirmationResult> => {
@@ -217,7 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loginWithGoogle = async (): Promise<void> => {
+  const loginWithGoogle = async (): Promise<LoginResponse> => {
     try {
       auth.useDeviceLanguage();
       
@@ -236,10 +259,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Failed to get sign-in result');
       }
   
-      const userData = await addUserToFirestore(result .user);
+      const userData = await addUserToFirestore(result.user);
       if (!userData) {
         throw new Error('User not registered');
       }
+  
+      // Get the token
+      const token = await result.user.getIdToken();
+  
+      return {
+        token,
+        user: userData
+      };
     } catch (error) {
       console.error('Google login error:', error);
       if (error instanceof Error) {
@@ -249,13 +280,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = async (navigate: NavigateFunction): Promise<void> => {
+  const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await auth.signOut();
       setUser(null);
-      localStorage.removeItem('authToken'); // Clear any stored auth tokens
-      sessionStorage.clear(); // Clear session storage
-      toast.success('Successfully logged out!'); // Add success toast
+      localStorage.removeItem('authToken');
+      sessionStorage.clear();
+      
+      // Clear any other auth-related storage
+      localStorage.removeItem('user');
+      localStorage.removeItem('lastLoginTime');
+      
+      // Optional: Clear any cached data
+      indexedDB.deleteDatabase('firebaseLocalStorageDb');
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
+    }
+  };
+
+  const logout = async (navigate: NavigateFunction) => {
+    try {
+      await handleLogout();
+      
+      // Broadcast logout event to other tabs
+      logoutChannel.postMessage('logout');
+      
+      toast.success('Successfully logged out!');
       navigate('/donor/login');
     } catch (error) {
       console.error('Logout error:', error);
