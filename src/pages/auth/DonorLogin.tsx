@@ -1,137 +1,33 @@
 // src/pages/auth/DonorLogin.tsx
-import React, { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Phone } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
 import PhoneInput from 'react-phone-number-input';
+import { useLogin } from '../../hooks/useLogin';
 import 'react-phone-number-input/style.css';
 
-interface LoginFormData {
-  identifier: string;
-  otp: string;
-}
-
 export function DonorLogin() {
-  const [formData, setFormData] = useState<LoginFormData>({
-    identifier: '',
-    otp: ''
-  });
-  const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [otpResendTimer, setOtpResendTimer] = useState(0);
-  const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const navigate = useNavigate();
-  const { loginWithGoogle, loginWithPhone, verifyOTP, user } = useAuth();
+  const { user } = useAuth();
+  const {
+    formData,
+    otpResendTimer,
+    confirmationResult,
+    authLoading,
+    handleIdentifierChange,
+    handleChange,
+    handlePhoneNumberSubmit,
+    handleOTPSubmit,
+    handleResendOTP,
+    handleGoogleLogin
+  } = useLogin();
 
   useEffect(() => {
     if (user) {
       navigate('/donor/dashboard');
     }
   }, [user, navigate]);
-
-  useEffect(() => {
-    if (confirmationResult) {
-      startResendTimer();
-    }
-  }, [confirmationResult]);
-
-  const handleIdentifierChange = (value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      identifier: value
-    }));
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handlePhoneNumberSubmit = async () => {
-    const digitsOnly = formData.identifier.replace(/\D/g, '');
-    const isValid10Digits = digitsOnly.length === 10 || 
-      (digitsOnly.startsWith('91') && digitsOnly.length === 12);
-  
-    if (!isValid10Digits) {
-      toast.error('Please enter a valid 10-digit phone number.');
-      return;
-    }
-  
-    try {
-      setLoading(true);
-      const confirmation = await loginWithPhone(formData.identifier);
-      setConfirmationResult(confirmation);
-      toast.success('OTP sent successfully!');
-    } catch (error) {
-      toast.error('Please register as a donor first before signing in.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOTPSubmit = async () => {
-    if (!formData.otp) {
-      toast.error('Please enter the OTP.');
-      return;
-    }
-    try {
-      setLoading(true);
-      await verifyOTP(confirmationResult, formData.otp);
-      toast.success('Login successful!');
-    } catch (error) {
-      toast.error('Invalid OTP. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const startResendTimer = () => {
-    setOtpResendTimer(30);
-    const timer = setInterval(() => {
-      setOtpResendTimer((prevTime) => {
-        if (prevTime <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prevTime - 1;
-      });
-    }, 1000);
-  };
-  
-  const handleResendOTP = async () => {
-    try {
-      setLoading(true);
-      const confirmation = await loginWithPhone(formData.identifier);
-      setConfirmationResult(confirmation);
-      toast.success('OTP resent successfully!');
-      startResendTimer();
-    } catch (error) {
-      toast.error('Failed to resend OTP. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    try {
-      setGoogleLoading(true);
-      await loginWithGoogle();
-      toast.success('Successfully logged in with Google!');
-      navigate('/donor/dashboard');
-    } catch (error) {
-      if (error instanceof Error) {
-        //toast.error(error.message);
-      } else {
-        toast.error('Failed to sign in with Google. Please try again.');
-      }
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
 
   const renderInitialForm = () => (
     <div className="space-y-4">
@@ -155,11 +51,11 @@ export function DonorLogin() {
       <button
         type="button"
         onClick={handlePhoneNumberSubmit}
-        disabled={loading || formData.identifier.replace(/\D/g, '').length !== 10 &&
+        disabled={authLoading || formData.identifier.replace(/\D/g, '').length !== 10 &&
                    formData.identifier.replace(/\D/g, '').length !== 12}
         className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? 'Processing...' : 'Send OTP'}
+        {authLoading ? 'Processing...' : 'Send OTP'}
       </button>
     </div>
   );
@@ -187,10 +83,10 @@ export function DonorLogin() {
       <button
         type="button"
         onClick={handleOTPSubmit}
-        disabled={loading}
+        disabled={authLoading}
         className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
       >
-        {loading ? 'Verifying...' : 'Verify OTP'}
+        {authLoading ? 'Verifying...' : 'Verify OTP'}
       </button>
   
       <div className="text-center">
@@ -200,7 +96,7 @@ export function DonorLogin() {
           <button
             type="button"
             onClick={handleResendOTP}
-            disabled={loading}
+            disabled={authLoading}
             className="text-sm text-red-600 hover:text-red-500"
           >
             Resend OTP
@@ -234,10 +130,10 @@ export function DonorLogin() {
               <button
                 type="button"
                 onClick={handleGoogleLogin}
-                disabled={loading || googleLoading}
+                disabled={authLoading}
                 className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
               >
-                {googleLoading ? (
+                {authLoading ? (
                   <span className="flex items-center">
                     <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
