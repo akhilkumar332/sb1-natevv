@@ -1,5 +1,4 @@
 // src/pages/donor/DonorDashboard.tsx
-import React from 'react';
 
 function DonorDashboard() {
   return (

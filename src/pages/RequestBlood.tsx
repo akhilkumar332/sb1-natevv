@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Droplet, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { useAuth } from '../contexts/AuthContext';
 
 interface BloodRequestFormData {
   patientName: string;
@@ -31,7 +30,6 @@ function RequestBlood() {
   });
   const [errors, setErrors] = useState<Partial<BloodRequestFormData>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { user } = useAuth();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;

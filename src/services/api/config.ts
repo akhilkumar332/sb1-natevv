@@ -1,7 +1,7 @@
 // src/services/api/config.ts
 
 export const API_CONFIG = {
-    BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5173/api',
+  BASE_URL: import.meta.env.VITE_API_BASE_URL,
     ENDPOINTS: {
       AUTH: {
         PHONE_LOGIN: '/auth/login/phone',

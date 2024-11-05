@@ -1,6 +1,19 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  node_version = "20"
+
+[[redirects]]
+  from = "/api/v1/api-docs/*"
+  to = "/api/v1/api-docs/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/*"
+  to = "/api/:splat"
+  status = 200
+  force = true
 
 [[redirects]]
   from = "/*"
