@@ -30,3 +30,6 @@ firebase-debug.log
 
 #env ignore
 .env
+vite-env.d.ts
+
+config/firebase-admin-sdk.json
