@@ -1,3 +1,5 @@
+// src/components/ErrorBoundary.tsx
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Home } from 'lucide-react';
@@ -60,4 +62,5 @@ class ErrorBoundary extends React.Component<Props, State> {
   }
 }
 
+// Add this line to export ErrorBoundary as the default export
 export default ErrorBoundary;
