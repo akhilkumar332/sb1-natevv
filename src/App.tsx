@@ -6,8 +6,12 @@ import Footer from './components/Footer';
 import Loading from './components/Loading';
 import { LoadingProvider } from './contexts/LoadingContext';
 import AppRoutes from './AppRoutes';
+import { useAuthSync } from './hooks/useAuthSync';
+import { useActivityTracker } from './hooks/useActivityTracker';
 
 function App() {
+  useAuthSync();
+  useActivityTracker();
   return (
     <LoadingProvider>
       <div className="min-h-screen flex flex-col bg-gray-50">
