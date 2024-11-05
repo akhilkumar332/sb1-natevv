@@ -10,6 +10,7 @@ interface LoginFormData {
 }
 
 export const useLogin = () => {
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [formData, setFormData] = useState<LoginFormData>({
     identifier: '',
     otp: ''
@@ -95,11 +96,14 @@ export const useLogin = () => {
 
   const handleGoogleLogin = async () => {
     try {
+      setGoogleLoading(true);
       await loginWithGoogle();
       toast.success('Successfully logged in with Google!');
       navigate('/donor/dashboard');
     } catch (error) {
-      toast.error('Failed to sign in with Google. Please try again.');
+      //toast.error('Failed to sign in with Google. Please try again.');
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -114,6 +118,7 @@ export const useLogin = () => {
     handlePhoneNumberSubmit,
     handleOTPSubmit,
     handleResendOTP,
-    handleGoogleLogin
+    handleGoogleLogin,
+    googleLoading,
   };
 };
