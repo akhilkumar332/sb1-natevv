@@ -5,8 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { authStorage } from '../utils/authStorage';
 import WarningModal from '../components/WarningModal';
 
-const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 3 minutes
-const WARNING_TIMEOUT = 9 * 60 * 1000; // 2 minutes
+const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 3 minutes
+const WARNING_TIMEOUT = 4 * 60 * 1000; // 2 minutes
 const CHECK_INTERVAL = 30000; // Check every 30 seconds
 
 export const useInactivityCheck = () => {
