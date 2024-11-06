@@ -5,13 +5,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { authStorage } from '../utils/authStorage';
 import WarningModal from '../components/WarningModal';
 
-const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 3 minutes
-const WARNING_TIMEOUT = 4 * 60 * 1000; // 2 minutes
+const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes 5 * 60 * 1000
+const WARNING_TIMEOUT = 4 * 60 * 1000; // 4 minutes 4 * 60 * 1000
 const CHECK_INTERVAL = 30000; // Check every 30 seconds
 
 export const useInactivityCheck = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [showWarning, setShowWarning] = useState(false);
   const logoutTimerRef = useRef<NodeJS.Timeout | null>(null);
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -49,13 +49,20 @@ export const useInactivityCheck = () => {
   }, [logout, navigate, showWarning, startLogoutTimer]);
 
   useEffect(() => {
+    if (!user) {
+      // Clear any existing timers if the user is not logged in
+      if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
+      if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
+      return;
+    }
+
     checkIntervalRef.current = setInterval(checkInactivity, CHECK_INTERVAL);
 
     return () => {
       if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
       if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
     };
-  }, [checkInactivity]);
+  }, [checkInactivity, user]);
 
   useEffect(() => {
     const handleActivity = () => {
@@ -82,5 +89,5 @@ export const useInactivityCheck = () => {
     <WarningModal isVisible={showWarning} onDismiss={resetActivity} />
   ), [showWarning, resetActivity]);
 
-  return { WarningComponent };
+  return { WarningComponent: user ? WarningComponent : () => null };
 };

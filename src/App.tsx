@@ -6,6 +6,7 @@ import Footer from './components/Footer';
 import Loading from './components/Loading';
 import { LoadingProvider } from './contexts/LoadingContext';
 import AppRoutes from './AppRoutes';
+import { useAuth } from './contexts/AuthContext';
 import { useAuthSync } from './hooks/useAuthSync';
 import { useActivityTracker } from './hooks/useActivityTracker';
 import { useInactivityCheck } from './hooks/useInactivityCheck';
@@ -13,6 +14,7 @@ import { useInactivityCheck } from './hooks/useInactivityCheck';
 function App() {
   useAuthSync();
   useActivityTracker();
+  const { user } = useAuth();
   const { WarningComponent } = useInactivityCheck();
   return (
     <LoadingProvider>
@@ -61,7 +63,7 @@ function App() {
             },
           }}
         />
-        <WarningComponent />
+        {user && <WarningComponent />}
       </div>
     </LoadingProvider>
   );
