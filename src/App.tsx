@@ -8,10 +8,12 @@ import { LoadingProvider } from './contexts/LoadingContext';
 import AppRoutes from './AppRoutes';
 import { useAuthSync } from './hooks/useAuthSync';
 import { useActivityTracker } from './hooks/useActivityTracker';
+import { useInactivityCheck } from './hooks/useInactivityCheck';
 
 function App() {
   useAuthSync();
   useActivityTracker();
+  const { WarningComponent } = useInactivityCheck();
   return (
     <LoadingProvider>
       <div className="min-h-screen flex flex-col bg-gray-50">
@@ -37,19 +39,29 @@ function App() {
             success: {
               duration: 3000,
               iconTheme: {
-                primary: '#dc2626', // red-600 (tailwind) for success icon
+                primary: '#10B981', // green-500
                 secondary: '#ffffff',
               },
             },
             error: {
               duration: 3000,
               iconTheme: {
-                primary: '#dc2626', // red-600 (tailwind) for error icon
+                primary: '#EF4444', // red-500
                 secondary: '#ffffff',
+              },
+            },
+            // Add custom styling for warning toasts
+            custom: {
+              duration: 60000,
+              style: {
+                background: '#FEF3C7',
+                color: '#92400E',
+                border: '1px solid #FCD34D',
               },
             },
           }}
         />
+        <WarningComponent />
       </div>
     </LoadingProvider>
   );
