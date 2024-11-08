@@ -12,7 +12,8 @@ import {
   ConfirmationResult,
 } from 'firebase/auth';
 import { 
-  doc, 
+  doc,
+  setDoc, 
   getDoc, 
   updateDoc, 
   serverTimestamp, 
@@ -34,22 +35,31 @@ interface User {
   email: string | null;
   displayName: string | null;
   photoURL?: string | null;
+  gender?: 'Male' | 'Female' | 'Other';
+  dateOfBirth?: Date;
   phoneNumber?: string | null;
   createdAt?: Date;
   lastLoginAt?: Date;
   role?: 'donor' | 'recipient' | 'admin';
+  address?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
   bloodType?: string;
   location?: {
     latitude?: number;
     longitude?: number;
-    address?: string;
-    city?: string;
   };
+  onboardingCompleted?: boolean;
   isAvailable?: boolean;
   lastDonation?: Date;
-  dateOfBirth?: Date | string;
-  gender?: string;
   totalDonations?: number;
+  medicalConditions?: string;
+  occupation?: string;
+  preferredLanguage?: string;
+  howHeardAboutUs?: string;
+  interestedInVolunteering?: boolean;
 }
 
 interface AuthContextType {
@@ -93,6 +103,7 @@ const updateUserInFirestore = async (
 
   // Prepare user data for update
   const userData: Partial<User> = {
+    onboardingCompleted: false,
     email: firebaseUser.email,
     displayName: firebaseUser.displayName,
     photoURL: firebaseUser.photoURL,
@@ -324,20 +335,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Update updateUserProfile method to handle onboarding
   const updateUserProfile = async (data: Partial<User>): Promise<void> => {
     if (!user) return;
+    console.log('Updating user profile with:', data);
     try {
-      const userRef = doc(db, 'users', user.uid);
-      
-      // Check if user document exists before updating
-      const userDoc = await getDoc(userRef);
-      if (!userDoc.exists()) {
-        throw new Error('User document does not exist');
-      }
-  
-      await updateDoc(userRef, data);
-      setUser(prev => ({ ...prev, ...data } as User));
-      toast.success('Profile updated successfully');
+      await setDoc(doc(db, 'users', user.uid), 
+        { 
+          ...data, 
+          onboardingCompleted: true // Set this to true upon successful completion
+        }, 
+        { merge: true }
+      );
+      setUser (prev => ({ 
+        ...prev, 
+        ...data, 
+        onboardingCompleted: true // Ensure this is updated in the state
+      } as User));
     } catch (error) {
       console.error('Error updating user profile:', error);
       toast.error('Failed to update profile. Please try again.');

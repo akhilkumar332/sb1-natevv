@@ -23,7 +23,9 @@ const About = lazy(() => lazyLoad(import('./pages/About')));
 const Contact = lazy(() => lazyLoad(import('./pages/Contact')));
 const DonorRegister = lazy(() => lazyLoad(import('./pages/auth/DonorRegister')));
 const NotFound = lazy(() => lazyLoad(import('./pages/NotFound')));
+const DonorOnboarding = lazy(() => lazyLoad(import('./pages/auth/DonorOnboarding')));
 const DonorDashboard = lazy(() => lazyLoad(import('./pages/donor/DonorDashboard')));
+
 
 const AppRoutes = () => {
   return (
@@ -41,6 +43,7 @@ const AppRoutes = () => {
       <Route path="/hospital/login" element={<HospitalLogin />} />
       <Route path="/ngo/login" element={<NgoLogin />} />
       <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/donor/onboarding" element={<DonorOnboarding />} />    
 
       {/* Protected Routes */}
       <Route element={<ProtectedRoute />}>

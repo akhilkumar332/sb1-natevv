@@ -26,6 +26,10 @@ function DonorDashboard() {
         bloodType: user.bloodType,
         lastDonation: user.lastDonation,
         isAvailable: user.isAvailable,
+        address: user.address,
+        city: user.city,
+        state: user.state,
+        postalCode: user.postalCode,
         location: user.location,
         dateOfBirth: user.dateOfBirth,
         gender: user.gender,
@@ -41,9 +45,9 @@ function DonorDashboard() {
     return date ? new Date(date).toLocaleDateString() : 'N/A';
   };
 
-  const calculateAge = (dob?: string | Date) => {
-    if (!dob) return 'N/A';
-    const birthDate = new Date(dob);
+  const calculateAge = (dateOfBirth?: string | Date) => {
+    if (!dateOfBirth) return 'N/A';
+    const birthDate = new Date(dateOfBirth);
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDifference = today.getMonth() - birthDate.getMonth();
@@ -106,7 +110,7 @@ function DonorDashboard() {
             </div>
             <div className="flex items-center justify-center transition-all duration-300 hover:text-red-500">
               <MapPin className="mr-2 text-red-500" size={20} />
-              <span>{donorData?.location?.city || 'Location Not Set'}</span>
+              <span>{donorData?.city || 'Location Not Set'}</span>
             </div>
             <div className="flex items-center justify-center transition-all duration-300 hover:text-red-500">
               <Phone className="mr-2 text-red-500" size={20} />

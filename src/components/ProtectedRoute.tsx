@@ -10,7 +10,16 @@ const ProtectedRoute = () => {
     return <Loading />;
   }
 
-  return user ? <Outlet /> : <Navigate to="/donor/login" replace />;
+  // Check if the user is authenticated and has completed onboarding
+  if (!user) {
+    return <Navigate to="/donor/login" replace />;
+  }
+
+  if (!user.onboardingCompleted) {
+    return <Navigate to="/donor/onboarding" replace />;
+  }
+
+  return <Outlet />;
 };
 
 export default ProtectedRoute;
