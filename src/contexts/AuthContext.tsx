@@ -43,9 +43,13 @@ interface User {
     latitude?: number;
     longitude?: number;
     address?: string;
+    city?: string;
   };
   isAvailable?: boolean;
   lastDonation?: Date;
+  dateOfBirth?: Date | string;
+  gender?: string;
+  totalDonations?: number;
 }
 
 interface AuthContextType {
