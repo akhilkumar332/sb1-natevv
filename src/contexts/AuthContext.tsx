@@ -13,8 +13,8 @@ import {
 } from 'firebase/auth';
 import { 
   doc, 
-  setDoc, 
-  getDoc,
+  getDoc, 
+  updateDoc, 
   serverTimestamp, 
   DocumentReference,
   DocumentSnapshot
@@ -74,20 +74,21 @@ const convertTimestampToDate = (timestamp: any): Date | undefined => {
   return timestamp ? new Date(timestamp.seconds * 1000) : undefined;
 };
 
-// Helper function to add or update user in Firestore
-const addUserToFirestore = async (
+// Helper function to update user in Firestore
+const updateUserInFirestore = async (
   firebaseUser: FirebaseUser, 
   additionalData?: Partial<User>
 ): Promise<User | null> => {
   const userRef: DocumentReference = doc(db, 'users', firebaseUser.uid);
   const userDoc: DocumentSnapshot = await getDoc(userRef);
   
+  // If user document doesn't exist, return null
   if (!userDoc.exists()) {
     return null;
   }
 
+  // Prepare user data for update
   const userData: Partial<User> = {
-    uid: firebaseUser.uid,
     email: firebaseUser.email,
     displayName: firebaseUser.displayName,
     photoURL: firebaseUser.photoURL,
@@ -96,16 +97,20 @@ const addUserToFirestore = async (
     ...additionalData
   };
 
-  await setDoc(userRef, {
+  // Update the existing document
+  await updateDoc(userRef, {
     ...userData,
     lastLoginAt: serverTimestamp(),
-  }, { merge: true });
+  });
 
+  // Fetch the updated document
   const updatedUserDoc = await getDoc(userRef);
   const updatedUserData = updatedUserDoc.data();
 
+  // Return updated user data
   return {
-    ...userData,
+    ...(updatedUserData as User),
+    uid: firebaseUser.uid,
     createdAt: convertTimestampToDate(updatedUserData?.createdAt),
     lastLoginAt: convertTimestampToDate(updatedUserData?.lastLoginAt),
     lastDonation: convertTimestampToDate(updatedUserData?.lastDonation),
@@ -124,10 +129,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         setAuthLoading(true);
         if (firebaseUser) {
-          const userData = await addUserToFirestore(firebaseUser);
+          const userData = await updateUserInFirestore(firebaseUser);
           if (userData) {
             setUser(userData);
           } else {
+            // If user update fails (document doesn't exist)
             await signOut(auth);
             setUser(null);
           }
@@ -229,7 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const verifyOTP = async (confirmationResult: ConfirmationResult, otp: string): Promise<void> => {
     try {
       const userCredential = await confirmationResult.confirm(otp);
-      const userData = await addUserToFirestore(userCredential.user);
+      const userData = await updateUserInFirestore(userCredential.user);
       if (!userData) {
         throw new Error('User not registered');
       }
@@ -259,9 +265,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Failed to get sign-in result');
       }
   
-      const userData = await addUserToFirestore(result.user);
+      const userData = await updateUserInFirestore(result.user);
       if (!userData) {
-        throw new Error('User not registered');
+        throw new Error('User not registered. Please register first.');
       }
   
       // Get the token
@@ -317,8 +323,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateUserProfile = async (data: Partial<User>): Promise<void> => {
     if (!user) return;
     try {
-      await setDoc(doc(db, 'users', user.uid), data, { merge: true });
-      setUser (prev => ({ ...prev, ...data } as User));
+      const userRef = doc(db, 'users', user.uid);
+      
+      // Check if user document exists before updating
+      const userDoc = await getDoc(userRef);
+      if (!userDoc.exists()) {
+        throw new Error('User document does not exist');
+      }
+  
+      await updateDoc(userRef, data);
+      setUser(prev => ({ ...prev, ...data } as User));
+      toast.success('Profile updated successfully');
     } catch (error) {
       console.error('Error updating user profile:', error);
       toast.error('Failed to update profile. Please try again.');
