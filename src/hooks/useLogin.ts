@@ -111,7 +111,7 @@ export const useLogin = () => {
         throw new Error('No token received');
       }
     } catch (error) {
-      toast.error('Failed to sign in with Google. Please try again.');
+      console.error('Failed to sign in with Google. Please try again.');
     } finally {
       setGoogleLoading(false);
     }
