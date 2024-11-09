@@ -1,4 +1,3 @@
-// src/components/ProtectedRoute.tsx
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Loading from './Loading';
@@ -9,9 +8,16 @@ const ProtectedRoute = () => {
   if (authLoading) {
     return <Loading />;
   }
-  
-  //return user ? <Outlet /> : <Navigate to="/donor/login" replace />;
-  return user && user.onboardingCompleted ? <Outlet /> : <Navigate to="/donor/onboarding" replace />;
+
+  if (!user) {
+    return <Navigate to="/donor/login" replace />;
+  }
+
+  if (!user.onboardingCompleted) {
+    return <Navigate to="/donor/onboarding" replace />;
+  }
+
+  return <Outlet />;
 };
 
 export default ProtectedRoute;
