@@ -102,19 +102,27 @@ const updateUserInFirestore = async (
   }
 
   // Prepare user data for update
+  const existingUserData = userDoc.data() as User; // Get existing user data
+
+  // Prepare user data for update
   const userData: Partial<User> = {
-    onboardingCompleted: false,
-    email: firebaseUser.email,
-    displayName: firebaseUser.displayName,
-    photoURL: firebaseUser.photoURL,
-    phoneNumber: firebaseUser.phoneNumber,
+    email: firebaseUser.email || existingUserData.email,
+    displayName: firebaseUser.displayName || existingUserData.displayName,
+    photoURL: firebaseUser.photoURL || existingUserData.photoURL,
+    phoneNumber: firebaseUser.phoneNumber || existingUserData.phoneNumber,
     lastLoginAt: new Date(),
+    onboardingCompleted: existingUserData.onboardingCompleted,
     ...additionalData
   };
 
+  // Remove any fields that are undefined
+  const sanitizedUserData = Object.fromEntries(
+    Object.entries(userData).filter(([_, value]) => value !== undefined)
+  );
+
   // Update the existing document
   await updateDoc(userRef, {
-    ...userData,
+    ...sanitizedUserData,
     lastLoginAt: serverTimestamp(),
   });
 

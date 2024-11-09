@@ -43,11 +43,12 @@ const AppRoutes = () => {
       <Route path="/hospital/login" element={<HospitalLogin />} />
       <Route path="/ngo/login" element={<NgoLogin />} />
       <Route path="/admin/login" element={<AdminLogin />} />
-      <Route path="/donor/onboarding" element={<DonorOnboarding />} />    
+      <Route path="/donor/onboarding" element={<DonorOnboarding />} />        
 
       {/* Protected Routes */}
       <Route element={<ProtectedRoute />}>
         <Route path="/donor/dashboard" element={<DonorDashboard />} />
+  
       </Route>
 
       {/* 404 Route */}

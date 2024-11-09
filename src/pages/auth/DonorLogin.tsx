@@ -25,11 +25,12 @@ export function DonorLogin() {
   } = useLogin();
 
   useEffect(() => {
-    if (!user) return; // Ensure user is loaded before checking onboarding status
-    if (!user.onboardingCompleted) {
-      navigate('/donor/onboarding');
-    } else {
-      navigate('/donor/dashboard');
+    if (user) {
+      if (!user.onboardingCompleted) {
+        navigate('/donor/onboarding');
+      } else {
+        navigate('/donor/dashboard');
+      }
     }
   }, [user, navigate]);
 
