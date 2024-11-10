@@ -111,7 +111,8 @@ const updateUserInFirestore = async (
     photoURL: firebaseUser.photoURL || existingUserData.photoURL,
     phoneNumber: firebaseUser.phoneNumber || existingUserData.phoneNumber,
     lastLoginAt: new Date(),
-    onboardingCompleted: existingUserData.onboardingCompleted,
+    onboardingCompleted: existingUserData.onboardingCompleted ?? false,
+    role: existingUserData.role || 'donor',
     ...additionalData
   };
 
