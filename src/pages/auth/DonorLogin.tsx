@@ -28,8 +28,10 @@ export function DonorLogin() {
     if (user) {
       if (!user.onboardingCompleted) {
         navigate('/donor/onboarding');
-      } else {
+      } else if (user.role === 'donor') {
         navigate('/donor/dashboard');
+      } else {
+        // Handle other roles if necessary
       }
     }
   }, [user, navigate]);
