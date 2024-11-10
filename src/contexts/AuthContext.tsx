@@ -40,7 +40,7 @@ interface User {
   phoneNumber?: string | null;
   createdAt?: Date;
   lastLoginAt?: Date;
-  role?: 'donor' | 'recipient' | 'admin';
+  role?: 'donor' | 'ngo' | 'hospital' | 'admin';
   address?: string;
   city?: string;
   state?: string;
