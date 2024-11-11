@@ -41,6 +41,7 @@ export interface User {
 
 export enum UserRole {
   DONOR = 'donor',
-  RECIPIENT = 'recipient',
+  NGO = 'ngo',
+  HOSPITAL = 'hospital',
   ADMIN = 'admin',
 }
