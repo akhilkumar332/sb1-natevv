@@ -25,6 +25,8 @@ const DonorRegister = lazy(() => lazyLoad(import('./pages/auth/DonorRegister')))
 const NotFound = lazy(() => lazyLoad(import('./pages/NotFound')));
 const DonorOnboarding = lazy(() => lazyLoad(import('./pages/auth/DonorOnboarding')));
 const DonorDashboard = lazy(() => lazyLoad(import('./pages/donor/DonorDashboard')));
+const AdminDashboard = lazy(() => lazyLoad(import('./pages/admin/AdminDashboard')));
+const AdminOnboarding = lazy(() => lazyLoad(import('./pages/auth/AdminOnboarding')));
 
 
 const AppRoutes = () => {
@@ -43,11 +45,13 @@ const AppRoutes = () => {
       <Route path="/hospital/login" element={<HospitalLogin />} />
       <Route path="/ngo/login" element={<NgoLogin />} />
       <Route path="/admin/login" element={<AdminLogin />} />
-      <Route path="/donor/onboarding" element={<DonorOnboarding />} />    
+      <Route path="/donor/onboarding" element={<DonorOnboarding />} />
+      <Route path="/admin/onboarding" element={<AdminOnboarding />} />    
 
       {/* Protected Routes */}
       <Route element={<ProtectedRoute />}>
         <Route path="/donor/dashboard" element={<DonorDashboard />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
       </Route>
 
       {/* 404 Route */}
