@@ -106,6 +106,7 @@ const updateUserInFirestore = async (
 
   // Prepare user data for update
   const userData: Partial<User> = {
+    uid: firebaseUser.uid || existingUserData.uid,
     email: firebaseUser.email || existingUserData.email,
     displayName: firebaseUser.displayName || existingUserData.displayName,
     photoURL: firebaseUser.photoURL || existingUserData.photoURL,
