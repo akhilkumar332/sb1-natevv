@@ -7,7 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 const lazyLoad = (importPromise: Promise<any>) => {
     return importPromise.catch(error => {
       console.error("Error loading component:", error);
-      return { default: () => <div>Error loading component</div> };
+      return { default: () => <div>Error loading, please reload.</div> };
     });
 };
 
