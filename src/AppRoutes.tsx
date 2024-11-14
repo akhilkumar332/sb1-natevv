@@ -13,19 +13,19 @@ const lazyLoad = (importPromise: Promise<any>) => {
 
 // Lazy load components
 const Home = lazy(() => lazyLoad(import('./pages/Home')));
-const DonorRegister = lazy(() => lazyLoad(import('./pages/auth/DonorRegister')));
-const DonorLogin = lazy(() => lazyLoad(import('./pages/auth/DonorLogin')));
-const DonorOnboarding = lazy(() => lazyLoad(import('./pages/auth/DonorOnboarding')));
+const DonorRegister = lazy(() => lazyLoad(import('./pages/donor/DonorRegister')));
+const DonorLogin = lazy(() => lazyLoad(import('./pages/donor/DonorLogin')));
+const DonorOnboarding = lazy(() => lazyLoad(import('./pages/donor/DonorOnboarding')));
 const DonorDashboard = lazy(() => lazyLoad(import('./pages/donor/DonorDashboard')));
-const HospitalLogin = lazy(() => lazyLoad(import('./pages/auth/HospitalLogin')));
+const HospitalLogin = lazy(() => lazyLoad(import('./pages/hospital/HospitalLogin')));
 const HospitalDashboard = lazy(() => lazyLoad(import('./pages/hospital/HospitalDashboard')));
-const HospitalOnboarding = lazy(() => lazyLoad(import('./pages/auth/HospitalOnboarding')));
-const NgoLogin = lazy(() => lazyLoad(import('./pages/auth/NgoLogin')));
+const HospitalOnboarding = lazy(() => lazyLoad(import('./pages/hospital/HospitalOnboarding')));
+const NgoLogin = lazy(() => lazyLoad(import('./pages/ngo/NgoLogin')));
 const NgoDashboard = lazy(() => lazyLoad(import('./pages/ngo/NgoDashboard')));
-const NgoOnboarding = lazy(() => lazyLoad(import('./pages/auth/NgoOnboarding')));
-const AdminLogin = lazy(() => lazyLoad(import('./pages/auth/AdminLogin')));
+const NgoOnboarding = lazy(() => lazyLoad(import('./pages/ngo/NgoOnboarding')));
+const AdminLogin = lazy(() => lazyLoad(import('./pages/admin/AdminLogin')));
 const AdminDashboard = lazy(() => lazyLoad(import('./pages/admin/AdminDashboard')));
-const AdminOnboarding = lazy(() => lazyLoad(import('./pages/auth/AdminOnboarding')));
+const AdminOnboarding = lazy(() => lazyLoad(import('./pages/admin/AdminOnboarding')));
 const FindDonors = lazy(() => lazyLoad(import('./pages/FindDonors')));
 const RequestBlood = lazy(() => lazyLoad(import('./pages/RequestBlood')));
 const About = lazy(() => lazyLoad(import('./pages/About')));

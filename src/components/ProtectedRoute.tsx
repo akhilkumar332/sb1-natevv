@@ -17,9 +17,8 @@ const ProtectedRoute = () => {
     admin: '/admin',
     ngo: '/ngo',
     hospital: '/hospital',
-  } as const; // Use 'as const' to make it a readonly object with literal types
+  } as const;
 
-  // If user is not logged in, redirect to the appropriate login page
   if (!user) {
     for (const role in rolePaths) {
       if (location.pathname.startsWith(rolePaths[role as keyof typeof rolePaths])) {
@@ -27,10 +26,8 @@ const ProtectedRoute = () => {
       }
     }
   } else {
-    // If user is logged in, check their role
     const userRole = user.role;
 
-    // Redirect if the user role does not match the path
     for (const role in rolePaths) {
       if (location.pathname.startsWith(rolePaths[role as keyof typeof rolePaths]) && userRole !== role) {
         toast.error(`You're not a ${role.charAt(0).toUpperCase() + role.slice(1)}`);
@@ -38,7 +35,6 @@ const ProtectedRoute = () => {
       }
     }
 
-    // Check for onboarding completion
     if (!user.onboardingCompleted) {
       return <Navigate to={`/${userRole}/onboarding`} replace />;
     }
