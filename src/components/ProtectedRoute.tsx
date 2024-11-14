@@ -11,38 +11,36 @@ const ProtectedRoute = () => {
     return <Loading />;
   }
 
-  // Check if the user is not logged in
+  // Define role-based paths
+  const rolePaths = {
+    donor: '/donor',
+    admin: '/admin',
+    ngo: '/ngo',
+    hospital: '/hospital',
+  } as const; // Use 'as const' to make it a readonly object with literal types
+
+  // If user is not logged in, redirect to the appropriate login page
   if (!user) {
-    return <Navigate to="/donor/login" replace />;
-  }
-
-  // Check if the user is trying to access admin routes
-  if (location.pathname.startsWith('/admin')) {
-    // If the user is not an admin, show an error and redirect to the admin login
-    if (user.role !== 'admin') {
-      toast.error("You're not an Admin");
-      return <Navigate to="/admin/login" replace />;
+    for (const role in rolePaths) {
+      if (location.pathname.startsWith(rolePaths[role as keyof typeof rolePaths])) {
+        return <Navigate to={`${rolePaths[role as keyof typeof rolePaths]}/login`} replace />;
+      }
     }
-  }
+  } else {
+    // If user is logged in, check their role
+    const userRole = user.role;
 
-  // Check if the user is trying to access NGO routes
-  if (location.pathname.startsWith('/ngo')) {
-    // If the user is not an NGO, show an error and redirect to the NGO login
-    if (user.role !== 'ngo') {
-      toast.error("You're not an NGO");
-      return <Navigate to="/ngo/login" replace />;
+    // Redirect if the user role does not match the path
+    for (const role in rolePaths) {
+      if (location.pathname.startsWith(rolePaths[role as keyof typeof rolePaths]) && userRole !== role) {
+        toast.error(`You're not a ${role.charAt(0).toUpperCase() + role.slice(1)}`);
+        return <Navigate to={`${rolePaths[role as keyof typeof rolePaths]}/login`} replace />;
+      }
     }
-  }
 
-  // Check for onboarding completion
-  if (!user.onboardingCompleted) {
-    // Redirect to the correct onboarding page based on role
-    if (user.role === 'admin') {
-      return <Navigate to="/admin/onboarding" replace />;
-    } else if (user.role === 'ngo') {
-      return <Navigate to="/ngo/onboarding" replace />;
-    } else {
-      return <Navigate to="/donor/onboarding" replace />;
+    // Check for onboarding completion
+    if (!user.onboardingCompleted) {
+      return <Navigate to={`/${userRole}/onboarding`} replace />;
     }
   }
 
