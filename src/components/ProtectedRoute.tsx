@@ -11,19 +11,18 @@ const ProtectedRoute = () => {
     return <Loading />;
   }
 
-  // Allow access to the admin login route without authentication
-  if (location.pathname === '/admin/login') {
-    return <Outlet />;
-  }
-
+  // Check if the user is not logged in
   if (!user) {
     return <Navigate to="/donor/login" replace />;
   }
 
-  // Check if the user is not an admin and trying to access admin routes
-  if (user.role !== 'admin' && location.pathname.startsWith('/admin')) {
-    toast.error("You're not an Admin");
-    return <Navigate to="/admin/login" replace />;
+  // Check if the user is trying to access admin routes
+  if (location.pathname.startsWith('/admin')) {
+    // If the user is not an admin, show an error and redirect to the admin login
+    if (user.role !== 'admin') {
+      toast.error("You're not an Admin");
+      return <Navigate to="/admin/login" replace />;
+    }
   }
 
   // Check for onboarding completion
