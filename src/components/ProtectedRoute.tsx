@@ -25,11 +25,22 @@ const ProtectedRoute = () => {
     }
   }
 
+  // Check if the user is trying to access NGO routes
+  if (location.pathname.startsWith('/ngo')) {
+    // If the user is not an NGO, show an error and redirect to the NGO login
+    if (user.role !== 'ngo') {
+      toast.error("You're not an NGO");
+      return <Navigate to="/ngo/login" replace />;
+    }
+  }
+
   // Check for onboarding completion
   if (!user.onboardingCompleted) {
     // Redirect to the correct onboarding page based on role
     if (user.role === 'admin') {
       return <Navigate to="/admin/onboarding" replace />;
+    } else if (user.role === 'ngo') {
+      return <Navigate to="/ngo/onboarding" replace />;
     } else {
       return <Navigate to="/donor/onboarding" replace />;
     }
