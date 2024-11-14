@@ -13,22 +13,24 @@ const lazyLoad = (importPromise: Promise<any>) => {
 
 // Lazy load components
 const Home = lazy(() => lazyLoad(import('./pages/Home')));
+const DonorRegister = lazy(() => lazyLoad(import('./pages/auth/DonorRegister')));
 const DonorLogin = lazy(() => lazyLoad(import('./pages/auth/DonorLogin')));
+const DonorOnboarding = lazy(() => lazyLoad(import('./pages/auth/DonorOnboarding')));
+const DonorDashboard = lazy(() => lazyLoad(import('./pages/donor/DonorDashboard')));
 const HospitalLogin = lazy(() => lazyLoad(import('./pages/auth/HospitalLogin')));
+const HospitalDashboard = lazy(() => lazyLoad(import('./pages/hospital/HospitalDashboard')));
+const HospitalOnboarding = lazy(() => lazyLoad(import('./pages/auth/HospitalOnboarding')));
 const NgoLogin = lazy(() => lazyLoad(import('./pages/auth/NgoLogin')));
 const NgoDashboard = lazy(() => lazyLoad(import('./pages/ngo/NgoDashboard')));
 const NgoOnboarding = lazy(() => lazyLoad(import('./pages/auth/NgoOnboarding')));
 const AdminLogin = lazy(() => lazyLoad(import('./pages/auth/AdminLogin')));
+const AdminDashboard = lazy(() => lazyLoad(import('./pages/admin/AdminDashboard')));
+const AdminOnboarding = lazy(() => lazyLoad(import('./pages/auth/AdminOnboarding')));
 const FindDonors = lazy(() => lazyLoad(import('./pages/FindDonors')));
 const RequestBlood = lazy(() => lazyLoad(import('./pages/RequestBlood')));
 const About = lazy(() => lazyLoad(import('./pages/About')));
 const Contact = lazy(() => lazyLoad(import('./pages/Contact')));
-const DonorRegister = lazy(() => lazyLoad(import('./pages/auth/DonorRegister')));
 const NotFound = lazy(() => lazyLoad(import('./pages/NotFound')));
-const DonorOnboarding = lazy(() => lazyLoad(import('./pages/auth/DonorOnboarding')));
-const DonorDashboard = lazy(() => lazyLoad(import('./pages/donor/DonorDashboard')));
-const AdminDashboard = lazy(() => lazyLoad(import('./pages/admin/AdminDashboard')));
-const AdminOnboarding = lazy(() => lazyLoad(import('./pages/auth/AdminOnboarding')));
 
 
 const AppRoutes = () => {
@@ -49,13 +51,15 @@ const AppRoutes = () => {
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/donor/onboarding" element={<DonorOnboarding />} />
       <Route path="/admin/onboarding" element={<AdminOnboarding />} />
-      <Route path="/ngo/onboarding" element={<NgoOnboarding />} />    
+      <Route path="/ngo/onboarding" element={<NgoOnboarding />} />
+      <Route path="/hospital/onboarding" element={<HospitalOnboarding />} />    
 
       {/* Protected Routes */}
       <Route element={<ProtectedRoute />}>
         <Route path="/donor/dashboard" element={<DonorDashboard />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/ngo/dashboard" element={<NgoDashboard />} />
+        <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
       </Route>
 
       {/* 404 Route */}
