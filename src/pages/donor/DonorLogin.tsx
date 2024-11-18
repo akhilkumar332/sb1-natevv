@@ -1,5 +1,5 @@
 // src/pages/auth/DonorLogin.tsx
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Phone } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -24,17 +24,25 @@ export function DonorLogin() {
     handleGoogleLogin
   } = useLogin();
 
+  const [loading, setLoading] = useState<boolean>(true); // Add loading state
+
   useEffect(() => {
     if (user) {
       if (!user.onboardingCompleted) {
         navigate('/donor/onboarding');
       } else if (user.role === 'donor') {
         navigate('/donor/dashboard');
-      } else {
-        // Handle other roles if necessary
       }
     }
   }, [user, navigate]);
+
+  // Simulate loading delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false); // Stop loading after 1 second
+    }, 500); // 1 second delay
+    return () => clearTimeout(timer);
+  }, []);
 
   const renderInitialForm = () => (
     <div className="space-y-4">
@@ -113,6 +121,17 @@ export function DonorLogin() {
     </div>
   );
 
+  // Skeleton Loader
+  const SkeletonLoader = () => (
+    <div className="animate-pulse">
+      <div className="h-8 bg-gray-300 rounded mb-4"></div>
+      <div className="h-4 bg-gray-300 rounded mb-2"></div>
+      <div className="h-4 bg-gray-300 rounded mb-2"></div>
+      <div className="h-12 bg-gray-300 rounded mb-4"></div>
+      <div className="h-10 bg-gray-300 rounded mb-4"></div>
+    </div>
+  );
+
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-sm">
@@ -122,7 +141,9 @@ export function DonorLogin() {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={(e) => e.preventDefault()}>
-          {confirmationResult ? renderOTPForm() : renderInitialForm()}
+          {loading ? (
+            <SkeletonLoader /> // Show skeleton loader while loading
+          ) : confirmationResult ? renderOTPForm() : renderInitialForm()}
 
           <div className="relative"> 
             <div className="relative">
@@ -134,47 +155,51 @@ export function DonorLogin() {
               </div>
             </div>
             <div className="mt-4">
-            <button
-              type="button"
-              onClick={handleGoogleLogin}
-              disabled={authLoading || googleLoading}
-              className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
-            >
-              {googleLoading ? (
-                <span className="flex items-center">
-                  <svg 
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-red-500" 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    fill="none" 
-                    viewBox="0 0 24 24"
-                  >
-                    <circle 
-                      className="opacity-25" 
-                      cx="12" 
-                      cy="12" 
-                      r="10" 
-                      stroke="currentColor" 
-                      strokeWidth="4"
-                    ></circle>
-                    <path 
-                      className="opacity-75" 
-                      fill="currentColor" 
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Signing in...
-                </span>
+              {loading ? ( // Show skeleton for Google button if loading
+                <SkeletonLoader />
               ) : (
-                <>
-                  <img
-                    className="h-5 w-5 mr-2"
-                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                    alt="Google logo"
-                  />
-                  Sign in with Google
-                </>
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={authLoading || googleLoading}
+                  className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                >
+                  {googleLoading ? (
+                    <span className="flex items-center">
+                      <svg 
+                        className="animate-spin -ml-1 mr-3 h-5 w-5 text-red-500" 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        fill="none" 
+                        viewBox="0 0 24 24"
+                      >
+                        <circle 
+                          className="opacity-25" 
+                          cx="12" 
+                          cy="12" 
+                          r="10" 
+                          stroke="currentColor" 
+                          strokeWidth="4"
+                        ></circle>
+                        <path 
+                          className="opacity-75" 
+                          fill="currentColor" 
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Signing in...
+                    </span>
+                  ) : (
+                    <>
+                      <img
+                        className="h-5 w-5 mr-2"
+                        src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                        alt="Google logo"
+                      />
+                      Sign in with Google
+                    </>
+                  )}
+                </button>
               )}
-            </button>
             </div>
           </div>
 

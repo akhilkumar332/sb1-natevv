@@ -1,8 +1,18 @@
-// src/pages/auth/HospitalLogin.tsx
+// src/pages/auth/AdminLogin.tsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
+
+// Skeleton Loader Component
+const SkeletonLoader = () => (
+  <div className="animate-pulse">
+    <div className="h-8 bg-gray-200 rounded mb-4"></div>
+    <div className="h-4 bg-gray-200 rounded mb-2"></div>
+    <div className="h-4 bg-gray-200 rounded mb-2"></div>
+    <div className="h-12 bg-gray-200 rounded mb-4"></div>
+  </div>
+);
 
 // Define the GoogleLoginButton component
 const GoogleLoginButton = ({ onClick, loading }: { onClick: () => void; loading: boolean }) => (
@@ -63,7 +73,7 @@ export function AdminLogin() {
       } else {
         setLoading(false); // Set loading to false when user is not present
       }
-    }, 500); // 1 seconds delay
+    }, 500); // 1 second delay
 
     return () => clearTimeout(timer); // Cleanup timer on unmount
   }, [user, navigate]);
@@ -73,12 +83,12 @@ export function AdminLogin() {
     try {
       const response = await loginWithGoogle();
       if (response.user.role !== 'admin') {
-        toast.error("You're not a Admin");
+        toast.error("You're not an Admin");
         await logout(navigate);
         navigate('/admin/login');
         return;
       }
-      toast.success('Successfully logged in as Hospital!');
+      toast.success('Successfully logged in as Admin!');
       navigate('/admin/dashboard');
     } catch (error) {
       toast.error('Failed to sign in with Google. Please try again.');
@@ -91,21 +101,7 @@ export function AdminLogin() {
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
         <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-sm">
-          <div className="mt-4">
-            <div className="h-12 bg-gray-200 rounded-md animate-pulse" />
-          </div>
-          <div className="mt-8 space-y-6">
-            <div className="relative">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <div className="h-12 bg-gray-200 rounded-md animate-pulse" />
-              </div>
-            </div>
-          </div>
+          <SkeletonLoader />
         </div>
       </div>
     );
