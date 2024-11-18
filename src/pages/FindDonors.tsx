@@ -16,18 +16,30 @@ interface Donor {
   gender: 'Male' | 'Female' | 'Other';
 }
 
-const SkeletonLoader: React.FC = () => {
+const SkeletonLoader: React.FC<{ type: 'card' | 'filter' }> = ({ type }) => {
+  if (type === 'card') {
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-6 animate-pulse">
+        <div className="h-6 bg-gray-300 rounded mb-2"></div>
+        <div className="flex items-center mb-2">
+          <div className="h-4 w-1/2 bg-gray-300 rounded mr-2"></div>
+          <div className="h-4 w-1/4 bg-gray-300 rounded"></div>
+        </div>
+        <div className="h-4 bg-gray-300 rounded mb-2"></div>
+        <div className="h-4 bg-gray-300 rounded mb-2"></div>
+        <div className="flex space-x-4">
+          <div className="h-10 w-10 bg-gray-300 rounded"></div>
+          <div className="h-10 w-10 bg-gray-300 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="animate-pulse">
       <div className="h-8 bg-gray-300 rounded mb-4"></div>
-      <div className="h-4 bg-gray-300 rounded mb-2"></div>
-      <div className="h-4 bg-gray-300 rounded mb-2"></div>
-      <div className="h-12 bg-gray-300 rounded mb-4"></div>
-      <div className="flex space-x-4">
-        <div className="h-12 w-12 bg-gray-300 rounded"></div>
-        <div className="h-12 w-12 bg-gray-300 rounded"></div>
-        <div className="h-12 w-12 bg-gray-300 rounded"></div>
-      </div>
+      <div className="h-8 bg-gray-300 rounded mb-4"></div>
+      <div className="h-8 bg-gray-300 rounded mb-4"></div>
     </div>
   );
 };
@@ -87,8 +99,8 @@ function FindDonors() {
       email: 'mike.johnson@example.com',
       availability: 'Unavailable',
       gender: 'Male',
-    },
     // Add more mock donors as needed
+    }
   ];
 
   const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -102,7 +114,7 @@ function FindDonors() {
     } else {
       toast.error('This donor is currently unavailable');
     }
- };
+  };
 
   const handleMessageDonor = (donor: Donor) => {
     if (donor.availability === 'Available') {
@@ -136,7 +148,7 @@ function FindDonors() {
 
         {/* Search and Filter Section */}
         {loading ? (
-          <SkeletonLoader /> // Show skeleton loader while loading
+          <SkeletonLoader type="filter" /> // Show skeleton loader for filter section while loading
         ) : (
           <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
             <div className="flex flex-col md:flex-row gap-4">
@@ -190,7 +202,7 @@ function FindDonors() {
                   <select
                       value={selectedDistance}
                       onChange={(e) => setSelectedDistance(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md p-2 focus:ring-red-500 focus:border-red-500"
+                      className="w-full border border-gray-300 rounded-md p-2 focus:ring-red- 500 focus:border-red-500"
                   >
                       <option value="">Any Distance</option>
                       {distances.map(distance => (
@@ -209,7 +221,7 @@ function FindDonors() {
                     onChange={(e) => setSelectedAvailability(e.target.value)}
                     className="w-full border border-gray-300 rounded-md p-2 focus:ring-red-500 focus:border-red-500"
                   >
-                    <option value="">Any Availability</ option>
+                    <option value="">Any Availability</option>
                     {availabilityOptions.map(option => (
                       <option key={option} value={option}>{option}</option>
                     ))}
@@ -252,7 +264,11 @@ function FindDonors() {
 
         {/* Results Section */}
         {loading ? (
-          <SkeletonLoader /> // Show skeleton loader while loading
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(3)].map((_, index) => (
+              <SkeletonLoader key={index} type="card" /> // Show skeleton loader for each donor card
+            ))}
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredDonors.length > 0 ? (
@@ -292,7 +308,7 @@ function FindDonors() {
                   <div className="mt-4 space-y-2">
                     <button
                       onClick={() => handleCallDonor(donor)}
-                      className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+                      className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red- 700"
                     >
                       <Phone className="h-4 w-4 mr-2" />
                       Call Donor
