@@ -56,12 +56,16 @@ export function HospitalLogin() {
   const [loading, setLoading] = useState(true); // New loading state for skeleton
 
   useEffect(() => {
-    if (user) {
-      const targetPath = user.onboardingCompleted ? '/hospital/dashboard' : '/hospital/onboarding';
-      navigate(targetPath); // Redirect based on onboarding status
-    } else {
-      setLoading(false); // Set loading to false when user is not present
-    }
+    const timer = setTimeout(() => {
+      if (user) {
+        const targetPath = user.onboardingCompleted ? '/hospital/dashboard' : '/hospital/onboarding';
+        navigate(targetPath); // Redirect based on onboarding status
+      } else {
+        setLoading(false); // Set loading to false when user is not present
+      }
+    }, 500); // 1 seconds delay
+
+    return () => clearTimeout(timer); // Cleanup timer on unmount
   }, [user, navigate]);
 
   const handleGoogleLogin = async () => {
@@ -87,9 +91,8 @@ export function HospitalLogin() {
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
         <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-sm">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-gray-900">Hospital Login</h2>
-            <p className="mt-2 text-gray-600">Loading...</p>
+          <div className="mt-4">
+            <div className="h-12 bg-gray-200 rounded-md animate-pulse" />
           </div>
           <div className="mt-8 space-y-6">
             <div className="relative">
