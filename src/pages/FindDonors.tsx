@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom'; // Use useNavigate instead of useHistory
 import { Search, MapPin, Filter, Droplet, Phone, Mail, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -45,12 +46,17 @@ const SkeletonLoader: React.FC<{ type: 'card' | 'filter' }> = ({ type }) => {
 };
 
 function FindDonors() {
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedBloodType, setSelectedBloodType] = useState<string>('');
-  const [selectedDistance, setSelectedDistance] = useState<string>('');
-  const [selectedAvailability, setSelectedAvailability] = useState<string>('');
-  const [selectedGender, setSelectedGender] = useState<string>('');
-  const [lastDonationDate, setLastDonationDate] = useState<string>('');
+  const location = useLocation();
+  const navigate = useNavigate(); // Use useNavigate instead of useHistory
+  
+  const query = new URLSearchParams(location.search);
+  
+  const [searchTerm, setSearchTerm] = useState<string>(query.get('searchTerm') || '');
+  const [selectedBloodType, setSelectedBloodType] = useState<string>(query.get('bloodType') || '');
+  const [selectedDistance, setSelectedDistance] = useState<string>(query.get('distance') || '');
+  const [selectedAvailability, setSelectedAvailability] = useState<string>(query.get('availability') || '');
+  const [selectedGender, setSelectedGender] = useState<string>(query.get('gender') || '');
+  const [lastDonationDate, setLastDonationDate] = useState<string>(query.get('lastDonationDate') || '');
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true); // Add loading state
 
@@ -61,6 +67,23 @@ function FindDonors() {
     }, 500);
     return () => clearTimeout(timer);
   }, []);
+
+  // Update URL parameters when filters change
+  const updateURL = () => {
+    const params = new URLSearchParams();
+    if (searchTerm) params.set('searchTerm', searchTerm);
+    if (selectedBloodType) params.set('bloodType', selectedBloodType);
+    if (selectedDistance) params.set('distance', selectedDistance);
+    if (selectedAvailability) params.set('availability', selectedAvailability);
+    if (selectedGender) params.set('gender', selectedGender);
+    if (lastDonationDate) params.set('lastDonationDate', lastDonationDate);
+    
+    navigate({ search: params.toString() }); // Use navigate instead of history.push
+  };
+
+  useEffect(() => {
+    updateURL();
+  }, [searchTerm, selectedBloodType, selectedDistance, selectedAvailability, selectedGender, lastDonationDate]);
 
   // Mock data - replace with actual API call
   const donors: Donor[] = [
@@ -99,8 +122,8 @@ function FindDonors() {
       email: 'mike.johnson@example.com',
       availability: 'Unavailable',
       gender: 'Male',
+    },
     // Add more mock donors as needed
-    }
   ];
 
   const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -176,7 +199,7 @@ function FindDonors() {
 
             {/* Filter Options */}
             {showFilters && (
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="mt-4 grid grid-cols-1 md:grid-cols -2 lg:grid-cols-3 gap-4">
                 {/* Blood Type Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -202,7 +225,7 @@ function FindDonors() {
                   <select
                       value={selectedDistance}
                       onChange={(e) => setSelectedDistance(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md p-2 focus:ring-red- 500 focus:border-red-500"
+                      className="w-full border border-gray-300 rounded-md p-2 focus:ring-red-500 focus:border-red-500"
                   >
                       <option value="">Any Distance</option>
                       {distances.map(distance => (
@@ -308,7 +331,7 @@ function FindDonors() {
                   <div className="mt-4 space-y-2">
                     <button
                       onClick={() => handleCallDonor(donor)}
-                      className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red- 700"
+                      className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
                     >
                       <Phone className="h-4 w-4 mr-2" />
                       Call Donor
