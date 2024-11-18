@@ -11,7 +11,7 @@ interface Donor {
 
 const SkeletonLoader: React.FC = () => {
   return (
-    <div className="animate-pulse">
+    <div className="animate-pulse mb-4">
       <div className="h-8 bg-gray-300 rounded mb-4"></div>
       <div className="h-4 bg-gray-300 rounded mb-2"></div>
       <div className="h-4 bg-gray-300 rounded mb-2"></div>
@@ -33,7 +33,7 @@ function Contact() {
   // Simulate loading data
   useEffect(() => {
     const timer = setTimeout(() => {
-      setLoading(false); // Stop loading after 1 second
+      setLoading(false);
     }, 500);
     return () => clearTimeout(timer);
   }, []);
@@ -54,11 +54,11 @@ function Contact() {
       <div className="max-w-4xl mx-auto">
         <h1 className="text-4xl font-bold text-center text-gray-900 mb-8">Contact Us</h1>
 
-        {loading ? (
-          <SkeletonLoader /> // Show skeleton loader while loading
-        ) : (
-          <>
-            <section className="bg-white shadow-md rounded-lg p-6 mb-8">
+        <section className="bg-white shadow-md rounded-lg p-6 mb-8">
+          {loading ? (
+            <SkeletonLoader />
+          ) : (
+            <>
               <h2 className="text-2xl font-semibold mb-4">Get in Touch</h2>
               <p className="text-gray-700 mb-4">
                 We’d love to hear from you! Whether you have questions, feedback, or need assistance, feel free to reach out.
@@ -77,10 +77,16 @@ function Contact() {
                   <span className="text-gray-700">123 Life Street, Health City</span>
                 </div>
               </div>
-            </section>
+            </>
+          )}
+        </section>
 
-            <section className="bg-white shadow-md rounded-lg p-6 mb-8">
-              <h2 className="text-2xl font-semibold mb-4">Live Donor Search</h2>
+        <section className="bg-white shadow-md rounded-lg p-6 mb-8">
+          {loading ? (
+            <SkeletonLoader />
+          ) : (
+            <>
+              <h2 className="text-2xl font-semibold mb-4">Live Donor Search </h2>
               <form onSubmit={handleSearch} className="mb-4">
                 <div className="flex">
                   <input
@@ -88,7 +94,7 @@ function Contact() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Enter blood type or location"
-                    className ="flex-grow px-4 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="flex-grow px-4 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   />
                   <button
                     type="submit"
@@ -117,9 +123,9 @@ function Contact() {
                   </ul>
                 </div>
               )}
-            </section>
-          </>
-        )}
+            </>
+          )}
+        </section>
       </div>
     </div>
   );

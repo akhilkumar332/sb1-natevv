@@ -39,8 +39,8 @@ export function DonorLogin() {
   // Simulate loading delay
   useEffect(() => {
     const timer = setTimeout(() => {
-      setLoading(false); // Stop loading after 1 second
-    }, 500); // 1 second delay
+      setLoading(false);
+    }, 500);
     return () => clearTimeout(timer);
   }, []);
 

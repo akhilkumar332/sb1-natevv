@@ -12,7 +12,7 @@ interface Donor {
 
 const SkeletonLoader: React.FC = () => {
   return (
-    <div className="animate-pulse">
+    <div className="animate-pulse mb-4">
       <div className="h-8 bg-gray-300 rounded mb-4"></div>
       <div className="h-4 bg-gray-300 rounded mb-2"></div>
       <div className="h-4 bg-gray-300 rounded mb-2"></div>
@@ -34,7 +34,7 @@ function About() {
   // Simulate loading data
   useEffect(() => {
     const timer = setTimeout(() => {
-      setLoading(false); // Stop loading after 1 second
+      setLoading(false);
     }, 500);
     return () => clearTimeout(timer);
   }, []);
@@ -55,11 +55,11 @@ function About() {
       <div className="max-w-4xl mx-auto">
         <h1 className="text-4xl font-bold text-center text-gray-900 mb-8">About LifeFlow</h1>
 
-        {loading ? (
-          <SkeletonLoader /> // Show skeleton loader while loading
-        ) : (
-          <>
-            <section className="bg-white shadow-md rounded-lg p-6 mb-8">
+        <section className="bg-white shadow-md rounded-lg p-6 mb-8">
+          {loading ? (
+            <SkeletonLoader />
+          ) : (
+            <>
               <h2 className="text-2xl font-semibold mb-4">Our Mission</h2>
               <p className="text-gray-700 mb-4">
                 At LifeFlow, our mission is to connect blood donors with those in need, saving lives one donation at a time. We believe that every individual has the power to make a difference, and through our platform, we aim to make the process of blood donation and receiving as seamless as possible.
@@ -76,14 +76,20 @@ function About() {
                   <p className="text-sm text-gray-500">Registered Donors</p>
                 </div>
                 <div className="text-center">
-                  <Award className="h-12 w-12 text-red-500 mx-auto mb-2" />
+                  <Award className="h-12 w-12 text-red-500 mx -auto mb-2" />
                   <p className="font-semibold">100+</p>
                   <p className="text-sm text-gray-500">Partner Hospitals</p>
                 </div>
               </div>
-            </section>
+            </>
+          )}
+        </section>
 
-            <section className="bg-white shadow-md rounded-lg p-6 mb-8">
+        <section className="bg-white shadow-md rounded-lg p-6 mb-8">
+          {loading ? (
+            <SkeletonLoader />
+          ) : (
+            <>
               <h2 className="text-2xl font-semibold mb-4">How It Works</h2>
               <ol className="list-decimal list-inside text-gray-700 space-y-2">
                 <li>Register as a donor or recipient on our platform</li>
@@ -92,9 +98,15 @@ function About() {
                 <li>Coordinate the donation process through our secure messaging system</li>
                 <li>Save lives and make a difference in your community</li>
               </ol>
-            </section>
+            </>
+          )}
+        </section>
 
-            <section className="bg-white shadow-md rounded-lg p-6 mb-8">
+        <section className="bg-white shadow-md rounded-lg p-6 mb-8">
+          {loading ? (
+            <SkeletonLoader />
+          ) : (
+            <>
               <h2 className="text-2xl font-semibold mb-4">Live Donor Search</h2>
               <form onSubmit={handleSearch} className="mb-4">
                 <div className="flex">
@@ -132,9 +144,15 @@ function About() {
                   </ul>
                 </div>
               )}
-            </section>
+            </>
+          )}
+        </section>
 
-            <section className="bg-white shadow-md rounded-lg p-6">
+        <section className="bg-white shadow-md rounded-lg p-6">
+          {loading ? (
+            <SkeletonLoader />
+          ) : (
+            <>
               <h2 className="text-2xl font-semibold mb-4">Join Our Community</h2>
               <p className="text-gray-700 mb-4">
                 Whether you're looking to donate blood or in need of a donation, LifeFlow is here to help. Join our community today and be part of this life-saving initiative.
@@ -153,9 +171,9 @@ function About() {
                   Request Blood
                 </Link>
               </div>
-            </section>
-          </>
-        )}
+            </>
+          )}
+        </section>
       </div>
     </div>
   );
