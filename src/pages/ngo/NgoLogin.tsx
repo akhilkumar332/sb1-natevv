@@ -69,11 +69,11 @@ export function NgoLogin() {
     const timer = setTimeout(() => {
       if (user) {
         const targetPath = user.onboardingCompleted ? '/ngo/dashboard' : '/ngo/onboarding';
-        navigate(targetPath); // Redirect based on onboarding status
+        navigate(targetPath);
       } else {
-        setLoading(false); // Set loading to false when user is not present
+        setLoading(false);
       }
-    }, 500); // 1 second delay
+    }, 500);
 
     return () => clearTimeout(timer); // Cleanup timer on unmount
   }, [user, navigate]);
