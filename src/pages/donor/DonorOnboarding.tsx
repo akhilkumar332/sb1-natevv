@@ -94,13 +94,13 @@ export function DonorOnboarding() {
         }
         break;
       case 2: // Medical Info
-        if (!formData.bloodType) {
+        if (!formData.bloodType || !formData.lastDonation || !formData.medicalConditions) {
           toast.error('Please select your blood type');
           return false;
         }
         break;
       case 3: // Additional Info
-        if (!formData.occupation || !formData.preferredLanguage) {
+        if (!formData.occupation || !formData.preferredLanguage || !formData.howHeardAboutUs || !formData.interestedInVolunteering) {
           toast.error('Please fill in additional information');
           return false;
         }

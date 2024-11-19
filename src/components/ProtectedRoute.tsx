@@ -28,15 +28,17 @@ const ProtectedRoute = () => {
   } else {
     const userRole = user.role;
 
+    // Check for onboarding completion
+    if (!user.onboardingCompleted) {
+      return <Navigate to={`/${userRole}/onboarding`} replace />;
+    }
+
+    // Role-based access
     for (const role in rolePaths) {
       if (location.pathname.startsWith(rolePaths[role as keyof typeof rolePaths]) && userRole !== role) {
         toast.error(`You're not a ${role.charAt(0).toUpperCase() + role.slice(1)}`);
         return <Navigate to={`${rolePaths[role as keyof typeof rolePaths]}/login`} replace />;
       }
-    }
-
-    if (!user.onboardingCompleted) {
-      return <Navigate to={`/${userRole}/onboarding`} replace />;
     }
   }
 
