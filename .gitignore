@@ -24,12 +24,12 @@ dist-ssr
 *.sw?
 
 # Firebase
-.firebase/
-.firebaserc
-firebase-debug.log
+#.firebase/
+#.firebaserc
+#firebase-debug.log
 
 #env ignore
-.env
-vite-env.d.ts
+#.env
+#vite-env.d.ts
 
-secrets/firebase-admin-sdk.json
+#secrets/firebase-admin-sdk.json
