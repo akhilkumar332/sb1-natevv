@@ -23,11 +23,17 @@ function Contact() {
 
   return (
     <div className="w-full">
-      {/* Hero Section */}
+      {/* Hero Section - PhonePe-inspired */}
       <section className="relative py-24 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-red-50 via-white to-red-50">
-          <div className="absolute top-20 right-20 w-72 h-72 bg-red-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-          <div className="absolute bottom-20 left-20 w-72 h-72 bg-red-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-red-50 via-white to-pink-50">
+          {/* Animated gradient orbs - PhonePe style */}
+          <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-gradient-to-r from-red-400 to-pink-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+          <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-red-500 to-red-600 rounded-full mix-blend-multiply filter blur-3xl opacity-25 animate-blob animation-delay-2000"></div>
+          <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-gradient-to-r from-pink-500 to-red-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
+
+          {/* Floating decorative elements */}
+          <div className="absolute top-10 left-10 w-20 h-20 bg-red-200/30 rounded-2xl rotate-12 animate-pulse"></div>
+          <div className="absolute bottom-20 right-20 w-16 h-16 bg-pink-200/30 rounded-full animate-pulse animation-delay-2000"></div>
         </div>
 
         <div className="container mx-auto px-4 relative z-10">
@@ -54,35 +60,74 @@ function Contact() {
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <div className="bg-gradient-to-br from-red-50 to-white p-8 rounded-2xl border-2 border-red-100 text-center hover:shadow-xl transition-shadow">
-              <div className="w-16 h-16 bg-gradient-to-r from-red-600 to-red-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Phone className="w-8 h-8 text-white" />
+            <div className="group relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-500"></div>
+              <div className="relative bg-white/90 backdrop-blur-xl p-8 rounded-2xl border border-white/50 text-center hover:shadow-2xl transition-all duration-500 overflow-hidden">
+                {/* Decorative orb */}
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-3xl opacity-10 group-hover:opacity-20 transition-opacity duration-500"></div>
+
+                <div className="relative z-10">
+                  <div className="relative inline-block mb-4">
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-red-800 rounded-full blur-lg opacity-40 group-hover:opacity-60 transition-opacity duration-500"></div>
+                    <div className="relative w-16 h-16 bg-gradient-to-r from-red-600 to-red-700 rounded-full flex items-center justify-center shadow-2xl transform group-hover:scale-110 group-hover:-translate-y-2 group-hover:rotate-12 transition-all duration-500"
+                         style={{ boxShadow: '0 20px 40px rgba(220, 38, 38, 0.3)' }}>
+                      <Phone className="w-8 h-8 text-white" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }} />
+                    </div>
+                  </div>
+
+                  <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-red-600 transition-colors duration-300">Phone</h3>
+                  <p className="text-gray-700 mb-2">Available 24/7</p>
+                  <a href="tel:+911800123456" className="text-red-600 font-semibold hover:text-red-700 transition-colors">
+                    +91 1800-123-456
+                  </a>
+                </div>
               </div>
-              <h3 className="text-xl font-bold mb-2 text-gray-900">Phone</h3>
-              <p className="text-gray-600 mb-2">Available 24/7</p>
-              <a href="tel:+911800123456" className="text-red-600 font-semibold hover:text-red-700">
-                +91 1800-123-456
-              </a>
             </div>
 
-            <div className="bg-gradient-to-br from-red-50 to-white p-8 rounded-2xl border-2 border-red-100 text-center hover:shadow-xl transition-shadow">
-              <div className="w-16 h-16 bg-gradient-to-r from-red-600 to-red-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Mail className="w-8 h-8 text-white" />
+            <div className="group relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-pink-600 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-500"></div>
+              <div className="relative bg-white/90 backdrop-blur-xl p-8 rounded-2xl border border-white/50 text-center hover:shadow-2xl transition-all duration-500 overflow-hidden">
+                {/* Decorative orb */}
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-r from-red-600 to-pink-600 rounded-full blur-3xl opacity-10 group-hover:opacity-20 transition-opacity duration-500"></div>
+
+                <div className="relative z-10">
+                  <div className="relative inline-block mb-4">
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-red-800 rounded-full blur-lg opacity-40 group-hover:opacity-60 transition-opacity duration-500"></div>
+                    <div className="relative w-16 h-16 bg-gradient-to-r from-red-600 to-red-700 rounded-full flex items-center justify-center shadow-2xl transform group-hover:scale-110 group-hover:-translate-y-2 group-hover:rotate-12 transition-all duration-500"
+                         style={{ boxShadow: '0 20px 40px rgba(220, 38, 38, 0.3)' }}>
+                      <Mail className="w-8 h-8 text-white" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }} />
+                    </div>
+                  </div>
+
+                  <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-red-600 transition-colors duration-300">Email</h3>
+                  <p className="text-gray-700 mb-2">Response in 24 hours</p>
+                  <a href="mailto:support@bloodhub.in" className="text-red-600 font-semibold hover:text-red-700 transition-colors">
+                    support@bloodhub.in
+                  </a>
+                </div>
               </div>
-              <h3 className="text-xl font-bold mb-2 text-gray-900">Email</h3>
-              <p className="text-gray-600 mb-2">Response in 24 hours</p>
-              <a href="mailto:support@bloodhub.in" className="text-red-600 font-semibold hover:text-red-700">
-                support@bloodhub.in
-              </a>
             </div>
 
-            <div className="bg-gradient-to-br from-red-50 to-white p-8 rounded-2xl border-2 border-red-100 text-center hover:shadow-xl transition-shadow">
-              <div className="w-16 h-16 bg-gradient-to-r from-red-600 to-red-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <MapPin className="w-8 h-8 text-white" />
+            <div className="group relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-red-700 to-pink-700 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-500"></div>
+              <div className="relative bg-white/90 backdrop-blur-xl p-8 rounded-2xl border border-white/50 text-center hover:shadow-2xl transition-all duration-500 overflow-hidden">
+                {/* Decorative orb */}
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-r from-red-700 to-pink-700 rounded-full blur-3xl opacity-10 group-hover:opacity-20 transition-opacity duration-500"></div>
+
+                <div className="relative z-10">
+                  <div className="relative inline-block mb-4">
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-red-800 rounded-full blur-lg opacity-40 group-hover:opacity-60 transition-opacity duration-500"></div>
+                    <div className="relative w-16 h-16 bg-gradient-to-r from-red-600 to-red-700 rounded-full flex items-center justify-center shadow-2xl transform group-hover:scale-110 group-hover:-translate-y-2 group-hover:rotate-12 transition-all duration-500"
+                         style={{ boxShadow: '0 20px 40px rgba(220, 38, 38, 0.3)' }}>
+                      <MapPin className="w-8 h-8 text-white" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }} />
+                    </div>
+                  </div>
+
+                  <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-red-600 transition-colors duration-300">Office</h3>
+                  <p className="text-gray-700 mb-2">Visit us</p>
+                  <p className="text-red-600 font-semibold">Mumbai, Maharashtra</p>
+                </div>
               </div>
-              <h3 className="text-xl font-bold mb-2 text-gray-900">Office</h3>
-              <p className="text-gray-600 mb-2">Visit us</p>
-              <p className="text-red-600 font-semibold">Mumbai, Maharashtra</p>
             </div>
           </div>
         </div>
@@ -92,8 +137,11 @@ function Contact() {
       <section className="py-24 bg-gradient-to-b from-white to-gray-50">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
-            <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
-              <div className="grid md:grid-cols-2">
+            <div className="group relative bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden border border-white/50">
+              {/* Decorative gradient orb */}
+              <div className="absolute -top-20 -right-20 w-64 h-64 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-3xl opacity-10 group-hover:opacity-15 transition-opacity duration-500 pointer-events-none"></div>
+
+              <div className="grid md:grid-cols-2 relative z-10">
                 {/* Form */}
                 <div className="p-12">
                   <h2 className="text-3xl font-bold mb-6">
@@ -251,9 +299,17 @@ function Contact() {
                 { q: "How quickly can I expect a response?", a: "Typically within 2 hours during business hours, and within 6 hours for overnight inquiries" },
                 { q: "Do you have physical offices?", a: "Our headquarters is in Mumbai, but we operate digitally across India" }
               ].map((faq, i) => (
-                <div key={i} className="bg-gray-50 p-6 rounded-xl">
-                  <h3 className="font-semibold text-gray-900 mb-2">{faq.q}</h3>
-                  <p className="text-gray-600">{faq.a}</p>
+                <div key={i} className="group relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-xl blur-lg opacity-0 group-hover:opacity-10 transition-opacity duration-500"></div>
+                  <div className="relative bg-white/80 backdrop-blur-xl p-6 rounded-xl border border-white/50 hover:shadow-lg transition-all duration-500 overflow-hidden">
+                    {/* Decorative orb */}
+                    <div className="absolute -top-8 -right-8 w-24 h-24 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-3xl opacity-0 group-hover:opacity-10 transition-opacity duration-500"></div>
+
+                    <div className="relative z-10">
+                      <h3 className="font-bold text-gray-900 mb-2 group-hover:text-red-600 transition-colors duration-300">{faq.q}</h3>
+                      <p className="text-gray-700">{faq.a}</p>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

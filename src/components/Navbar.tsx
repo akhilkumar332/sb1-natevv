@@ -104,23 +104,32 @@ function UserMenu() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl py-2 z-50 border border-gray-100 overflow-hidden">
-          <Link
-            to={getDashboardPath()}
-            className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 transition-all group"
-            onClick={() => setIsOpen(false)}
-          >
-            <LayoutDashboard className="w-5 h-5 mr-3 text-red-600 group-hover:scale-110 transition-transform" />
-            <span className="font-medium">Dashboard</span>
-          </Link>
-          <div className="h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent my-1"></div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 transition-all group"
-          >
-            <LogOut className="w-5 h-5 mr-3 text-red-600 group-hover:scale-110 transition-transform" />
-            <span className="font-medium">Logout</span>
-          </button>
+        <div className="absolute right-0 mt-3 w-56 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl py-2 z-50 border border-white/50 overflow-hidden animate-fadeIn">
+          {/* Decorative gradient orb */}
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-3xl opacity-10 pointer-events-none"></div>
+
+          <div className="relative z-10">
+            <Link
+              to={getDashboardPath()}
+              className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 transition-all duration-300 group"
+              onClick={() => setIsOpen(false)}
+            >
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-r from-red-600 to-red-700 mr-3 shadow-md transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                <LayoutDashboard className="w-4 h-4 text-white" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+              </div>
+              <span className="font-semibold">Dashboard</span>
+            </Link>
+            <div className="h-px bg-gradient-to-r from-transparent via-red-200 to-transparent my-1"></div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 transition-all duration-300 group"
+            >
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-r from-red-600 to-red-700 mr-3 shadow-md transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                <LogOut className="w-4 h-4 text-white" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+              </div>
+              <span className="font-semibold">Logout</span>
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -207,7 +216,10 @@ const Navbar: React.FC = () => {
 
 
   return (
-    <nav className="bg-white/90 backdrop-blur-lg shadow-sm border-b border-gray-100 sticky top-0 z-40">
+    <nav className="relative bg-white/95 backdrop-blur-xl shadow-lg border-b border-white/50 sticky top-0 z-40">
+      {/* Decorative gradient line */}
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-red-600 to-transparent opacity-50"></div>
+
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -276,36 +288,39 @@ const Navbar: React.FC = () => {
 
         {/* Mobile Menu Content */}
         {isOpen && (
-          <div className="md:hidden bg-white rounded-2xl shadow-2xl my-4 p-4 border border-gray-100">
-            <div className="space-y-2">
+          <div className="md:hidden relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl my-4 p-4 border border-white/50 overflow-hidden animate-fadeIn">
+            {/* Decorative gradient orb */}
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-3xl opacity-10 pointer-events-none"></div>
+
+            <div className="relative z-10 space-y-2">
               <MobileNavLink to="/donors">Find Donors</MobileNavLink>
               <MobileNavLink to="/request-blood">Request Blood</MobileNavLink>
               <MobileNavLink to="/about">About</MobileNavLink>
               <MobileNavLink to="/contact">Contact</MobileNavLink>
-            </div>
 
-            {authLoading ? (
-              <LoadingFallback />
-            ) : !user ? (
-              <div className="flex flex-col space-y-2 mt-4 pt-4 border-t border-gray-200">
-                <Link
-                  to="/donor/login"
-                  className="block w-full text-center px-5 py-3 text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all"
-                >
-                  Login
-                </Link>
-                <Link
-                  to="/donor/register"
-                  className="block w-full text-center px-5 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:shadow-lg transition-all"
-                >
-                  Register
-                </Link>
-              </div>
-            ) : (
-              <Suspense fallback={<LoadingFallback />}>
-                <MobileUserMenu />
-              </Suspense>
-            )}
+              {authLoading ? (
+                <LoadingFallback />
+              ) : !user ? (
+                <div className="flex flex-col space-y-2 mt-4 pt-4 border-t border-gray-200">
+                  <Link
+                    to="/donor/login"
+                    className="block w-full text-center px-5 py-3 text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/donor/register"
+                    className="block w-full text-center px-5 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300"
+                  >
+                    Register
+                  </Link>
+                </div>
+              ) : (
+                <Suspense fallback={<LoadingFallback />}>
+                  <MobileUserMenu />
+                </Suspense>
+              )}
+            </div>
           </div>
         )}
       </div>
