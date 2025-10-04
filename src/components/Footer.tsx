@@ -3,8 +3,12 @@ import { Heart, Phone, Mail, MapPin, Droplet, Facebook, Twitter, Instagram, Link
 
 function Footer() {
   return (
-    <footer className="bg-gradient-to-br from-gray-50 to-white border-t border-gray-100">
-      <div className="container mx-auto px-4 py-12">
+    <footer className="relative bg-gradient-to-br from-gray-50 to-white border-t border-gray-200 overflow-hidden">
+      {/* Decorative gradient orbs - PhonePe style */}
+      <div className="absolute top-0 right-1/4 w-96 h-96 bg-gradient-to-r from-red-400 to-pink-400 rounded-full mix-blend-multiply filter blur-3xl opacity-10 pointer-events-none"></div>
+      <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-gradient-to-r from-pink-500 to-red-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 pointer-events-none"></div>
+
+      <div className="container mx-auto px-4 py-12 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
           {/* About Section */}
           <div className="lg:col-span-1">
@@ -28,7 +32,7 @@ function Footer() {
               <span>Saving Lives Together</span>
             </div>
 
-            {/* Social Media */}
+            {/* Social Media - PhonePe-inspired */}
             <div className="mt-6">
               <p className="text-sm font-semibold text-gray-900 mb-3">Follow Us</p>
               <div className="flex space-x-3">
@@ -36,33 +40,37 @@ function Footer() {
                   href="https://facebook.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-10 h-10 bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 rounded-full flex items-center justify-center transition-all transform hover:scale-110"
+                  className="group relative w-10 h-10 bg-white/80 backdrop-blur-xl hover:bg-white rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:-translate-y-1 shadow-md hover:shadow-lg border border-red-100"
                 >
-                  <Facebook className="w-5 h-5 text-red-600" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-md opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
+                  <Facebook className="w-5 h-5 text-red-600 relative z-10" />
                 </a>
                 <a
                   href="https://twitter.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-10 h-10 bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 rounded-full flex items-center justify-center transition-all transform hover:scale-110"
+                  className="group relative w-10 h-10 bg-white/80 backdrop-blur-xl hover:bg-white rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:-translate-y-1 shadow-md hover:shadow-lg border border-red-100"
                 >
-                  <Twitter className="w-5 h-5 text-red-600" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-md opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
+                  <Twitter className="w-5 h-5 text-red-600 relative z-10" />
                 </a>
                 <a
                   href="https://instagram.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-10 h-10 bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 rounded-full flex items-center justify-center transition-all transform hover:scale-110"
+                  className="group relative w-10 h-10 bg-white/80 backdrop-blur-xl hover:bg-white rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:-translate-y-1 shadow-md hover:shadow-lg border border-red-100"
                 >
-                  <Instagram className="w-5 h-5 text-red-600" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-md opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
+                  <Instagram className="w-5 h-5 text-red-600 relative z-10" />
                 </a>
                 <a
                   href="https://linkedin.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-10 h-10 bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 rounded-full flex items-center justify-center transition-all transform hover:scale-110"
+                  className="group relative w-10 h-10 bg-white/80 backdrop-blur-xl hover:bg-white rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:-translate-y-1 shadow-md hover:shadow-lg border border-red-100"
                 >
-                  <Linkedin className="w-5 h-5 text-red-600" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-md opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
+                  <Linkedin className="w-5 h-5 text-red-600 relative z-10" />
                 </a>
               </div>
             </div>
@@ -203,19 +211,26 @@ function Footer() {
               </li>
             </ul>
 
-            {/* Emergency Box */}
-            <div className="bg-gradient-to-r from-red-50 to-pink-50 p-4 rounded-xl border-2 border-red-100">
-              <div className="flex items-center mb-2">
-                <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
-                <p className="text-red-700 font-bold">24/7 Emergency</p>
+            {/* Emergency Box - PhonePe-inspired glassmorphism */}
+            <div className="group relative bg-white/80 backdrop-blur-xl p-4 rounded-xl border border-red-200 hover:shadow-xl transition-all duration-500 overflow-hidden">
+              {/* Decorative orb */}
+              <div className="absolute -top-8 -right-8 w-24 h-24 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-3xl opacity-20 group-hover:opacity-30 transition-opacity duration-500"></div>
+
+              <div className="relative z-10">
+                <div className="flex items-center mb-2">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-r from-red-600 to-red-700 mr-2 shadow-md transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                    <AlertCircle className="w-4 h-4 text-white" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+                  </div>
+                  <p className="text-red-700 font-bold">24/7 Emergency</p>
+                </div>
+                <a
+                  href="tel:+911800999888"
+                  className="text-red-600 font-bold text-lg hover:text-red-700 transition-colors block"
+                >
+                  +91 1800-999-888
+                </a>
+                <p className="text-xs text-gray-600 mt-1">Available round the clock</p>
               </div>
-              <a
-                href="tel:+911800999888"
-                className="text-red-600 font-bold text-lg hover:text-red-700 transition-colors"
-              >
-                +91 1800-999-888
-              </a>
-              <p className="text-xs text-gray-600 mt-1">Available round the clock</p>
             </div>
           </div>
         </div>
