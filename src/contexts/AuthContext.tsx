@@ -90,55 +90,36 @@ const convertTimestampToDate = (timestamp: any): Date | undefined => {
 
 // Helper function to update user in Firestore
 const updateUserInFirestore = async (
-  firebaseUser: FirebaseUser, 
+  firebaseUser: FirebaseUser,
   additionalData?: Partial<User>
 ): Promise<User | null> => {
   const userRef: DocumentReference = doc(db, 'users', firebaseUser.uid);
   const userDoc: DocumentSnapshot = await getDoc(userRef);
-  
+
   // If user document doesn't exist, return null
   if (!userDoc.exists()) {
     return null;
   }
 
-  // Prepare user data for update
-  const existingUserData = userDoc.data() as User; // Get existing user data
+  const existingUserData = userDoc.data() as User;
 
-  // Prepare user data for update
-  const userData: Partial<User> = {
-    uid: firebaseUser.uid || existingUserData.uid,
+  // Prepare optimized update (only lastLoginAt)
+  await updateDoc(userRef, {
+    lastLoginAt: serverTimestamp(),
+  });
+
+  // Return user data without extra fetch
+  return {
+    ...existingUserData,
+    uid: firebaseUser.uid,
     email: firebaseUser.email || existingUserData.email,
     displayName: firebaseUser.displayName || existingUserData.displayName,
     photoURL: firebaseUser.photoURL || existingUserData.photoURL,
     phoneNumber: firebaseUser.phoneNumber || existingUserData.phoneNumber,
     lastLoginAt: new Date(),
-    onboardingCompleted: existingUserData.onboardingCompleted ?? false,
-    role: existingUserData.role || 'donor',
+    createdAt: convertTimestampToDate(existingUserData?.createdAt),
+    lastDonation: convertTimestampToDate(existingUserData?.lastDonation),
     ...additionalData
-  };
-
-  // Remove any fields that are undefined
-  const sanitizedUserData = Object.fromEntries(
-    Object.entries(userData).filter(([_, value]) => value !== undefined)
-  );
-
-  // Update the existing document
-  await updateDoc(userRef, {
-    ...sanitizedUserData,
-    lastLoginAt: serverTimestamp(),
-  });
-
-  // Fetch the updated document
-  const updatedUserDoc = await getDoc(userRef);
-  const updatedUserData = updatedUserDoc.data();
-
-  // Return updated user data
-  return {
-    ...(updatedUserData as User),
-    uid: firebaseUser.uid,
-    createdAt: convertTimestampToDate(updatedUserData?.createdAt),
-    lastLoginAt: convertTimestampToDate(updatedUserData?.lastLoginAt),
-    lastDonation: convertTimestampToDate(updatedUserData?.lastDonation),
   } as User;
 };
 
@@ -152,7 +133,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       try {
-        setAuthLoading(true);
         if (firebaseUser) {
           const userData = await updateUserInFirestore(firebaseUser);
           if (userData) {
@@ -169,7 +149,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('Error in auth state change:', error);
         setUser(null);
       } finally {
-        setAuthLoading(false);
         setLoading(false);
       }
     });
@@ -259,12 +238,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const verifyOTP = async (confirmationResult: ConfirmationResult, otp: string): Promise<void> => {
     try {
-      const userCredential = await confirmationResult.confirm(otp);
-      const userData = await updateUserInFirestore(userCredential.user);
-      if (!userData) {
-        throw new Error('User not registered');
-      }
-      setUser(userData);
+      await confirmationResult.confirm(otp);
+      // User state will be updated by onAuthStateChanged
     } catch (error) {
       console.error('OTP verification error:', error);
       throw error;
@@ -274,7 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithGoogle = async (): Promise<LoginResponse> => {
     try {
       auth.useDeviceLanguage();
-      
+
       const result = await signInWithPopup(auth, googleProvider)
         .catch((error) => {
           if (error.code === 'auth/popup-closed-by-user') {
@@ -285,22 +260,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           throw error;
         });
-  
+
       if (!result) {
         throw new Error('Failed to get sign-in result');
       }
-  
-      const userData = await updateUserInFirestore(result.user);
-      if (!userData) {
+
+      // Check if user exists before proceeding
+      const userRef = doc(db, 'users', result.user.uid);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        await signOut(auth);
         throw new Error('User not registered. Please register first.');
       }
-  
+
       // Get the token
       const token = await result.user.getIdToken();
-  
+
+      // User state will be updated by onAuthStateChanged
       return {
         token,
-        user: userData
+        user: userDoc.data() as User
       };
     } catch (error) {
       console.error('Google login error:', error);
