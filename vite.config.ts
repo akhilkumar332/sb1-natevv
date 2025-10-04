@@ -43,6 +43,39 @@ export default defineConfig(({ command, mode }) => {
     build: {
       outDir: 'dist',
       sourcemap: !isProd,
+      // Optimize bundle size
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          drop_console: isProd, // Remove console.logs in production
+          drop_debugger: isProd,
+        },
+      },
+      // Increase chunk size warning limit
+      chunkSizeWarningLimit: 1000,
+      // Manual chunks for better code splitting
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            // Vendor chunks
+            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+            'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
+            'ui-vendor': ['lucide-react', 'react-hot-toast'],
+            '3d-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
+            'i18n-vendor': ['i18next', 'react-i18next', 'i18next-browser-languagedetector', 'i18next-http-backend'],
+            // App chunks
+            'analytics': [
+              './src/services/analytics.service.ts',
+              './src/components/analytics/StatsCard.tsx',
+              './src/components/analytics/LineChart.tsx',
+              './src/components/analytics/PieChart.tsx',
+              './src/components/analytics/BarChart.tsx',
+              './src/components/analytics/DateRangeFilter.tsx',
+              './src/components/analytics/ExportButton.tsx',
+            ],
+          },
+        },
+      },
     },
     server: {
       port: 5180,

@@ -28,8 +28,8 @@ const ProtectedRoute = () => {
   } else {
     const userRole = user.role;
 
-    // Check for onboarding completion
-    if (!user.onboardingCompleted) {
+    // Check for onboarding completion (only redirect if explicitly false/undefined and not already on onboarding page)
+    if (user.onboardingCompleted !== true && !location.pathname.includes('/onboarding')) {
       return <Navigate to={`/${userRole}/onboarding`} replace />;
     }
 

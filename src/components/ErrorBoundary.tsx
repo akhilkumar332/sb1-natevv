@@ -24,6 +24,16 @@ class ErrorBoundary extends React.Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
+
+    // Log to monitoring service in production
+    if (import.meta.env.PROD) {
+      import('../services/monitoring.service').then(({ monitoringService }) => {
+        monitoringService.logError(error, {
+          componentStack: errorInfo.componentStack,
+          errorBoundary: true,
+        });
+      });
+    }
   }
 
   public render() {

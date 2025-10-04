@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { NavigateFunction } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { 
+import {
   signInWithPopup,
   signOut,
   onAuthStateChanged,
@@ -10,6 +10,11 @@ import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
   ConfirmationResult,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile,
+  sendEmailVerification,
 } from 'firebase/auth';
 import { 
   doc,
@@ -68,11 +73,14 @@ interface AuthContextType {
   authLoading: boolean;
   loginWithGoogle: () => Promise<LoginResponse>;
   loginWithPhone: (phoneNumber: string) => Promise<ConfirmationResult>;
+  loginWithEmail: (email: string, password: string) => Promise<LoginResponse>;
+  registerWithEmail: (email: string, password: string, displayName: string) => Promise<FirebaseUser>;
+  resetPassword: (email: string) => Promise<void>;
   logout: (navigate: NavigateFunction) => Promise<void>;
   updateUserProfile: (data: Partial<User>) => Promise<void>;
   loginLoading: boolean;
   setLoginLoading: (loading: boolean) => void;
-  verifyOTP: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
+  verifyOTP: (confirmationResult: ConfirmationResult, otp: string) => Promise<User>;
   setAuthLoading: (loading: boolean) => void;
 }
 
@@ -118,6 +126,7 @@ const updateUserInFirestore = async (
     phoneNumber: firebaseUser.phoneNumber || existingUserData.phoneNumber,
     lastLoginAt: new Date(),
     createdAt: convertTimestampToDate(existingUserData?.createdAt),
+    dateOfBirth: convertTimestampToDate(existingUserData?.dateOfBirth),
     lastDonation: convertTimestampToDate(existingUserData?.lastDonation),
     ...additionalData
   } as User;
@@ -177,55 +186,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoginLoading(true);
     try {
       setAuthLoading(true);
-      // Clean up existing recaptcha
+
+      // Clear existing verifier first
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (e) {
+          console.warn('Error clearing recaptcha:', e);
+        }
+        window.recaptchaVerifier = undefined;
+      }
+
+      // Clean up existing recaptcha container
       const existingContainer = document.getElementById('recaptcha-container');
       if (existingContainer) {
         existingContainer.remove();
       }
-  
+
       // Create new recaptcha container
       const container = document.createElement('div');
       container.id = 'recaptcha-container';
       document.body.appendChild(container);
-  
-      // Clear existing verifier
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-        window.recaptchaVerifier = undefined;
-      }
-  
+
       // Create new recaptcha verifier
       const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         'size': 'invisible',
-        'callback': () => {},
+        'callback': () => {
+          console.log('reCAPTCHA solved');
+        },
         'expired-callback': () => {
           toast.error('reCAPTCHA expired. Please try again.');
         }
       });
-  
+
       window.recaptchaVerifier = recaptchaVerifier;
-  
+
       // Send OTP
       const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
-      
-      // Clean up after successful send
-      if (container) {
-        container.remove();
-      }
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-        window.recaptchaVerifier = undefined;
-      }
-  
+
+      console.log('OTP sent successfully');
+
+      // DON'T clean up here - keep recaptcha active until OTP is verified
       return confirmation;
     } catch (error) {
-      // Clean up on error
+      // Clean up on error only
       const container = document.getElementById('recaptcha-container');
       if (container) {
         container.remove();
       }
       if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (e) {
+          console.warn('Error clearing recaptcha on error:', e);
+        }
         window.recaptchaVerifier = undefined;
       }
       console.error('Phone login error:', error);
@@ -236,13 +250,206 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const verifyOTP = async (confirmationResult: ConfirmationResult, otp: string): Promise<void> => {
+  const verifyOTP = async (confirmationResult: ConfirmationResult, otp: string): Promise<User> => {
     try {
-      await confirmationResult.confirm(otp);
-      // User state will be updated by onAuthStateChanged
+      const userCredential = await confirmationResult.confirm(otp);
+
+      // Clean up reCAPTCHA after successful verification
+      const container = document.getElementById('recaptcha-container');
+      if (container) {
+        container.remove();
+      }
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (e) {
+          console.warn('Error clearing recaptcha after OTP verify:', e);
+        }
+        window.recaptchaVerifier = undefined;
+      }
+
+      const userRef = doc(db, 'users', userCredential.user.uid);
+
+      // Fetch user data first
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        await signOut(auth);
+        throw new Error('User not registered');
+      }
+
+      const userData = userDoc.data() as User;
+
+      // Update last login in background (don't wait)
+      updateDoc(userRef, { lastLoginAt: serverTimestamp() }).catch(err =>
+        console.error('Failed to update lastLoginAt:', err)
+      );
+
+      // Prepare user data
+      const userDataToReturn = {
+        ...userData,
+        uid: userCredential.user.uid,
+        lastLoginAt: new Date(),
+        createdAt: convertTimestampToDate(userData?.createdAt),
+        dateOfBirth: convertTimestampToDate(userData?.dateOfBirth),
+        lastDonation: convertTimestampToDate(userData?.lastDonation),
+      } as User;
+
+      // Update user state immediately for navigation
+      setUser(userDataToReturn);
+
+      // Return user data for immediate navigation
+      return userDataToReturn;
     } catch (error) {
       console.error('OTP verification error:', error);
+
+      // Clean up reCAPTCHA on error too
+      const container = document.getElementById('recaptcha-container');
+      if (container) {
+        container.remove();
+      }
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (e) {
+          console.warn('Error clearing recaptcha on OTP error:', e);
+        }
+        window.recaptchaVerifier = undefined;
+      }
+
       throw error;
+    }
+  };
+
+  const loginWithEmail = async (email: string, password: string): Promise<LoginResponse> => {
+    try {
+      setLoginLoading(true);
+      setAuthLoading(true);
+
+      const result = await signInWithEmailAndPassword(auth, email, password);
+
+      if (!result) {
+        throw new Error('Failed to sign in with email');
+      }
+
+      // Check if user exists in Firestore
+      const userRef = doc(db, 'users', result.user.uid);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        await signOut(auth);
+        throw new Error('User not registered. Please register first.');
+      }
+
+      // Get the token
+      const token = await result.user.getIdToken();
+
+      const userDataToReturn = {
+        ...userDoc.data(),
+        uid: result.user.uid,
+        createdAt: convertTimestampToDate(userDoc.data()?.createdAt),
+        dateOfBirth: convertTimestampToDate(userDoc.data()?.dateOfBirth),
+        lastLoginAt: new Date(),
+        lastDonation: convertTimestampToDate(userDoc.data()?.lastDonation),
+      } as User;
+
+      // Update last login time in background
+      updateDoc(userRef, { lastLoginAt: serverTimestamp() }).catch(err =>
+        console.error('Failed to update lastLoginAt:', err)
+      );
+
+      // Update user state immediately
+      setUser(userDataToReturn);
+
+      return {
+        token,
+        user: userDataToReturn
+      };
+    } catch (error: any) {
+      console.error('Email login error:', error);
+
+      // Provide user-friendly error messages
+      let errorMessage = 'Failed to sign in';
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address';
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = 'This account has been disabled';
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoginLoading(false);
+      setAuthLoading(false);
+    }
+  };
+
+  const registerWithEmail = async (
+    email: string,
+    password: string,
+    displayName: string
+  ): Promise<FirebaseUser> => {
+    try {
+      setAuthLoading(true);
+
+      // Create user account
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+
+      // Update profile with display name
+      await updateProfile(result.user, { displayName });
+
+      // Send email verification
+      await sendEmailVerification(result.user);
+
+      toast.success('Registration successful! Please check your email for verification.');
+
+      return result.user;
+    } catch (error: any) {
+      console.error('Email registration error:', error);
+
+      // Provide user-friendly error messages
+      let errorMessage = 'Failed to register';
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'An account with this email already exists';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password is too weak. Use at least 6 characters';
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const resetPassword = async (email: string): Promise<void> => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast.success('Password reset email sent! Please check your inbox.');
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+
+      let errorMessage = 'Failed to send password reset email';
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address';
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
@@ -277,10 +484,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Get the token
       const token = await result.user.getIdToken();
 
-      // User state will be updated by onAuthStateChanged
+      const userDataToReturn = {
+        ...userDoc.data(),
+        uid: result.user.uid,
+        createdAt: convertTimestampToDate(userDoc.data()?.createdAt),
+        dateOfBirth: convertTimestampToDate(userDoc.data()?.dateOfBirth),
+        lastLoginAt: new Date(),
+        lastDonation: convertTimestampToDate(userDoc.data()?.lastDonation),
+      } as User;
+
+      // Update user state immediately for navigation
+      setUser(userDataToReturn);
+
       return {
         token,
-        user: userDoc.data() as User
+        user: userDataToReturn
       };
     } catch (error) {
       console.error('Google login error:', error);
@@ -327,38 +545,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Update updateUserProfile method to handle onboarding
   const updateUserProfile = async (data: Partial<User>): Promise<void> => {
-    if (!user) return;
+    if (!user) {
+      throw new Error('No user logged in');
+    }
     console.log('Updating user profile with:', data);
     try {
-      await setDoc(doc(db, 'users', user.uid), 
-        { 
-          ...data, 
+      await setDoc(doc(db, 'users', user.uid),
+        {
+          ...data,
           onboardingCompleted: true // Set this to true upon successful completion
-        }, 
+        },
         { merge: true }
       );
-      setUser (prev => ({ 
-        ...prev, 
-        ...data, 
+      setUser (prev => ({
+        ...prev,
+        ...data,
         onboardingCompleted: true // Ensure this is updated in the state
       } as User));
     } catch (error) {
       console.error('Error updating user profile:', error);
-      toast.error('Failed to update profile. Please try again.');
+      throw error; // Re-throw the error so the caller can handle it
     }
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      authLoading, 
-      loginWithGoogle, 
-      loginWithPhone, 
-      logout, 
-      updateUserProfile, 
-      loginLoading, 
-      setLoginLoading, 
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      authLoading,
+      loginWithGoogle,
+      loginWithPhone,
+      loginWithEmail,
+      registerWithEmail,
+      resetPassword,
+      logout,
+      updateUserProfile,
+      loginLoading,
+      setLoginLoading,
       verifyOTP,
       setAuthLoading
     }}>
