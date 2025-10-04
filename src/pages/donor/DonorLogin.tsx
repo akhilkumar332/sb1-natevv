@@ -25,14 +25,15 @@ export function DonorLogin() {
   } = useLogin();
 
   useEffect(() => {
-    if (user) {
+    // Only redirect if user is already logged in when component mounts
+    if (user && !confirmationResult) {
       if (!user.onboardingCompleted) {
         navigate('/donor/onboarding');
       } else if (user.role === 'donor') {
         navigate('/donor/dashboard');
       }
     }
-  }, [user, navigate]);
+  }, []);
 
   const renderInitialForm = () => (
     <div className="space-y-4">
