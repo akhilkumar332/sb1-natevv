@@ -1,7 +1,7 @@
 // src/components/nav/UserMenu.tsx
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { User as UserIcon, LogOut } from 'lucide-react';
+import { User as UserIcon, LogOut, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,6 +12,22 @@ export function UserMenu() {
 
   const handleLogout = async () => {
     await logout(navigate);
+  };
+
+  // Get dashboard path based on user role
+  const getDashboardPath = () => {
+    switch (user?.role) {
+      case 'donor':
+        return '/donor/dashboard';
+      case 'hospital':
+        return '/hospital/dashboard';
+      case 'ngo':
+        return '/ngo/dashboard';
+      case 'admin':
+        return '/admin/dashboard';
+      default:
+        return '/donor/dashboard';
+    }
   };
 
   if(authLoading) {
@@ -40,15 +56,16 @@ export function UserMenu() {
         {isOpen && (
           <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-100">
             <Link
-              to="/profile"
-              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              to={getDashboardPath()}
+              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
               onClick={() => setIsOpen(false)}
             >
-              Profile
+              <LayoutDashboard className="inline-block w-4 h-4 mr-2" />
+              Dashboard
             </Link>
             <button
               onClick={handleLogout}
-              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
             >
               <LogOut className="inline-block w-4 h-4 mr-2" />
               Logout
@@ -68,6 +85,22 @@ export function MobileUserMenu() {
     await logout(navigate);
   };
 
+  // Get dashboard path based on user role
+  const getDashboardPath = () => {
+    switch (user?.role) {
+      case 'donor':
+        return '/donor/dashboard';
+      case 'hospital':
+        return '/hospital/dashboard';
+      case 'ngo':
+        return '/ngo/dashboard';
+      case 'admin':
+        return '/admin/dashboard';
+      default:
+        return '/donor/dashboard';
+    }
+  };
+
   return (
     <div className="space-y-2 border-t border-gray-200 pt-4">
       <div className="flex items-center space-x-2 px-3 py-2">
@@ -85,10 +118,11 @@ export function MobileUserMenu() {
         <span className="text-gray-700">{user?.displayName || 'User'}</span>
       </div>
       <Link
-        to="/profile"
-        className="block px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+        to={getDashboardPath()}
+        className="flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50"
       >
-        Profile
+        <LayoutDashboard className="w-4 h-4 mr-2" />
+        Dashboard
       </Link>
       <button
         onClick={handleLogout}

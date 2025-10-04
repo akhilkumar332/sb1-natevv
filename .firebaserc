@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "bloodhubindia-1da2a",
+    "production": "bloodhubindia-1da2a"
+  },
+  "targets": {},
+  "etags": {}
+}

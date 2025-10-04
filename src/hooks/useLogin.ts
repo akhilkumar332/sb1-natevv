@@ -12,13 +12,14 @@ interface LoginFormData {
 
 export const useLogin = () => {
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
   const [formData, setFormData] = useState<LoginFormData>({
     identifier: '',
     otp: ''
   });
   const [otpResendTimer, setOtpResendTimer] = useState(0);
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
-  
+
   const navigate = useNavigate();
   const { loginWithGoogle, loginWithPhone, verifyOTP, user, authLoading } = useAuth();
 
@@ -76,11 +77,25 @@ export const useLogin = () => {
       return;
     }
     try {
-      await verifyOTP(confirmationResult, formData.otp);
+      setOtpLoading(true);
+      const userData = await verifyOTP(confirmationResult, formData.otp);
+      console.log('OTP verified, user data:', userData);
+      console.log('Onboarding completed:', userData.onboardingCompleted);
       toast.success('Login successful!');
-      navigate('/donor/dashboard');
+
+      // Navigate based on onboarding status - if not explicitly true, go to onboarding
+      if (userData.onboardingCompleted === true) {
+        console.log('Navigating to dashboard');
+        navigate('/donor/dashboard');
+      } else {
+        console.log('Navigating to onboarding');
+        navigate('/donor/onboarding');
+      }
     } catch (error) {
+      console.error('OTP verification error:', error);
       toast.error('Invalid OTP. Please try again.');
+    } finally {
+      setOtpLoading(false);
     }
   };
 
@@ -103,10 +118,20 @@ export const useLogin = () => {
     try {
       setGoogleLoading(true);
       const result = await loginWithGoogle();
-      if (result?.token) {
+      if (result?.token && result?.user) {
         handleLoginSuccess(result.token);
+        console.log('Google login user data:', result.user);
+        console.log('Onboarding completed:', result.user.onboardingCompleted);
         toast.success('Successfully logged in with Google!');
-        navigate('/donor/dashboard');
+
+        // Navigate based on onboarding status - if not explicitly true, go to onboarding
+        if (result.user.onboardingCompleted === true) {
+          console.log('Navigating to dashboard');
+          navigate('/donor/dashboard');
+        } else {
+          console.log('Navigating to onboarding');
+          navigate('/donor/onboarding');
+        }
       } else {
         throw new Error('No token received');
       }
@@ -130,5 +155,6 @@ export const useLogin = () => {
     handleResendOTP,
     handleGoogleLogin,
     googleLoading,
+    otpLoading,
   };
 };

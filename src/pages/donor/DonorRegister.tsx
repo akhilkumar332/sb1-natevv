@@ -1,384 +1,319 @@
 // src/pages/auth/DonorRegister.tsx
-import React, { useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, User, MapPin, Calendar } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Phone, Droplet, Heart, Shield, Users, Award, ArrowRight } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import PhoneInput from 'react-phone-number-input';
+import { useRegister } from '../../hooks/useRegister';
 import 'react-phone-number-input/style.css';
-
-interface RegisterFormData {
-  fullName: string;
-  email: string;
-  phoneNumber: string;
-  bloodType: string;
-  dateOfBirth: string;
-  address: string;
-  city: string;
-  state: string;
-  pincode: string;
-  lastDonation?: string;
-  medicalConditions: string;
-  agreement: boolean;
-}
-
-const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 export function DonorRegister() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState<RegisterFormData>({
-    fullName: '',
-    email: '',
-    phoneNumber: '',
-    bloodType: '',
-    dateOfBirth: '',
-    address: '',
-    city: '',
-    state: '',
-    pincode: '',
-    lastDonation: '',
-    medicalConditions: '',
-    agreement: false,
-  });
+  const { user } = useAuth();
+  const hasNavigated = useRef(false);
+  const {
+    formData,
+    otpResendTimer,
+    confirmationResult,
+    authLoading,
+    googleLoading,
+    otpLoading,
+    handleIdentifierChange,
+    handleChange,
+    handlePhoneNumberSubmit,
+    handleOTPSubmit,
+    handleResendOTP,
+    handleGoogleRegister
+  } = useRegister();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-    }));
-  };
-
-  const handlePhoneChange = (value: string | undefined) => {
-    setFormData(prev => ({
-      ...prev,
-      phoneNumber: value || ''
-    }));
-  };
-
-  const validateForm = (): boolean => {
-    // Name validation
-    if (formData.fullName.length < 3) {
-      toast.error('Please enter a valid full name');
-      return false;
+  useEffect(() => {
+    if (user && !hasNavigated.current) {
+      hasNavigated.current = true;
+      if (!user.onboardingCompleted) {
+        navigate('/donor/onboarding');
+      } else if (user.role === 'donor') {
+        navigate('/donor/dashboard');
+      }
     }
+  }, []);
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      toast.error('Please enter a valid email address');
-      return false;
-    }
+  const renderInitialForm = () => (
+    <div className="space-y-6">
+      <div>
+        <label htmlFor="identifier" className="block text-sm font-semibold text-gray-700 mb-2">
+          Phone Number
+        </label>
+        <div className="relative">
+          <PhoneInput
+            international
+            defaultCountry="IN"
+            countryCallingCodeEditable={false}
+            value={formData.identifier}
+            onChange={(value) => handleIdentifierChange(value || '')}
+            className="block w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors"
+          />
+          <Phone className="absolute right-4 top-3.5 h-5 w-5 text-gray-400" />
+        </div>
+      </div>
 
-    // Phone validation
-    if (!formData.phoneNumber || formData.phoneNumber.length < 10) {
-      toast.error('Please enter a valid phone number');
-      return false;
-    }
+      <button
+        type="button"
+        onClick={handlePhoneNumberSubmit}
+        disabled={authLoading || formData.identifier.replace(/\D/g, '').length !== 10 &&
+                 formData.identifier.replace(/\D/g, '').length !== 12}
+        className="w-full py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
+      >
+        {authLoading ? (
+          <>
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <span>Processing...</span>
+          </>
+        ) : (
+          <>
+            <span>Send OTP</span>
+            <ArrowRight className="w-5 h-5" />
+          </>
+        )}
+      </button>
+    </div>
+  );
 
-    // Blood type validation
-    if (!BLOOD_TYPES.includes(formData.bloodType)) {
-      toast.error('Please select a valid blood type');
-      return false;
-    }
+  const renderOTPForm = () => (
+    <div className="space-y-6">
+      <div>
+        <label htmlFor="otp" className="block text-sm font-semibold text-gray-700 mb-2">
+          Enter OTP
+        </label>
+        <div className="relative">
+          <input
+            id="otp"
+            name="otp"
+            type="text"
+            required
+            value={formData.otp}
+            onChange={handleChange}
+            disabled={otpLoading}
+            maxLength={6}
+            className="block w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors text-center text-2xl font-bold tracking-widest disabled:opacity-50"
+            placeholder="000000"
+          />
+        </div>
+        <p className="mt-2 text-sm text-gray-500 text-center">
+          We've sent a 6-digit code to your phone
+        </p>
+      </div>
 
-    // Date of birth validation
-    const dob = new Date(formData.dateOfBirth);
-    const today = new Date();
-    const age = today.getFullYear() - dob.getFullYear();
-    if (age < 18 || age > 65) {
-      toast.error('You must be between 18 and 65 years old to register');
-      return false;
-    }
+      <button
+        type="button"
+        onClick={handleOTPSubmit}
+        disabled={otpLoading}
+        className="w-full py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
+      >
+        {otpLoading ? (
+          <>
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <span>Verifying...</span>
+          </>
+        ) : (
+          <>
+            <span>Verify OTP</span>
+            <ArrowRight className="w-5 h-5" />
+          </>
+        )}
+      </button>
 
-    // Address validation
-    if (!formData.address || !formData.city || !formData.state || !formData.pincode) {
-      toast.error('Please fill in all address fields');
-      return false;
-    }
-
-    // Agreement validation
-    if (!formData.agreement) {
-      toast.error('Please agree to the terms and conditions');
-      return false;
-    }
-
-    return true;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      // Here you would typically:
-      // 1. Create user account
-      // 2. Store additional donor information in Firestore
-      // 3. Send verification SMS/email
-      
-      // For now, we'll just simulate the registration process
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast.success('Registration successful! Please verify your phone number.');
-      navigate('/donor/verify-phone', { state: { phoneNumber: formData.phoneNumber } });
-    } catch (error) {
-      console.error('Registration error:', error);
-      toast.error('Failed to register. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+      <div className="text-center">
+        {otpResendTimer > 0 ? (
+          <p className="text-sm text-gray-500">
+            Resend OTP in <span className="font-bold text-red-600">{otpResendTimer}s</span>
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={handleResendOTP}
+            disabled={otpLoading}
+            className="text-sm text-red-600 hover:text-red-700 font-semibold disabled:opacity-50 transition-colors"
+          >
+            Resend OTP
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900">Register as a Blood Donor</h2>
-          <p className="mt-2 text-gray-600">Join our community of life-savers</p>
+    <div className="min-h-screen flex">
+      {/* Left Side - Gradient Background with Info */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-red-800 relative overflow-hidden">
+        {/* Animated Background Elements */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-red-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-red-900 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+
+        <div className="relative z-10 flex flex-col justify-center px-12 py-12 text-white">
+          <div className="mb-12">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="relative">
+                <Droplet className="w-12 h-12" />
+                <Heart className="w-5 h-5 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-extrabold">BloodHub</h1>
+                <p className="text-sm tracking-wider opacity-90">INDIA</p>
+              </div>
+            </div>
+            <h2 className="text-4xl font-bold mb-4">Become a Life-Saver</h2>
+            <p className="text-xl opacity-90 leading-relaxed">
+              Join thousands of heroes who are saving lives through blood donation.
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            <div className="flex items-start space-x-4">
+              <div className="flex-shrink-0 w-12 h-12 bg-white/10 backdrop-blur-lg rounded-xl flex items-center justify-center">
+                <Heart className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg mb-1">Save Lives</h3>
+                <p className="opacity-90 text-sm">One donation can save up to three lives</p>
+              </div>
+            </div>
+
+            <div className="flex items-start space-x-4">
+              <div className="flex-shrink-0 w-12 h-12 bg-white/10 backdrop-blur-lg rounded-xl flex items-center justify-center">
+                <Users className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg mb-1">Join the Community</h3>
+                <p className="opacity-90 text-sm">Connect with 50,000+ active donors</p>
+              </div>
+            </div>
+
+            <div className="flex items-start space-x-4">
+              <div className="flex-shrink-0 w-12 h-12 bg-white/10 backdrop-blur-lg rounded-xl flex items-center justify-center">
+                <Award className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg mb-1">Track Your Impact</h3>
+                <p className="opacity-90 text-sm">Monitor your donation history and badges</p>
+              </div>
+            </div>
+
+            <div className="flex items-start space-x-4">
+              <div className="flex-shrink-0 w-12 h-12 bg-white/10 backdrop-blur-lg rounded-xl flex items-center justify-center">
+                <Shield className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg mb-1">Safe & Secure</h3>
+                <p className="opacity-90 text-sm">Your privacy is our top priority</p>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg px-8 pt-6 pb-8 mb-4">
-          {/* Personal Information */}
-          <div className="mb-8">
-            <h3 className="text-lg font-semibold mb-4">Personal Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
-                  Full Name
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    type="text"
-                    id="fullName"
-                    name="fullName"
-                    value={formData.fullName}
-                    onChange={handleChange}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                    required
-                  />
-                  <User className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+      {/* Right Side - Register Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-12 bg-gray-50">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10 border border-gray-100">
+            {/* Mobile Logo */}
+            <div className="lg:hidden text-center mb-8">
+              <div className="inline-flex items-center space-x-2">
+                <div className="relative">
+                  <Droplet className="w-10 h-10 text-red-600" />
+                  <Heart className="w-4 h-4 text-red-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+                </div>
+                <div>
+                  <span className="font-extrabold text-2xl bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
+                    BloodHub
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Donor Registration</h2>
+              <p className="text-gray-600">Join our community of life-savers!</p>
+            </div>
+
+            <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+              {confirmationResult ? renderOTPForm() : renderInitialForm()}
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-4 bg-white text-gray-500 font-medium">Or continue with</span>
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                    required
-                  />
-                  <Mail className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={handleGoogleRegister}
+                disabled={authLoading || googleLoading || otpLoading}
+                className="w-full flex items-center justify-center px-6 py-4 border-2 border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {googleLoading || otpLoading ? (
+                  <span className="flex items-center space-x-2">
+                    <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span>{googleLoading ? 'Signing up...' : 'Verifying...'}</span>
+                  </span>
+                ) : (
+                  <>
+                    <img
+                      className="h-5 w-5 mr-3"
+                      src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                      alt="Google logo"
+                    />
+                    Sign up with Google
+                  </>
+                )}
+              </button>
 
-              <div>
-                <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
-                  Phone Number
-                </label>
-                <PhoneInput
-                  international
-                  defaultCountry="IN"
-                  value={formData.phoneNumber}
-                  onChange={handlePhoneChange}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="bloodType" className="block text-sm font-medium text-gray-700">
-                  Blood Type
-                </label>
-                <div className="mt-1 relative">
-                  <select
-                    id="bloodType"
-                    name="bloodType"
-                    value={formData.bloodType}
-                    onChange={handleChange}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                    required
+              <div className="pt-4 border-t border-gray-100">
+                <p className="text-center text-sm text-gray-600">
+                  Already have an account?{' '}
+                  <Link
+                    to="/donor/login"
+                    className="font-semibold text-red-600 hover:text-red-700 transition-colors"
                   >
-                    <option value="" disabled>Select your blood type</option>
-                    {BLOOD_TYPES.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
-                </div>
+                    Login now
+                  </Link>
+                </p>
               </div>
-
-              <div>
-                <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
-                  Date of Birth
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    type="date"
-                    id="dateOfBirth"
-                    name="dateOfBirth"
-                    value={formData.dateOfBirth}
-                    onChange={handleChange}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                    required
-                  />
-                  <Calendar className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-                </div>
-              </div>
-            </div>
+            </form>
           </div>
 
-          {/* Address Information */}
-          <div className="mb-8">
-            <h3 className="text-lg font-semibold mb-4">Address Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="address" className="block text-sm font-medium text-gray-700">
-                  Address
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    type="text"
-                    id="address"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                    required
-                  />
-                  <MapPin className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="city" className="block text-sm font-medium text-gray-700">
-                  City
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    type="text"
-                    id="city"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="state" className="block text-sm font-medium text-gray-700">
-                  State
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    type="text"
-                    id="state"
-                    name="state"
-                    value={formData.state}
-                    onChange={handleChange}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="pincode" className="block text-sm font-medium text-gray-700">
-                  Pincode
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    type="text"
-                    id="pincode"
-                    name="pincode"
-                    value={formData.pincode}
-                    onChange={handleChange}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
+          {/* Benefits */}
+          <div className="mt-6 bg-gradient-to-r from-red-50 to-pink-50 rounded-2xl p-6 border border-red-100">
+            <h3 className="font-bold text-gray-900 mb-3 flex items-center">
+              <Heart className="w-5 h-5 text-red-600 mr-2" />
+              Why Donate Blood?
+            </h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-center">
+                <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2"></span>
+                Save up to 3 lives with one donation
+              </li>
+              <li className="flex items-center">
+                <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2"></span>
+                Free health checkup before every donation
+              </li>
+              <li className="flex items-center">
+                <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2"></span>
+                Reduces risk of heart diseases
+              </li>
+              <li className="flex items-center">
+                <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2"></span>
+                Join a community of heroes
+              </li>
+            </ul>
           </div>
 
-          {/* Medical Information */}
-          <div className="mb-8">
-            <h3 className="text-lg font-semibold mb-4">Medical Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="lastDonation" className="block text-sm font-medium text-gray-700">
-                  Last Donation Date (if applicable)
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                    type="date"
-                    id="lastDonation"
-                    name="lastDonation"
-                    value={formData.lastDonation}
-                    onChange={handleChange}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="medicalConditions" className="block text-sm font-medium text-gray-700">
-                  Medical Conditions
-                </label>
-                <div className="mt-1 relative">
-                  <textarea
-                    id="medicalConditions"
-                    name="medicalConditions"
-                    value={formData.medicalConditions}
-                    onChange={handleChange}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500"
-                    rows={3}
-                  />
-                </div>
-              </div>
-            </div>
+          {/* Terms */}
+          <div className="mt-4 text-center text-xs text-gray-500">
+            <p>By registering, you agree to our Terms of Service and Privacy Policy</p>
           </div>
-
-          {/* Agreement */}
-          <div className="mb-4">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                name="agreement"
-                checked={formData.agreement}
-                onChange={handleChange}
-                className="mr-2"
-                required
-              />
-              I agree to the terms and conditions
-            </label>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Registering...' : 'Register'}
-            </button>
-          </div>
-        </form>
-
-        <div className="text-center">
-          <Link to="/auth/login" className="text-sm text-gray-600 hover:text-gray-900">
-            Already have an account? Login
-          </Link>
         </div>
       </div>
     </div>

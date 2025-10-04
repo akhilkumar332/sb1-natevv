@@ -1,0 +1,402 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========================================================================
+    // HELPER FUNCTIONS
+    // ========================================================================
+
+    /**
+     * Check if user is authenticated
+     */
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    /**
+     * Check if user owns the resource
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * Get user document data
+     */
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    /**
+     * Check if user has a specific role
+     */
+    function hasRole(role) {
+      return isAuthenticated() && getUserData().role == role;
+    }
+
+    /**
+     * Check if user is admin
+     */
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    /**
+     * Check if user is donor
+     */
+    function isDonor() {
+      return hasRole('donor');
+    }
+
+    /**
+     * Check if user is hospital
+     */
+    function isHospital() {
+      return hasRole('hospital');
+    }
+
+    /**
+     * Check if user is NGO
+     */
+    function isNGO() {
+      return hasRole('ngo');
+    }
+
+    /**
+     * Check if user is verified (for hospitals and NGOs)
+     */
+    function isVerified() {
+      return isAuthenticated() && getUserData().verified == true;
+    }
+
+    /**
+     * Check if user account is active
+     */
+    function isActive() {
+      return isAuthenticated() && getUserData().status == 'active';
+    }
+
+    // ========================================================================
+    // COLLECTION: users
+    // ========================================================================
+
+    match /users/{userId} {
+      // Anyone authenticated can read user data
+      allow read: if isAuthenticated();
+
+      // Users can create their own document during registration
+      allow create: if isAuthenticated() && isOwner(userId);
+
+      // Users can update their own data, admins can update any
+      // Prevent users from changing their own role or verification status
+      allow update: if isAuthenticated() && (
+        (isOwner(userId) &&
+          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'verified', 'status']))) ||
+        isAdmin()
+      );
+
+      // Only admins can delete users
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: donations
+    // ========================================================================
+
+    match /donations/{donationId} {
+      // Donors can read their own, hospitals can read received, admins can read all
+      // Direct donorId check avoids role lookup issues during initial load
+      allow read: if isAuthenticated() && (
+        resource.data.donorId == request.auth.uid ||
+        resource.data.hospitalId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Hospitals and admins can create donations
+      allow create: if isAuthenticated() && (
+        (isHospital() && isVerified()) ||
+        isAdmin()
+      );
+
+      // Only the creating hospital or admin can update
+      allow update: if isAuthenticated() && (
+        (isHospital() && resource.data.hospitalId == request.auth.uid) ||
+        isAdmin()
+      );
+
+      // Only admins can delete
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: bloodRequests
+    // ========================================================================
+
+    match /bloodRequests/{requestId} {
+      // Anyone authenticated can read active requests
+      allow read: if isAuthenticated();
+
+      // Only verified hospitals and admins can create requests
+      allow create: if isAuthenticated() && (
+        (isHospital() && isVerified()) ||
+        isAdmin()
+      );
+
+      // Only the requester or admin can update
+      // Any authenticated user can update respondedDonors and confirmedDonors arrays
+      allow update: if isAuthenticated() && (
+        resource.data.requesterId == request.auth.uid ||
+        isAdmin() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['respondedDonors', 'confirmedDonors', 'updatedAt'])
+      );
+
+      // Only the requester or admin can delete
+      allow delete: if isAuthenticated() && (
+        resource.data.requesterId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // ========================================================================
+    // COLLECTION: bloodInventory
+    // ========================================================================
+
+    match /bloodInventory/{inventoryId} {
+      // Anyone authenticated can read inventory (for searching available blood)
+      allow read: if isAuthenticated();
+
+      // Only the hospital or admin can create/update their inventory
+      allow create: if isAuthenticated() && (
+        (isHospital() && isVerified() && request.resource.data.hospitalId == request.auth.uid) ||
+        isAdmin()
+      );
+
+      allow update: if isAuthenticated() && (
+        (isHospital() && resource.data.hospitalId == request.auth.uid) ||
+        isAdmin()
+      );
+
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: campaigns
+    // ========================================================================
+
+    match /campaigns/{campaignId} {
+      // Anyone authenticated can read campaigns
+      allow read: if isAuthenticated();
+
+      // Only verified NGOs and admins can create campaigns
+      allow create: if isAuthenticated() && (
+        (isNGO() && isVerified() && request.resource.data.ngoId == request.auth.uid) ||
+        isAdmin()
+      );
+
+      // Only the creating NGO or admin can update
+      // Any authenticated user can update registeredDonors and confirmedDonors arrays
+      allow update: if isAuthenticated() && (
+        resource.data.ngoId == request.auth.uid ||
+        isAdmin() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registeredDonors', 'confirmedDonors', 'updatedAt'])
+      );
+
+      // Only the creating NGO or admin can delete
+      allow delete: if isAuthenticated() && (
+        resource.data.ngoId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // ========================================================================
+    // COLLECTION: appointments
+    // ========================================================================
+
+    match /appointments/{appointmentId} {
+      // Donor and hospital involved, plus admin, can read
+      allow read: if isAuthenticated() && (
+        resource.data.donorId == request.auth.uid ||
+        resource.data.hospitalId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Any authenticated user can create appointments
+      allow create: if isAuthenticated();
+
+      // Involved parties or admin can update
+      allow update: if isAuthenticated() && (
+        resource.data.donorId == request.auth.uid ||
+        resource.data.hospitalId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: volunteers
+    // ========================================================================
+
+    match /volunteers/{volunteerId} {
+      // NGO and volunteer can read, admin can read all
+      allow read: if isAuthenticated() && (
+        resource.data.ngoId == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // NGO can create volunteers
+      allow create: if isAuthenticated() && (
+        (isNGO() && request.resource.data.ngoId == request.auth.uid) ||
+        isAdmin()
+      );
+
+      // NGO or admin can update
+      allow update: if isAuthenticated() && (
+        resource.data.ngoId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // NGO or admin can delete
+      allow delete: if isAuthenticated() && (
+        resource.data.ngoId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // ========================================================================
+    // COLLECTION: partnerships
+    // ========================================================================
+
+    match /partnerships/{partnershipId} {
+      // Involved parties and admin can read
+      allow read: if isAuthenticated() && (
+        resource.data.ngoId == request.auth.uid ||
+        resource.data.partnerId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // NGO or admin can create partnerships
+      allow create: if isAuthenticated() && (
+        (isNGO() && request.resource.data.ngoId == request.auth.uid) ||
+        isAdmin()
+      );
+
+      // Involved parties or admin can update
+      allow update: if isAuthenticated() && (
+        resource.data.ngoId == request.auth.uid ||
+        resource.data.partnerId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: notifications
+    // ========================================================================
+
+    match /notifications/{notificationId} {
+      // Only the recipient or admin can read
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // System and admins can create notifications
+      // In practice, this should be done via Cloud Functions
+      allow create: if isAuthenticated();
+
+      // Recipient can update (mark as read), admin can update any
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Recipient or admin can delete
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // ========================================================================
+    // COLLECTION: badges (Read-only for users)
+    // ========================================================================
+
+    match /badges/{badgeId} {
+      // Anyone authenticated can read badges
+      allow read: if isAuthenticated();
+
+      // Only admins can write badges
+      allow write: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: userBadges
+    // ========================================================================
+
+    match /userBadges/{userBadgeId} {
+      // Anyone authenticated can read badges (for public profiles)
+      allow read: if isAuthenticated();
+
+      // Only system/admin can create badges for users
+      // In practice, this should be done via Cloud Functions
+      allow create: if isAdmin();
+
+      // User can update display preferences, admin can update any
+      allow update: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDisplayed', 'displayOrder'])) ||
+        isAdmin()
+      );
+
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: verificationRequests
+    // ========================================================================
+
+    match /verificationRequests/{requestId} {
+      // Requester and admin can read
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Hospital or NGO can create their verification request
+      allow create: if isAuthenticated() && (
+        (isHospital() || isNGO()) &&
+        request.resource.data.userId == request.auth.uid
+      );
+
+      // Requester can update their own request (before review)
+      // Admin can always update
+      allow update: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid && resource.data.status == 'pending') ||
+        isAdmin()
+      );
+
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: analytics (Admin only write, all can read)
+    // ========================================================================
+
+    match /analytics/{analyticsId} {
+      // Anyone authenticated can read analytics
+      allow read: if isAuthenticated();
+
+      // Only admins can write analytics
+      // In practice, this should be done via Cloud Functions
+      allow write: if isAdmin();
+    }
+  }
+}
