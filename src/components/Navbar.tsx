@@ -32,13 +32,14 @@ function DesktopNavLink({ to, children }: NavLinkProps) {
   );
 }
 
-function MobileNavLink({ to, children }: NavLinkProps) {
+function MobileNavLink({ to, children, onClick }: NavLinkProps & { onClick?: () => void }) {
   const location = useLocation();
   const isActive = location.pathname === to;
 
   return (
     <Link
       to={to}
+      onClick={onClick}
       className={`block px-4 py-3 rounded-xl text-base font-medium transition-all ${
         isActive
           ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg'
@@ -136,12 +137,13 @@ function UserMenu() {
   );
 }
 
-function MobileUserMenu() {
+function MobileUserMenu({ onClose }: { onClose?: () => void }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     await logout(navigate);
+    if (onClose) onClose();
   };
 
   // Get dashboard path based on user role
@@ -187,6 +189,7 @@ function MobileUserMenu() {
       </div>
       <Link
         to={getDashboardPath()}
+        onClick={onClose}
         className="flex items-center px-4 py-3 text-gray-700 hover:bg-red-50 rounded-xl transition-all group"
       >
         <LayoutDashboard className="w-5 h-5 mr-3 text-red-600 group-hover:scale-110 transition-transform" />
@@ -216,115 +219,175 @@ const Navbar: React.FC = () => {
 
 
   return (
-    <nav className="relative bg-white/95 backdrop-blur-xl shadow-lg border-b border-white/50 sticky top-0 z-40">
-      {/* Decorative gradient line */}
-      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-red-600 to-transparent opacity-50"></div>
+    <>
+      <nav className="relative bg-white/95 backdrop-blur-xl shadow-lg border-b border-white/50 sticky top-0 z-40">
+        {/* Decorative gradient line */}
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-red-600 to-transparent opacity-50"></div>
 
-      <div className="container mx-auto px-4">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2 group">
-              <div className="relative">
-                <Droplet className="w-9 h-9 text-red-600 group-hover:scale-110 transition-transform duration-300" />
-                <Heart className="w-4 h-4 text-red-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-              </div>
-              <div>
-                <span className="font-extrabold text-2xl bg-gradient-to-r from-red-600 via-red-700 to-red-800 bg-clip-text text-transparent">
-                  BloodHub
-                </span>
-                <p className="text-[10px] text-gray-500 -mt-1 tracking-wider">INDIA</p>
-              </div>
-            </Link>
-          </div>
-
-          {/* Desktop Menu */}
-          <div className="hidden md:flex items-center space-x-1">
-            <DesktopNavLink to="/donors">Find Donors</DesktopNavLink>
-            <DesktopNavLink to="/request-blood">Request Blood</DesktopNavLink>
-            <DesktopNavLink to="/about">About</DesktopNavLink>
-            <DesktopNavLink to="/contact">Contact</DesktopNavLink>
-
-            <div className="ml-4 pl-4 border-l border-gray-200">
-              {authLoading ? (
-                <LoadingFallback />
-              ) : !user ? (
-                <div className="flex items-center space-x-3">
-                  <Link
-                    to="/donor/login"
-                    className="px-5 py-2 text-red-600 font-semibold hover:text-red-700 transition-colors"
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    to="/donor/register"
-                    className="px-6 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-full font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300"
-                  >
-                    Register
-                  </Link>
+        <div className="container mx-auto px-4">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <div className="flex items-center">
+              <Link to="/" className="flex items-center space-x-2 group">
+                <div className="relative">
+                  <Droplet className="w-9 h-9 text-red-600 group-hover:scale-110 transition-transform duration-300" />
+                  <Heart className="w-4 h-4 text-red-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
                 </div>
-              ) : (
-                <Suspense fallback={<LoadingFallback />}>
-                  <UserMenu />
-                </Suspense>
-              )}
+                <div>
+                  <span className="font-extrabold text-2xl bg-gradient-to-r from-red-600 via-red-700 to-red-800 bg-clip-text text-transparent">
+                    BloodHub
+                  </span>
+                  <p className="text-[10px] text-gray-500 -mt-1 tracking-wider">INDIA</p>
+                </div>
+              </Link>
             </div>
-          </div>
 
-           {/* Mobile Menu Button */}
-          <div className="md:hidden flex items-center">
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all border border-red-200"
-            >
-              {isOpen ? (
-                <X className="w-5 h-5 text-red-600" />
-              ) : (
-                <Menu className="w-5 h-5 text-red-600" />
-              )}
-            </button>
+            {/* Desktop Menu */}
+            <div className="hidden md:flex items-center space-x-1">
+              <DesktopNavLink to="/donors">Find Donors</DesktopNavLink>
+              <DesktopNavLink to="/request-blood">Request Blood</DesktopNavLink>
+              <DesktopNavLink to="/about">About</DesktopNavLink>
+              <DesktopNavLink to="/contact">Contact</DesktopNavLink>
+
+              <div className="ml-4 pl-4 border-l border-gray-200">
+                {authLoading ? (
+                  <LoadingFallback />
+                ) : !user ? (
+                  <div className="flex items-center space-x-3">
+                    <Link
+                      to="/donor/login"
+                      className="px-5 py-2 text-red-600 font-semibold hover:text-red-700 transition-colors"
+                    >
+                      Login
+                    </Link>
+                    <Link
+                      to="/donor/register"
+                      className="px-6 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-full font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300"
+                    >
+                      Register
+                    </Link>
+                  </div>
+                ) : (
+                  <Suspense fallback={<LoadingFallback />}>
+                    <UserMenu />
+                  </Suspense>
+                )}
+              </div>
+            </div>
+
+             {/* Mobile Menu Button */}
+            <div className="md:hidden flex items-center">
+              <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all border border-red-200"
+              >
+                {isOpen ? (
+                  <X className="w-5 h-5 text-red-600" />
+                ) : (
+                  <Menu className="w-5 h-5 text-red-600" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
+      </nav>
 
-        {/* Mobile Menu Content */}
-        {isOpen && (
-          <div className="md:hidden relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl my-4 p-4 border border-white/50 overflow-hidden animate-fadeIn">
-            {/* Decorative gradient orb */}
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-3xl opacity-10 pointer-events-none"></div>
+      {/* Mobile Menu - Modern Drawer Style - Outside navbar for proper positioning */}
+      {isOpen && (
+        <>
+          {/* Backdrop Overlay */}
+          <div
+            className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 animate-fadeIn"
+            onClick={() => setIsOpen(false)}
+          />
 
-            <div className="relative z-10 space-y-2">
-              <MobileNavLink to="/donors">Find Donors</MobileNavLink>
-              <MobileNavLink to="/request-blood">Request Blood</MobileNavLink>
-              <MobileNavLink to="/about">About</MobileNavLink>
-              <MobileNavLink to="/contact">Contact</MobileNavLink>
+          {/* Drawer Menu */}
+          <div className="md:hidden fixed top-0 right-0 bottom-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl animate-slideInRight">
+            {/* Decorative gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-red-50 via-white to-pink-50">
+              <div className="absolute -top-20 -right-20 w-64 h-64 bg-gradient-to-r from-red-400 to-pink-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+              <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-r from-pink-500 to-red-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10"></div>
+            </div>
 
-              {authLoading ? (
-                <LoadingFallback />
-              ) : !user ? (
-                <div className="flex flex-col space-y-2 mt-4 pt-4 border-t border-gray-200">
-                  <Link
-                    to="/donor/login"
-                    className="block w-full text-center px-5 py-3 text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300"
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    to="/donor/register"
-                    className="block w-full text-center px-5 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300"
-                  >
-                    Register
-                  </Link>
+            {/* Content */}
+            <div className="relative z-10 h-full flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center space-x-2">
+                  <div className="relative">
+                    <Droplet className="w-8 h-8 text-red-600" />
+                    <Heart className="w-3 h-3 text-red-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-extrabold bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
+                      BloodHub
+                    </h2>
+                    <p className="text-[10px] text-gray-500 -mt-1 tracking-wider">INDIA</p>
+                  </div>
                 </div>
-              ) : (
-                <Suspense fallback={<LoadingFallback />}>
-                  <MobileUserMenu />
-                </Suspense>
-              )}
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-50 hover:bg-red-100 transition-colors"
+                >
+                  <X className="w-5 h-5 text-red-600" />
+                </button>
+              </div>
+
+              {/* Menu Items with staggered animation */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-2">
+                <div className="animate-slideInRight" style={{ animationDelay: '0.1s', animationFillMode: 'both' }}>
+                  <MobileNavLink to="/donors" onClick={() => setIsOpen(false)}>Find Donors</MobileNavLink>
+                </div>
+                <div className="animate-slideInRight" style={{ animationDelay: '0.15s', animationFillMode: 'both' }}>
+                  <MobileNavLink to="/request-blood" onClick={() => setIsOpen(false)}>Request Blood</MobileNavLink>
+                </div>
+                <div className="animate-slideInRight" style={{ animationDelay: '0.2s', animationFillMode: 'both' }}>
+                  <MobileNavLink to="/about" onClick={() => setIsOpen(false)}>About</MobileNavLink>
+                </div>
+                <div className="animate-slideInRight" style={{ animationDelay: '0.25s', animationFillMode: 'both' }}>
+                  <MobileNavLink to="/contact" onClick={() => setIsOpen(false)}>Contact</MobileNavLink>
+                </div>
+
+                {authLoading ? (
+                  <LoadingFallback />
+                ) : !user ? (
+                  <div className="flex flex-col space-y-2 mt-6 pt-6 border-t border-gray-200 animate-slideInRight" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
+                    <Link
+                      to="/donor/login"
+                      onClick={() => setIsOpen(false)}
+                      className="block w-full text-center px-5 py-3 text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300"
+                    >
+                      Login
+                    </Link>
+                    <Link
+                      to="/donor/register"
+                      onClick={() => setIsOpen(false)}
+                      className="block w-full text-center px-5 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300"
+                    >
+                      Register
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="animate-slideInRight" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
+                    <Suspense fallback={<LoadingFallback />}>
+                      <MobileUserMenu onClose={() => setIsOpen(false)} />
+                    </Suspense>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 border-t border-gray-200 bg-gradient-to-r from-red-50 to-pink-50">
+                <div className="flex items-center text-red-600 font-semibold justify-center">
+                  <Heart className="w-4 h-4 mr-2 animate-pulse" />
+                  <span className="text-sm">Saving Lives Together</span>
+                </div>
+              </div>
             </div>
           </div>
-        )}
-      </div>
-    </nav>
+        </>
+      )}
+    </>
   );
 };
 
