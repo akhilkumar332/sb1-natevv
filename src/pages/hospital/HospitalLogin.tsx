@@ -55,11 +55,12 @@ export function HospitalLogin() {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
+    // Only redirect if user is already logged in when component mounts
     if (user) {
       const targetPath = user.onboardingCompleted ? '/hospital/dashboard' : '/hospital/onboarding';
       navigate(targetPath);
     }
-  }, [user, navigate]);
+  }, []);
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
