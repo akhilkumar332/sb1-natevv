@@ -17,9 +17,11 @@ const DonorRegister = lazy(() => lazyLoad(import('./pages/donor/DonorRegister'))
 const DonorLogin = lazy(() => lazyLoad(import('./pages/donor/DonorLogin')));
 const DonorOnboarding = lazy(() => lazyLoad(import('./pages/donor/DonorOnboarding')));
 const DonorDashboard = lazy(() => lazyLoad(import('./pages/donor/DonorDashboard')));
+const HospitalRegister = lazy(() => lazyLoad(import('./pages/hospital/HospitalRegister')));
 const HospitalLogin = lazy(() => lazyLoad(import('./pages/hospital/HospitalLogin')));
 const HospitalDashboard = lazy(() => lazyLoad(import('./pages/hospital/HospitalDashboard')));
 const HospitalOnboarding = lazy(() => lazyLoad(import('./pages/hospital/HospitalOnboarding')));
+const NgoRegister = lazy(() => lazyLoad(import('./pages/ngo/NgoRegister')));
 const NgoLogin = lazy(() => lazyLoad(import('./pages/ngo/NgoLogin')));
 const NgoDashboard = lazy(() => lazyLoad(import('./pages/ngo/NgoDashboard')));
 const NgoOnboarding = lazy(() => lazyLoad(import('./pages/ngo/NgoOnboarding')));
@@ -46,20 +48,22 @@ const AppRoutes = () => {
       {/* Auth Routes */}
       <Route path="/donor/register" element={<DonorRegister />} />
       <Route path="/donor/login" element={<DonorLogin />} />
+      <Route path="/hospital/register" element={<HospitalRegister />} />
       <Route path="/hospital/login" element={<HospitalLogin />} />
+      <Route path="/ngo/register" element={<NgoRegister />} />
       <Route path="/ngo/login" element={<NgoLogin />} />
       <Route path="/admin/login" element={<AdminLogin />} />
-      <Route path="/donor/onboarding" element={<DonorOnboarding />} />
-      <Route path="/admin/onboarding" element={<AdminOnboarding />} />
-      <Route path="/ngo/onboarding" element={<NgoOnboarding />} />
-      <Route path="/hospital/onboarding" element={<HospitalOnboarding />} />    
 
       {/* Protected Routes */}
       <Route element={<ProtectedRoute />}>
+        <Route path="/donor/onboarding" element={<DonorOnboarding />} />
         <Route path="/donor/dashboard" element={<DonorDashboard />} />
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
-        <Route path="/ngo/dashboard" element={<NgoDashboard />} />
+        <Route path="/hospital/onboarding" element={<HospitalOnboarding />} />
         <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
+        <Route path="/ngo/onboarding" element={<NgoOnboarding />} />
+        <Route path="/ngo/dashboard" element={<NgoDashboard />} />
+        <Route path="/admin/onboarding" element={<AdminOnboarding />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
       </Route>
 
       {/* 404 Route */}

@@ -231,6 +231,9 @@ export function DonorRegister() {
             </div>
 
             <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-red-600 to-red-700 rounded-2xl mb-4">
+                <Heart className="w-8 h-8 text-white" />
+              </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-2">Donor Registration</h2>
               <p className="text-gray-600">Join our community of life-savers!</p>
             </div>

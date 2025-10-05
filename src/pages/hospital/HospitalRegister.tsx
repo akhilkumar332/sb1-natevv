@@ -1,45 +1,30 @@
-// src/pages/auth/HospitalLogin.tsx
-import { useEffect, useState } from 'react';
+// src/pages/hospital/HospitalRegister.tsx
+import { useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Droplet, Heart, Hospital as HospitalIcon, Activity, MapPin, Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
-import { Droplet, Heart, Hospital as HospitalIcon, Users, Activity, Shield } from 'lucide-react';
+import { useHospitalRegister } from '../../hooks/useHospitalRegister';
 
-export function HospitalLogin() {
+export function HospitalRegister() {
   const navigate = useNavigate();
-  const { user, loginWithGoogle, logout } = useAuth();
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const { user } = useAuth();
+  const hasNavigated = useRef(false);
+  const {
+    googleLoading,
+    handleGoogleRegister
+  } = useHospitalRegister();
 
   useEffect(() => {
-    if (user) {
-      const targetPath = user.onboardingCompleted ? '/hospital/dashboard' : '/hospital/onboarding';
-      navigate(targetPath);
+    if (user && !hasNavigated.current) {
+      hasNavigated.current = true;
+      if (!user.onboardingCompleted) {
+        navigate('/hospital/onboarding');
+      } else if (user.role === 'hospital') {
+        navigate('/hospital/dashboard');
+      }
     }
   }, []);
 
-  const handleGoogleLogin = async () => {
-    setGoogleLoading(true);
-    try {
-      const response = await loginWithGoogle();
-      if (response.user.role !== 'hospital') {
-        toast.error("You're not a Hospital Admin");
-        await logout(navigate);
-        navigate('/hospital/login');
-        return;
-      }
-      toast.success('Successfully logged in as Hospital!');
-
-      if (response.user.onboardingCompleted === true) {
-        navigate('/hospital/dashboard');
-      } else {
-        navigate('/hospital/onboarding');
-      }
-    } catch (error) {
-      toast.error('Failed to sign in with Google. Please try again.');
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen flex">
@@ -61,9 +46,9 @@ export function HospitalLogin() {
                 <p className="text-sm tracking-wider opacity-90">INDIA</p>
               </div>
             </div>
-            <h2 className="text-4xl font-bold mb-4">Hospital Portal</h2>
+            <h2 className="text-4xl font-bold mb-4">Hospital Registration</h2>
             <p className="text-xl opacity-90 leading-relaxed">
-              Manage blood requests, connect with donors, and save lives efficiently.
+              Join our network to manage blood requests and inventory efficiently.
             </p>
           </div>
 
@@ -73,18 +58,8 @@ export function HospitalLogin() {
                 <HospitalIcon className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Streamlined Requests</h3>
-                <p className="opacity-90 text-sm">Create and manage blood requests with ease</p>
-              </div>
-            </div>
-
-            <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0 w-12 h-12 bg-white/10 backdrop-blur-lg rounded-xl flex items-center justify-center">
-                <Users className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="font-bold text-lg mb-1">Donor Network</h3>
-                <p className="opacity-90 text-sm">Access our vast network of verified donors</p>
+                <h3 className="font-bold text-lg mb-1">Manage Inventory</h3>
+                <p className="opacity-90 text-sm">Track blood stock and requirements</p>
               </div>
             </div>
 
@@ -93,8 +68,18 @@ export function HospitalLogin() {
                 <Activity className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Real-time Tracking</h3>
-                <p className="opacity-90 text-sm">Monitor blood inventory and request status</p>
+                <h3 className="font-bold text-lg mb-1">Request Blood</h3>
+                <p className="opacity-90 text-sm">Connect with donors in emergency</p>
+              </div>
+            </div>
+
+            <div className="flex items-start space-x-4">
+              <div className="flex-shrink-0 w-12 h-12 bg-white/10 backdrop-blur-lg rounded-xl flex items-center justify-center">
+                <MapPin className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg mb-1">Local Network</h3>
+                <p className="opacity-90 text-sm">Access nearby donors instantly</p>
               </div>
             </div>
 
@@ -103,15 +88,15 @@ export function HospitalLogin() {
                 <Shield className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Secure Platform</h3>
-                <p className="opacity-90 text-sm">HIPAA-compliant data protection and privacy</p>
+                <h3 className="font-bold text-lg mb-1">Verified Hospital</h3>
+                <p className="opacity-90 text-sm">Build trust with verified badge</p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Right Side - Login Form */}
+      {/* Right Side - Register Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-12 bg-gray-50">
         <div className="max-w-md w-full">
           <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10 border border-gray-100">
@@ -134,33 +119,21 @@ export function HospitalLogin() {
               <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-green-600 to-green-700 rounded-2xl mb-4">
                 <HospitalIcon className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Hospital Login</h2>
-              <p className="text-gray-600">Welcome back, Hospital Admin!</p>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Hospital Registration</h2>
+              <p className="text-gray-600">Register your hospital</p>
             </div>
 
-            <div className="space-y-6">
-              <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-2xl p-6 border border-green-100">
-                <div className="flex items-start space-x-3">
-                  <Shield className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Secure Hospital Access</h3>
-                    <p className="text-sm text-gray-600">
-                      Sign in with your hospital's Google Workspace account for secure access to patient management features.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
+            <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
               <button
                 type="button"
-                onClick={handleGoogleLogin}
+                onClick={handleGoogleRegister}
                 disabled={googleLoading}
                 className="w-full flex items-center justify-center px-6 py-4 border-2 border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {googleLoading ? (
                   <span className="flex items-center space-x-2">
                     <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span>Signing in...</span>
+                    <span>Signing up...</span>
                   </span>
                 ) : (
                   <>
@@ -169,28 +142,28 @@ export function HospitalLogin() {
                       src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
                       alt="Google logo"
                     />
-                    Sign in with Google
+                    Sign up with Google
                   </>
                 )}
               </button>
 
               <div className="pt-4 border-t border-gray-100">
                 <p className="text-center text-sm text-gray-600">
-                  Don't have an account?{' '}
+                  Already registered?{' '}
                   <Link
-                    to="/hospital/register"
+                    to="/hospital/login"
                     className="font-semibold text-green-600 hover:text-green-700 transition-colors"
                   >
-                    Register now
+                    Login now
                   </Link>
                 </p>
               </div>
-            </div>
+            </form>
           </div>
 
-          {/* Additional Info */}
-          <div className="mt-6 text-center text-sm text-gray-500">
-            <p>By signing in, you agree to our Terms of Service and Privacy Policy</p>
+          {/* Terms */}
+          <div className="mt-4 text-center text-xs text-gray-500">
+            <p>By registering, you agree to our Terms of Service and Privacy Policy</p>
           </div>
         </div>
       </div>
@@ -198,4 +171,4 @@ export function HospitalLogin() {
   );
 }
 
-export default HospitalLogin;
+export default HospitalRegister;
