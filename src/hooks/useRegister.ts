@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 
@@ -114,18 +114,17 @@ export const useRegister = () => {
         return;
       }
 
-      // Create new user document
+      // Create new user document with Donor role
       await setDoc(userRef, {
         uid: userCredential.user.uid,
         phoneNumber: userCredential.user.phoneNumber,
         role: 'donor',
         onboardingCompleted: false,
-        createdAt: new Date(),
-        lastLoginAt: new Date(),
+        createdAt: serverTimestamp(),
+        lastLoginAt: serverTimestamp(),
       });
 
       toast.success('Registration successful!');
-      console.log('Navigating to onboarding');
       navigate('/donor/onboarding');
     } catch (error: any) {
       console.error('OTP verification error:', error);
@@ -166,39 +165,57 @@ export const useRegister = () => {
   };
 
   const handleGoogleRegister = async () => {
+    console.log('🔵 Donor Registration started');
     try {
       setGoogleLoading(true);
 
-      // Authenticate with Google
-      auth.useDeviceLanguage();
+      // Authenticate with Google using popup
+      console.log('🔵 Opening Google popup...');
       const result = await signInWithPopup(auth, googleProvider)
         .catch((error) => {
+          console.error('🔴 Popup error:', error);
           if (error.code === 'auth/popup-closed-by-user') {
             throw new Error('Sign-in popup was closed before completing the sign-in process.');
           }
           if (error.code === 'auth/popup-blocked') {
             throw new Error('Sign-in popup was blocked by the browser. Please allow popups for this site.');
           }
+          if (error.code === 'auth/cancelled-popup-request') {
+            // Silently handle multiple popup requests
+            return null;
+          }
           throw error;
         });
 
       if (!result) {
-        throw new Error('Failed to get sign-in result');
+        console.log('🟡 Popup cancelled, exiting');
+        setGoogleLoading(false);
+        return;
       }
+
+      console.log('✅ Google auth successful:', result.user.email);
 
       // Check if user already registered
       const userRef = doc(db, 'users', result.user.uid);
-      const userDoc = await getDoc(userRef);
+      console.log('🔵 Checking if user exists...');
+
+      const userDoc = await getDoc(userRef).catch((error) => {
+        console.error('🔴 Error checking user existence:', error);
+        throw new Error(`Failed to check user: ${error.message}`);
+      });
 
       if (userDoc.exists()) {
-        // User already exists - sign them out and redirect to login
+        console.log('🟡 User already exists, redirecting to login');
         await signOut(auth);
         toast.error('Email already registered. Please use the login page.');
+        setGoogleLoading(false);
         navigate('/donor/login');
         return;
       }
 
-      // Create new user document
+      console.log('🔵 Creating new user document...');
+
+      // Create new user document with Donor role
       await setDoc(userRef, {
         uid: result.user.uid,
         email: result.user.email,
@@ -206,21 +223,38 @@ export const useRegister = () => {
         photoURL: result.user.photoURL,
         role: 'donor',
         onboardingCompleted: false,
-        createdAt: new Date(),
-        lastLoginAt: new Date(),
+        createdAt: serverTimestamp(),
+        lastLoginAt: serverTimestamp(),
+      }).catch((error) => {
+        console.error('🔴 Error creating user document:', error);
+        throw new Error(`Failed to create user: ${error.message}`);
       });
 
+      console.log('✅ User document created');
+
+      // Wait a moment to ensure Firestore has processed the write
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Verify the document was created
+      console.log('🔵 Verifying document creation...');
+      const verifyDoc = await getDoc(userRef);
+      if (!verifyDoc.exists()) {
+        console.error('🔴 Document verification failed');
+        throw new Error('Failed to create user document. Please try again.');
+      }
+
+      console.log('✅ Registration complete, navigating to onboarding');
       toast.success('Registration successful!');
-      console.log('Navigating to onboarding');
       navigate('/donor/onboarding');
     } catch (error: any) {
-      console.error('Google registration error:', error);
+      console.error('🔴 Google registration error:', error);
       if (error instanceof Error) {
         toast.error(error.message);
       } else {
         toast.error('Registration failed. Please try again.');
       }
     } finally {
+      console.log('🔵 Setting loading to false');
       setGoogleLoading(false);
     }
   };

@@ -5,15 +5,28 @@ import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 import {
   Hospital,
   MapPin,
   FileText,
   CheckCircle,
   ChevronRight,
-  Check
+  Check,
+  Locate,
+  Loader
 } from 'lucide-react';
 import { countries, getStatesByCountry, getCitiesByState } from '../../data/locations';
+
+// Fix Leaflet default marker icon issue
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 const HOSPITAL_TYPES = ['Government', 'Private', 'Multi-Specialty', 'Super-Specialty', 'General', 'Teaching Hospital', 'Community Hospital', 'Other'];
 
@@ -25,6 +38,8 @@ interface OnboardingFormData {
   email: string;
   phone: string;
   address: string;
+  latitude: number;
+  longitude: number;
   city: string;
   state: string;
   postalCode: string;
@@ -45,6 +60,30 @@ const steps = [
   { icon: CheckCircle, title: 'Consent', subtitle: 'Agreement', color: 'green' },
 ];
 
+// Map click handler component
+function LocationMarker({ position, setPosition }: { position: [number, number], setPosition: (pos: [number, number]) => void }) {
+  useMapEvents({
+    click(e: L.LeafletMouseEvent) {
+      setPosition([e.latlng.lat, e.latlng.lng]);
+    },
+  });
+
+  return position ? (
+    <Marker position={position}>
+      <Popup>Your selected location</Popup>
+    </Marker>
+  ) : null;
+}
+
+// Map auto-centering component
+function MapUpdater({ center }: { center: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, 13);
+  }, [center, map]);
+  return null;
+}
+
 export function HospitalOnboarding() {
   const navigate = useNavigate();
   const { user, updateUserProfile } = useAuth();
@@ -57,6 +96,8 @@ export function HospitalOnboarding() {
     email: user?.email || '',
     phone: user?.phoneNumber || '+91',
     address: '',
+    latitude: 20.5937,
+    longitude: 78.9629,
     city: '',
     state: '',
     postalCode: '',
@@ -72,8 +113,13 @@ export function HospitalOnboarding() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [mapPosition, setMapPosition] = useState<[number, number]>([20.5937, 78.9629]);
   const [availableStates, setAvailableStates] = useState(getStatesByCountry('IN'));
   const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -107,6 +153,196 @@ export function HospitalOnboarding() {
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     }));
+  };
+
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({ ...prev, address: value }));
+
+    // Clear previous timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    // If input is empty, hide suggestions
+    if (!value.trim()) {
+      setShowAddressSuggestions(false);
+      setAddressSuggestions([]);
+      return;
+    }
+
+    // Debounce search - wait 500ms after user stops typing
+    const timeout = setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(value)}&limit=5&addressdetails=1`
+        );
+        const data = await response.json();
+        setAddressSuggestions(data);
+        setShowAddressSuggestions(data.length > 0);
+      } catch (error) {
+        console.error('Address search error:', error);
+      }
+    }, 500);
+
+    setSearchTimeout(timeout);
+  };
+
+  const handleAddressSelect = (suggestion: any) => {
+    setFormData(prev => ({
+      ...prev,
+      address: suggestion.display_name,
+      latitude: parseFloat(suggestion.lat),
+      longitude: parseFloat(suggestion.lon)
+    }));
+    setMapPosition([parseFloat(suggestion.lat), parseFloat(suggestion.lon)]);
+    setShowAddressSuggestions(false);
+    setAddressSuggestions([]);
+
+    // Try to extract and match state/city from address
+    if (suggestion.address) {
+      const addr = suggestion.address;
+
+      if (addr.state) {
+        const matchedState = availableStates.find(s =>
+          s.name.toLowerCase() === addr.state.toLowerCase()
+        );
+        if (matchedState) {
+          setFormData(prev => ({ ...prev, state: matchedState.name }));
+
+          const stateCities = getCitiesByState(formData.country, matchedState.name);
+          const matchedCity = stateCities.find(c =>
+            c.toLowerCase() === (addr.city || addr.town || addr.village || '').toLowerCase()
+          );
+          if (matchedCity) {
+            setFormData(prev => ({ ...prev, city: matchedCity }));
+          }
+        }
+      }
+
+      if (addr.postcode) {
+        setFormData(prev => ({ ...prev, postalCode: addr.postcode }));
+      }
+    }
+  };
+
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setMapPosition([latitude, longitude]);
+        setFormData(prev => ({ ...prev, latitude, longitude }));
+
+        // Reverse geocode to get address
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          const data = await response.json();
+
+          if (data && data.address) {
+            const address = data.address;
+            setFormData(prev => ({
+              ...prev,
+              address: data.display_name || '',
+              postalCode: address.postcode || prev.postalCode,
+            }));
+
+            // Try to match state and city
+            if (address.state) {
+              const matchedState = availableStates.find(s =>
+                s.name.toLowerCase() === address.state.toLowerCase()
+              );
+              if (matchedState) {
+                setFormData(prev => ({ ...prev, state: matchedState.name }));
+
+                // Try to match city
+                const stateCities = getCitiesByState(formData.country, matchedState.name);
+                const matchedCity = stateCities.find(c =>
+                  c.toLowerCase() === (address.city || address.town || address.village || '').toLowerCase()
+                );
+                if (matchedCity) {
+                  setFormData(prev => ({ ...prev, city: matchedCity }));
+                }
+              }
+            }
+
+            toast.success('Location detected successfully!');
+          }
+        } catch (error) {
+          console.error('Reverse geocoding error:', error);
+          toast.error('Could not fetch address details');
+        }
+
+        setLocationLoading(false);
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        toast.error('Unable to retrieve your location. Please enable location services.');
+        setLocationLoading(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  };
+
+  const handleMapPositionChange = async (newPosition: [number, number]) => {
+    setMapPosition(newPosition);
+    setFormData(prev => ({
+      ...prev,
+      latitude: newPosition[0],
+      longitude: newPosition[1]
+    }));
+
+    // Reverse geocode to get address from coordinates
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${newPosition[0]}&lon=${newPosition[1]}`
+      );
+      const data = await response.json();
+
+      if (data && data.address) {
+        const address = data.address;
+        setFormData(prev => ({
+          ...prev,
+          address: data.display_name || '',
+          postalCode: address.postcode || prev.postalCode,
+        }));
+
+        // Try to match state and city from location data
+        if (address.state) {
+          const matchedState = availableStates.find(s =>
+            s.name.toLowerCase() === address.state.toLowerCase()
+          );
+          if (matchedState) {
+            setFormData(prev => ({ ...prev, state: matchedState.name }));
+
+            // Try to match city
+            const stateCities = getCitiesByState(formData.country, matchedState.name);
+            const matchedCity = stateCities.find(c =>
+              c.toLowerCase() === (address.city || address.town || address.village || '').toLowerCase()
+            );
+            if (matchedCity) {
+              setFormData(prev => ({ ...prev, city: matchedCity }));
+            }
+          }
+        }
+
+        toast.success('Address updated from map location');
+      }
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+      toast.error('Could not fetch address for this location');
+    }
   };
 
   const validateStep = () => {
@@ -245,62 +481,130 @@ export function HospitalOnboarding() {
       case 1:
         return (
           <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Email <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                placeholder="hospital@example.com"
-                required
-              />
-            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                  placeholder="hospital@example.com"
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Phone Number <span className="text-red-500">*</span>
-              </label>
-              <PhoneInput
-                international
-                defaultCountry="IN"
-                value={formData.phone}
-                onChange={(value) => setFormData(prev => ({ ...prev, phone: value || '' }))}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 transition-all phone-input-custom"
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Phone Number <span className="text-red-500">*</span>
+                </label>
+                <PhoneInput
+                  international
+                  defaultCountry="IN"
+                  value={formData.phone}
+                  onChange={(value) => setFormData(prev => ({ ...prev, phone: value || '' }))}
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 transition-all phone-input-custom"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Country <span className="text-red-500">*</span>
-              </label>
-              <select name="country" value={formData.country} onChange={handleChange} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" required>
-                <option value="">Select Country</option>
-                {countries.map((country) => (
-                  <option key={country.code} value={country.code}>{country.name}</option>
-                ))}
-              </select>
-            </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Country <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="country"
+                  value={formData.country}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                  required
+                >
+                  <option value="">Select Country</option>
+                  {countries.map((country) => (
+                    <option key={country.code} value={country.code}>
+                      {country.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Address <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                placeholder="Street address"
-                required
-              />
-            </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    Address <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={getCurrentLocation}
+                    disabled={locationLoading}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-600 text-sm font-medium rounded-lg transition-all disabled:opacity-50"
+                  >
+                    {locationLoading ? (
+                      <>
+                        <Loader className="w-4 h-4 animate-spin" />
+                        Detecting...
+                      </>
+                    ) : (
+                      <>
+                        <Locate className="w-4 h-4" />
+                        Use Current Location
+                      </>
+                    )}
+                  </button>
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
+                {/* Map */}
+                <div className="mb-3 rounded-xl overflow-hidden border border-gray-200" style={{ height: '300px' }}>
+                  <MapContainer
+                    center={mapPosition}
+                    zoom={13}
+                    style={{ height: '100%', width: '100%' }}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    <LocationMarker position={mapPosition} setPosition={handleMapPositionChange} />
+                    <MapUpdater center={mapPosition} />
+                  </MapContainer>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleAddressChange}
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    placeholder="Start typing your address..."
+                    required
+                    autoComplete="off"
+                  />
+
+                  {/* Address Suggestions Dropdown */}
+                  {showAddressSuggestions && addressSuggestions.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                      {addressSuggestions.map((suggestion, index) => (
+                        <div
+                          key={index}
+                          onClick={() => handleAddressSelect(suggestion)}
+                          className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                        >
+                          <div className="flex items-start space-x-2">
+                            <MapPin className="w-4 h-4 text-green-500 flex-shrink-0 mt-1" />
+                            <div className="text-sm text-gray-700">{suggestion.display_name}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="text-xs text-gray-500 mt-1">Type to search or click on the map to set your location</p>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   State <span className="text-red-500">*</span>
@@ -315,44 +619,50 @@ export function HospitalOnboarding() {
                 >
                   <option value="">Select State</option>
                   {availableStates.map((state) => (
-                    <option key={state.name} value={state.name}>{state.name}</option>
+                    <option key={state.name} value={state.name}>
+                      {state.name}
+                    </option>
                   ))}
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  City <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="city"
-                  value={formData.city}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                  required
-                  disabled={!formData.state}
-                >
-                  <option value="">Select City</option>
-                  {availableCities.map((city) => (
-                    <option key={city} value={city}>{city}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    City <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="city"
+                    value={formData.city}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    required
+                    disabled={!formData.state}
+                  >
+                    <option value="">Select City</option>
+                    {availableCities.map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Postal Code <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="postalCode"
-                value={formData.postalCode}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                placeholder="Postal code"
-                required
-              />
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Pincode <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="postalCode"
+                    value={formData.postalCode}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    placeholder="XXXXXX"
+                    required
+                  />
+                </div>
+              </div>
             </div>
           </div>
         );
