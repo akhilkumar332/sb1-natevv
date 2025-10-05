@@ -1,7 +1,7 @@
 // src/components/Navbar.tsx
 import React, { useState, Suspense } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Droplet, LogOut, LayoutDashboard, Heart } from 'lucide-react';
+import { Menu, X, Droplet, LogOut, LayoutDashboard, Heart, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -48,6 +48,84 @@ function MobileNavLink({ to, children, onClick }: NavLinkProps & { onClick?: () 
     >
       {children}
     </Link>
+  );
+}
+
+function LoginDropdown() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const loginOptions = [
+    { label: 'Donor Login', path: '/donor/login', color: 'red' },
+    { label: 'NGO Login', path: '/ngo/login', color: 'blue' },
+    { label: 'Hospital Login', path: '/hospital/login', color: 'green' },
+  ];
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+    >
+      <button className="px-5 py-2 text-red-600 font-semibold hover:text-red-700 transition-colors flex items-center space-x-1">
+        <span>Login</span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full pt-1 z-50">
+          <div className="w-48 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl py-2 border border-gray-100 animate-fadeIn">
+            {loginOptions.map((option) => (
+              <Link
+                key={option.path}
+                to={option.path}
+                className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 transition-all"
+              >
+                {option.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RegisterDropdown() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const registerOptions = [
+    { label: 'Donor Register', path: '/donor/register', color: 'red' },
+    { label: 'NGO Register', path: '/ngo/register', color: 'blue' },
+    { label: 'Hospital Register', path: '/hospital/register', color: 'green' },
+  ];
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+    >
+      <button className="px-6 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-full font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300 flex items-center space-x-1">
+        <span>Register</span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full pt-1 z-50">
+          <div className="w-52 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl py-2 border border-gray-100 animate-fadeIn">
+            {registerOptions.map((option) => (
+              <Link
+                key={option.path}
+                to={option.path}
+                className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 transition-all"
+              >
+                {option.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -133,6 +211,77 @@ function UserMenu() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function MobileAuthMenu({ onClose }: { onClose?: () => void }) {
+  const [loginExpanded, setLoginExpanded] = useState(false);
+  const [registerExpanded, setRegisterExpanded] = useState(false);
+
+  const loginOptions = [
+    { label: 'Donor Login', path: '/donor/login' },
+    { label: 'NGO Login', path: '/ngo/login' },
+    { label: 'Hospital Login', path: '/hospital/login' },
+  ];
+
+  const registerOptions = [
+    { label: 'Donor Register', path: '/donor/register' },
+    { label: 'NGO Register', path: '/ngo/register' },
+    { label: 'Hospital Register', path: '/hospital/register' },
+  ];
+
+  return (
+    <div className="flex flex-col space-y-2 mt-6 pt-6 border-t border-gray-200 animate-slideInRight" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
+      {/* Login Dropdown */}
+      <div>
+        <button
+          onClick={() => setLoginExpanded(!loginExpanded)}
+          className="flex items-center justify-between w-full px-5 py-3 text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300"
+        >
+          <span>Login</span>
+          <ChevronDown className={`w-4 h-4 transition-transform ${loginExpanded ? 'rotate-180' : ''}`} />
+        </button>
+        {loginExpanded && (
+          <div className="mt-2 ml-4 space-y-1">
+            {loginOptions.map((option) => (
+              <Link
+                key={option.path}
+                to={option.path}
+                onClick={onClose}
+                className="block px-4 py-2 text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all"
+              >
+                {option.label}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Register Dropdown */}
+      <div>
+        <button
+          onClick={() => setRegisterExpanded(!registerExpanded)}
+          className="flex items-center justify-between w-full px-5 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
+        >
+          <span>Register</span>
+          <ChevronDown className={`w-4 h-4 transition-transform ${registerExpanded ? 'rotate-180' : ''}`} />
+        </button>
+        {registerExpanded && (
+          <div className="mt-2 ml-4 space-y-1">
+            {registerOptions.map((option) => (
+              <Link
+                key={option.path}
+                to={option.path}
+                onClick={onClose}
+                className="block px-4 py-2 text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all"
+              >
+                {option.label}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -254,18 +403,8 @@ const Navbar: React.FC = () => {
                   <LoadingFallback />
                 ) : !user ? (
                   <div className="flex items-center space-x-3">
-                    <Link
-                      to="/donor/login"
-                      className="px-5 py-2 text-red-600 font-semibold hover:text-red-700 transition-colors"
-                    >
-                      Login
-                    </Link>
-                    <Link
-                      to="/donor/register"
-                      className="px-6 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-full font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300"
-                    >
-                      Register
-                    </Link>
+                    <LoginDropdown />
+                    <RegisterDropdown />
                   </div>
                 ) : (
                   <Suspense fallback={<LoadingFallback />}>
@@ -351,22 +490,7 @@ const Navbar: React.FC = () => {
                 {authLoading ? (
                   <LoadingFallback />
                 ) : !user ? (
-                  <div className="flex flex-col space-y-2 mt-6 pt-6 border-t border-gray-200 animate-slideInRight" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
-                    <Link
-                      to="/donor/login"
-                      onClick={() => setIsOpen(false)}
-                      className="block w-full text-center px-5 py-3 text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300"
-                    >
-                      Login
-                    </Link>
-                    <Link
-                      to="/donor/register"
-                      onClick={() => setIsOpen(false)}
-                      className="block w-full text-center px-5 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300"
-                    >
-                      Register
-                    </Link>
-                  </div>
+                  <MobileAuthMenu onClose={() => setIsOpen(false)} />
                 ) : (
                   <div className="animate-slideInRight" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
                     <Suspense fallback={<LoadingFallback />}>
