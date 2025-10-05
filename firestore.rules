@@ -21,17 +21,20 @@ service cloud.firestore {
     }
 
     /**
-     * Get user document data
+     * Get user document data (with existence check)
      */
     function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        : null;
     }
 
     /**
      * Check if user has a specific role
      */
     function hasRole(role) {
-      return isAuthenticated() && getUserData().role == role;
+      let userData = getUserData();
+      return isAuthenticated() && userData != null && userData.role == role;
     }
 
     /**

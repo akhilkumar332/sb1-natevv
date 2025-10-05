@@ -79,6 +79,10 @@ export default defineConfig(({ command, mode }) => {
     },
     server: {
       port: 5180,
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+        'Cross-Origin-Embedder-Policy': 'unsafe-none',
+      },
       proxy: {
         '^/api/.*': {
           target: 'http://localhost:5001',

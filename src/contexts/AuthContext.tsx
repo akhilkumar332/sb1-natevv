@@ -101,35 +101,47 @@ const updateUserInFirestore = async (
   firebaseUser: FirebaseUser,
   additionalData?: Partial<User>
 ): Promise<User | null> => {
-  const userRef: DocumentReference = doc(db, 'users', firebaseUser.uid);
-  const userDoc: DocumentSnapshot = await getDoc(userRef);
+  try {
+    const userRef: DocumentReference = doc(db, 'users', firebaseUser.uid);
+    const userDoc: DocumentSnapshot = await getDoc(userRef);
 
-  // If user document doesn't exist, return null
-  if (!userDoc.exists()) {
-    return null;
+    // If user document doesn't exist, return null
+    if (!userDoc.exists()) {
+      console.warn('User document does not exist for:', firebaseUser.uid);
+      return null;
+    }
+
+    const existingUserData = userDoc.data() as User;
+
+    // Prepare optimized update (only lastLoginAt)
+    // Use try-catch to handle potential update failures
+    try {
+      await updateDoc(userRef, {
+        lastLoginAt: serverTimestamp(),
+      });
+    } catch (updateError) {
+      console.warn('Failed to update lastLoginAt, continuing anyway:', updateError);
+      // Continue even if update fails - not critical
+    }
+
+    // Return user data without extra fetch
+    return {
+      ...existingUserData,
+      uid: firebaseUser.uid,
+      email: firebaseUser.email || existingUserData.email,
+      displayName: firebaseUser.displayName || existingUserData.displayName,
+      photoURL: firebaseUser.photoURL || existingUserData.photoURL,
+      phoneNumber: firebaseUser.phoneNumber || existingUserData.phoneNumber,
+      lastLoginAt: new Date(),
+      createdAt: convertTimestampToDate(existingUserData?.createdAt),
+      dateOfBirth: convertTimestampToDate(existingUserData?.dateOfBirth),
+      lastDonation: convertTimestampToDate(existingUserData?.lastDonation),
+      ...additionalData
+    } as User;
+  } catch (error) {
+    console.error('Error in updateUserInFirestore:', error);
+    throw error;
   }
-
-  const existingUserData = userDoc.data() as User;
-
-  // Prepare optimized update (only lastLoginAt)
-  await updateDoc(userRef, {
-    lastLoginAt: serverTimestamp(),
-  });
-
-  // Return user data without extra fetch
-  return {
-    ...existingUserData,
-    uid: firebaseUser.uid,
-    email: firebaseUser.email || existingUserData.email,
-    displayName: firebaseUser.displayName || existingUserData.displayName,
-    photoURL: firebaseUser.photoURL || existingUserData.photoURL,
-    phoneNumber: firebaseUser.phoneNumber || existingUserData.phoneNumber,
-    lastLoginAt: new Date(),
-    createdAt: convertTimestampToDate(existingUserData?.createdAt),
-    dateOfBirth: convertTimestampToDate(existingUserData?.dateOfBirth),
-    lastDonation: convertTimestampToDate(existingUserData?.lastDonation),
-    ...additionalData
-  } as User;
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -143,13 +155,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       try {
         if (firebaseUser) {
-          const userData = await updateUserInFirestore(firebaseUser);
+          // Check if user is newly created (within last 30 seconds)
+          const creationTime = new Date(firebaseUser.metadata.creationTime!).getTime();
+          const currentTime = Date.now();
+          const isNewUser = (currentTime - creationTime) < 30000; // 30 seconds grace period
+
+          // Add retry logic with delay for new users
+          let userData = null;
+          let retries = isNewUser ? 5 : 3; // More retries for new users
+          let delay = isNewUser ? 1000 : 500; // Longer delay for new users
+
+          while (retries > 0 && !userData) {
+            try {
+              userData = await updateUserInFirestore(firebaseUser);
+              if (userData) break;
+
+              // If document doesn't exist and user is NEW, wait for registration to complete
+              if (isNewUser && !userData) {
+                console.log(`⏳ New user detected, waiting for registration (${retries} retries left)...`);
+                retries--;
+                if (retries > 0) {
+                  await new Promise(resolve => setTimeout(resolve, delay));
+                }
+              } else {
+                // For existing users, don't retry
+                break;
+              }
+            } catch (error) {
+              console.warn(`Attempt ${(isNewUser ? 5 : 3) - retries + 1} failed, retrying...`, error);
+              retries--;
+              if (retries > 0) {
+                await new Promise(resolve => setTimeout(resolve, delay));
+              }
+            }
+          }
+
           if (userData) {
             setUser(userData);
           } else {
-            // If user update fails (document doesn't exist)
-            await signOut(auth);
-            setUser(null);
+            // Only sign out if NOT a new user
+            // New users are still in registration process
+            if (!isNewUser) {
+              console.warn('User document not found for existing user, signing out');
+              await signOut(auth);
+              setUser(null);
+            } else {
+              console.log('⏳ New user registration in progress, keeping user signed in...');
+              // Set a temporary user object so UI doesn't flicker
+              setUser({
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName,
+                photoURL: firebaseUser.photoURL,
+                phoneNumber: firebaseUser.phoneNumber,
+              } as User);
+            }
           }
         } else {
           setUser(null);
