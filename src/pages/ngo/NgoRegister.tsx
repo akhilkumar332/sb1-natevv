@@ -23,7 +23,7 @@ export function NgoRegister() {
         navigate('/ngo/dashboard');
       }
     }
-  }, []);
+  }, [user, navigate]);
 
   return (
     <div className="min-h-screen flex">

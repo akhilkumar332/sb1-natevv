@@ -23,7 +23,7 @@ export function HospitalRegister() {
         navigate('/hospital/dashboard');
       }
     }
-  }, []);
+  }, [user, navigate]);
 
 
   return (
