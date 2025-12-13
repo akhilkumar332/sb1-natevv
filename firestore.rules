@@ -369,8 +369,8 @@ service cloud.firestore {
       // Stats can be displayed across the app (leaderboards, dashboards)
       allow read: if isAuthenticated();
 
-      // Stats are managed by privileged services/admins
-      allow write: if isAdmin();
+      // Allow users to maintain their own stats document, admins can manage all
+      allow write: if isAuthenticated() && (isOwner(userId) || isAdmin());
     }
 
     // ========================================================================

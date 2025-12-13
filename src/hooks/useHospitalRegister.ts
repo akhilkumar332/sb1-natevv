@@ -229,20 +229,7 @@ export const useHospitalRegister = () => {
         throw new Error(`Failed to create user: ${error.message}`);
       });
 
-      console.log('✅ User document created');
-
-      // Wait a moment to ensure Firestore has processed the write
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Verify the document was created
-      console.log('🔵 Verifying document creation...');
-      const verifyDoc = await getDoc(userRef);
-      if (!verifyDoc.exists()) {
-        console.error('🔴 Document verification failed');
-        throw new Error('Failed to create user document. Please try again.');
-      }
-
-      console.log('✅ Registration complete, navigating to onboarding');
+      console.log('✅ User document created, navigating to onboarding');
       toast.success('Registration successful!');
       navigate('/hospital/onboarding');
     } catch (error: any) {
