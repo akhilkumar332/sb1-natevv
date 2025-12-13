@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "build:prod": "tsc && vite build --mode production",
+    "build": "node scripts/build.mjs",
+    "build:prod": "node scripts/build.mjs --mode production",
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "node src/functions/index.js",

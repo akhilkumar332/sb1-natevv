@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import fs from 'fs-extra';
 
+process.env.BROWSERSLIST_IGNORE_OLD_DATA = '1';
+
 export default defineConfig(({ command, mode }) => {
   // Load env file based on `mode` in the current working directory.
   const env = loadEnv(mode, process.cwd(), '');
