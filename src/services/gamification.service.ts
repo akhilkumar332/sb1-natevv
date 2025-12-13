@@ -19,6 +19,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import type { User } from '../types/database.types';
 
 export interface Badge {
   id: string;
@@ -147,30 +148,8 @@ const BADGES: Omit<Badge, 'earned' | 'earnedDate' | 'progress'>[] = [
 ];
 
 class GamificationService {
-  /**
-   * Get or create user stats
-   */
-  async getUserStats(userId: string): Promise<UserStats> {
-    const userStatsRef = doc(db, 'userStats', userId);
-    const userStatsSnap = await getDoc(userStatsRef);
-
-    if (userStatsSnap.exists()) {
-      const data = userStatsSnap.data();
-      return {
-        userId,
-        totalDonations: data.totalDonations || 0,
-        points: data.points || 0,
-        currentStreak: data.currentStreak || 0,
-        longestStreak: data.longestStreak || 0,
-        emergencyResponses: data.emergencyResponses || 0,
-        rank: data.rank,
-        level: data.level || 1,
-        nextLevelPoints: data.nextLevelPoints || 500,
-      };
-    }
-
-    // Create initial stats
-    const initialStats: UserStats = {
+  private buildDefaultStats(userId: string, overrides: Partial<UserStats> = {}): UserStats {
+    return {
       userId,
       totalDonations: 0,
       points: 0,
@@ -179,58 +158,69 @@ class GamificationService {
       emergencyResponses: 0,
       level: 1,
       nextLevelPoints: 500,
+      ...overrides,
     };
-
-    await setDoc(userStatsRef, {
-      ...initialStats,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-
-    return initialStats;
   }
 
-  /**
-   * Get user badges with progress
-   */
-  async getUserBadges(userId: string): Promise<Badge[]> {
-    const stats = await this.getUserStats(userId);
-    const userRef = doc(db, 'users', userId);
-    const userSnap = await getDoc(userRef);
-    const userData = userSnap.data();
+  private async getUserProfile(userId: string): Promise<User | null> {
+    try {
+      const userRef = doc(db, 'users', userId);
+      const userSnap = await getDoc(userRef);
+      return userSnap.exists() ? (userSnap.data() as User) : null;
+    } catch (error) {
+      console.error('Error fetching user profile for gamification service:', error);
+      return null;
+    }
+  }
 
-    // Get user's earned badges
-    const userBadgesRef = collection(db, 'userBadges');
-    const q = query(userBadgesRef, where('userId', '==', userId));
-    const userBadgesSnap = await getDocs(q);
+  private async buildStatsFromProfile(userId: string): Promise<UserStats> {
+    const userProfile = await this.getUserProfile(userId);
+    if (!userProfile) {
+      return this.buildDefaultStats(userId);
+    }
 
-    const earnedBadgeIds = new Set(
-      userBadgesSnap.docs.map(doc => doc.data().badgeId)
-    );
+    const totalDonations = userProfile.totalDonations || 0;
+    const fallbackPoints = userProfile.impactScore || (totalDonations * 100);
 
+    return this.buildDefaultStats(userId, {
+      totalDonations,
+      points: fallbackPoints,
+    });
+  }
+
+  private calculateBadgeProgress(
+    badge: Omit<Badge, 'earned' | 'earnedDate' | 'progress'>,
+    stats: UserStats,
+    userData?: User | null
+  ): number {
+    switch (badge.category) {
+      case 'donation':
+        return Math.min(stats.totalDonations, badge.requirement);
+      case 'streak':
+        return Math.min(stats.currentStreak, badge.requirement);
+      case 'emergency':
+        return Math.min(stats.emergencyResponses, badge.requirement);
+      case 'special':
+        if (badge.id === 'rare_hero') {
+          const rareBloodTypes = ['AB-', 'B-', 'O-'];
+          return rareBloodTypes.includes(userData?.bloodType || '') ? 1 : 0;
+        }
+        return 0;
+      default:
+        return 0;
+    }
+  }
+
+  private buildBadgeList(
+    stats: UserStats,
+    userData?: User | null,
+    earnedBadgeIds?: Set<string>
+  ): Badge[] {
     return BADGES.map(badge => {
-      const earned = earnedBadgeIds.has(badge.id);
-      let progress = 0;
-
-      // Calculate progress based on badge category
-      switch (badge.category) {
-        case 'donation':
-          progress = Math.min(stats.totalDonations, badge.requirement);
-          break;
-        case 'streak':
-          progress = Math.min(stats.currentStreak, badge.requirement);
-          break;
-        case 'emergency':
-          progress = Math.min(stats.emergencyResponses, badge.requirement);
-          break;
-        case 'special':
-          // Check for rare blood types
-          if (badge.id === 'rare_hero') {
-            const rareBloodTypes = ['AB-', 'B-', 'O-'];
-            progress = rareBloodTypes.includes(userData?.bloodType || '') ? 1 : 0;
-          }
-          break;
-      }
+      const progress = this.calculateBadgeProgress(badge, stats, userData);
+      const earned = earnedBadgeIds
+        ? earnedBadgeIds.has(badge.id)
+        : progress >= badge.requirement;
 
       return {
         ...badge,
@@ -238,6 +228,69 @@ class GamificationService {
         progress,
       };
     });
+  }
+
+  /**
+   * Get or create user stats
+   */
+  async getUserStats(userId: string): Promise<UserStats> {
+    const userStatsRef = doc(db, 'userStats', userId);
+    try {
+      const userStatsSnap = await getDoc(userStatsRef);
+
+      if (userStatsSnap.exists()) {
+        const data = userStatsSnap.data();
+        return this.buildDefaultStats(userId, {
+          totalDonations: data.totalDonations || 0,
+          points: data.points || 0,
+          currentStreak: data.currentStreak || 0,
+          longestStreak: data.longestStreak || 0,
+          emergencyResponses: data.emergencyResponses || 0,
+          rank: data.rank,
+          level: data.level || 1,
+          nextLevelPoints: data.nextLevelPoints || 500,
+        });
+      }
+
+      const initialStats = this.buildDefaultStats(userId);
+      try {
+        await setDoc(userStatsRef, {
+          ...initialStats,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } catch (error) {
+        console.warn('Unable to create user stats document, continuing with defaults:', error);
+      }
+
+      return initialStats;
+    } catch (error) {
+      console.error('Error fetching user stats, using fallback values:', error);
+      return this.buildStatsFromProfile(userId);
+    }
+  }
+
+  /**
+   * Get user badges with progress
+   */
+  async getUserBadges(userId: string): Promise<Badge[]> {
+    const stats = await this.getUserStats(userId);
+    const userData = await this.getUserProfile(userId);
+
+    try {
+      const userBadgesRef = collection(db, 'userBadges');
+      const q = query(userBadgesRef, where('userId', '==', userId));
+      const userBadgesSnap = await getDocs(q);
+
+      const earnedBadgeIds = new Set(
+        userBadgesSnap.docs.map(doc => doc.data().badgeId)
+      );
+
+      return this.buildBadgeList(stats, userData, earnedBadgeIds);
+    } catch (error) {
+      console.error('Error fetching user badges, using calculated progress instead:', error);
+      return this.buildBadgeList(stats, userData);
+    }
   }
 
   /**
