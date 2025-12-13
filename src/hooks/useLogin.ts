@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { FirebaseError } from 'firebase/app';
 import { authStorage } from '../utils/authStorage';
 
 interface LoginFormData {
@@ -30,6 +31,22 @@ export const useLogin = () => {
     }));
   };
 
+  const normalizePhoneNumber = (value: string) => {
+    if (!value) return '';
+    let formatted = value.replace(/\s+/g, '').trim();
+
+    if (!formatted.startsWith('+')) {
+      const digitsOnly = formatted.replace(/\D/g, '');
+      if (digitsOnly.length === 10) {
+        formatted = `+91${digitsOnly}`;
+      } else if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
+        formatted = `+${digitsOnly}`;
+      }
+    }
+
+    return formatted;
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -52,17 +69,17 @@ export const useLogin = () => {
   };
 
   const handlePhoneNumberSubmit = async () => {
-    const digitsOnly = formData.identifier.replace(/\D/g, '');
-    const isValid10Digits = digitsOnly.length === 10 || 
-      (digitsOnly.startsWith('91') && digitsOnly.length === 12);
-  
-    if (!isValid10Digits) {
-      toast.error('Please enter a valid 10-digit phone number.');
+    const formattedNumber = normalizePhoneNumber(formData.identifier);
+    const digitsOnly = formattedNumber.replace(/\D/g, '');
+    const isValidPhone = digitsOnly.length >= 10 && digitsOnly.length <= 15;
+
+    if (!isValidPhone) {
+      toast.error('Please enter a valid phone number.');
       return;
     }
-  
+
     try {
-      const confirmation = await loginWithPhone(formData.identifier);
+      const confirmation = await loginWithPhone(formattedNumber);
       setConfirmationResult(confirmation);
       toast.success('OTP sent successfully!');
       startResendTimer();
@@ -72,13 +89,25 @@ export const useLogin = () => {
   };
 
   const handleOTPSubmit = async () => {
-    if (!formData.otp) {
+    if (!confirmationResult) {
+      toast.error('Please request an OTP before verifying.');
+      return;
+    }
+
+    const sanitizedOtp = formData.otp.replace(/\D/g, '').trim();
+
+    if (!sanitizedOtp) {
       toast.error('Please enter the OTP.');
+      return;
+    }
+
+    if (sanitizedOtp.length !== 6) {
+      toast.error('Invalid OTP length. Please enter the 6-digit code.');
       return;
     }
     try {
       setOtpLoading(true);
-      const userData = await verifyOTP(confirmationResult, formData.otp);
+      const userData = await verifyOTP(confirmationResult, sanitizedOtp);
       console.log('OTP verified, user data:', userData);
       console.log('Onboarding completed:', userData.onboardingCompleted);
       toast.success('Login successful!');
@@ -93,7 +122,19 @@ export const useLogin = () => {
       }
     } catch (error) {
       console.error('OTP verification error:', error);
-      toast.error('Invalid OTP. Please try again.');
+      if (error instanceof FirebaseError) {
+        if (error.code === 'auth/invalid-verification-code') {
+          toast.error('Invalid OTP. Please try again.');
+        } else if (error.code === 'auth/code-expired') {
+          toast.error('OTP expired. Please request a new code.');
+        } else {
+          toast.error('Failed to verify OTP. Please try again.');
+        }
+      } else if (error instanceof Error && error.message === 'User not registered') {
+        toast.error('Please register as a donor before signing in.');
+      } else {
+        toast.error('Failed to verify OTP. Please try again.');
+      }
     } finally {
       setOtpLoading(false);
     }
@@ -101,7 +142,7 @@ export const useLogin = () => {
 
   const handleResendOTP = async () => {
     try {
-      const confirmation = await loginWithPhone(formData.identifier);
+      const confirmation = await loginWithPhone(normalizePhoneNumber(formData.identifier));
       setConfirmationResult(confirmation);
       toast.success('OTP resent successfully!');
       startResendTimer();
