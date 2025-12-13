@@ -15,7 +15,7 @@ export function HospitalLogin() {
       const targetPath = user.onboardingCompleted ? '/hospital/dashboard' : '/hospital/onboarding';
       navigate(targetPath);
     }
-  }, []);
+  }, [user, navigate]);
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);

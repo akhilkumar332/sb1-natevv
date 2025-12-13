@@ -35,7 +35,7 @@ export function DonorLogin() {
         navigate('/donor/dashboard');
       }
     }
-  }, []);
+  }, [user, navigate]);
 
   const renderInitialForm = () => (
     <div className="space-y-6">
