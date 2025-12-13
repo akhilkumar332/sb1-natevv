@@ -10,12 +10,37 @@ import { useAuth } from './contexts/AuthContext';
 import { useAuthSync } from './hooks/useAuthSync';
 import { useActivityTracker } from './hooks/useActivityTracker';
 import { useInactivityCheck } from './hooks/useInactivityCheck';
+import { useLocation } from 'react-router-dom';
 
 function App() {
   useAuthSync();
   useActivityTracker();
   const { user } = useAuth();
   const { WarningComponent } = useInactivityCheck();
+  const location = useLocation();
+
+  const mobileOnlyRoutes = new Set([
+    '/donor/login',
+    '/donor/register',
+    '/ngo/login',
+    '/ngo/register',
+    '/hospital/login',
+    '/hospital/register',
+  ]);
+  const noFooterRoutes = new Set([
+    '/donor/dashboard',
+    '/ngo/dashboard',
+    '/hospital/dashboard',
+  ]);
+
+  const hideCompletely = noFooterRoutes.has(location.pathname);
+  const hideOnMobile = mobileOnlyRoutes.has(location.pathname);
+  const footerWrapperClass = hideCompletely
+    ? 'hidden'
+    : hideOnMobile
+      ? 'hidden md:block'
+      : undefined;
+
   return (
     <LoadingProvider>
       <div className="min-h-screen flex flex-col bg-gray-50">
@@ -25,7 +50,9 @@ function App() {
             <AppRoutes />
           </main>
         </Suspense>
-        <Footer />
+        <div className={footerWrapperClass}>
+          <Footer />
+        </div>
         <Toaster
           position="top-right"
           toastOptions={{
