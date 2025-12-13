@@ -31,6 +31,9 @@ function App() {
     '/donor/dashboard',
     '/ngo/dashboard',
     '/hospital/dashboard',
+    '/donor/onboarding',
+    '/ngo/onboarding',
+    '/hospital/onboarding',
   ]);
 
   const hideCompletely = noFooterRoutes.has(location.pathname);
