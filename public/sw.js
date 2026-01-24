@@ -43,6 +43,10 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   // Skip cross-origin requests
   if (event.request.url.startsWith(self.location.origin)) {
+    if (event.request.url.endsWith('/version.json')) {
+      event.respondWith(fetch(event.request, { cache: 'no-store' }));
+      return;
+    }
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
         if (cachedResponse) {
@@ -55,7 +59,8 @@ self.addEventListener('fetch', (event) => {
             if (response && response.status === 200) {
               // Don't cache API calls or Firebase requests
               if (!event.request.url.includes('/api/') &&
-                  !event.request.url.includes('firestore.googleapis.com')) {
+                  !event.request.url.includes('firestore.googleapis.com') &&
+                  !event.request.url.endsWith('/version.json')) {
                 cache.put(event.request, response.clone());
               }
             }

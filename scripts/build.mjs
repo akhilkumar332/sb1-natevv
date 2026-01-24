@@ -1,4 +1,22 @@
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
+import { writeFile } from 'fs/promises';
+import path from 'path';
+
+const writeVersionFile = async () => {
+  let commit = 'unknown';
+  try {
+    commit = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
+  } catch (error) {
+    console.warn('Unable to read git commit hash, using fallback.');
+  }
+
+  const version = new Date().toISOString();
+  const payload = { version, commit };
+  const versionPath = path.resolve('public', 'version.json');
+  await writeFile(versionPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+};
 
 const isWindows = process.platform === 'win32';
 const getBinPath = (command) => {
@@ -58,6 +76,7 @@ const suppressBaselineWarnings = (text) => {
 };
 
 try {
+  await writeVersionFile();
   await run(getBinPath('tsc'), []);
   process.env.BROWSERSLIST_IGNORE_OLD_DATA = '1';
   const viteArgs = ['build', ...process.argv.slice(2)];
