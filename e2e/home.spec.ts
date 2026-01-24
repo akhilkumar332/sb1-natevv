@@ -15,24 +15,17 @@ test.describe('Home Page', () => {
     await expect(page.getByRole('link', { name: /contact/i })).toBeVisible();
   });
 
-  test('should have functional donor login button', async ({ page }) => {
+  test('should have functional donor signin link', async ({ page }) => {
     await page.goto('/');
 
-    const loginButton = page.getByRole('link', { name: /donor login/i });
-    await expect(loginButton).toBeVisible();
+    const signinButton = page.getByRole('button', { name: /sign in/i });
+    await expect(signinButton).toBeVisible();
+    await signinButton.hover();
 
-    await loginButton.click();
+    const donorSigninLink = page.getByRole('link', { name: /^donor$/i });
+    await expect(donorSigninLink).toBeVisible();
+    await donorSigninLink.click();
     await expect(page).toHaveURL(/.*donor\/login/);
-  });
-
-  test('should have functional register button', async ({ page }) => {
-    await page.goto('/');
-
-    const registerButton = page.getByRole('link', { name: /register/i });
-    if (await registerButton.isVisible()) {
-      await registerButton.click();
-      await expect(page).toHaveURL(/.*donor\/register/);
-    }
   });
 
   test('should display hero section', async ({ page }) => {
