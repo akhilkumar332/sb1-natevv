@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Heart, Phone, Mail, MapPin, Droplet, Facebook, Twitter, Instagram, Linkedin, AlertCircle } from 'lucide-react';
+import { Heart, Phone, Mail, MapPin, Facebook, Twitter, Instagram, Linkedin, AlertCircle } from 'lucide-react';
+import LogoMark from './LogoMark';
 
 function Footer() {
   return (
@@ -13,10 +14,7 @@ function Footer() {
           {/* About Section */}
           <div className="lg:col-span-1">
             <div className="flex items-center space-x-2 mb-4">
-              <div className="relative">
-                <Droplet className="w-8 h-8 text-red-600" />
-                <Heart className="w-3 h-3 text-red-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-              </div>
+              <LogoMark className="w-8 h-8" />
               <div>
                 <h3 className="text-xl font-extrabold bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
                   BloodHub

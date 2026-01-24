@@ -1,9 +1,10 @@
 // src/components/Navbar.tsx
 import React, { useState, Suspense } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Droplet, LogOut, LayoutDashboard, Heart, ChevronDown } from 'lucide-react';
+import { Menu, X, LogOut, LayoutDashboard, Heart, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import LogoMark from './LogoMark';
 
 
 interface NavLinkProps {
@@ -51,52 +52,13 @@ function MobileNavLink({ to, children, onClick }: NavLinkProps & { onClick?: () 
   );
 }
 
-function LoginDropdown() {
+function SigninDropdown() {
   const [isOpen, setIsOpen] = useState(false);
 
-  const loginOptions = [
-    { label: 'Donor Login', path: '/donor/login', color: 'red' },
-    { label: 'NGO Login', path: '/ngo/login', color: 'blue' },
-    { label: 'Hospital Login', path: '/hospital/login', color: 'green' },
-  ];
-
-  return (
-    <div
-      className="relative"
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
-    >
-      <button className="px-5 py-2 text-red-600 font-semibold hover:text-red-700 transition-colors flex items-center space-x-1">
-        <span>Login</span>
-        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {isOpen && (
-        <div className="absolute right-0 top-full pt-1 z-50">
-          <div className="w-48 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl py-2 border border-gray-100 animate-fadeIn">
-            {loginOptions.map((option) => (
-              <Link
-                key={option.path}
-                to={option.path}
-                className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 transition-all"
-              >
-                {option.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RegisterDropdown() {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const registerOptions = [
-    { label: 'Donor Register', path: '/donor/register', color: 'red' },
-    { label: 'NGO Register', path: '/ngo/register', color: 'blue' },
-    { label: 'Hospital Register', path: '/hospital/register', color: 'green' },
+  const signinOptions = [
+    { label: 'Donor', path: '/donor/login' },
+    { label: 'NGO', path: '/ngo/login' },
+    { label: 'Hospital', path: '/hospital/login' },
   ];
 
   return (
@@ -106,14 +68,14 @@ function RegisterDropdown() {
       onMouseLeave={() => setIsOpen(false)}
     >
       <button className="px-6 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-full font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300 flex items-center space-x-1">
-        <span>Register</span>
+        <span>Sign In</span>
         <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
         <div className="absolute right-0 top-full pt-1 z-50">
-          <div className="w-52 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl py-2 border border-gray-100 animate-fadeIn">
-            {registerOptions.map((option) => (
+          <div className="w-48 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl py-2 border border-gray-100 animate-fadeIn">
+            {signinOptions.map((option) => (
               <Link
                 key={option.path}
                 to={option.path}
@@ -216,60 +178,28 @@ function UserMenu() {
 }
 
 function MobileAuthMenu({ onClose }: { onClose?: () => void }) {
-  const [loginExpanded, setLoginExpanded] = useState(false);
-  const [registerExpanded, setRegisterExpanded] = useState(false);
+  const [signinExpanded, setSigninExpanded] = useState(false);
 
-  const loginOptions = [
-    { label: 'Donor Login', path: '/donor/login' },
-    { label: 'NGO Login', path: '/ngo/login' },
-    { label: 'Hospital Login', path: '/hospital/login' },
-  ];
-
-  const registerOptions = [
-    { label: 'Donor Register', path: '/donor/register' },
-    { label: 'NGO Register', path: '/ngo/register' },
-    { label: 'Hospital Register', path: '/hospital/register' },
+  const signinOptions = [
+    { label: 'Donor', path: '/donor/login' },
+    { label: 'NGO', path: '/ngo/login' },
+    { label: 'Hospital', path: '/hospital/login' },
   ];
 
   return (
     <div className="flex flex-col space-y-2 mt-6 pt-6 border-t border-gray-200 animate-slideInRight" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
-      {/* Login Dropdown */}
+      {/* Signin Dropdown */}
       <div>
         <button
-          onClick={() => setLoginExpanded(!loginExpanded)}
-          className="flex items-center justify-between w-full px-5 py-3 text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300"
-        >
-          <span>Login</span>
-          <ChevronDown className={`w-4 h-4 transition-transform ${loginExpanded ? 'rotate-180' : ''}`} />
-        </button>
-        {loginExpanded && (
-          <div className="mt-2 ml-4 space-y-1">
-            {loginOptions.map((option) => (
-              <Link
-                key={option.path}
-                to={option.path}
-                onClick={onClose}
-                className="block px-4 py-2 text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all"
-              >
-                {option.label}
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Register Dropdown */}
-      <div>
-        <button
-          onClick={() => setRegisterExpanded(!registerExpanded)}
+          onClick={() => setSigninExpanded(!signinExpanded)}
           className="flex items-center justify-between w-full px-5 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:shadow-lg transition-all duration-300"
         >
-          <span>Register</span>
-          <ChevronDown className={`w-4 h-4 transition-transform ${registerExpanded ? 'rotate-180' : ''}`} />
+          <span>Sign In</span>
+          <ChevronDown className={`w-4 h-4 transition-transform ${signinExpanded ? 'rotate-180' : ''}`} />
         </button>
-        {registerExpanded && (
+        {signinExpanded && (
           <div className="mt-2 ml-4 space-y-1">
-            {registerOptions.map((option) => (
+            {signinOptions.map((option) => (
               <Link
                 key={option.path}
                 to={option.path}
@@ -378,10 +308,7 @@ const Navbar: React.FC = () => {
             {/* Logo */}
             <div className="flex items-center">
               <Link to="/" className="flex items-center space-x-2 group">
-                <div className="relative">
-                  <Droplet className="w-9 h-9 text-red-600 group-hover:scale-110 transition-transform duration-300" />
-                  <Heart className="w-4 h-4 text-red-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-                </div>
+                <LogoMark className="w-9 h-9 group-hover:scale-110 transition-transform duration-300" />
                 <div>
                   <span className="font-extrabold text-2xl bg-gradient-to-r from-red-600 via-red-700 to-red-800 bg-clip-text text-transparent">
                     BloodHub
@@ -403,8 +330,7 @@ const Navbar: React.FC = () => {
                   <LoadingFallback />
                 ) : !user ? (
                   <div className="flex items-center space-x-3">
-                    <LoginDropdown />
-                    <RegisterDropdown />
+                    <SigninDropdown />
                   </div>
                 ) : (
                   <Suspense fallback={<LoadingFallback />}>
@@ -453,10 +379,7 @@ const Navbar: React.FC = () => {
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
                 <div className="flex items-center space-x-2">
-                  <div className="relative">
-                    <Droplet className="w-8 h-8 text-red-600" />
-                    <Heart className="w-3 h-3 text-red-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-                  </div>
+                  <LogoMark className="w-8 h-8" />
                   <div>
                     <h2 className="text-xl font-extrabold bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
                       BloodHub

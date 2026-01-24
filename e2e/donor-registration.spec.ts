@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Donor Registration Flow', () => {
-  test('should navigate to registration page', async ({ page }) => {
-    await page.goto('/');
-    await page.getByRole('link', { name: /register/i }).click();
+  test('should navigate to registration page from login', async ({ page }) => {
+    await page.goto('/donor/login');
+    await page.getByRole('link', { name: /register now|register/i }).click();
     await expect(page).toHaveURL(/.*donor\/register/);
   });
 
