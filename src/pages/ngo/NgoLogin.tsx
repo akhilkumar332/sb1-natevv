@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
-import { Droplet, Heart, Users, Calendar, TrendingUp, Shield } from 'lucide-react';
+import { Heart, Users, Calendar, TrendingUp, Shield } from 'lucide-react';
+import LogoMark from '../../components/LogoMark';
 
 export function NgoLogin() {
   const navigate = useNavigate();
@@ -60,10 +61,7 @@ export function NgoLogin() {
         <div className="relative z-10 flex flex-col justify-center px-12 py-12 text-white">
           <div className="mb-12">
             <div className="flex items-center space-x-3 mb-6">
-              <div className="relative">
-                <Droplet className="w-12 h-12" />
-                <Heart className="w-5 h-5 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-              </div>
+              <LogoMark className="w-12 h-12" />
               <div>
                 <h1 className="text-3xl font-extrabold">BloodHub</h1>
                 <p className="text-sm tracking-wider opacity-90">INDIA</p>
@@ -126,10 +124,7 @@ export function NgoLogin() {
             {/* Mobile Logo */}
             <div className="lg:hidden text-center mb-8">
               <div className="inline-flex items-center space-x-2">
-                <div className="relative">
-                  <Droplet className="w-10 h-10 text-blue-600" />
-                  <Heart className="w-4 h-4 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-                </div>
+                <LogoMark className="w-10 h-10" />
                 <div>
                   <span className="font-extrabold text-2xl bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                     BloodHub
