@@ -34,6 +34,7 @@ export interface User {
   phoneNumber?: string;
   displayName?: string;
   photoURL?: string;
+  bhId?: string;
   role?: UserRole;
   createdAt?: string;
   updatedAt?: string;

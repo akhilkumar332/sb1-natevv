@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNgoData } from '../../hooks/useNgoData';
+import BhIdBanner from '../../components/BhIdBanner';
 import {
   Heart,
   Users,
@@ -132,6 +133,9 @@ function NgoDashboard() {
                 Welcome back, <span className="text-purple-600">{user?.displayName || 'NGO Admin'}</span>! 👋
               </h1>
               <p className="text-gray-600">Manage your campaigns, volunteers, and partnerships</p>
+              {user?.bhId && (
+                <p className="text-sm text-purple-600 font-semibold mt-2">BH ID: {user.bhId}</p>
+              )}
             </div>
             <div className="flex gap-3">
               <button
@@ -148,6 +152,8 @@ function NgoDashboard() {
             </div>
           </div>
         </div>
+
+        <BhIdBanner className="mb-6" />
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

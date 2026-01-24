@@ -35,6 +35,7 @@ interface OnboardingFormData {
   registrationNumber: string;
   hospitalType: string;
   contactPersonName: string;
+  dateOfBirth: string;
   email: string;
   phone: string;
   address: string;
@@ -93,6 +94,7 @@ export function HospitalOnboarding() {
     registrationNumber: '',
     hospitalType: '',
     contactPersonName: user?.displayName || '',
+    dateOfBirth: '',
     email: user?.email || '',
     phone: user?.phoneNumber || '+91',
     address: '',
@@ -354,7 +356,7 @@ export function HospitalOnboarding() {
         }
         break;
       case 1:
-        if (!formData.email || !formData.phone || !formData.address || !formData.city || !formData.state || !formData.postalCode || !formData.country) {
+        if (!formData.email || !formData.phone || !formData.dateOfBirth || !formData.address || !formData.city || !formData.state || !formData.postalCode || !formData.country) {
           toast.error('Please fill in all required contact information');
           return false;
         }
@@ -396,6 +398,7 @@ export function HospitalOnboarding() {
     try {
       await updateUserProfile({
         ...formData,
+        dateOfBirth: new Date(formData.dateOfBirth),
         onboardingCompleted: true
       });
       toast.success('Hospital profile completed successfully!');
@@ -507,6 +510,20 @@ export function HospitalOnboarding() {
                   value={formData.phone}
                   onChange={(value) => setFormData(prev => ({ ...prev, phone: value || '' }))}
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 transition-all phone-input-custom"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Date of Birth <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  name="dateOfBirth"
+                  value={formData.dateOfBirth}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                  required
                 />
               </div>
 

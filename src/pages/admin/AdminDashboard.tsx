@@ -29,8 +29,11 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useAdminData } from '../../hooks/useAdminData';
+import BhIdBanner from '../../components/BhIdBanner';
+import { useAuth } from '../../contexts/AuthContext';
 
 function AdminDashboard() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verification' | 'emergency' | 'reports'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -154,6 +157,9 @@ function AdminDashboard() {
                 Admin Dashboard 👨‍💼
               </h1>
               <p className="text-gray-600">Platform-wide management and monitoring</p>
+              {user?.bhId && (
+                <p className="text-sm text-blue-600 font-semibold mt-2">BH ID: {user.bhId}</p>
+              )}
             </div>
             <div className="flex gap-3">
               <button
@@ -174,6 +180,8 @@ function AdminDashboard() {
             </div>
           </div>
         </div>
+
+        <BhIdBanner className="mb-6" />
 
         {/* System Alerts */}
         <div className="mb-8">
