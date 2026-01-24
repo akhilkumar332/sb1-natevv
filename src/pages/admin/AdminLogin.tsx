@@ -1,5 +1,5 @@
 // src/pages/auth/AdminLogin.tsx
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -9,22 +9,30 @@ export function AdminLogin() {
   const navigate = useNavigate();
   const { user, loginWithGoogle, logout } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
-    if (user) {
-      const targetPath = user.onboardingCompleted ? '/admin/dashboard' : '/admin/onboarding';
-      navigate(targetPath);
+    if (!user || hasRedirected.current) {
+      return;
     }
-  }, []);
+
+    if (user.role !== 'admin') {
+      toast.error("You're not an Admin", { id: 'role-mismatch-admin' });
+      return;
+    }
+
+    const targetPath = user.onboardingCompleted ? '/admin/dashboard' : '/admin/onboarding';
+    hasRedirected.current = true;
+    navigate(targetPath);
+  }, [user, navigate]);
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     try {
       const response = await loginWithGoogle();
       if (response.user.role !== 'admin') {
-        toast.error("You're not an Admin");
-        await logout(navigate);
-        navigate('/admin/login');
+        toast.error("You're not an Admin", { id: 'role-mismatch-admin' });
+        await logout(navigate, { redirectTo: '/admin/login', showToast: false });
         return;
       }
       toast.success('Successfully logged in as Admin!');

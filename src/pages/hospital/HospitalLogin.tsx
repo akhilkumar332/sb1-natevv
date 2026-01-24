@@ -1,5 +1,5 @@
 // src/pages/auth/HospitalLogin.tsx
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -9,12 +9,21 @@ export function HospitalLogin() {
   const navigate = useNavigate();
   const { user, loginWithGoogle, logout } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
-    if (user) {
-      const targetPath = user.onboardingCompleted ? '/hospital/dashboard' : '/hospital/onboarding';
-      navigate(targetPath);
+    if (!user || hasRedirected.current) {
+      return;
     }
+
+    if (user.role !== 'hospital') {
+      toast.error("You're not a Hospital Admin", { id: 'role-mismatch-hospital' });
+      return;
+    }
+
+    const targetPath = user.onboardingCompleted ? '/hospital/dashboard' : '/hospital/onboarding';
+    hasRedirected.current = true;
+    navigate(targetPath);
   }, [user, navigate]);
 
   const handleGoogleLogin = async () => {
@@ -22,9 +31,8 @@ export function HospitalLogin() {
     try {
       const response = await loginWithGoogle();
       if (response.user.role !== 'hospital') {
-        toast.error("You're not a Hospital Admin");
-        await logout(navigate);
-        navigate('/hospital/login');
+        toast.error("You're not a Hospital Admin", { id: 'role-mismatch-hospital' });
+        await logout(navigate, { redirectTo: '/hospital/login', showToast: false });
         return;
       }
       toast.success('Successfully logged in as Hospital!');

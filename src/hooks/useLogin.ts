@@ -22,7 +22,7 @@ export const useLogin = () => {
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
 
   const navigate = useNavigate();
-  const { loginWithGoogle, loginWithPhone, verifyOTP, user, authLoading } = useAuth();
+  const { loginWithGoogle, loginWithPhone, verifyOTP, logout, user, authLoading } = useAuth();
 
   const handleIdentifierChange = (value: string) => {
     setFormData(prev => ({
@@ -110,6 +110,11 @@ export const useLogin = () => {
       const userData = await verifyOTP(confirmationResult, sanitizedOtp);
       console.log('OTP verified, user data:', userData);
       console.log('Onboarding completed:', userData.onboardingCompleted);
+      if (userData.role !== 'donor') {
+        toast.error("You're not a Donor", { id: 'role-mismatch-donor' });
+        await logout(navigate, { redirectTo: '/donor/login', showToast: false });
+        return;
+      }
       toast.success('Login successful!');
 
       // Navigate based on onboarding status - if not explicitly true, go to onboarding
@@ -159,6 +164,11 @@ export const useLogin = () => {
     try {
       setGoogleLoading(true);
       const result = await loginWithGoogle();
+      if (result.user.role !== 'donor') {
+        toast.error("You're not a Donor", { id: 'role-mismatch-donor' });
+        await logout(navigate, { redirectTo: '/donor/login', showToast: false });
+        return;
+      }
       if (result?.token && result?.user) {
         handleLoginSuccess(result.token);
         console.log('Google login user data:', result.user);

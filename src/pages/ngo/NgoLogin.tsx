@@ -1,5 +1,5 @@
 // src/pages/auth/NgoLogin.tsx
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -9,12 +9,21 @@ export function NgoLogin() {
   const navigate = useNavigate();
   const { user, loginWithGoogle, logout } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
-    if (user) {
-      const targetPath = user.onboardingCompleted ? '/ngo/dashboard' : '/ngo/onboarding';
-      navigate(targetPath);
+    if (!user || hasRedirected.current) {
+      return;
     }
+
+    if (user.role !== 'ngo') {
+      toast.error("You're not an NGO", { id: 'role-mismatch-ngo' });
+      return;
+    }
+
+    const targetPath = user.onboardingCompleted ? '/ngo/dashboard' : '/ngo/onboarding';
+    hasRedirected.current = true;
+    navigate(targetPath);
   }, [user, navigate]);
 
   const handleGoogleLogin = async () => {
@@ -22,9 +31,8 @@ export function NgoLogin() {
     try {
       const response = await loginWithGoogle();
       if (response.user.role !== 'ngo') {
-        toast.error("You're not an NGO");
-        await logout(navigate);
-        navigate('/ngo/login');
+        toast.error("You're not an NGO", { id: 'role-mismatch-ngo' });
+        await logout(navigate, { redirectTo: '/ngo/login', showToast: false });
         return;
       }
       toast.success('Successfully logged in as NGO!');
