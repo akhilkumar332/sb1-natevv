@@ -1,7 +1,7 @@
 // src/pages/auth/DonorRegister.tsx
 import { useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Phone, Droplet, Heart, Shield, Users, Award, ArrowRight } from 'lucide-react';
+import { Phone, Heart, Shield, Users, Award, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import PhoneInput from 'react-phone-number-input';
 import { useRegister } from '../../hooks/useRegister';
