@@ -11,10 +11,12 @@ import { useAuthSync } from './hooks/useAuthSync';
 import { useActivityTracker } from './hooks/useActivityTracker';
 import { useInactivityCheck } from './hooks/useInactivityCheck';
 import { useLocation } from 'react-router-dom';
+import { useVersionCheck } from './hooks/useVersionCheck';
 
 function App() {
   useAuthSync();
   useActivityTracker();
+  useVersionCheck();
   const { user } = useAuth();
   const { WarningComponent } = useInactivityCheck();
   const location = useLocation();
