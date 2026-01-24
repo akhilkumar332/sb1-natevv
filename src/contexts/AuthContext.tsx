@@ -76,7 +76,7 @@ interface AuthContextType {
   loginWithEmail: (email: string, password: string) => Promise<LoginResponse>;
   registerWithEmail: (email: string, password: string, displayName: string) => Promise<FirebaseUser>;
   resetPassword: (email: string) => Promise<void>;
-  logout: (navigate: NavigateFunction) => Promise<void>;
+  logout: (navigate: NavigateFunction, options?: { redirectTo?: string; showToast?: boolean }) => Promise<void>;
   updateUserProfile: (data: Partial<User>) => Promise<void>;
   loginLoading: boolean;
   setLoginLoading: (loading: boolean) => void;
@@ -190,13 +190,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
+          const isRegistrationRoute =
+            typeof window !== 'undefined' &&
+            (window.location.pathname.includes('/register') ||
+              window.location.pathname.includes('/onboarding'));
+
           if (userData) {
             setUser(userData);
           } else {
-            // Only sign out if NOT a new user
-            // New users are still in registration process
-            if (!isNewUser) {
-              console.warn('User document not found for existing user, signing out');
+            // Only keep new users signed in during registration/onboarding flows
+            if (!isNewUser || !isRegistrationRoute) {
+              console.warn('User document not found, signing out');
               await signOut(auth);
               setUser(null);
             } else {
@@ -588,18 +592,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = async (navigate: NavigateFunction) => {
+  const logout = async (
+    navigate: NavigateFunction,
+    options: { redirectTo?: string; showToast?: boolean } = {}
+  ) => {
+    const { redirectTo = '/donor/login', showToast = true } = options;
     try {
       await handleLogout();
       
       // Broadcast logout event to other tabs
       logoutChannel.postMessage('logout');
       
-      toast.success('Successfully logged out!');
-      navigate('/donor/login');
+      if (showToast) {
+        toast.success('Successfully logged out!');
+      }
+      if (redirectTo) {
+        navigate(redirectTo);
+      }
     } catch (error) {
       console.error('Logout error:', error);
-      toast.error('Failed to log out. Please try again.');
+      if (showToast) {
+        toast.error('Failed to log out. Please try again.');
+      }
     }
   };
 

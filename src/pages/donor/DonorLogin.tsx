@@ -27,13 +27,19 @@ export function DonorLogin() {
   } = useLogin();
 
   useEffect(() => {
-    if (user && !hasNavigated.current) {
-      hasNavigated.current = true;
-      if (!user.onboardingCompleted) {
-        navigate('/donor/onboarding');
-      } else if (user.role === 'donor') {
-        navigate('/donor/dashboard');
-      }
+    if (!user || hasNavigated.current) {
+      return;
+    }
+
+    if (user.role !== 'donor') {
+      return;
+    }
+
+    hasNavigated.current = true;
+    if (!user.onboardingCompleted) {
+      navigate('/donor/onboarding');
+    } else {
+      navigate('/donor/dashboard');
     }
   }, [user, navigate]);
 
