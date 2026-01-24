@@ -26,6 +26,7 @@ import {
   DocumentSnapshot
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
+import { generateBhId } from '../utils/bhId';
 
 // Define window recaptcha type
 declare global {
@@ -50,6 +51,7 @@ interface User {
   city?: string;
   state?: string;
   postalCode?: string;
+  bhId?: string;
   country?: string;
   bloodType?: string;
   location?: {
@@ -112,13 +114,26 @@ const updateUserInFirestore = async (
     }
 
     const existingUserData = userDoc.data() as User;
+    const existingDob = convertTimestampToDate(existingUserData?.dateOfBirth);
+    const existingBhId = existingUserData?.bhId;
+    const generatedBhId = existingBhId
+      ? null
+      : generateBhId({
+          dateOfBirth: existingDob,
+          postalCode: existingUserData?.postalCode || undefined,
+          uid: firebaseUser.uid
+        });
 
-    // Prepare optimized update (only lastLoginAt)
+    // Prepare optimized update (lastLoginAt and optional bhId)
     // Use try-catch to handle potential update failures
     try {
-      await updateDoc(userRef, {
-        lastLoginAt: serverTimestamp(),
-      });
+      const updatePayload: Record<string, any> = {
+        lastLoginAt: serverTimestamp()
+      };
+      if (!existingBhId && generatedBhId) {
+        updatePayload.bhId = generatedBhId;
+      }
+      await updateDoc(userRef, updatePayload);
     } catch (updateError) {
       console.warn('Failed to update lastLoginAt, continuing anyway:', updateError);
       // Continue even if update fails - not critical
@@ -133,8 +148,9 @@ const updateUserInFirestore = async (
       photoURL: firebaseUser.photoURL || existingUserData.photoURL,
       phoneNumber: firebaseUser.phoneNumber || existingUserData.phoneNumber,
       lastLoginAt: new Date(),
+      bhId: existingBhId || generatedBhId || undefined,
       createdAt: convertTimestampToDate(existingUserData?.createdAt),
-      dateOfBirth: convertTimestampToDate(existingUserData?.dateOfBirth),
+      dateOfBirth: existingDob,
       lastDonation: convertTimestampToDate(existingUserData?.lastDonation),
       ...additionalData
     } as User;
@@ -343,9 +359,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const userData = userDoc.data() as User;
+      const existingDob = convertTimestampToDate(userData?.dateOfBirth);
+      const existingBhId = userData?.bhId;
+      const generatedBhId = existingBhId
+        ? null
+        : generateBhId({
+            dateOfBirth: existingDob,
+            postalCode: userData?.postalCode || undefined,
+            uid: userCredential.user.uid
+          });
 
-      // Update last login in background (don't wait)
-      updateDoc(userRef, { lastLoginAt: serverTimestamp() }).catch(err =>
+      // Update last login and optional bhId in background (don't wait)
+      const updatePayload: Record<string, any> = { lastLoginAt: serverTimestamp() };
+      if (!existingBhId && generatedBhId) {
+        updatePayload.bhId = generatedBhId;
+      }
+      updateDoc(userRef, updatePayload).catch(err =>
         console.error('Failed to update lastLoginAt:', err)
       );
 
@@ -355,8 +384,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         uid: userCredential.user.uid,
         lastLoginAt: new Date(),
         createdAt: convertTimestampToDate(userData?.createdAt),
-        dateOfBirth: convertTimestampToDate(userData?.dateOfBirth),
+        dateOfBirth: existingDob,
         lastDonation: convertTimestampToDate(userData?.lastDonation),
+        bhId: existingBhId || generatedBhId || undefined,
       } as User;
 
       // Update user state immediately for navigation
@@ -408,17 +438,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Get the token
       const token = await result.user.getIdToken();
 
+      const userDocData = userDoc.data() as User;
+      const existingDob = convertTimestampToDate(userDocData?.dateOfBirth);
+      const existingBhId = userDocData?.bhId;
+      const generatedBhId = existingBhId
+        ? null
+        : generateBhId({
+            dateOfBirth: existingDob,
+            postalCode: userDocData?.postalCode || undefined,
+            uid: result.user.uid
+          });
+
       const userDataToReturn = {
-        ...userDoc.data(),
+        ...userDocData,
         uid: result.user.uid,
-        createdAt: convertTimestampToDate(userDoc.data()?.createdAt),
-        dateOfBirth: convertTimestampToDate(userDoc.data()?.dateOfBirth),
+        createdAt: convertTimestampToDate(userDocData?.createdAt),
+        dateOfBirth: existingDob,
         lastLoginAt: new Date(),
-        lastDonation: convertTimestampToDate(userDoc.data()?.lastDonation),
+        lastDonation: convertTimestampToDate(userDocData?.lastDonation),
+        bhId: existingBhId || generatedBhId || undefined,
       } as User;
 
-      // Update last login time in background
-      updateDoc(userRef, { lastLoginAt: serverTimestamp() }).catch(err =>
+      // Update last login time and optional bhId in background
+      const updatePayload: Record<string, any> = { lastLoginAt: serverTimestamp() };
+      if (!existingBhId && generatedBhId) {
+        updatePayload.bhId = generatedBhId;
+      }
+      updateDoc(userRef, updatePayload).catch(err =>
         console.error('Failed to update lastLoginAt:', err)
       );
 
@@ -548,14 +594,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Get the token
       const token = await result.user.getIdToken();
 
+      const userDocData = userDoc.data() as User;
+      const existingDob = convertTimestampToDate(userDocData?.dateOfBirth);
+      const existingBhId = userDocData?.bhId;
+      const generatedBhId = existingBhId
+        ? null
+        : generateBhId({
+            dateOfBirth: existingDob,
+            postalCode: userDocData?.postalCode || undefined,
+            uid: result.user.uid
+          });
+
       const userDataToReturn = {
-        ...userDoc.data(),
+        ...userDocData,
         uid: result.user.uid,
-        createdAt: convertTimestampToDate(userDoc.data()?.createdAt),
-        dateOfBirth: convertTimestampToDate(userDoc.data()?.dateOfBirth),
+        createdAt: convertTimestampToDate(userDocData?.createdAt),
+        dateOfBirth: existingDob,
         lastLoginAt: new Date(),
-        lastDonation: convertTimestampToDate(userDoc.data()?.lastDonation),
+        lastDonation: convertTimestampToDate(userDocData?.lastDonation),
+        bhId: existingBhId || generatedBhId || undefined,
       } as User;
+
+      const updatePayload: Record<string, any> = { lastLoginAt: serverTimestamp() };
+      if (!existingBhId && generatedBhId) {
+        updatePayload.bhId = generatedBhId;
+      }
+      updateDoc(userRef, updatePayload).catch(err =>
+        console.error('Failed to update lastLoginAt:', err)
+      );
 
       // Update user state immediately for navigation
       setUser(userDataToReturn);
@@ -624,17 +690,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     console.log('Updating user profile with:', data);
     try {
+      const nextDateOfBirth = data.dateOfBirth ?? user.dateOfBirth;
+      const nextPostalCode = data.postalCode ?? user.postalCode;
+      const existingBhId = user.bhId;
+      const generatedBhId = existingBhId
+        ? null
+        : generateBhId({
+            dateOfBirth: nextDateOfBirth,
+            postalCode: nextPostalCode || undefined,
+            uid: user.uid
+          });
+
       await setDoc(doc(db, 'users', user.uid),
         {
           ...data,
-          onboardingCompleted: true // Set this to true upon successful completion
+          onboardingCompleted: true, // Set this to true upon successful completion
+          ...(existingBhId ? {} : generatedBhId ? { bhId: generatedBhId } : {})
         },
         { merge: true }
       );
       setUser (prev => ({
         ...prev,
         ...data,
-        onboardingCompleted: true // Ensure this is updated in the state
+        onboardingCompleted: true, // Ensure this is updated in the state
+        bhId: prev?.bhId || generatedBhId || undefined
       } as User));
     } catch (error) {
       console.error('Error updating user profile:', error);

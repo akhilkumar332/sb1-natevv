@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useHospitalData } from '../../hooks/useHospitalData';
+import BhIdBanner from '../../components/BhIdBanner';
 
 function HospitalDashboard() {
   const { user } = useAuth();
@@ -107,6 +108,9 @@ function HospitalDashboard() {
                   <MapPin className="w-4 h-4 mr-1" />
                   {user?.city || 'Location'}
                 </p>
+                {user?.bhId && (
+                  <p className="text-white/80 text-sm mt-1">BH ID: {user.bhId}</p>
+                )}
               </div>
             </div>
             <div className="flex gap-3">
@@ -124,6 +128,10 @@ function HospitalDashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="container mx-auto px-4 pt-6">
+        <BhIdBanner />
       </div>
 
       <div className="container mx-auto px-4 py-8">

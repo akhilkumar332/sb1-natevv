@@ -46,6 +46,7 @@ export interface User {
   createdAt: Timestamp;
   lastLoginAt: Timestamp;
   onboardingCompleted: boolean;
+  bhId?: string;
 
   // Location
   address?: string;

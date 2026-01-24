@@ -32,6 +32,7 @@ import { useDonorData } from '../../hooks/useDonorData';
 import { useBloodRequest } from '../../hooks/useBloodRequest';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import BhIdBanner from '../../components/BhIdBanner';
 
 function DonorDashboard() {
   const { user } = useAuth();
@@ -288,6 +289,10 @@ function DonorDashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="container mx-auto px-4 pt-6">
+        <BhIdBanner />
       </div>
 
       <div className="container mx-auto px-4 py-8">
@@ -591,6 +596,15 @@ function DonorDashboard() {
                   </span>
                   <span className="font-semibold text-gray-800">{user?.city || 'Not Set'}</span>
                 </div>
+                {user?.bhId && (
+                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-600 flex items-center">
+                      <Award className="w-4 h-4 mr-2 text-indigo-500" />
+                      BH ID
+                    </span>
+                    <span className="font-semibold text-gray-800">{user.bhId}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-600 flex items-center">
                     <Phone className="w-4 h-4 mr-2 text-purple-500" />
