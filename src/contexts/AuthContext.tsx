@@ -17,6 +17,8 @@ import {
   sendEmailVerification,
   PhoneAuthProvider,
   linkWithCredential,
+  linkWithPopup,
+  linkWithPhoneNumber,
 } from 'firebase/auth';
 import { 
   doc,
@@ -90,6 +92,9 @@ interface AuthContextType {
   setLoginLoading: (loading: boolean) => void;
   verifyOTP: (confirmationResult: ConfirmationResult, otp: string) => Promise<User>;
   setAuthLoading: (loading: boolean) => void;
+  linkGoogleProvider: () => Promise<void>;
+  startPhoneLink: (phoneNumber: string) => Promise<ConfirmationResult>;
+  confirmPhoneLink: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
 }
 
 interface LoginResponse {
@@ -129,6 +134,21 @@ const savePendingPhoneLink = (data: {
 const clearPendingPhoneLink = () => {
   if (typeof window === 'undefined') return;
   sessionStorage.removeItem(pendingPhoneLinkKey);
+};
+
+const cleanupRecaptcha = () => {
+  const container = document.getElementById('recaptcha-container');
+  if (container) {
+    container.remove();
+  }
+  if (window.recaptchaVerifier) {
+    try {
+      window.recaptchaVerifier.clear();
+    } catch (error) {
+      console.warn('Error clearing recaptcha:', error);
+    }
+    window.recaptchaVerifier = undefined;
+  }
 };
 
 const readPendingPhoneLink = () => {
@@ -380,18 +400,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return confirmation;
     } catch (error) {
       // Clean up on error only
-      const container = document.getElementById('recaptcha-container');
-      if (container) {
-        container.remove();
-      }
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-        } catch (e) {
-          console.warn('Error clearing recaptcha on error:', e);
-        }
-        window.recaptchaVerifier = undefined;
-      }
+      cleanupRecaptcha();
       console.error('Phone login error:', error);
       throw error;
     } finally {
@@ -405,18 +414,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userCredential = await confirmationResult.confirm(otp);
 
       // Clean up reCAPTCHA after successful verification
-      const container = document.getElementById('recaptcha-container');
-      if (container) {
-        container.remove();
-      }
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-        } catch (e) {
-          console.warn('Error clearing recaptcha after OTP verify:', e);
-        }
-        window.recaptchaVerifier = undefined;
-      }
+      cleanupRecaptcha();
 
       const normalizedPhone = normalizePhoneNumber(userCredential.user.phoneNumber || '');
       const userRef = doc(db, 'users', userCredential.user.uid);
@@ -521,19 +519,114 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('OTP verification error:', error);
 
       // Clean up reCAPTCHA on error too
-      const container = document.getElementById('recaptcha-container');
-      if (container) {
-        container.remove();
+      cleanupRecaptcha();
+
+      throw error;
+    }
+  };
+
+  const linkGoogleProvider = async (): Promise<void> => {
+    if (!auth.currentUser) {
+      throw new Error('No user logged in');
+    }
+
+    auth.useDeviceLanguage();
+
+    try {
+      await linkWithPopup(auth.currentUser, googleProvider);
+    } catch (error: any) {
+      if (error?.code === 'auth/popup-closed-by-user') {
+        throw new Error('Sign-in popup was closed before completing the sign-in process.');
       }
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-        } catch (e) {
-          console.warn('Error clearing recaptcha on OTP error:', e);
-        }
-        window.recaptchaVerifier = undefined;
+      if (error?.code === 'auth/popup-blocked') {
+        throw new Error('Sign-in popup was blocked by the browser. Please allow popups for this site.');
+      }
+      if (error?.code === 'auth/credential-already-in-use') {
+        throw new Error('Google account is already linked to another user.');
+      }
+      if (error?.code === 'auth/provider-already-linked') {
+        return;
+      }
+      throw error;
+    }
+  };
+
+  const startPhoneLink = async (phoneNumber: string): Promise<ConfirmationResult> => {
+    if (!auth.currentUser) {
+      throw new Error('No user logged in');
+    }
+
+    if (window.recaptchaVerifier) {
+      try {
+        window.recaptchaVerifier.clear();
+      } catch (e) {
+        console.warn('Error clearing recaptcha:', e);
+      }
+      window.recaptchaVerifier = undefined;
+    }
+
+    const existingContainer = document.getElementById('recaptcha-container');
+    if (existingContainer) {
+      existingContainer.remove();
+    }
+
+    const container = document.createElement('div');
+    container.id = 'recaptcha-container';
+    document.body.appendChild(container);
+
+    const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+      'size': 'invisible',
+      'callback': () => {
+        console.log('reCAPTCHA solved');
+      },
+      'expired-callback': () => {
+        toast.error('reCAPTCHA expired. Please try again.');
+      }
+    });
+
+    window.recaptchaVerifier = recaptchaVerifier;
+
+    try {
+      const confirmation = await linkWithPhoneNumber(auth.currentUser, phoneNumber, recaptchaVerifier);
+      return confirmation;
+    } catch (error) {
+      cleanupRecaptcha();
+      throw error;
+    }
+  };
+
+  const confirmPhoneLink = async (
+    confirmationResult: ConfirmationResult,
+    otp: string
+  ): Promise<void> => {
+    if (!auth.currentUser) {
+      throw new Error('No user logged in');
+    }
+
+    try {
+      const userCredential = await confirmationResult.confirm(otp);
+      cleanupRecaptcha();
+
+      const phoneNumber = userCredential.user.phoneNumber || auth.currentUser.phoneNumber || '';
+      const normalizedPhone = normalizePhoneNumber(phoneNumber);
+      const updatePayload: Record<string, any> = {};
+      if (phoneNumber) {
+        updatePayload.phoneNumber = phoneNumber;
+      }
+      if (normalizedPhone) {
+        updatePayload.phoneNumberNormalized = normalizedPhone;
       }
 
+      if (Object.keys(updatePayload).length > 0) {
+        await updateDoc(doc(db, 'users', auth.currentUser.uid), updatePayload);
+        setUser(prev => prev ? {
+          ...prev,
+          phoneNumber: updatePayload.phoneNumber || prev.phoneNumber,
+          phoneNumberNormalized: updatePayload.phoneNumberNormalized || prev.phoneNumberNormalized
+        } : prev);
+      }
+    } catch (error) {
+      cleanupRecaptcha();
       throw error;
     }
   };
@@ -914,7 +1007,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loginLoading,
       setLoginLoading,
       verifyOTP,
-      setAuthLoading
+      setAuthLoading,
+      linkGoogleProvider,
+      startPhoneLink,
+      confirmPhoneLink
     }}>
       {children}
     </AuthContext.Provider>

@@ -1,5 +1,5 @@
 // src/pages/donor/DonorDashboard.tsx
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   User as LucideUser,
   MapPin,
@@ -25,7 +25,8 @@ import {
   Download,
   RefreshCw,
   Loader2,
-  X
+  X,
+  Chrome
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDonorData } from '../../hooks/useDonorData';
@@ -33,9 +34,14 @@ import { useBloodRequest } from '../../hooks/useBloodRequest';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import BhIdBanner from '../../components/BhIdBanner';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
+import { auth } from '../../firebase';
+import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
+import type { ConfirmationResult } from 'firebase/auth';
 
 function DonorDashboard() {
-  const { user } = useAuth();
+  const { user, linkGoogleProvider, startPhoneLink, confirmPhoneLink } = useAuth();
   const navigate = useNavigate();
 
   // State for modals and UI
@@ -43,6 +49,11 @@ function DonorDashboard() {
   const [showAllRequests, setShowAllRequests] = useState(false);
   const [showAllBadges, setShowAllBadges] = useState(false);
   const [showAllCamps, setShowAllCamps] = useState(false);
+  const [linkPhoneNumber, setLinkPhoneNumber] = useState('');
+  const [linkOtp, setLinkOtp] = useState('');
+  const [linkConfirmation, setLinkConfirmation] = useState<ConfirmationResult | null>(null);
+  const [linkPhoneLoading, setLinkPhoneLoading] = useState(false);
+  const [linkGoogleLoading, setLinkGoogleLoading] = useState(false);
 
   // Use custom hook to fetch all donor data
   const {
@@ -78,6 +89,84 @@ function DonorDashboard() {
     if (minutes < 60) return `${minutes} minutes ago`;
     if (hours < 24) return `${hours} hours ago`;
     return `${days} days ago`;
+  };
+
+  useEffect(() => {
+    if (user?.phoneNumber && !linkPhoneNumber) {
+      setLinkPhoneNumber(user.phoneNumber);
+    }
+  }, [user?.phoneNumber, linkPhoneNumber]);
+
+  const providerIds = auth.currentUser?.providerData?.map(provider => provider.providerId) || [];
+  const isPhoneLinked = providerIds.includes('phone');
+  const isGoogleLinked = providerIds.includes('google.com');
+
+  const handleGoogleLink = async () => {
+    if (isGoogleLinked) return;
+    try {
+      setLinkGoogleLoading(true);
+      await linkGoogleProvider();
+      toast.success('Google account linked successfully!');
+    } catch (error: any) {
+      console.error('Google link error:', error);
+      toast.error(error?.message || 'Failed to link Google account.');
+    } finally {
+      setLinkGoogleLoading(false);
+    }
+  };
+
+  const handlePhoneLinkStart = async () => {
+    const normalized = normalizePhoneNumber(linkPhoneNumber);
+    if (!isValidPhoneNumber(normalized)) {
+      toast.error('Please enter a valid phone number.');
+      return;
+    }
+
+    try {
+      setLinkPhoneLoading(true);
+      const confirmation = await startPhoneLink(normalized);
+      setLinkConfirmation(confirmation);
+      toast.success('OTP sent successfully!');
+    } catch (error: any) {
+      console.error('Phone link error:', error);
+      toast.error(error?.message || 'Failed to send OTP. Please try again.');
+    } finally {
+      setLinkPhoneLoading(false);
+    }
+  };
+
+  const handlePhoneLinkConfirm = async () => {
+    if (!linkConfirmation) {
+      toast.error('Please request an OTP before verifying.');
+      return;
+    }
+
+    const sanitizedOtp = linkOtp.replace(/\D/g, '').trim();
+    if (!sanitizedOtp) {
+      toast.error('Please enter the OTP.');
+      return;
+    }
+    if (sanitizedOtp.length !== 6) {
+      toast.error('Invalid OTP length. Please enter the 6-digit code.');
+      return;
+    }
+
+    try {
+      setLinkPhoneLoading(true);
+      await confirmPhoneLink(linkConfirmation, sanitizedOtp);
+      setLinkConfirmation(null);
+      setLinkOtp('');
+      toast.success('Phone number linked successfully!');
+    } catch (error: any) {
+      console.error('Phone link confirm error:', error);
+      toast.error(error?.message || 'Failed to link phone number.');
+    } finally {
+      setLinkPhoneLoading(false);
+    }
+  };
+
+  const handlePhoneLinkResend = async () => {
+    await handlePhoneLinkStart();
   };
 
   const calculateAge = (dateOfBirth?: string | Date) => {
@@ -619,6 +708,87 @@ function DonorDashboard() {
                   </span>
                   <span className="font-semibold text-gray-800 text-xs">{user?.email || 'Not Set'}</span>
                 </div>
+              </div>
+              <div className="mt-6 border-t border-gray-100 pt-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-gray-700">Linked Accounts</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 flex items-center">
+                    <Phone className="w-4 h-4 mr-2 text-purple-500" />
+                    Phone
+                  </span>
+                  <span className={`text-xs font-semibold ${isPhoneLinked ? 'text-green-600' : 'text-gray-400'}`}>
+                    {isPhoneLinked ? 'Linked' : 'Not linked'}
+                  </span>
+                </div>
+                {!isPhoneLinked && (
+                  <div className="space-y-3">
+                    <PhoneInput
+                      international
+                      defaultCountry="IN"
+                      countryCallingCodeEditable={false}
+                      value={linkPhoneNumber}
+                      onChange={(value) => setLinkPhoneNumber(value || '')}
+                      className="block w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={handlePhoneLinkStart}
+                      disabled={linkPhoneLoading}
+                      className="w-full py-2 px-4 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50"
+                    >
+                      {linkPhoneLoading ? 'Sending OTP...' : 'Send OTP'}
+                    </button>
+                    {linkConfirmation && (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={linkOtp}
+                          onChange={(e) => setLinkOtp(e.target.value)}
+                          maxLength={6}
+                          placeholder="Enter OTP"
+                          className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors text-center text-sm font-semibold tracking-widest"
+                        />
+                        <button
+                          type="button"
+                          onClick={handlePhoneLinkConfirm}
+                          disabled={linkPhoneLoading}
+                          className="w-full py-2 px-4 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all duration-300 disabled:opacity-50"
+                        >
+                          {linkPhoneLoading ? 'Verifying...' : 'Verify & Link'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handlePhoneLinkResend}
+                          disabled={linkPhoneLoading}
+                          className="w-full py-2 px-4 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300 disabled:opacity-50"
+                        >
+                          Resend OTP
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 flex items-center">
+                    <Chrome className="w-4 h-4 mr-2 text-blue-500" />
+                    Google
+                  </span>
+                  <span className={`text-xs font-semibold ${isGoogleLinked ? 'text-green-600' : 'text-gray-400'}`}>
+                    {isGoogleLinked ? 'Linked' : 'Not linked'}
+                  </span>
+                </div>
+                {!isGoogleLinked && (
+                  <button
+                    type="button"
+                    onClick={handleGoogleLink}
+                    disabled={linkGoogleLoading}
+                    className="w-full py-2 px-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all duration-300 disabled:opacity-50"
+                  >
+                    {linkGoogleLoading ? 'Linking...' : 'Link Google'}
+                  </button>
+                )}
               </div>
             </div>
 
