@@ -288,6 +288,8 @@ function MobileUserMenu({ onClose }: { onClose?: () => void }) {
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const { user, authLoading } = useAuth();
+  const location = useLocation();
+  const hideDonorNav = user?.role === 'donor' && location.pathname.startsWith('/donor/dashboard');
 
   const LoadingFallback = () => (
     <div className="flex items-center space-x-2">
@@ -320,10 +322,14 @@ const Navbar: React.FC = () => {
 
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center space-x-1">
-              <DesktopNavLink to="/donors">Find Donors</DesktopNavLink>
-              <DesktopNavLink to="/request-blood">Request Blood</DesktopNavLink>
-              <DesktopNavLink to="/about">About</DesktopNavLink>
-              <DesktopNavLink to="/contact">Contact</DesktopNavLink>
+              {!hideDonorNav && (
+                <>
+                  <DesktopNavLink to="/donors">Find Donors</DesktopNavLink>
+                  <DesktopNavLink to="/request-blood">Request Blood</DesktopNavLink>
+                  <DesktopNavLink to="/about">About</DesktopNavLink>
+                  <DesktopNavLink to="/contact">Contact</DesktopNavLink>
+                </>
+              )}
 
               <div className="ml-4 pl-4 border-l border-gray-200">
                 {authLoading ? (
@@ -397,18 +403,22 @@ const Navbar: React.FC = () => {
 
               {/* Menu Items with staggered animation */}
               <div className="flex-1 overflow-y-auto p-6 space-y-2">
-                <div className="animate-slideInRight" style={{ animationDelay: '0.1s', animationFillMode: 'both' }}>
-                  <MobileNavLink to="/donors" onClick={() => setIsOpen(false)}>Find Donors</MobileNavLink>
-                </div>
-                <div className="animate-slideInRight" style={{ animationDelay: '0.15s', animationFillMode: 'both' }}>
-                  <MobileNavLink to="/request-blood" onClick={() => setIsOpen(false)}>Request Blood</MobileNavLink>
-                </div>
-                <div className="animate-slideInRight" style={{ animationDelay: '0.2s', animationFillMode: 'both' }}>
-                  <MobileNavLink to="/about" onClick={() => setIsOpen(false)}>About</MobileNavLink>
-                </div>
-                <div className="animate-slideInRight" style={{ animationDelay: '0.25s', animationFillMode: 'both' }}>
-                  <MobileNavLink to="/contact" onClick={() => setIsOpen(false)}>Contact</MobileNavLink>
-                </div>
+                {!hideDonorNav && (
+                  <>
+                    <div className="animate-slideInRight" style={{ animationDelay: '0.1s', animationFillMode: 'both' }}>
+                      <MobileNavLink to="/donors" onClick={() => setIsOpen(false)}>Find Donors</MobileNavLink>
+                    </div>
+                    <div className="animate-slideInRight" style={{ animationDelay: '0.15s', animationFillMode: 'both' }}>
+                      <MobileNavLink to="/request-blood" onClick={() => setIsOpen(false)}>Request Blood</MobileNavLink>
+                    </div>
+                    <div className="animate-slideInRight" style={{ animationDelay: '0.2s', animationFillMode: 'both' }}>
+                      <MobileNavLink to="/about" onClick={() => setIsOpen(false)}>About</MobileNavLink>
+                    </div>
+                    <div className="animate-slideInRight" style={{ animationDelay: '0.25s', animationFillMode: 'both' }}>
+                      <MobileNavLink to="/contact" onClick={() => setIsOpen(false)}>Contact</MobileNavLink>
+                    </div>
+                  </>
+                )}
 
                 {authLoading ? (
                   <LoadingFallback />

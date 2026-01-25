@@ -103,6 +103,15 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // COLLECTION: DonationHistory
+    // ========================================================================
+
+    match /DonationHistory/{userId} {
+      // Donors can read/write their own history, admins can manage all
+      allow read, write: if isAuthenticated() && (isOwner(userId) || isAdmin());
+    }
+
+    // ========================================================================
     // COLLECTION: donations
     // ========================================================================
 

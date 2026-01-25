@@ -76,6 +76,9 @@ interface User {
   preferredLanguage?: string;
   howHeardAboutUs?: string;
   interestedInVolunteering?: boolean;
+  notificationPreferences?: {
+    emergencyAlerts?: boolean;
+  };
 }
 
 interface AuthContextType {
