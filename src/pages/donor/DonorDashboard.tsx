@@ -41,7 +41,14 @@ import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
 import type { ConfirmationResult } from 'firebase/auth';
 
 function DonorDashboard() {
-  const { user, linkGoogleProvider, startPhoneLink, confirmPhoneLink } = useAuth();
+  const {
+    user,
+    linkGoogleProvider,
+    startPhoneLink,
+    confirmPhoneLink,
+    unlinkGoogleProvider,
+    unlinkPhoneProvider
+  } = useAuth();
   const navigate = useNavigate();
 
   // State for modals and UI
@@ -54,6 +61,8 @@ function DonorDashboard() {
   const [linkConfirmation, setLinkConfirmation] = useState<ConfirmationResult | null>(null);
   const [linkPhoneLoading, setLinkPhoneLoading] = useState(false);
   const [linkGoogleLoading, setLinkGoogleLoading] = useState(false);
+  const [unlinkPhoneLoading, setUnlinkPhoneLoading] = useState(false);
+  const [unlinkGoogleLoading, setUnlinkGoogleLoading] = useState(false);
 
   // Use custom hook to fetch all donor data
   const {
@@ -100,6 +109,8 @@ function DonorDashboard() {
   const providerIds = auth.currentUser?.providerData?.map(provider => provider.providerId) || [];
   const isPhoneLinked = providerIds.includes('phone');
   const isGoogleLinked = providerIds.includes('google.com');
+  const canUnlinkPhone = isPhoneLinked && isGoogleLinked;
+  const canUnlinkGoogle = isGoogleLinked && isPhoneLinked;
 
   const handleGoogleLink = async () => {
     if (isGoogleLinked) return;
@@ -112,6 +123,26 @@ function DonorDashboard() {
       toast.error(error?.message || 'Failed to link Google account.');
     } finally {
       setLinkGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleUnlink = async () => {
+    if (!canUnlinkGoogle) {
+      toast.error('At least one login method must remain linked.');
+      return;
+    }
+    if (!window.confirm('Unlink Google login from your account?')) {
+      return;
+    }
+    try {
+      setUnlinkGoogleLoading(true);
+      await unlinkGoogleProvider();
+      toast.success('Google login unlinked.');
+    } catch (error: any) {
+      console.error('Google unlink error:', error);
+      toast.error(error?.message || 'Failed to unlink Google login.');
+    } finally {
+      setUnlinkGoogleLoading(false);
     }
   };
 
@@ -167,6 +198,26 @@ function DonorDashboard() {
 
   const handlePhoneLinkResend = async () => {
     await handlePhoneLinkStart();
+  };
+
+  const handlePhoneUnlink = async () => {
+    if (!canUnlinkPhone) {
+      toast.error('At least one login method must remain linked.');
+      return;
+    }
+    if (!window.confirm('Unlink phone login from your account?')) {
+      return;
+    }
+    try {
+      setUnlinkPhoneLoading(true);
+      await unlinkPhoneProvider();
+      toast.success('Phone login unlinked.');
+    } catch (error: any) {
+      console.error('Phone unlink error:', error);
+      toast.error(error?.message || 'Failed to unlink phone login.');
+    } finally {
+      setUnlinkPhoneLoading(false);
+    }
   };
 
   const calculateAge = (dateOfBirth?: string | Date) => {
@@ -722,6 +773,16 @@ function DonorDashboard() {
                     {isPhoneLinked ? 'Linked' : 'Not linked'}
                   </span>
                 </div>
+                {isPhoneLinked && (
+                  <button
+                    type="button"
+                    onClick={handlePhoneUnlink}
+                    disabled={!canUnlinkPhone || unlinkPhoneLoading}
+                    className="w-full py-2 px-4 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all duration-300 disabled:opacity-50"
+                  >
+                    {unlinkPhoneLoading ? 'Unlinking...' : 'Unlink Phone'}
+                  </button>
+                )}
                 {!isPhoneLinked && (
                   <div className="space-y-3">
                     <PhoneInput
@@ -779,6 +840,16 @@ function DonorDashboard() {
                     {isGoogleLinked ? 'Linked' : 'Not linked'}
                   </span>
                 </div>
+                {isGoogleLinked && (
+                  <button
+                    type="button"
+                    onClick={handleGoogleUnlink}
+                    disabled={!canUnlinkGoogle || unlinkGoogleLoading}
+                    className="w-full py-2 px-4 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all duration-300 disabled:opacity-50"
+                  >
+                    {unlinkGoogleLoading ? 'Unlinking...' : 'Unlink Google'}
+                  </button>
+                )}
                 {!isGoogleLinked && (
                   <button
                     type="button"

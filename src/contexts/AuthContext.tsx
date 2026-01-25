@@ -19,6 +19,7 @@ import {
   linkWithCredential,
   linkWithPopup,
   linkWithPhoneNumber,
+  unlink,
 } from 'firebase/auth';
 import { 
   doc,
@@ -95,6 +96,8 @@ interface AuthContextType {
   linkGoogleProvider: () => Promise<void>;
   startPhoneLink: (phoneNumber: string) => Promise<ConfirmationResult>;
   confirmPhoneLink: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
+  unlinkGoogleProvider: () => Promise<void>;
+  unlinkPhoneProvider: () => Promise<void>;
 }
 
 interface LoginResponse {
@@ -631,6 +634,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const ensureAnotherProvider = () => {
+    const providers = auth.currentUser?.providerData?.map(provider => provider.providerId) || [];
+    if (providers.length <= 1) {
+      throw new Error('You must keep at least one login method linked.');
+    }
+  };
+
+  const unlinkGoogleProvider = async (): Promise<void> => {
+    if (!auth.currentUser) {
+      throw new Error('No user logged in');
+    }
+    ensureAnotherProvider();
+    await unlink(auth.currentUser, 'google.com');
+  };
+
+  const unlinkPhoneProvider = async (): Promise<void> => {
+    if (!auth.currentUser) {
+      throw new Error('No user logged in');
+    }
+    ensureAnotherProvider();
+    await unlink(auth.currentUser, 'phone');
+  };
+
   const loginWithEmail = async (email: string, password: string): Promise<LoginResponse> => {
     try {
       setLoginLoading(true);
@@ -1010,7 +1036,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAuthLoading,
       linkGoogleProvider,
       startPhoneLink,
-      confirmPhoneLink
+      confirmPhoneLink,
+      unlinkGoogleProvider,
+      unlinkPhoneProvider
     }}>
       {children}
     </AuthContext.Provider>
