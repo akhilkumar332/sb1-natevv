@@ -6,6 +6,9 @@ import toast from 'react-hot-toast';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
+import { authStorage } from '../utils/authStorage';
+import { normalizePhoneNumber, isValidPhoneNumber } from '../utils/phone';
+import { findUsersByPhone } from '../utils/userLookup';
 
 interface RegisterFormData {
   identifier: string;
@@ -54,22 +57,14 @@ export const useRegister = () => {
   };
 
   const handlePhoneNumberSubmit = async () => {
-    const digitsOnly = formData.identifier.replace(/\D/g, '');
-    const isValid10Digits = digitsOnly.length === 10 ||
-      (digitsOnly.startsWith('91') && digitsOnly.length === 12);
-
-    if (!isValid10Digits) {
-      toast.error('Please enter a valid 10-digit phone number.');
+    const normalizedPhone = normalizePhoneNumber(formData.identifier);
+    if (!isValidPhoneNumber(normalizedPhone)) {
+      toast.error('Please enter a valid phone number.');
       return;
     }
 
     try {
-      // Check if user already exists
-      const phoneNumber = formData.identifier.startsWith('+')
-        ? formData.identifier
-        : `+${formData.identifier}`;
-
-      const confirmation = await loginWithPhone(phoneNumber);
+      const confirmation = await loginWithPhone(normalizedPhone);
       setConfirmationResult(confirmation);
       toast.success('OTP sent successfully!');
       startResendTimer();
@@ -80,6 +75,11 @@ export const useRegister = () => {
   };
 
   const handleOTPSubmit = async () => {
+    if (!confirmationResult) {
+      toast.error('Please request an OTP before verifying.');
+      return;
+    }
+
     if (!formData.otp) {
       toast.error('Please enter the OTP.');
       return;
@@ -102,14 +102,29 @@ export const useRegister = () => {
         window.recaptchaVerifier = undefined;
       }
 
-      // Check if user already registered
+      const normalizedPhone = normalizePhoneNumber(formData.identifier);
+
+      // Check if user already registered by uid as a fallback
       const userRef = doc(db, 'users', userCredential.user.uid);
       const userDoc = await getDoc(userRef);
 
       if (userDoc.exists()) {
         // User already exists - sign them out and redirect to login
         await signOut(auth);
-        toast.error('Phone number already registered. Please use the login page.');
+        toast.error('Mobile Number already registered');
+        navigate('/donor/login');
+        return;
+      }
+
+      const existingMatches = await findUsersByPhone(normalizedPhone);
+      const otherMatch = existingMatches.find(match => {
+        const matchUid = match.uid || match.id;
+        return matchUid !== userCredential.user.uid;
+      });
+
+      if (otherMatch) {
+        await signOut(auth);
+        toast.error('Mobile Number already registered');
         navigate('/donor/login');
         return;
       }
@@ -118,11 +133,15 @@ export const useRegister = () => {
       await setDoc(userRef, {
         uid: userCredential.user.uid,
         phoneNumber: userCredential.user.phoneNumber,
+        phoneNumberNormalized: normalizedPhone,
         role: 'donor',
         onboardingCompleted: false,
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
       });
+
+      const token = await userCredential.user.getIdToken();
+      authStorage.setAuthToken(token);
 
       toast.success('Registration successful!');
       navigate('/donor/onboarding');
@@ -155,7 +174,7 @@ export const useRegister = () => {
 
   const handleResendOTP = async () => {
     try {
-      const confirmation = await loginWithPhone(formData.identifier);
+      const confirmation = await loginWithPhone(normalizePhoneNumber(formData.identifier));
       setConfirmationResult(confirmation);
       toast.success('OTP resent successfully!');
       startResendTimer();
@@ -229,6 +248,9 @@ export const useRegister = () => {
         console.error('🔴 Error creating user document:', error);
         throw new Error(`Failed to create user: ${error.message}`);
       });
+
+      const token = await result.user.getIdToken();
+      authStorage.setAuthToken(token);
 
       console.log('✅ User document created, navigating to onboarding');
       toast.success('Registration successful!');

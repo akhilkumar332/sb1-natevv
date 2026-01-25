@@ -8,7 +8,8 @@ import admin from 'firebase-admin';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { dirname, resolve } from 'path';
+import fs from 'fs';
 
 // Load environment variables
 dotenv.config();
@@ -16,14 +17,70 @@ dotenv.config();
 // Get the directory name of the current module
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+const resolveServiceAccountPath = () => {
+  const envPath = process.env.FIREBASE_ADMIN_SDK_PATH || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (envPath) {
+    return resolve(envPath);
+  }
+
+  const defaultPath = resolve(__dirname, '../../secrets/firebase-admin-sdk.json');
+  if (fs.existsSync(defaultPath)) {
+    return defaultPath;
+  }
+
+  return null;
+};
+
+const loadServiceAccount = () => {
+  const filePath = resolveServiceAccountPath();
+  if (!filePath || !fs.existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const data = JSON.parse(raw);
+    if (data.private_key) {
+      data.private_key = String(data.private_key).replace(/\\n/g, '\n');
+    }
+    return data;
+  } catch (error) {
+    console.warn('Failed to load service account file:', error);
+    return null;
+  }
+};
+
 // Initialize Firebase Admin
-admin.initializeApp({
-  credential: admin.credential.cert({
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-    privateKey: process.env.VITE_FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    clientEmail: process.env.VITE_FIREBASE_CLIENT_EMAIL
-  })
-});
+if (!admin.apps.length) {
+  const serviceAccount = loadServiceAccount();
+  const rawPrivateKey = process.env.VITE_FIREBASE_PRIVATE_KEY;
+  const privateKey = rawPrivateKey
+    ? rawPrivateKey.replace(/^"|"$/g, '').replace(/\\n/g, '\n')
+    : undefined;
+  const projectId = process.env.VITE_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.VITE_FIREBASE_CLIENT_EMAIL;
+
+  const envServiceAccount = projectId && privateKey && clientEmail
+    ? { projectId, privateKey, clientEmail }
+    : null;
+
+  try {
+    if (serviceAccount) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+      });
+    } else if (envServiceAccount) {
+      admin.initializeApp({
+        credential: admin.credential.cert(envServiceAccount)
+      });
+    } else {
+      admin.initializeApp();
+    }
+  } catch (error) {
+    console.warn('Firebase Admin init failed, falling back to default credentials:', error);
+    admin.initializeApp();
+  }
+}
 
 // Initialize Express app
 const app = express();
