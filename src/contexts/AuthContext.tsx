@@ -15,6 +15,8 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   sendEmailVerification,
+  PhoneAuthProvider,
+  linkWithCredential,
 } from 'firebase/auth';
 import { 
   doc,
@@ -27,6 +29,8 @@ import {
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { generateBhId } from '../utils/bhId';
+import { normalizePhoneNumber } from '../utils/phone';
+import { findUsersByPhone } from '../utils/userLookup';
 
 // Define window recaptcha type
 declare global {
@@ -44,6 +48,8 @@ interface User {
   gender?: 'Male' | 'Female' | 'Other';
   dateOfBirth?: Date;
   phoneNumber?: string | null;
+  phoneNumberNormalized?: string;
+  phone?: string;
   createdAt?: Date;
   lastLoginAt?: Date;
   role?: 'donor' | 'ngo' | 'hospital' | 'admin';
@@ -93,6 +99,61 @@ interface LoginResponse {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+type PhoneAuthErrorCode = 'not_registered' | 'multiple_accounts' | 'role_mismatch' | 'link_required';
+
+export class PhoneAuthError extends Error {
+  code: PhoneAuthErrorCode;
+
+  constructor(message: string, code: PhoneAuthErrorCode) {
+    super(message);
+    this.name = 'PhoneAuthError';
+    this.code = code;
+  }
+}
+
+const pendingPhoneLinkKey = 'pendingPhoneLink';
+
+const savePendingPhoneLink = (data: {
+  verificationId: string;
+  otp: string;
+  phoneNumber: string;
+  targetUid: string;
+}) => {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem(pendingPhoneLinkKey, JSON.stringify({
+    ...data,
+    createdAt: Date.now()
+  }));
+};
+
+const clearPendingPhoneLink = () => {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem(pendingPhoneLinkKey);
+};
+
+const readPendingPhoneLink = () => {
+  if (typeof window === 'undefined') return null;
+  const raw = sessionStorage.getItem(pendingPhoneLinkKey);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as {
+      verificationId: string;
+      otp: string;
+      phoneNumber: string;
+      targetUid: string;
+      createdAt: number;
+    };
+    if (parsed.createdAt && Date.now() - parsed.createdAt > 10 * 60 * 1000) {
+      clearPendingPhoneLink();
+      return null;
+    }
+    return parsed;
+  } catch (error) {
+    console.warn('Failed to parse pending phone link data:', error);
+    return null;
+  }
+};
+
 // Helper function to convert Firestore timestamp to Date
 const convertTimestampToDate = (timestamp: any): Date | undefined => {
   return timestamp ? new Date(timestamp.seconds * 1000) : undefined;
@@ -130,6 +191,15 @@ const updateUserInFirestore = async (
       const updatePayload: Record<string, any> = {
         lastLoginAt: serverTimestamp()
       };
+      const rawPhone = existingUserData?.phoneNumber
+        || (existingUserData as any)?.phone
+        || firebaseUser.phoneNumber;
+      if (!existingUserData?.phoneNumberNormalized && rawPhone) {
+        const normalizedPhone = normalizePhoneNumber(rawPhone);
+        if (normalizedPhone) {
+          updatePayload.phoneNumberNormalized = normalizedPhone;
+        }
+      }
       if (!existingBhId && generatedBhId) {
         updatePayload.bhId = generatedBhId;
       }
@@ -348,14 +418,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         window.recaptchaVerifier = undefined;
       }
 
+      const normalizedPhone = normalizePhoneNumber(userCredential.user.phoneNumber || '');
       const userRef = doc(db, 'users', userCredential.user.uid);
 
       // Fetch user data first
       const userDoc = await getDoc(userRef);
 
       if (!userDoc.exists()) {
+        const matches = await findUsersByPhone(normalizedPhone);
+
+        if (matches.length === 0) {
+          await signOut(auth);
+          throw new PhoneAuthError('User not registered', 'not_registered');
+        }
+
+        if (matches.length > 1) {
+          await signOut(auth);
+          throw new PhoneAuthError('Phone number linked to multiple accounts', 'multiple_accounts');
+        }
+
+        const matchedUser = matches[0];
+        const matchedUid = matchedUser.uid || matchedUser.id;
+
+        if (matchedUser.role && matchedUser.role !== 'donor') {
+          await signOut(auth);
+          throw new PhoneAuthError("You're not a Donor", 'role_mismatch');
+        }
+
+        if (matchedUid && matchedUid !== userCredential.user.uid) {
+          if (confirmationResult.verificationId) {
+            savePendingPhoneLink({
+              verificationId: confirmationResult.verificationId,
+              otp,
+              phoneNumber: normalizedPhone,
+              targetUid: matchedUid
+            });
+          }
+
+          try {
+            await userCredential.user.delete();
+          } catch (deleteError) {
+            console.warn('Failed to delete temporary phone user:', deleteError);
+          }
+
+          await signOut(auth);
+          throw new PhoneAuthError(
+            'Phone number already registered. Please sign in with Google to link.',
+            'link_required'
+          );
+        }
+
         await signOut(auth);
-        throw new Error('User not registered');
+        throw new PhoneAuthError('User not registered', 'not_registered');
       }
 
       const userData = userDoc.data() as User;
@@ -371,6 +485,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Update last login and optional bhId in background (don't wait)
       const updatePayload: Record<string, any> = { lastLoginAt: serverTimestamp() };
+      const rawPhone = userData?.phoneNumber
+        || (userData as any)?.phone
+        || userCredential.user.phoneNumber;
+      if (!userData?.phoneNumberNormalized && rawPhone) {
+        const normalizedPhone = normalizePhoneNumber(rawPhone);
+        if (normalizedPhone) {
+          updatePayload.phoneNumberNormalized = normalizedPhone;
+        }
+      }
       if (!existingBhId && generatedBhId) {
         updatePayload.bhId = generatedBhId;
       }
@@ -461,6 +584,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Update last login time and optional bhId in background
       const updatePayload: Record<string, any> = { lastLoginAt: serverTimestamp() };
+      const rawPhone = userDocData?.phoneNumber
+        || (userDocData as any)?.phone
+        || result.user.phoneNumber;
+      if (!userDocData?.phoneNumberNormalized && rawPhone) {
+        const normalizedPhone = normalizePhoneNumber(rawPhone);
+        if (normalizedPhone) {
+          updatePayload.phoneNumberNormalized = normalizedPhone;
+        }
+      }
       if (!existingBhId && generatedBhId) {
         updatePayload.bhId = generatedBhId;
       }
@@ -582,6 +714,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Failed to get sign-in result');
       }
 
+      const pendingLink = readPendingPhoneLink();
+      if (pendingLink) {
+        if (pendingLink.targetUid && pendingLink.targetUid !== result.user.uid) {
+          await signOut(auth);
+          throw new Error('Please sign in with the account linked to this phone number.');
+        }
+
+        try {
+          const credential = PhoneAuthProvider.credential(
+            pendingLink.verificationId,
+            pendingLink.otp
+          );
+          await linkWithCredential(result.user, credential);
+          clearPendingPhoneLink();
+        } catch (linkError: any) {
+          console.error('Phone link error:', linkError);
+          if (linkError?.code === 'auth/provider-already-linked') {
+            clearPendingPhoneLink();
+          } else if (linkError?.code === 'auth/credential-already-in-use') {
+            clearPendingPhoneLink();
+            throw new Error('Phone number is already linked to another account. Please contact support.');
+          } else if (linkError?.code === 'auth/invalid-verification-code') {
+            clearPendingPhoneLink();
+            throw new Error('Verification code expired. Please retry phone login.');
+          } else {
+            throw linkError;
+          }
+        }
+      }
+
       // Check if user exists before proceeding
       const userRef = doc(db, 'users', result.user.uid);
       const userDoc = await getDoc(userRef);
@@ -616,6 +778,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } as User;
 
       const updatePayload: Record<string, any> = { lastLoginAt: serverTimestamp() };
+      const rawPhone = userDocData?.phoneNumber
+        || (userDocData as any)?.phone
+        || result.user.phoneNumber;
+      if (!userDocData?.phoneNumberNormalized && rawPhone) {
+        const normalizedPhone = normalizePhoneNumber(rawPhone);
+        if (normalizedPhone) {
+          updatePayload.phoneNumberNormalized = normalizedPhone;
+        }
+      }
       if (!existingBhId && generatedBhId) {
         updatePayload.bhId = generatedBhId;
       }
@@ -701,17 +872,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             uid: user.uid
           });
 
-      await setDoc(doc(db, 'users', user.uid),
+      const phoneNumberNormalized = data.phoneNumber
+        ? normalizePhoneNumber(data.phoneNumber)
+        : undefined;
+
+      await setDoc(
+        doc(db, 'users', user.uid),
         {
           ...data,
+          ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
           onboardingCompleted: true, // Set this to true upon successful completion
           ...(existingBhId ? {} : generatedBhId ? { bhId: generatedBhId } : {})
         },
         { merge: true }
       );
-      setUser (prev => ({
+      setUser(prev => ({
         ...prev,
         ...data,
+        ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
         onboardingCompleted: true, // Ensure this is updated in the state
         bhId: prev?.bhId || generatedBhId || undefined
       } as User));

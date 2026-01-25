@@ -1,10 +1,12 @@
 // src/hooks/useLogin.ts
 import { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { PhoneAuthError, useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { FirebaseError } from 'firebase/app';
 import { authStorage } from '../utils/authStorage';
+import { auth } from '../firebase';
+import { normalizePhoneNumber, isValidPhoneNumber } from '../utils/phone';
 
 interface LoginFormData {
   identifier: string;
@@ -31,22 +33,6 @@ export const useLogin = () => {
     }));
   };
 
-  const normalizePhoneNumber = (value: string) => {
-    if (!value) return '';
-    let formatted = value.replace(/\s+/g, '').trim();
-
-    if (!formatted.startsWith('+')) {
-      const digitsOnly = formatted.replace(/\D/g, '');
-      if (digitsOnly.length === 10) {
-        formatted = `+91${digitsOnly}`;
-      } else if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
-        formatted = `+${digitsOnly}`;
-      }
-    }
-
-    return formatted;
-  };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -70,10 +56,7 @@ export const useLogin = () => {
 
   const handlePhoneNumberSubmit = async () => {
     const formattedNumber = normalizePhoneNumber(formData.identifier);
-    const digitsOnly = formattedNumber.replace(/\D/g, '');
-    const isValidPhone = digitsOnly.length >= 10 && digitsOnly.length <= 15;
-
-    if (!isValidPhone) {
+    if (!isValidPhoneNumber(formattedNumber)) {
       toast.error('Please enter a valid phone number.');
       return;
     }
@@ -84,7 +67,7 @@ export const useLogin = () => {
       toast.success('OTP sent successfully!');
       startResendTimer();
     } catch (error) {
-      toast.error('Please register as a donor first before signing in.');
+      toast.error('Failed to send OTP. Please try again.');
     }
   };
 
@@ -107,26 +90,42 @@ export const useLogin = () => {
     }
     try {
       setOtpLoading(true);
-      const userData = await verifyOTP(confirmationResult, sanitizedOtp);
-      console.log('OTP verified, user data:', userData);
-      console.log('Onboarding completed:', userData.onboardingCompleted);
-      if (userData.role !== 'donor') {
+      const verifiedUser = await verifyOTP(confirmationResult, sanitizedOtp);
+      if (verifiedUser.role !== 'donor') {
         toast.error("You're not a Donor", { id: 'role-mismatch-donor' });
         await logout(navigate, { redirectTo: '/donor/login', showToast: false });
         return;
       }
-      toast.success('Login successful!');
 
-      // Navigate based on onboarding status - if not explicitly true, go to onboarding
-      if (userData.onboardingCompleted === true) {
-        console.log('Navigating to dashboard');
-        navigate('/donor/dashboard');
-      } else {
-        console.log('Navigating to onboarding');
-        navigate('/donor/onboarding');
+      const token = await auth.currentUser?.getIdToken();
+      if (token) {
+        handleLoginSuccess(token);
       }
+
+      toast.success('Login successful!');
     } catch (error) {
       console.error('OTP verification error:', error);
+
+      if (error instanceof PhoneAuthError) {
+        if (error.code === 'not_registered') {
+          toast.error('Mobile Number not registered. Please sign up.');
+          navigate('/donor/register');
+          return;
+        }
+        if (error.code === 'multiple_accounts') {
+          toast.error('Mobile Number is linked to Multiple account, Contact Support');
+          return;
+        }
+        if (error.code === 'role_mismatch') {
+          toast.error("You're not a Donor", { id: 'role-mismatch-donor' });
+          return;
+        }
+        if (error.code === 'link_required') {
+          toast.error('Phone number already registered. Please sign in with Google to link.');
+          return;
+        }
+      }
+
       if (error instanceof FirebaseError) {
         if (error.code === 'auth/invalid-verification-code') {
           toast.error('Invalid OTP. Please try again.');
@@ -135,8 +134,6 @@ export const useLogin = () => {
         } else {
           toast.error('Failed to verify OTP. Please try again.');
         }
-      } else if (error instanceof Error && error.message === 'User not registered') {
-        toast.error('Please register as a donor before signing in.');
       } else {
         toast.error('Failed to verify OTP. Please try again.');
       }

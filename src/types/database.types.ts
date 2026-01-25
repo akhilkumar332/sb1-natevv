@@ -34,6 +34,7 @@ export interface User {
   uid: string;
   email: string | null;
   phoneNumber: string | null;
+  phoneNumberNormalized?: string;
   displayName: string | null;
   photoURL: string | null;
 
