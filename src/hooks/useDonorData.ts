@@ -3,8 +3,20 @@
  * Fetches all donor-related data from Firestore
  */
 
-import { useState, useEffect } from 'react';
-import { collection, query, where, limit, onSnapshot, getDocs } from 'firebase/firestore';
+import { useState, useEffect, useRef } from 'react';
+import {
+  collection,
+  query,
+  where,
+  limit,
+  onSnapshot,
+  getDocs,
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  Timestamp
+} from 'firebase/firestore';
 import { db } from '../firebase';
 import { gamificationService } from '../services/gamification.service';
 
@@ -93,40 +105,131 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
   const [badges, setBadges] = useState<Badge[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const legacySyncRef = useRef(false);
+
+  const parseDonationDate = (value: any): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === 'function') return value.toDate();
+    if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
+    return null;
+  };
+
+  const mapDonationEntry = (entry: any, fallbackId: string): DonationHistory => {
+    const dateValue = parseDonationDate(entry?.date ?? entry?.donationDate);
+    return {
+      id: entry?.id || entry?.legacyId || fallbackId,
+      date: dateValue || new Date(),
+      location: entry?.location || '',
+      bloodBank: entry?.bloodBank || entry?.hospitalName || '',
+      hospitalId: entry?.hospitalId || '',
+      hospitalName: entry?.hospitalName || '',
+      quantity: entry?.quantity || '450ml',
+      status: entry?.status || 'completed',
+      certificateUrl: entry?.certificateUrl,
+      units: entry?.units || 1,
+    };
+  };
+
+  const syncDonationHistoryFromLegacy = async () => {
+    if (!userId) return;
+    try {
+      const historyRef = doc(db, 'DonationHistory', userId);
+      const [historySnapshot, legacySnapshot] = await Promise.all([
+        getDoc(historyRef),
+        getDocs(query(
+          collection(db, 'donations'),
+          where('donorId', '==', userId),
+          limit(50)
+        ))
+      ]);
+
+      const existingDonations = historySnapshot.exists() && Array.isArray(historySnapshot.data().donations)
+        ? historySnapshot.data().donations
+        : [];
+      const existingLegacyIds = new Set(
+        existingDonations
+          .map((entry: any) => entry?.legacyId)
+          .filter(Boolean)
+      );
+
+      const legacyDonations = legacySnapshot.docs.map(docSnapshot => {
+        const data = docSnapshot.data();
+        return {
+          legacyId: docSnapshot.id,
+          date: data.donationDate ? data.donationDate : Timestamp.now(),
+          location: data.location || '',
+          bloodBank: data.hospitalName || data.bloodBank || '',
+          hospitalId: data.hospitalId || '',
+          hospitalName: data.hospitalName || '',
+          quantity: data.quantity || '450ml',
+          status: data.status || 'completed',
+          certificateUrl: data.certificateUrl,
+          units: data.units || 1,
+          source: 'legacy',
+        };
+      });
+
+      const mergedDonations = [...existingDonations];
+      legacyDonations.forEach((entry) => {
+        if (!existingLegacyIds.has(entry.legacyId)) {
+          mergedDonations.push(entry);
+        }
+      });
+
+      const sorted = mergedDonations
+        .sort((a: any, b: any) => {
+          const dateA = parseDonationDate(a?.date ?? a?.donationDate)?.getTime() || 0;
+          const dateB = parseDonationDate(b?.date ?? b?.donationDate)?.getTime() || 0;
+          return dateB - dateA;
+        })
+        .slice(0, 20);
+
+      const lastDonationDate = sorted.length > 0 ? parseDonationDate(sorted[0].date ?? sorted[0].donationDate) : null;
+
+      await setDoc(
+        historyRef,
+        {
+          userId,
+          donations: sorted,
+          lastDonationDate: lastDonationDate ? Timestamp.fromDate(lastDonationDate) : null,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error('Error syncing legacy donation history:', err);
+    }
+  };
+
+  useEffect(() => {
+    legacySyncRef.current = false;
+  }, [userId]);
 
   // Fetch donation history
   const fetchDonationHistory = async () => {
     try {
-      const donationsRef = collection(db, 'donations');
-      // Simplified query - fetch by donorId only, then sort in memory
-      // This avoids needing a composite index (donorId + donationDate)
-      const q = query(
-        donationsRef,
-        where('donorId', '==', userId),
-        limit(20) // Fetch more to allow client-side sorting
-      );
+      if (!legacySyncRef.current) {
+        legacySyncRef.current = true;
+        void syncDonationHistoryFromLegacy();
+      }
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const allDonations: DonationHistory[] = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            date: data.donationDate?.toDate() || new Date(),
-            location: data.location || '',
-            bloodBank: data.hospitalName || data.bloodBank || '',
-            hospitalId: data.hospitalId || '',
-            hospitalName: data.hospitalName || '',
-            quantity: data.quantity || '450ml',
-            status: data.status || 'completed',
-            certificateUrl: data.certificateUrl,
-            units: data.units || 1,
-          };
-        });
+      const historyRef = doc(db, 'DonationHistory', userId);
+      const unsubscribe = onSnapshot(historyRef, (snapshot) => {
+        if (!snapshot.exists()) {
+          setDonationHistory([]);
+          return;
+        }
 
-        // Sort by date descending (newest first) client-side
-        const sortedDonations = allDonations
+        const data = snapshot.data();
+        const rawDonations = Array.isArray(data.donations) ? data.donations : [];
+        const mapped = rawDonations.map((entry: any, index: number) => (
+          mapDonationEntry(entry, `donation-${index}`)
+        ));
+
+        const sortedDonations = mapped
           .sort((a, b) => b.date.getTime() - a.date.getTime())
-          .slice(0, 10); // Take top 10
+          .slice(0, 10);
 
         setDonationHistory(sortedDonations);
       });
@@ -339,6 +442,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
 
   const refreshData = async () => {
     setLoading(true);
+    await syncDonationHistoryFromLegacy();
     await fetchDonationHistory();
     await fetchEmergencyRequests();
     await fetchBloodCamps();
