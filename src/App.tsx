@@ -1,5 +1,5 @@
 // src/App.tsx
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -12,6 +12,7 @@ import { useActivityTracker } from './hooks/useActivityTracker';
 import { useInactivityCheck } from './hooks/useInactivityCheck';
 import { useLocation } from 'react-router-dom';
 import { useVersionCheck } from './hooks/useVersionCheck';
+import { setReferralTracking } from './utils/referralTracking';
 
 function App() {
   useAuthSync();
@@ -45,6 +46,14 @@ function App() {
     : hideOnMobile
       ? 'hidden md:block'
       : undefined;
+
+  useEffect(() => {
+    if (!location.search) return;
+    const params = new URLSearchParams(location.search);
+    const bhId = params.get('BHID') || params.get('bhid');
+    if (!bhId) return;
+    setReferralTracking(bhId.trim());
+  }, [location.search]);
 
   return (
     <LoadingProvider>

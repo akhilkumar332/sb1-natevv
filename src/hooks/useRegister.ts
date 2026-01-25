@@ -3,12 +3,13 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, getDocs, query, where, limit, collection } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { authStorage } from '../utils/authStorage';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
+import { clearReferralTracking, getReferralTracking } from '../utils/referralTracking';
 
 interface RegisterFormData {
   identifier: string;
@@ -33,6 +34,63 @@ export const useRegister = () => {
       ...prev,
       identifier: value
     }));
+  };
+
+  const applyReferralTracking = async (newUserUid: string) => {
+    const referralBhId = getReferralTracking();
+    if (!referralBhId) return;
+
+    try {
+      const referrerSnapshot = await getDocs(query(
+        collection(db, 'users'),
+        where('bhId', '==', referralBhId),
+        limit(1)
+      ));
+
+      if (referrerSnapshot.empty) {
+        clearReferralTracking();
+        return;
+      }
+
+      const referrerDoc = referrerSnapshot.docs[0];
+      const referrerUid = referrerDoc.id;
+
+      if (referrerUid === newUserUid) {
+        clearReferralTracking();
+        return;
+      }
+
+      const referralDocId = `${referrerUid}_${newUserUid}`;
+      const referralRef = doc(db, 'ReferralTracking', referralDocId);
+      const referralExisting = await getDoc(referralRef);
+
+      if (referralExisting.exists()) {
+        clearReferralTracking();
+        return;
+      }
+
+      await setDoc(referralRef, {
+        referrerUid,
+        referredUid: newUserUid,
+        referrerBhId: referralBhId,
+        referredAt: serverTimestamp(),
+        status: 'registered',
+        createdAt: serverTimestamp(),
+      });
+
+      await setDoc(
+        doc(db, 'users', newUserUid),
+        {
+          referredByUid: referrerUid,
+          referredByBhId: referralBhId,
+        },
+        { merge: true }
+      );
+
+      clearReferralTracking();
+    } catch (error) {
+      console.warn('Failed to apply referral tracking:', error);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,6 +197,8 @@ export const useRegister = () => {
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
       });
+
+      await applyReferralTracking(userCredential.user.uid);
 
       const token = await userCredential.user.getIdToken();
       authStorage.setAuthToken(token);
@@ -248,6 +308,8 @@ export const useRegister = () => {
         console.error('🔴 Error creating user document:', error);
         throw new Error(`Failed to create user: ${error.message}`);
       });
+
+      await applyReferralTracking(result.user.uid);
 
       const token = await result.user.getIdToken();
       authStorage.setAuthToken(token);
