@@ -19,6 +19,7 @@ import {
   addDoc,
   updateDoc,
   doc,
+  setDoc,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -610,6 +611,61 @@ export const recordDonation = async (
         updatedAt: getServerTimestamp(),
       });
     }
+
+    const historyRef = doc(db, 'DonationHistory', donation.donorId);
+    const historySnapshot = await getDoc(historyRef);
+    const existingHistory = historySnapshot.exists() && Array.isArray(historySnapshot.data().donations)
+      ? historySnapshot.data().donations
+      : [];
+    const entryId = docRef.id;
+    const alreadyExists = existingHistory.some((entry: any) => {
+      const existingId = entry?.id || entry?.legacyId;
+      return existingId === entryId;
+    });
+
+    const parseHistoryDate = (value: any) => {
+      if (!value) return 0;
+      if (value instanceof Date) return value.getTime();
+      if (typeof value?.toDate === 'function') return value.toDate().getTime();
+      if (typeof value?.seconds === 'number') return value.seconds * 1000;
+      return 0;
+    };
+
+    const nextHistory = [...existingHistory];
+    if (!alreadyExists) {
+      const locationLabel = donation.location?.city || '';
+      const unitsValue = donation.units || 1;
+      nextHistory.push({
+        id: entryId,
+        legacyId: entryId,
+        date: donation.donationDate,
+        location: locationLabel,
+        bloodBank: donation.hospitalName || '',
+        hospitalId: donation.hospitalId || '',
+        hospitalName: donation.hospitalName || '',
+        quantity: `${unitsValue} unit${unitsValue === 1 ? '' : 's'}`,
+        status: donation.status || 'completed',
+        units: unitsValue,
+        notes: donation.notes || '',
+        source: 'verified',
+        createdAt: getServerTimestamp(),
+      });
+    }
+
+    const sortedHistory = nextHistory
+      .sort((a: any, b: any) => parseHistoryDate(b?.date ?? b?.donationDate) - parseHistoryDate(a?.date ?? a?.donationDate))
+      .slice(0, 50);
+
+    await setDoc(
+      historyRef,
+      {
+        userId: donation.donorId,
+        lastDonationDate: donation.donationDate,
+        donations: sortedHistory,
+        updatedAt: getServerTimestamp(),
+      },
+      { merge: true }
+    );
 
     // If linked to an appointment, update it
     if (donation.requestId) {

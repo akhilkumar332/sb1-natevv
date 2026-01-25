@@ -31,6 +31,8 @@ export interface DonationHistory {
   status: 'completed' | 'scheduled' | 'cancelled';
   certificateUrl?: string;
   units: number;
+  notes?: string;
+  source?: 'manual' | 'legacy' | 'verified';
 }
 
 export interface Badge {
@@ -117,10 +119,14 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
 
   const mapDonationEntry = (entry: any, fallbackId: string): DonationHistory => {
     const dateValue = parseDonationDate(entry?.date ?? entry?.donationDate);
+    const sourceValue = entry?.source || (entry?.legacyId || entry?.hospitalId ? 'verified' : 'manual');
+    const locationValue = typeof entry?.location === 'string'
+      ? entry.location
+      : entry?.location?.city || '';
     return {
       id: entry?.id || entry?.legacyId || fallbackId,
       date: dateValue || new Date(),
-      location: entry?.location || '',
+      location: locationValue,
       bloodBank: entry?.bloodBank || entry?.hospitalName || '',
       hospitalId: entry?.hospitalId || '',
       hospitalName: entry?.hospitalName || '',
@@ -128,6 +134,8 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       status: entry?.status || 'completed',
       certificateUrl: entry?.certificateUrl,
       units: entry?.units || 1,
+      notes: entry?.notes || '',
+      source: sourceValue,
     };
   };
 
@@ -155,10 +163,14 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
 
       const legacyDonations = legacySnapshot.docs.map(docSnapshot => {
         const data = docSnapshot.data();
+        const locationValue = typeof data.location === 'string'
+          ? data.location
+          : data.location?.city || '';
         return {
           legacyId: docSnapshot.id,
+          id: docSnapshot.id,
           date: data.donationDate ? data.donationDate : Timestamp.now(),
-          location: data.location || '',
+          location: locationValue,
           bloodBank: data.hospitalName || data.bloodBank || '',
           hospitalId: data.hospitalId || '',
           hospitalName: data.hospitalName || '',
@@ -166,7 +178,8 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
           status: data.status || 'completed',
           certificateUrl: data.certificateUrl,
           units: data.units || 1,
-          source: 'legacy',
+          notes: data.notes || '',
+          source: 'verified',
         };
       });
 
