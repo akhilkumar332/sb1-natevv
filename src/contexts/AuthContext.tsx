@@ -79,6 +79,15 @@ interface User {
   notificationPreferences?: {
     emergencyAlerts?: boolean;
   };
+  eligibilityChecklist?: {
+    hydrated?: boolean;
+    weightOk?: boolean;
+    hemoglobinOk?: boolean;
+    updatedAt?: Date;
+  };
+  availableUntil?: Date | null;
+  referredByUid?: string;
+  referredByBhId?: string;
 }
 
 interface AuthContextType {
@@ -182,7 +191,26 @@ const readPendingPhoneLink = () => {
 
 // Helper function to convert Firestore timestamp to Date
 const convertTimestampToDate = (timestamp: any): Date | undefined => {
-  return timestamp ? new Date(timestamp.seconds * 1000) : undefined;
+  if (!timestamp) return undefined;
+  if (timestamp instanceof Date) return timestamp;
+  if (typeof timestamp === 'string') {
+    const parsed = new Date(timestamp);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+  if (typeof timestamp?.toDate === 'function') return timestamp.toDate();
+  if (typeof timestamp?.seconds === 'number') return new Date(timestamp.seconds * 1000);
+  return undefined;
+};
+
+const normalizeEligibilityChecklist = (checklist: any) => {
+  if (!checklist) return undefined;
+  const updatedAt = convertTimestampToDate(checklist.updatedAt);
+  return {
+    hydrated: Boolean(checklist.hydrated),
+    weightOk: Boolean(checklist.weightOk),
+    hemoglobinOk: Boolean(checklist.hemoglobinOk),
+    ...(updatedAt ? { updatedAt } : {}),
+  };
 };
 
 // Helper function to update user in Firestore
@@ -248,6 +276,8 @@ const updateUserInFirestore = async (
       createdAt: convertTimestampToDate(existingUserData?.createdAt),
       dateOfBirth: existingDob,
       lastDonation: convertTimestampToDate(existingUserData?.lastDonation),
+      availableUntil: convertTimestampToDate(existingUserData?.availableUntil) || null,
+      eligibilityChecklist: normalizeEligibilityChecklist(existingUserData?.eligibilityChecklist),
       ...additionalData
     } as User;
   } catch (error) {
@@ -514,6 +544,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dateOfBirth: existingDob,
         lastDonation: convertTimestampToDate(userData?.lastDonation),
         bhId: existingBhId || generatedBhId || undefined,
+        availableUntil: convertTimestampToDate(userData?.availableUntil) || null,
+        eligibilityChecklist: normalizeEligibilityChecklist(userData?.eligibilityChecklist),
       } as User;
 
       // Update user state immediately for navigation
@@ -702,6 +734,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         lastLoginAt: new Date(),
         lastDonation: convertTimestampToDate(userDocData?.lastDonation),
         bhId: existingBhId || generatedBhId || undefined,
+        availableUntil: convertTimestampToDate(userDocData?.availableUntil) || null,
+        eligibilityChecklist: normalizeEligibilityChecklist(userDocData?.eligibilityChecklist),
       } as User;
 
       // Update last login time and optional bhId in background
@@ -897,6 +931,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         lastLoginAt: new Date(),
         lastDonation: convertTimestampToDate(userDocData?.lastDonation),
         bhId: existingBhId || generatedBhId || undefined,
+        availableUntil: convertTimestampToDate(userDocData?.availableUntil) || null,
+        eligibilityChecklist: normalizeEligibilityChecklist(userDocData?.eligibilityChecklist),
       } as User;
 
       const updatePayload: Record<string, any> = { lastLoginAt: serverTimestamp() };

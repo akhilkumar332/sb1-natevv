@@ -27,7 +27,9 @@ import {
   Edit3,
   SlidersHorizontal,
   Save,
-  XCircle
+  XCircle,
+  MessageCircle,
+  Star
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDonorData } from '../../hooks/useDonorData';
@@ -37,7 +39,7 @@ import toast from 'react-hot-toast';
 import BhIdBanner from '../../components/BhIdBanner';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, serverTimestamp, Timestamp, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
 import type { ConfirmationResult } from 'firebase/auth';
@@ -47,6 +49,15 @@ type ShareOptions = {
   showEmail: boolean;
   showBhId: boolean;
   showQr: boolean;
+};
+
+type DonationFeedback = {
+  donationId: string;
+  rating?: number;
+  notes?: string;
+  certificateUrl?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 };
 
 function DonorDashboard() {
@@ -81,6 +92,8 @@ function DonorDashboard() {
   const [emergencyAlertsSaving, setEmergencyAlertsSaving] = useState(false);
   const [availabilityEnabled, setAvailabilityEnabled] = useState(true);
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
+  const [availableTodayLoading, setAvailableTodayLoading] = useState(false);
+  const [qrPreviewOpen, setQrPreviewOpen] = useState(false);
   const [shareOptionsOpen, setShareOptionsOpen] = useState(false);
   const [shareOptions, setShareOptions] = useState<ShareOptions>(() => {
     if (typeof window === 'undefined') {
@@ -121,6 +134,22 @@ function DonorDashboard() {
     notes: '',
   });
   const [donationEditSaving, setDonationEditSaving] = useState(false);
+  const [referralCount, setReferralCount] = useState(0);
+  const [referralLoading, setReferralLoading] = useState(true);
+  const [eligibilityChecklist, setEligibilityChecklist] = useState({
+    hydrated: false,
+    weightOk: false,
+    hemoglobinOk: false,
+  });
+  const [checklistSaving, setChecklistSaving] = useState(false);
+  const [feedbackOpenId, setFeedbackOpenId] = useState<string | null>(null);
+  const [feedbackSaving, setFeedbackSaving] = useState(false);
+  const [feedbackForm, setFeedbackForm] = useState({
+    rating: 0,
+    notes: '',
+    certificateUrl: '',
+  });
+  const [donationFeedbackMap, setDonationFeedbackMap] = useState<Record<string, DonationFeedback>>({});
 
   // Use custom hook to fetch all donor data
   const {
@@ -144,6 +173,12 @@ function DonorDashboard() {
     if (!date) return 'N/A';
     const d = typeof date === 'string' ? new Date(date) : date;
     return d.toLocaleDateString();
+  };
+
+  const formatDateTime = (date?: Date | string) => {
+    if (!date) return 'N/A';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return d.toLocaleString();
   };
 
   const formatTime = (date: Date) => {
@@ -293,12 +328,87 @@ function DonorDashboard() {
   }, [user?.notificationPreferences?.emergencyAlerts]);
 
   useEffect(() => {
+    if (!user?.eligibilityChecklist) return;
+    setEligibilityChecklist({
+      hydrated: Boolean(user.eligibilityChecklist.hydrated),
+      weightOk: Boolean(user.eligibilityChecklist.weightOk),
+      hemoglobinOk: Boolean(user.eligibilityChecklist.hemoglobinOk),
+    });
+  }, [user?.eligibilityChecklist]);
+
+  useEffect(() => {
     if (user?.isAvailable === undefined) {
       setAvailabilityEnabled(true);
       return;
     }
     setAvailabilityEnabled(Boolean(user.isAvailable));
   }, [user?.isAvailable]);
+
+  useEffect(() => {
+    if (!user?.availableUntil || !user?.isAvailable) return;
+    const expiry = user.availableUntil instanceof Date
+      ? user.availableUntil
+      : new Date(user.availableUntil);
+    if (Number.isNaN(expiry.getTime())) return;
+    if (expiry.getTime() <= Date.now()) {
+      updateUserProfile({
+        isAvailable: false,
+        availableUntil: null,
+        notificationPreferences: {
+          emergencyAlerts: false,
+        },
+      }).catch(error => {
+        console.warn('Failed to auto-disable availability:', error);
+      });
+    }
+  }, [user?.availableUntil, user?.isAvailable, updateUserProfile]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    setReferralLoading(true);
+    const referralQuery = query(
+      collection(db, 'ReferralTracking'),
+      where('referrerUid', '==', user.uid)
+    );
+    const unsubscribe = onSnapshot(referralQuery, (snapshot) => {
+      setReferralCount(snapshot.size);
+      setReferralLoading(false);
+    }, (error) => {
+      console.warn('Failed to load referrals:', error);
+      setReferralLoading(false);
+    });
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const feedbackQuery = query(
+      collection(db, 'DonationFeedback'),
+      where('donorId', '==', user.uid)
+    );
+    const unsubscribe = onSnapshot(feedbackQuery, (snapshot) => {
+      const nextMap: Record<string, DonationFeedback> = {};
+      snapshot.forEach((docSnapshot) => {
+        const data = docSnapshot.data();
+        const donationId = data.donationId || docSnapshot.id;
+        if (!donationId) return;
+        const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : undefined;
+        const updatedAt = data.updatedAt?.toDate ? data.updatedAt.toDate() : undefined;
+        nextMap[donationId] = {
+          donationId,
+          rating: data.rating,
+          notes: data.notes,
+          certificateUrl: data.certificateUrl,
+          createdAt,
+          updatedAt,
+        };
+      });
+      setDonationFeedbackMap(nextMap);
+    }, (error) => {
+      console.warn('Failed to load donation feedback:', error);
+    });
+    return () => unsubscribe();
+  }, [user?.uid]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -431,6 +541,19 @@ function DonorDashboard() {
     if (donations < 50) return { level: 'Hero Donor', color: 'orange', icon: '🦸' };
     if (donations < 100) return { level: 'Legend Donor', color: 'red', icon: '👑' };
     return { level: 'Champion Donor', color: 'yellow', icon: '🏆' };
+  };
+
+  const getReferralMilestone = (count: number) => {
+    const milestones = [1, 3, 5, 10, 25];
+    const next = milestones.find(milestone => count < milestone);
+    if (!next) {
+      return { next: null, remaining: 0, label: 'Legend Referrer' };
+    }
+    return {
+      next,
+      remaining: next - count,
+      label: `Next milestone at ${next}`,
+    };
   };
 
   const getNextMilestone = (donations: number = 0) => {
@@ -830,6 +953,7 @@ function DonorDashboard() {
       setAvailabilitySaving(true);
       await updateUserProfile({
         isAvailable: nextValue,
+        availableUntil: null,
         notificationPreferences: {
           emergencyAlerts: nextAlertsValue,
         },
@@ -842,6 +966,126 @@ function DonorDashboard() {
       toast.error(error?.message || 'Failed to update availability.');
     } finally {
       setAvailabilitySaving(false);
+    }
+  };
+
+  const handleAvailableToday = async () => {
+    if (!user?.uid) return;
+    try {
+      setAvailableTodayLoading(true);
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      setAvailabilityEnabled(true);
+      setEmergencyAlertsEnabled(true);
+      await updateUserProfile({
+        isAvailable: true,
+        availableUntil: expiresAt,
+        notificationPreferences: {
+          emergencyAlerts: true,
+        },
+      });
+      toast.success('You are available for the next 24 hours.');
+    } catch (error: any) {
+      console.error('Available today update error:', error);
+      toast.error(error?.message || 'Failed to update availability.');
+    } finally {
+      setAvailableTodayLoading(false);
+    }
+  };
+
+  const handleChecklistToggle = async (key: 'hydrated' | 'weightOk' | 'hemoglobinOk') => {
+    const nextChecklist = {
+      ...eligibilityChecklist,
+      [key]: !eligibilityChecklist[key],
+    };
+    setEligibilityChecklist(nextChecklist);
+    try {
+      setChecklistSaving(true);
+      await updateUserProfile({
+        eligibilityChecklist: {
+          ...nextChecklist,
+          updatedAt: new Date(),
+        },
+      });
+    } catch (error: any) {
+      console.error('Checklist update error:', error);
+      toast.error(error?.message || 'Failed to update checklist.');
+    } finally {
+      setChecklistSaving(false);
+    }
+  };
+
+  const handleOpenFeedback = (donationId: string) => {
+    const existing = donationFeedbackMap[donationId];
+    setFeedbackForm({
+      rating: existing?.rating || 0,
+      notes: existing?.notes || '',
+      certificateUrl: existing?.certificateUrl || '',
+    });
+    setFeedbackOpenId(donationId);
+  };
+
+  const handleCancelFeedback = () => {
+    setFeedbackOpenId(null);
+  };
+
+  const handleSaveFeedback = async (donationId: string) => {
+    if (!user?.uid) return;
+    if (!feedbackForm.rating) {
+      toast.error('Please add a rating.');
+      return;
+    }
+    try {
+      setFeedbackSaving(true);
+      const feedbackRef = doc(db, 'DonationFeedback', `${user.uid}_${donationId}`);
+      const existing = donationFeedbackMap[donationId];
+      await setDoc(
+        feedbackRef,
+        {
+          donorId: user.uid,
+          donationId,
+          rating: feedbackForm.rating,
+          notes: feedbackForm.notes,
+          certificateUrl: feedbackForm.certificateUrl,
+          createdAt: existing?.createdAt || serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      if (feedbackForm.certificateUrl) {
+        const historyRef = doc(db, 'DonationHistory', user.uid);
+        const historySnapshot = await getDoc(historyRef);
+        if (historySnapshot.exists()) {
+          const existingDonations = Array.isArray(historySnapshot.data().donations)
+            ? historySnapshot.data().donations
+            : [];
+          const updatedDonations = existingDonations.map((entry: any, index: number) => {
+            const entryId = entry?.id || entry?.legacyId || `donation-${index}`;
+            if (entryId !== donationId) return entry;
+            return {
+              ...entry,
+              certificateUrl: feedbackForm.certificateUrl,
+              updatedAt: serverTimestamp(),
+            };
+          });
+          await setDoc(
+            historyRef,
+            {
+              donations: updatedDonations,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        }
+      }
+
+      toast.success('Feedback saved.');
+      setFeedbackOpenId(null);
+    } catch (error: any) {
+      console.error('Feedback save error:', error);
+      toast.error(error?.message || 'Failed to save feedback.');
+    } finally {
+      setFeedbackSaving(false);
     }
   };
 
@@ -869,6 +1113,25 @@ function DonorDashboard() {
   const nextEligibleDate = normalizedLastDonation
     ? new Date(normalizedLastDonation.getTime() + 90 * 86400000)
     : null;
+  const availabilityExpiry = user?.availableUntil
+    ? user.availableUntil instanceof Date
+      ? user.availableUntil
+      : new Date(user.availableUntil as any)
+    : null;
+  const availabilityExpiryValid = availabilityExpiry && !Number.isNaN(availabilityExpiry.getTime());
+  const availabilityActiveUntil = Boolean(availabilityExpiryValid && availabilityExpiry!.getTime() > Date.now());
+  const availabilityExpiryLabel = availabilityActiveUntil ? formatDateTime(availabilityExpiry as Date) : null;
+  const availableTodayLabel = availabilityActiveUntil ? 'Extend 24h' : 'I\'m Available Today';
+  const availableTodayHint = availabilityExpiryLabel
+    ? `Active until ${availabilityExpiryLabel}`
+    : 'Auto-off after 24h';
+  const checklistCompleted = Object.values(eligibilityChecklist).filter(Boolean).length;
+  const checklistUpdatedAt = user?.eligibilityChecklist?.updatedAt
+    ? user.eligibilityChecklist.updatedAt instanceof Date
+      ? user.eligibilityChecklist.updatedAt
+      : new Date(user.eligibilityChecklist.updatedAt as any)
+    : null;
+  const referralMilestone = getReferralMilestone(referralCount);
   const profileFields = [
     { label: 'Name', value: user?.displayName },
     { label: 'Blood type', value: user?.bloodType },
@@ -1133,109 +1396,7 @@ function DonorDashboard() {
             <p className="text-xs uppercase tracking-[0.3em] text-red-600">Eligibility & Actions</p>
             <h2 className="text-xl font-bold text-gray-900">Your readiness and quick actions</h2>
           </div>
-          <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-            <div className="rounded-2xl border border-red-200 bg-white p-5 shadow-sm">
-              {isLoading ? (
-                <div className="space-y-4">
-                  <div className="h-4 w-32 rounded-full bg-gray-100 animate-pulse" />
-                  <div className="h-6 w-64 rounded-full bg-gray-100 animate-pulse" />
-                  <div className="h-4 w-72 rounded-full bg-gray-100 animate-pulse" />
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-                    <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
-                    <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
-                    <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className="p-3 rounded-2xl bg-red-600">
-                        {eligibleToDonate ? (
-                          <CheckCircle className="w-6 h-6 text-white" />
-                        ) : (
-                          <Clock className="w-6 h-6 text-white" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-red-600">Eligibility</p>
-                        <h3 className="text-lg font-bold text-gray-900">
-                          {eligibleToDonate ? 'You\'re Eligible to Donate!' : 'Not Eligible to Donate'}
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          {lastDonationDate
-                            ? eligibleToDonate
-                              ? 'You can donate now. Thank you for staying ready!'
-                              : nextEligibleDate
-                                ? `Next eligible on ${formatDate(nextEligibleDate)}`
-                                : 'Record your last donation date to track eligibility.'
-                            : 'Record your last donation date to track eligibility.'}
-                        </p>
-                        {!eligibleToDonate && (
-                          <p className="text-xs text-gray-500 mt-1">Minimum recovery window is 90 days.</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-center">
-                      <p className="text-[10px] uppercase tracking-wide text-red-600">Next Eligible In</p>
-                      <p className="text-2xl font-bold text-red-700">
-                        {eligibleToDonate ? 0 : daysUntilEligible}
-                      </p>
-                      <p className="text-[11px] text-red-600/80">
-                        {eligibleToDonate ? 'days' : 'days remaining'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600">Last Donation Date</label>
-                      <input
-                        type="date"
-                        value={lastDonationInput}
-                        onChange={(event) => setLastDonationInput(event.target.value)}
-                        className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
-                      />
-                    </div>
-                    <div className="flex flex-col items-center gap-2 sm:items-end">
-                      <button
-                        type="button"
-                        onClick={handleSaveLastDonation}
-                        disabled={lastDonationSaving}
-                        className="w-full sm:w-auto px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-all duration-300 disabled:opacity-50"
-                      >
-                        {lastDonationSaving ? 'Saving...' : 'Save'}
-                      </button>
-                      {lastDonationSaved && (
-                        <span className="text-[11px] font-semibold text-red-600">Saved</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                      <p className="text-[10px] uppercase tracking-wide text-gray-500">Last Donation</p>
-                      <p className="text-sm font-semibold text-gray-800">
-                        {normalizedLastDonation ? formatDate(normalizedLastDonation) : 'Not set'}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                      <p className="text-[10px] uppercase tracking-wide text-gray-500">Recovery Window</p>
-                      <p className="text-sm font-semibold text-gray-800">90 days</p>
-                    </div>
-                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                      <p className="text-[10px] uppercase tracking-wide text-gray-500">Eligible On</p>
-                      <p className="text-sm font-semibold text-gray-800">
-                        {nextEligibleDate ? formatDate(nextEligibleDate) : 'Now'}
-                      </p>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
+          <div className="space-y-6">
             <div className="bg-white rounded-2xl shadow-xl p-6">
               <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
                 <Zap className="w-6 h-6 mr-2 text-red-600" />
@@ -1281,8 +1442,226 @@ function DonorDashboard() {
                     <Share2 className="w-7 h-7 text-red-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
                     <p className="text-sm font-semibold text-gray-800">Invite Friends</p>
                   </button>
+                  <button
+                    onClick={handleAvailableToday}
+                    disabled={availableTodayLoading}
+                    className={`p-5 rounded-xl transition-all duration-300 hover:scale-[1.02] group ${
+                      availabilityActiveUntil ? 'bg-red-100' : 'bg-red-50 hover:bg-red-100'
+                    } ${availableTodayLoading ? 'opacity-70' : ''}`}
+                  >
+                    <Clock className="w-7 h-7 text-red-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
+                    <p className="text-sm font-semibold text-gray-800">
+                      {availableTodayLoading ? 'Updating...' : availableTodayLabel}
+                    </p>
+                    <p className="mt-1 text-[10px] text-gray-500">{availableTodayHint}</p>
+                  </button>
                 </div>
               )}
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-3 items-start">
+              <div className="rounded-2xl border border-red-200 bg-white p-5 shadow-sm">
+                {isLoading ? (
+                  <div className="space-y-4">
+                    <div className="h-4 w-32 rounded-full bg-gray-100 animate-pulse" />
+                    <div className="h-6 w-64 rounded-full bg-gray-100 animate-pulse" />
+                    <div className="h-4 w-72 rounded-full bg-gray-100 animate-pulse" />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
+                      <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
+                      <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
+                      <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex items-start gap-3">
+                        <div className="p-3 rounded-2xl bg-red-600">
+                          {eligibleToDonate ? (
+                            <CheckCircle className="w-6 h-6 text-white" />
+                          ) : (
+                            <Clock className="w-6 h-6 text-white" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-red-600">Eligibility</p>
+                          <h3 className="text-lg font-bold text-gray-900">
+                            {eligibleToDonate ? 'You\'re Eligible to Donate!' : 'Not Eligible to Donate'}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {lastDonationDate
+                              ? eligibleToDonate
+                                ? 'You can donate now. Thank you for staying ready!'
+                                : nextEligibleDate
+                                  ? `Next eligible on ${formatDate(nextEligibleDate)}`
+                                  : 'Record your last donation date to track eligibility.'
+                              : 'Record your last donation date to track eligibility.'}
+                          </p>
+                          {!eligibleToDonate && (
+                            <p className="text-xs text-gray-500 mt-1">Minimum recovery window is 90 days.</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-center">
+                        <p className="text-[10px] uppercase tracking-wide text-red-600">Next Eligible In</p>
+                        <p className="text-2xl font-bold text-red-700">
+                          {eligibleToDonate ? 0 : daysUntilEligible}
+                        </p>
+                        <p className="text-[11px] text-red-600/80">
+                          {eligibleToDonate ? 'days' : 'days remaining'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-600">Last Donation Date</label>
+                        <input
+                          type="date"
+                          value={lastDonationInput}
+                          onChange={(event) => setLastDonationInput(event.target.value)}
+                          className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
+                        />
+                      </div>
+                      <div className="flex flex-col items-center gap-2 sm:items-end">
+                        <button
+                          type="button"
+                          onClick={handleSaveLastDonation}
+                          disabled={lastDonationSaving}
+                          className="w-full sm:w-auto px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-all duration-300 disabled:opacity-50"
+                        >
+                          {lastDonationSaving ? 'Saving...' : 'Save'}
+                        </button>
+                        {lastDonationSaved && (
+                          <span className="text-[11px] font-semibold text-red-600">Saved</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                        <p className="text-[10px] uppercase tracking-wide text-gray-500">Last Donation</p>
+                        <p className="text-sm font-semibold text-gray-800">
+                          {normalizedLastDonation ? formatDate(normalizedLastDonation) : 'Not set'}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                        <p className="text-[10px] uppercase tracking-wide text-gray-500">Recovery Window</p>
+                        <p className="text-sm font-semibold text-gray-800">90 days</p>
+                      </div>
+                      <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                        <p className="text-[10px] uppercase tracking-wide text-gray-500">Eligible On</p>
+                        <p className="text-sm font-semibold text-gray-800">
+                          {nextEligibleDate ? formatDate(nextEligibleDate) : 'Now'}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-xl p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-800">Eligibility Checklist</h2>
+                  <p className="text-xs text-gray-500">Quick self-check before donating.</p>
+                </div>
+                <span className="text-xs font-semibold text-red-600">{checklistCompleted}/3 ready</span>
+              </div>
+              <div className="mt-4 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => handleChecklistToggle('hydrated')}
+                  disabled={checklistSaving}
+                  className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-left transition-all duration-300 hover:bg-gray-100"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Hydrated</p>
+                    <p className="text-xs text-gray-500">Had enough water in the last 24 hours.</p>
+                  </div>
+                  <CheckCircle className={`w-5 h-5 ${eligibilityChecklist.hydrated ? 'text-red-600' : 'text-gray-300'}`} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleChecklistToggle('weightOk')}
+                  disabled={checklistSaving}
+                  className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-left transition-all duration-300 hover:bg-gray-100"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Weight Check</p>
+                    <p className="text-xs text-gray-500">Above 50 kg and feeling well.</p>
+                  </div>
+                  <CheckCircle className={`w-5 h-5 ${eligibilityChecklist.weightOk ? 'text-red-600' : 'text-gray-300'}`} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleChecklistToggle('hemoglobinOk')}
+                  disabled={checklistSaving}
+                  className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-left transition-all duration-300 hover:bg-gray-100"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Hemoglobin Ready</p>
+                    <p className="text-xs text-gray-500">Hemoglobin above required level.</p>
+                  </div>
+                  <CheckCircle className={`w-5 h-5 ${eligibilityChecklist.hemoglobinOk ? 'text-red-600' : 'text-gray-300'}`} />
+                </button>
+              </div>
+              <div className="mt-4 flex items-center justify-between text-[11px] text-gray-500">
+                <span>
+                  {checklistUpdatedAt ? `Updated ${formatDateTime(checklistUpdatedAt)}` : 'Not updated yet'}
+                </span>
+                {checklistSaving && <span className="text-red-600">Saving...</span>}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-xl p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-800">Referral Impact</h2>
+                  <p className="text-xs text-gray-500">Track donors who joined through you.</p>
+                </div>
+                <div className="p-2 rounded-lg bg-red-50">
+                  <Users className="w-5 h-5 text-red-600" />
+                </div>
+              </div>
+              {referralLoading ? (
+                <div className="mt-4 space-y-3">
+                  <div className="h-4 w-24 rounded-full bg-gray-100 animate-pulse" />
+                  <div className="h-8 w-16 rounded-full bg-gray-100 animate-pulse" />
+                  <div className="h-3 w-40 rounded-full bg-gray-100 animate-pulse" />
+                  <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
+                </div>
+              ) : (
+                <>
+                  <div className="mt-4 flex items-end justify-between">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-500">Total Referrals</p>
+                      <p className="text-3xl font-bold text-gray-900">{referralCount}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[11px] uppercase tracking-wide text-gray-500">Milestone</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {referralMilestone.next ? `${referralMilestone.next} donors` : referralMilestone.label}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-gray-600">
+                    {referralMilestone.next
+                      ? `${referralMilestone.remaining} more donor${referralMilestone.remaining === 1 ? '' : 's'} to reach the next milestone.`
+                      : 'You are a Legend Referrer!'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={copyInviteLink}
+                    className="mt-4 w-full rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition-all duration-300 hover:bg-red-50"
+                  >
+                    Copy Referral Link
+                  </button>
+                </>
+              )}
+            </div>
             </div>
           </div>
         </div>
@@ -1426,6 +1805,12 @@ function DonorDashboard() {
                 <div className="space-y-4">
                   {donationHistory.map((donation) => {
                     const isSelfReported = donation.source === 'manual';
+                    const feedbackEntry = donationFeedbackMap[donation.id];
+                    const isFeedbackOpen = feedbackOpenId === donation.id;
+                    const displayCertificateUrl = donation.certificateUrl || feedbackEntry?.certificateUrl;
+                    const hasFeedback = Boolean(
+                      feedbackEntry?.rating || feedbackEntry?.notes || feedbackEntry?.certificateUrl
+                    );
                     return (
                       <div
                         key={donation.id}
@@ -1463,15 +1848,23 @@ function DonorDashboard() {
                             >
                               <Edit3 className="w-4 h-4 text-gray-600" />
                             </button>
-                            {donation.certificateUrl && (
+                            {displayCertificateUrl && (
                               <button
-                                onClick={() => handleDownloadCertificate(donation.certificateUrl || '')}
+                                onClick={() => handleDownloadCertificate(displayCertificateUrl || '')}
                                 className="p-2 hover:bg-white rounded-lg transition-all duration-300"
                                 title="Download certificate"
                               >
                                 <Download className="w-5 h-5 text-gray-600" />
                               </button>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenFeedback(donation.id)}
+                              className="p-2 hover:bg-white rounded-lg transition-all duration-300"
+                              title={hasFeedback ? 'Edit feedback' : 'Add feedback'}
+                            >
+                              <MessageCircle className="w-4 h-4 text-gray-600" />
+                            </button>
                           </div>
                         </div>
                         {editingDonationId === donation.id && (
@@ -1529,6 +1922,116 @@ function DonorDashboard() {
                                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-all duration-300"
                               >
                                 <XCircle className="w-4 h-4" />
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {!isFeedbackOpen && hasFeedback && (
+                          <div className="mt-4 rounded-xl border border-red-100 bg-white/80 px-4 py-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-[10px] uppercase tracking-wide text-gray-500">Feedback</p>
+                                <div className="mt-1 flex items-center gap-1">
+                                  {[1, 2, 3, 4, 5].map((value) => (
+                                    <Star
+                                      key={`feedback-star-${donation.id}-${value}`}
+                                      className={`h-4 w-4 ${
+                                        (feedbackEntry?.rating || 0) >= value
+                                          ? 'text-yellow-400 fill-yellow-400'
+                                          : 'text-gray-300'
+                                      }`}
+                                    />
+                                  ))}
+                                </div>
+                                {feedbackEntry?.notes && (
+                                  <p className="text-xs text-gray-600 mt-1">{feedbackEntry.notes}</p>
+                                )}
+                              </div>
+                              {displayCertificateUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadCertificate(displayCertificateUrl || '')}
+                                  className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-50 transition-all duration-300"
+                                >
+                                  <Download className="h-3 w-3" />
+                                  Certificate
+                                </button>
+                              )}
+                            </div>
+                            {feedbackEntry?.updatedAt && (
+                              <p className="mt-2 text-[11px] text-gray-500">
+                                Updated {formatDateTime(feedbackEntry.updatedAt)}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {isFeedbackOpen && (
+                          <div className="mt-4 rounded-xl border border-red-100 bg-white px-4 py-4">
+                            <p className="text-[11px] uppercase tracking-wide text-red-600">Post-donation feedback</p>
+                            <div className="mt-3 flex items-center justify-between">
+                              <span className="text-sm font-semibold text-gray-800">Rating</span>
+                              <div className="flex items-center gap-1">
+                                {[1, 2, 3, 4, 5].map((value) => (
+                                  <button
+                                    key={`rating-${donation.id}-${value}`}
+                                    type="button"
+                                    onClick={() => setFeedbackForm((prev) => ({ ...prev, rating: value }))}
+                                    className="rounded-full p-1"
+                                  >
+                                    <Star
+                                      className={`h-5 w-5 ${
+                                        feedbackForm.rating >= value
+                                          ? 'text-yellow-400 fill-yellow-400'
+                                          : 'text-gray-300'
+                                      }`}
+                                    />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="mt-3">
+                              <label className="text-xs font-semibold text-gray-600">Notes</label>
+                              <textarea
+                                value={feedbackForm.notes}
+                                onChange={(event) => setFeedbackForm((prev) => ({
+                                  ...prev,
+                                  notes: event.target.value,
+                                }))}
+                                rows={3}
+                                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
+                                placeholder="Share your experience"
+                              />
+                            </div>
+                            <div className="mt-3">
+                              <label className="text-xs font-semibold text-gray-600">Certificate URL</label>
+                              <input
+                                type="url"
+                                value={feedbackForm.certificateUrl}
+                                onChange={(event) => setFeedbackForm((prev) => ({
+                                  ...prev,
+                                  certificateUrl: event.target.value,
+                                }))}
+                                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
+                                placeholder="https://"
+                              />
+                            </div>
+                            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveFeedback(donation.id)}
+                                disabled={feedbackSaving}
+                                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-all duration-300 disabled:opacity-50"
+                              >
+                                <MessageCircle className="h-4 w-4" />
+                                {feedbackSaving ? 'Saving...' : 'Save Feedback'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleCancelFeedback}
+                                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-all duration-300"
+                              >
+                                <XCircle className="h-4 w-4" />
                                 Cancel
                               </button>
                             </div>
@@ -1752,11 +2255,18 @@ function DonorDashboard() {
                             <p className="text-[11px] uppercase tracking-wide text-gray-500">Share QR</p>
                             <p className="text-xs text-gray-600">Scan to open your donor profile link.</p>
                           </div>
-                          <img
-                            src={qrCodeDataUrl}
-                            alt="BH ID QR"
-                            className="h-16 w-16 shrink-0"
-                          />
+                          <button
+                            type="button"
+                            onClick={() => setQrPreviewOpen(true)}
+                            className="rounded-lg border border-red-100 bg-white p-1 transition-transform duration-300 hover:scale-105"
+                            aria-label="Open QR preview"
+                          >
+                            <img
+                              src={qrCodeDataUrl}
+                              alt="BH ID QR"
+                              className="h-16 w-16 shrink-0"
+                            />
+                          </button>
                         </div>
                       )}
                     </div>
@@ -1818,6 +2328,11 @@ function DonorDashboard() {
                         />
                       </button>
                     </div>
+                    {availabilityExpiryLabel && availabilityEnabled && (
+                      <p className="text-[11px] text-gray-500">
+                        Available until {availabilityExpiryLabel}
+                      </p>
+                    )}
                     <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
                       <div>
                         <p className="text-sm font-semibold text-gray-800">Emergency Alerts</p>
@@ -2195,6 +2710,40 @@ function DonorDashboard() {
               >
                 Done
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Preview Modal */}
+      {qrPreviewOpen && qrCodeDataUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setQrPreviewOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <button
+              type="button"
+              onClick={() => setQrPreviewOpen(false)}
+              className="absolute right-3 top-3 rounded-full p-2 hover:bg-gray-100 transition-all"
+              aria-label="Close QR preview"
+            >
+              <X className="h-5 w-5 text-gray-600" />
+            </button>
+            <p className="text-xs uppercase tracking-[0.3em] text-red-600">BloodHub Donor QR</p>
+            <h3 className="mt-2 text-lg font-bold text-gray-900">Scan to open your profile</h3>
+            <div className="mt-6 flex justify-center">
+              <img
+                src={qrCodeDataUrl}
+                alt="QR code preview"
+                className="h-56 w-56 rounded-xl border border-red-100 bg-white p-3"
+              />
             </div>
           </div>
         </div>
