@@ -1,5 +1,6 @@
 const referralCookieName = 'bh_referrer';
 const referralStorageKey = 'bh_referrer_meta';
+const referralUidStorageKey = 'bh_referrer_uid';
 const referralMaxAgeDays = 30;
 
 type ReferralMeta = {
@@ -42,6 +43,13 @@ export const setReferralTracking = (bhId: string) => {
   }
 };
 
+export const setReferralReferrerUid = (referrerUid: string) => {
+  if (!referrerUid) return;
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(referralUidStorageKey, referrerUid);
+  }
+};
+
 export const getReferralTracking = () => {
   const now = Date.now();
   const maxAgeMs = referralMaxAgeDays * 24 * 60 * 60 * 1000;
@@ -68,9 +76,16 @@ export const getReferralTracking = () => {
   return null;
 };
 
+export const getReferralReferrerUid = () => {
+  if (typeof window === 'undefined') return null;
+  const value = localStorage.getItem(referralUidStorageKey);
+  return value || null;
+};
+
 export const clearReferralTracking = () => {
   removeCookie();
   if (typeof window !== 'undefined') {
     localStorage.removeItem(referralStorageKey);
+    localStorage.removeItem(referralUidStorageKey);
   }
 };
