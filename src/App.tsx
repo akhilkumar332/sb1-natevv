@@ -38,8 +38,12 @@ function App() {
     '/ngo/onboarding',
     '/hospital/onboarding',
   ]);
+  const noFooterPrefixes = [
+    '/donor/dashboard',
+  ];
 
-  const hideCompletely = noFooterRoutes.has(location.pathname);
+  const hideCompletely = noFooterRoutes.has(location.pathname)
+    || noFooterPrefixes.some(prefix => location.pathname.startsWith(prefix));
   const hideOnMobile = mobileOnlyRoutes.has(location.pathname);
   const footerWrapperClass = hideCompletely
     ? 'hidden'

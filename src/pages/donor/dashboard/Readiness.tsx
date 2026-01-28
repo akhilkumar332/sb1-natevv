@@ -1,0 +1,222 @@
+import { useOutletContext } from 'react-router-dom';
+import { BookOpen, CheckCircle, Clock } from 'lucide-react';
+
+const DonorReadiness = () => {
+  const dashboard = useOutletContext<any>();
+
+  const {
+    isLoading,
+    eligibleToDonate,
+    lastDonationDate,
+    nextEligibleDate,
+    lastDonationInput,
+    setLastDonationInput,
+    handleSaveLastDonation,
+    lastDonationSaving,
+    lastDonationSaved,
+    normalizedLastDonation,
+    daysUntilEligible,
+    eligibilityChecklist,
+    handleChecklistToggle,
+    checklistSaving,
+    checklistUpdatedAt,
+    checklistCompleted,
+    formatDate,
+    formatDateTime,
+    handleLearnMore,
+  } = dashboard;
+
+  return (
+    <>
+      <div className="mb-4">
+        <p className="text-xs uppercase tracking-[0.3em] text-red-600">Readiness</p>
+        <h2 className="text-xl font-bold text-gray-900">Eligibility and preparation</h2>
+      </div>
+      <div className="grid gap-6 lg:grid-cols-3 items-start">
+        <div className="rounded-2xl border border-red-200 bg-white p-5 shadow-sm">
+          {isLoading ? (
+            <div className="space-y-4">
+              <div className="h-4 w-32 rounded-full bg-gray-100 animate-pulse" />
+              <div className="h-6 w-64 rounded-full bg-gray-100 animate-pulse" />
+              <div className="h-4 w-72 rounded-full bg-gray-100 animate-pulse" />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
+                <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
+                <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
+                <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="p-3 rounded-2xl bg-red-600">
+                    {eligibleToDonate ? (
+                      <CheckCircle className="w-6 h-6 text-white" />
+                    ) : (
+                      <Clock className="w-6 h-6 text-white" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-red-600">Eligibility</p>
+                    <h3 className="text-lg font-bold text-gray-900">
+                      {eligibleToDonate ? "You're Eligible to Donate!" : 'Not Eligible to Donate'}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {lastDonationDate
+                        ? eligibleToDonate
+                          ? 'You can donate now. Thank you for staying ready!'
+                          : nextEligibleDate
+                            ? `Next eligible on ${formatDate(nextEligibleDate)}`
+                            : 'Record your last donation date to track eligibility.'
+                        : 'Record your last donation date to track eligibility.'}
+                    </p>
+                    {!eligibleToDonate && (
+                      <p className="text-xs text-gray-500 mt-1">Minimum recovery window is 90 days.</p>
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-center">
+                  <p className="text-[10px] uppercase tracking-wide text-red-600">Next Eligible In</p>
+                  <p className="text-2xl font-bold text-red-700">
+                    {eligibleToDonate ? 0 : daysUntilEligible}
+                  </p>
+                  <p className="text-[11px] text-red-600/80">
+                    {eligibleToDonate ? 'days' : 'days remaining'}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                <div>
+                  <label className="text-xs font-semibold text-gray-600">Last Donation Date</label>
+                  <input
+                    type="date"
+                    value={lastDonationInput}
+                    onChange={(event) => setLastDonationInput(event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
+                  />
+                </div>
+                <div className="flex flex-col items-center gap-2 sm:items-end">
+                  <button
+                    type="button"
+                    onClick={handleSaveLastDonation}
+                    disabled={lastDonationSaving}
+                    className="w-full sm:w-auto px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-all duration-300 disabled:opacity-50"
+                  >
+                    {lastDonationSaving ? 'Saving...' : 'Save'}
+                  </button>
+                  {lastDonationSaved && (
+                    <span className="text-[11px] font-semibold text-red-600">Saved</span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                  <p className="text-[10px] uppercase tracking-wide text-gray-500">Last Donation</p>
+                  <p className="text-sm font-semibold text-gray-800">
+                    {normalizedLastDonation ? formatDate(normalizedLastDonation) : 'Not set'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                  <p className="text-[10px] uppercase tracking-wide text-gray-500">Recovery Window</p>
+                  <p className="text-sm font-semibold text-gray-800">90 days</p>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                  <p className="text-[10px] uppercase tracking-wide text-gray-500">Eligible On</p>
+                  <p className="text-sm font-semibold text-gray-800">
+                    {nextEligibleDate ? formatDate(nextEligibleDate) : 'Now'}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-xl p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">Eligibility Checklist</h2>
+              <p className="text-xs text-gray-500">Quick self-check before donating.</p>
+            </div>
+            <span className="text-xs font-semibold text-red-600">{checklistCompleted}/3 ready</span>
+          </div>
+          <div className="mt-4 space-y-3">
+            <button
+              type="button"
+              onClick={() => handleChecklistToggle('hydrated')}
+              disabled={checklistSaving}
+              className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-left transition-all duration-300 hover:bg-gray-100"
+            >
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Hydrated</p>
+                <p className="text-xs text-gray-500">Had enough water in the last 24 hours.</p>
+              </div>
+              <CheckCircle className={`w-5 h-5 ${eligibilityChecklist.hydrated ? 'text-red-600' : 'text-gray-300'}`} />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleChecklistToggle('weightOk')}
+              disabled={checklistSaving}
+              className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-left transition-all duration-300 hover:bg-gray-100"
+            >
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Weight Check</p>
+                <p className="text-xs text-gray-500">Above 50 kg and feeling well.</p>
+              </div>
+              <CheckCircle className={`w-5 h-5 ${eligibilityChecklist.weightOk ? 'text-red-600' : 'text-gray-300'}`} />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleChecklistToggle('hemoglobinOk')}
+              disabled={checklistSaving}
+              className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-left transition-all duration-300 hover:bg-gray-100"
+            >
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Hemoglobin Ready</p>
+                <p className="text-xs text-gray-500">Hemoglobin above required level.</p>
+              </div>
+              <CheckCircle className={`w-5 h-5 ${eligibilityChecklist.hemoglobinOk ? 'text-red-600' : 'text-gray-300'}`} />
+            </button>
+          </div>
+          <div className="mt-4 flex items-center justify-between text-[11px] text-gray-500">
+            <span>
+              {checklistUpdatedAt ? `Updated ${formatDateTime(checklistUpdatedAt)}` : 'Not updated yet'}
+            </span>
+            {checklistSaving && <span className="text-red-600">Saving...</span>}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-xl p-6 border-2 border-red-100">
+          <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center">
+            <BookOpen className="w-5 h-5 mr-2 text-red-600" />
+            Today's Health Tip
+          </h2>
+          {isLoading ? (
+            <div className="space-y-3">
+              <div className="h-4 w-full rounded-full bg-gray-100 animate-pulse" />
+              <div className="h-4 w-3/4 rounded-full bg-gray-100 animate-pulse" />
+              <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-gray-700 mb-4">
+                💧 Drink plenty of water before and after donation to help your body replenish fluids quickly. Aim for 8-10 glasses of water daily!
+              </p>
+              <button
+                onClick={handleLearnMore}
+                className="w-full py-2 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-all duration-300"
+              >
+                Learn More
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  );
+};
+
+export default DonorReadiness;

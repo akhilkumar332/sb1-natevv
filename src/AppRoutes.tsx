@@ -1,6 +1,6 @@
 // src/AppRoutes.tsx
 import { lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Helper function for lazy loading with delay
@@ -17,6 +17,12 @@ const DonorRegister = lazy(() => lazyLoad(import('./pages/donor/DonorRegister'))
 const DonorLogin = lazy(() => lazyLoad(import('./pages/donor/DonorLogin')));
 const DonorOnboarding = lazy(() => lazyLoad(import('./pages/donor/DonorOnboarding')));
 const DonorDashboard = lazy(() => lazyLoad(import('./pages/donor/DonorDashboard')));
+const DonorOverview = lazy(() => lazyLoad(import('./pages/donor/dashboard/Overview')));
+const DonorReadiness = lazy(() => lazyLoad(import('./pages/donor/dashboard/Readiness')));
+const DonorRequests = lazy(() => lazyLoad(import('./pages/donor/dashboard/Requests')));
+const DonorJourney = lazy(() => lazyLoad(import('./pages/donor/dashboard/Journey')));
+const DonorReferrals = lazy(() => lazyLoad(import('./pages/donor/dashboard/Referrals')));
+const DonorAccount = lazy(() => lazyLoad(import('./pages/donor/dashboard/Account')));
 const HospitalRegister = lazy(() => lazyLoad(import('./pages/hospital/HospitalRegister')));
 const HospitalLogin = lazy(() => lazyLoad(import('./pages/hospital/HospitalLogin')));
 const HospitalDashboard = lazy(() => lazyLoad(import('./pages/hospital/HospitalDashboard')));
@@ -57,7 +63,15 @@ const AppRoutes = () => {
       {/* Protected Routes */}
       <Route element={<ProtectedRoute />}>
         <Route path="/donor/onboarding" element={<DonorOnboarding />} />
-        <Route path="/donor/dashboard" element={<DonorDashboard />} />
+        <Route path="/donor/dashboard" element={<DonorDashboard />}>
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<DonorOverview />} />
+          <Route path="readiness" element={<DonorReadiness />} />
+          <Route path="requests" element={<DonorRequests />} />
+          <Route path="journey" element={<DonorJourney />} />
+          <Route path="referrals" element={<DonorReferrals />} />
+          <Route path="account" element={<DonorAccount />} />
+        </Route>
         <Route path="/hospital/onboarding" element={<HospitalOnboarding />} />
         <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
         <Route path="/ngo/onboarding" element={<NgoOnboarding />} />
