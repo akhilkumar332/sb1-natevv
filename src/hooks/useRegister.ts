@@ -9,7 +9,7 @@ import { signInWithPopup, signOut } from 'firebase/auth';
 import { authStorage } from '../utils/authStorage';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
-import { clearReferralTracking, getReferralTracking } from '../utils/referralTracking';
+import { clearReferralTracking, getReferralReferrerUid, getReferralTracking } from '../utils/referralTracking';
 
 interface RegisterFormData {
   identifier: string;
@@ -38,22 +38,42 @@ export const useRegister = () => {
 
   const applyReferralTracking = async (newUserUid: string) => {
     const referralBhId = getReferralTracking();
-    if (!referralBhId) return;
+    const referralUid = getReferralReferrerUid();
+    if (!referralBhId && !referralUid) return;
 
     try {
-      const referrerSnapshot = await getDocs(query(
-        collection(db, 'users'),
-        where('bhId', '==', referralBhId),
-        limit(1)
-      ));
+      let referrerUid: string | null = referralUid;
+      let referrerBhId: string | undefined = referralBhId || undefined;
 
-      if (referrerSnapshot.empty) {
+      if (referrerUid) {
+        const referrerDoc = await getDoc(doc(db, 'users', referrerUid));
+        if (!referrerDoc.exists()) {
+          clearReferralTracking();
+          return;
+        }
+        const referrerData = referrerDoc.data();
+        referrerBhId = referrerData?.bhId || referrerBhId;
+      } else if (referralBhId) {
+        const referrerSnapshot = await getDocs(query(
+          collection(db, 'users'),
+          where('bhId', '==', referralBhId),
+          limit(1)
+        ));
+
+        if (referrerSnapshot.empty) {
+          clearReferralTracking();
+          return;
+        }
+
+        const referrerDoc = referrerSnapshot.docs[0];
+        referrerUid = referrerDoc.id;
+        referrerBhId = referrerDoc.data()?.bhId || referrerBhId;
+      }
+
+      if (!referrerUid) {
         clearReferralTracking();
         return;
       }
-
-      const referrerDoc = referrerSnapshot.docs[0];
-      const referrerUid = referrerDoc.id;
 
       if (referrerUid === newUserUid) {
         clearReferralTracking();
@@ -72,7 +92,7 @@ export const useRegister = () => {
       await setDoc(referralRef, {
         referrerUid,
         referredUid: newUserUid,
-        referrerBhId: referralBhId,
+        referrerBhId: referrerBhId,
         referredAt: serverTimestamp(),
         status: 'registered',
         createdAt: serverTimestamp(),

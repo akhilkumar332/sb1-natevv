@@ -683,7 +683,12 @@ function DonorDashboard() {
     if (!bhId) {
       return baseUrl;
     }
-    return `${baseUrl}/?BHID=${encodeURIComponent(bhId)}`;
+    const referrerUid = user?.uid;
+    const params = new URLSearchParams({ BHID: bhId });
+    if (referrerUid) {
+      params.set('ref', referrerUid);
+    }
+    return `${baseUrl}/?${params.toString()}`;
   };
 
   const createQrCodeDataUrl = async () => {

@@ -12,7 +12,7 @@ import { useActivityTracker } from './hooks/useActivityTracker';
 import { useInactivityCheck } from './hooks/useInactivityCheck';
 import { useLocation } from 'react-router-dom';
 import { useVersionCheck } from './hooks/useVersionCheck';
-import { setReferralTracking } from './utils/referralTracking';
+import { setReferralTracking, setReferralReferrerUid } from './utils/referralTracking';
 
 function App() {
   useAuthSync();
@@ -55,8 +55,13 @@ function App() {
     if (!location.search) return;
     const params = new URLSearchParams(location.search);
     const bhId = params.get('BHID') || params.get('bhid');
-    if (!bhId) return;
-    setReferralTracking(bhId.trim());
+    const referrerUid = params.get('ref') || params.get('referrer');
+    if (bhId) {
+      setReferralTracking(bhId.trim());
+    }
+    if (referrerUid) {
+      setReferralReferrerUid(referrerUid.trim());
+    }
   }, [location.search]);
 
   return (

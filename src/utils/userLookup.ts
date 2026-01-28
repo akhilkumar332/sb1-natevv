@@ -97,5 +97,5 @@ export const findUsersByPhone = async (phoneNumber: string): Promise<UserRecord[
     }
   }
 
-  return Array.from(matches.values());
+  return Array.from(matches.values()).filter((user) => user.status !== 'deleted');
 };
