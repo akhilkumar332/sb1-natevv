@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 
 const VERSION_URL = '/version.json';
 const POLL_INTERVAL_MS = 60_000;
+const VERSION_STORAGE_KEY = 'bh_app_version';
 
 type VersionPayload = {
   version?: string;
@@ -48,15 +49,17 @@ const clearCookies = () => {
 
 export const useVersionCheck = () => {
   const currentVersionRef = useRef<string | null>(null);
+  const isRefreshingRef = useRef(false);
   const notifiedVersionRef = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
-    const handleRefresh = async (toastId?: string) => {
-      if (toastId) {
-        toast.dismiss(toastId);
+    const handleRefresh = async (nextVersion?: string) => {
+      if (isRefreshingRef.current) {
+        return;
       }
+      isRefreshingRef.current = true;
 
       try {
         await Promise.all([clearCaches(), unregisterServiceWorkers()]);
@@ -65,10 +68,13 @@ export const useVersionCheck = () => {
       }
 
       clearCookies();
+      if (nextVersion) {
+        localStorage.setItem(VERSION_STORAGE_KEY, nextVersion);
+      }
       window.location.reload();
     };
 
-    const showUpdateToast = (_version: string) => {
+    const showUpdateToast = (nextVersion: string) => {
       const toastId = 'version-update';
       toast.custom(
         (t) => (
@@ -81,7 +87,7 @@ export const useVersionCheck = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleRefresh(t.id)}
+                  onClick={() => handleRefresh(nextVersion)}
                   className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition-colors"
                 >
                   Refresh
@@ -97,7 +103,7 @@ export const useVersionCheck = () => {
       );
     };
 
-    const fetchVersion = async () => {
+    const fetchVersion = async (source: 'initial' | 'poll' | 'visibility' = 'poll') => {
       try {
         const response = await fetch(VERSION_URL, { cache: 'no-store' });
         if (!response.ok) {
@@ -111,24 +117,38 @@ export const useVersionCheck = () => {
 
         if (!currentVersionRef.current) {
           currentVersionRef.current = nextVersion;
+          const storedVersion = localStorage.getItem(VERSION_STORAGE_KEY);
+          if (storedVersion && storedVersion !== nextVersion) {
+            await handleRefresh(nextVersion);
+            return;
+          }
+          if (!storedVersion) {
+            localStorage.setItem(VERSION_STORAGE_KEY, nextVersion);
+          }
           return;
         }
 
-        if (nextVersion !== currentVersionRef.current && notifiedVersionRef.current !== nextVersion) {
-          notifiedVersionRef.current = nextVersion;
-          showUpdateToast(nextVersion);
+        if (nextVersion !== currentVersionRef.current) {
+          if (source === 'initial') {
+            await handleRefresh(nextVersion);
+            return;
+          }
+          if (notifiedVersionRef.current !== nextVersion) {
+            notifiedVersionRef.current = nextVersion;
+            showUpdateToast(nextVersion);
+          }
         }
       } catch (error) {
         console.warn('Failed to fetch version metadata:', error);
       }
     };
 
-    fetchVersion();
-    const intervalId = window.setInterval(fetchVersion, POLL_INTERVAL_MS);
+    fetchVersion('initial');
+    const intervalId = window.setInterval(() => fetchVersion('poll'), POLL_INTERVAL_MS);
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        fetchVersion();
+        fetchVersion('visibility');
       }
     };
 
