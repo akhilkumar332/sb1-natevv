@@ -5,41 +5,26 @@ import {
   MapPin,
   Calendar,
   Droplet,
-  Phone,
-  Heart,
-  Award,
   Clock,
   Users,
   Bell,
   Share2,
-  Zap,
   Activity,
   AlertCircle,
   CheckCircle,
   MapPinned,
-  BookOpen,
   Trophy,
-  Download,
   RefreshCw,
-  Loader2,
+  Menu,
   X,
-  Chrome,
-  Edit3,
-  SlidersHorizontal,
-  Save,
-  XCircle,
-  MessageCircle,
-  Star
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDonorData } from '../../hooks/useDonorData';
 import { useBloodRequest } from '../../hooks/useBloodRequest';
-import { useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import BhIdBanner from '../../components/BhIdBanner';
-import PhoneInput from 'react-phone-number-input';
-import 'react-phone-number-input/style.css';
-import { collection, doc, getDoc, setDoc, serverTimestamp, Timestamp, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, serverTimestamp, Timestamp, query, where, onSnapshot, documentId } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
 import type { ConfirmationResult } from 'firebase/auth';
@@ -60,6 +45,15 @@ type DonationFeedback = {
   updatedAt?: Date;
 };
 
+type ReferralEntry = {
+  id: string;
+  referredUid: string;
+  referredAt?: Date | null;
+  status?: string;
+  referrerBhId?: string;
+};
+
+
 function DonorDashboard() {
   const {
     user,
@@ -77,6 +71,7 @@ function DonorDashboard() {
   const [showAllRequests, setShowAllRequests] = useState(false);
   const [showAllBadges, setShowAllBadges] = useState(false);
   const [showAllCamps, setShowAllCamps] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [linkPhoneNumber, setLinkPhoneNumber] = useState('');
   const [linkOtp, setLinkOtp] = useState('');
   const [linkConfirmation, setLinkConfirmation] = useState<ConfirmationResult | null>(null);
@@ -136,6 +131,9 @@ function DonorDashboard() {
   const [donationEditSaving, setDonationEditSaving] = useState(false);
   const [referralCount, setReferralCount] = useState(0);
   const [referralLoading, setReferralLoading] = useState(true);
+  const [referralEntries, setReferralEntries] = useState<ReferralEntry[]>([]);
+  const [referralUsers, setReferralUsers] = useState<Record<string, any>>({});
+  const [referralUsersLoading, setReferralUsersLoading] = useState(false);
   const [eligibilityChecklist, setEligibilityChecklist] = useState({
     hydrated: false,
     weightOk: false,
@@ -371,6 +369,23 @@ function DonorDashboard() {
       where('referrerUid', '==', user.uid)
     );
     const unsubscribe = onSnapshot(referralQuery, (snapshot) => {
+      const nextEntries = snapshot.docs.map((docSnapshot) => {
+        const data = docSnapshot.data() as any;
+        const referredAt = data?.referredAt?.toDate
+          ? data.referredAt.toDate()
+          : typeof data?.referredAt?.seconds === 'number'
+            ? new Date(data.referredAt.seconds * 1000)
+            : null;
+        return {
+          id: docSnapshot.id,
+          referredUid: data?.referredUid,
+          referredAt,
+          status: data?.status,
+          referrerBhId: data?.referrerBhId,
+        } as ReferralEntry;
+      }).filter(entry => Boolean(entry.referredUid));
+      nextEntries.sort((a, b) => (b.referredAt?.getTime() || 0) - (a.referredAt?.getTime() || 0));
+      setReferralEntries(nextEntries);
       setReferralCount(snapshot.size);
       setReferralLoading(false);
     }, (error) => {
@@ -379,6 +394,48 @@ function DonorDashboard() {
     });
     return () => unsubscribe();
   }, [user?.uid]);
+
+  useEffect(() => {
+    if (referralEntries.length === 0) {
+      setReferralUsers({});
+      setReferralUsersLoading(false);
+      return;
+    }
+    let isActive = true;
+    const fetchReferralUsers = async () => {
+      setReferralUsersLoading(true);
+      try {
+        const uniqueIds = Array.from(new Set(referralEntries.map(entry => entry.referredUid).filter(Boolean)));
+        const chunkSize = 10;
+        const chunks: string[][] = [];
+        for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+          chunks.push(uniqueIds.slice(i, i + chunkSize));
+        }
+        const results = await Promise.all(chunks.map(async (chunk) => {
+          const usersQuery = query(collection(db, 'users'), where(documentId(), 'in', chunk));
+          const usersSnapshot = await getDocs(usersQuery);
+          const map: Record<string, any> = {};
+          usersSnapshot.forEach((userDoc) => {
+            map[userDoc.id] = userDoc.data();
+          });
+          return map;
+        }));
+        if (!isActive) return;
+        const merged = results.reduce((acc, current) => ({ ...acc, ...current }), {} as Record<string, any>);
+        setReferralUsers(merged);
+      } catch (error) {
+        console.warn('Failed to load referred users:', error);
+      } finally {
+        if (isActive) {
+          setReferralUsersLoading(false);
+        }
+      }
+    };
+    fetchReferralUsers();
+    return () => {
+      isActive = false;
+    };
+  }, [referralEntries]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -1144,6 +1201,122 @@ function DonorDashboard() {
   const profileCompletionPercent = Math.round((completedProfileFields / profileFields.length) * 100);
   const missingProfileFields = profileFields.filter(field => !field.value).map(field => field.label);
   const isLoading = loading;
+  const referralDetails = referralEntries.map((entry) => ({
+    ...entry,
+    user: referralUsers[entry.referredUid],
+  }));
+  const menuItems = [
+    { id: 'overview', label: 'Overview', to: 'overview', icon: Activity },
+    { id: 'readiness', label: 'Readiness', to: 'readiness', icon: CheckCircle },
+    { id: 'requests', label: 'Requests', to: 'requests', icon: AlertCircle },
+    { id: 'journey', label: 'Journey', to: 'journey', icon: Trophy },
+    { id: 'referrals', label: 'Referrals', to: 'referrals', icon: Users },
+    { id: 'account', label: 'Account', to: 'account', icon: LucideUser },
+  ] as const;
+  const dashboardContext = {
+    user,
+    isLoading,
+    donationHistory,
+    emergencyRequests,
+    bloodCamps,
+    stats,
+    badges,
+    loading,
+    error,
+    refreshData,
+    responding,
+    formatDate,
+    formatDateTime,
+    formatTime,
+    eligibleToDonate,
+    daysUntilEligible,
+    profileCompletionPercent,
+    missingProfileFields,
+    lastDonationDate,
+    nextEligibleDate,
+    normalizedLastDonation,
+    lastDonationInput,
+    setLastDonationInput,
+    lastDonationSaving,
+    lastDonationSaved,
+    availabilityExpiryLabel,
+    availabilityActiveUntil,
+    availableTodayLabel,
+    availableTodayHint,
+    availableTodayLoading,
+    availabilityEnabled,
+    availabilitySaving,
+    emergencyAlertsEnabled,
+    emergencyAlertsSaving,
+    eligibilityChecklist,
+    checklistSaving,
+    checklistCompleted,
+    checklistUpdatedAt,
+    referralCount,
+    referralLoading,
+    referralUsersLoading,
+    referralMilestone,
+    referralDetails,
+    donorLevel,
+    nextMilestone,
+    shareOptions,
+    shareCardLoading,
+    qrCodeDataUrl,
+    shareOptionsOpen,
+    setShareOptionsOpen,
+    setQrPreviewOpen,
+    isPhoneLinked,
+    canUnlinkPhone,
+    unlinkPhoneLoading,
+    linkPhoneNumber,
+    setLinkPhoneNumber,
+    linkOtp,
+    setLinkOtp,
+    linkConfirmation,
+    linkPhoneLoading,
+    isGoogleLinked,
+    canUnlinkGoogle,
+    unlinkGoogleLoading,
+    linkGoogleLoading,
+    editingDonationId,
+    editingDonationData,
+    setEditingDonationData,
+    donationEditSaving,
+    feedbackOpenId,
+    feedbackForm,
+    setFeedbackForm,
+    feedbackSaving,
+    donationFeedbackMap,
+    handleEmergencyRequests,
+    handleFindDonors,
+    handleInviteFriends,
+    handleAvailableToday,
+    handleSaveLastDonation,
+    handleChecklistToggle,
+    handleViewAllRequests,
+    handleRespondToRequest,
+    handleViewAllBadges,
+    handleViewAllCamps,
+    handleBookDonation,
+    handleLearnMore,
+    handleStartDonationEdit,
+    handleDonationEditSave,
+    handleCancelDonationEdit,
+    handleOpenFeedback,
+    handleSaveFeedback,
+    handleCancelFeedback,
+    handleDownloadCertificate,
+    handleShareDonorCard,
+    handleAvailabilityToggle,
+    handleEmergencyAlertsToggle,
+    handlePhoneLinkStart,
+    handlePhoneLinkConfirm,
+    handlePhoneLinkResend,
+    handlePhoneUnlink,
+    handleGoogleLink,
+    handleGoogleUnlink,
+    copyInviteLink,
+  } as const;
 
   if (error && !loading) {
     return (
@@ -1228,1237 +1401,90 @@ function DonorDashboard() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <p className="text-xs uppercase tracking-[0.3em] text-red-600">Snapshot</p>
-          <h2 className="text-xl font-bold text-gray-900">Your Snapshot</h2>
-        </div>
-        {/* Top Highlights */}
-        <div className="mb-6">
-          {/* Stats Strip */}
-          <div className="grid grid-cols-2 gap-4">
-            {isLoading ? (
-              Array.from({ length: 4 }).map((_, index) => (
-                <div
-                  key={`stat-skeleton-${index}`}
-                  className="bg-white rounded-xl border border-red-100 p-4 shadow-sm"
-                >
-                  <div className="space-y-3">
-                    <div className="h-3 w-24 rounded-full bg-gray-100 animate-pulse" />
-                    <div className="h-6 w-16 rounded-full bg-gray-100 animate-pulse" />
-                    <div className="h-3 w-20 rounded-full bg-gray-100 animate-pulse" />
-                  </div>
-                </div>
-              ))
-            ) : (
-              <>
-                <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Total Donations</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats?.totalDonations || 0}</p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-red-50">
-                    <Droplet className="w-5 h-5 text-red-600" />
-                  </div>
-                </div>
-                <p className="mt-2 text-xs text-gray-500">Your lifesaving journey</p>
-              </div>
-              <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Lives Saved</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats?.livesSaved || 0}</p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-red-50">
-                    <Heart className="w-5 h-5 text-red-600" />
-                  </div>
-                </div>
-                <p className="mt-2 text-xs text-gray-500">Each donation saves 3 lives</p>
-              </div>
-              <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Next Eligible In</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {eligibleToDonate ? 0 : daysUntilEligible}
-                    </p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-red-50">
-                    <Clock className="w-5 h-5 text-red-600" />
-                  </div>
-                </div>
-                <p className="mt-2 text-xs text-gray-500">
-                  {eligibleToDonate ? 'Ready to donate' : 'days remaining'}
-                </p>
-              </div>
-              <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Impact Score</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats?.impactScore || 0}</p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-red-50">
-                    <Award className="w-5 h-5 text-red-600" />
-                  </div>
-                </div>
-                <p className="mt-2 text-xs text-gray-500">
-                  {stats?.rank ? `Rank #${stats.rank}` : 'Keep donating!'}
-                </p>
-              </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="grid gap-6 mb-6 lg:grid-cols-2">
-          {/* Profile Completeness */}
-          <div className="bg-white rounded-2xl shadow-xl p-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Profile Strength</h2>
-            {isLoading ? (
-              <div className="space-y-3">
-                <div className="h-4 w-32 rounded-full bg-gray-100 animate-pulse" />
-                <div className="h-2 w-full rounded-full bg-gray-100 animate-pulse" />
-                <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Completion</span>
-                  <span className="font-semibold text-gray-900">{profileCompletionPercent}%</span>
-                </div>
-                <div className="h-2 rounded-full bg-gray-100">
-                  <div
-                    className="h-2 rounded-full bg-red-600 transition-all duration-300"
-                    style={{ width: `${profileCompletionPercent}%` }}
-                  />
-                </div>
-                {missingProfileFields.length > 0 ? (
-                  <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3">
-                    <p className="text-xs font-semibold text-red-700">Missing details</p>
-                    <p className="text-xs text-red-700/80">
-                      {missingProfileFields.slice(0, 3).join(', ')}
-                      {missingProfileFields.length > 3 ? '...' : ''}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3">
-                    <p className="text-xs font-semibold text-red-700">All set</p>
-                    <p className="text-xs text-red-700/80">Your donor profile is complete.</p>
-                  </div>
-                )}
-                {missingProfileFields.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/donor/onboarding')}
-                    className="w-full py-2 px-4 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-all duration-300"
-                  >
-                    Complete Profile
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Momentum */}
-          <div className="bg-white rounded-2xl shadow-xl p-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Momentum</h2>
-            {isLoading ? (
-              <div className="space-y-3">
-                <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-                <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-500">Current Streak</p>
-                    <p className="text-sm text-gray-600">Keep the rhythm going</p>
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">{stats?.streak || 0} days</p>
-                </div>
-                <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3">
-                  <p className="text-[10px] uppercase tracking-wide text-red-600">Next Milestone</p>
-                  <p className="text-sm font-semibold text-gray-900">{nextMilestone.label}</p>
-                  <p className="text-xs text-gray-600">
-                    {nextMilestone.remaining === 0
-                      ? 'You reached this milestone.'
-                      : `${nextMilestone.remaining} more donation${nextMilestone.remaining === 1 ? '' : 's'} to hit ${nextMilestone.target}.`}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Eligibility & Actions */}
-        <div className="mb-10">
-          <div className="mb-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-red-600">Eligibility & Actions</p>
-            <h2 className="text-xl font-bold text-gray-900">Your readiness and quick actions</h2>
-          </div>
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                <Zap className="w-6 h-6 mr-2 text-red-600" />
-                Quick Actions
-              </h2>
-              {isLoading ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div
-                      key={`action-skeleton-${index}`}
-                      className="p-5 rounded-xl bg-gray-50 border border-gray-100"
-                    >
-                      <div className="h-8 w-8 rounded-full bg-gray-100 animate-pulse mx-auto mb-3" />
-                      <div className="h-3 w-20 rounded-full bg-gray-100 animate-pulse mx-auto" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <button
-                    onClick={handleEmergencyRequests}
-                    className="p-5 bg-red-50 rounded-xl hover:bg-red-100 transition-all duration-300 hover:scale-[1.02] group"
-                  >
-                    <AlertCircle className="w-7 h-7 text-red-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
-                    <p className="text-sm font-semibold text-gray-800">Emergency Requests</p>
-                    {emergencyRequests.length > 0 && (
-                      <span className="inline-block mt-1 px-2 py-0.5 bg-red-200 text-red-700 text-xs rounded-full font-bold">
-                        {emergencyRequests.length}
-                      </span>
+        <div className="lg:flex lg:gap-6">
+          <aside className="hidden lg:block lg:w-64">
+            <div className="sticky top-6 space-y-2 rounded-2xl border border-red-100 bg-white p-4 shadow-lg">
+              {menuItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.id}
+                    to={item.to}
+                    className={({ isActive }) => (
+                      `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-all ${isActive ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md' : 'text-gray-600 hover:bg-red-50'}`
                     )}
-                  </button>
-                  <button
-                    onClick={handleFindDonors}
-                    className="p-5 bg-red-50 rounded-xl hover:bg-red-100 transition-all duration-300 hover:scale-[1.02] group"
                   >
-                    <Users className="w-7 h-7 text-red-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
-                    <p className="text-sm font-semibold text-gray-800">Find Donors</p>
-                  </button>
-                  <button
-                    onClick={handleInviteFriends}
-                    className="p-5 bg-red-50 rounded-xl hover:bg-red-100 transition-all duration-300 hover:scale-[1.02] group"
-                  >
-                    <Share2 className="w-7 h-7 text-red-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
-                    <p className="text-sm font-semibold text-gray-800">Invite Friends</p>
-                  </button>
-                  <button
-                    onClick={handleAvailableToday}
-                    disabled={availableTodayLoading}
-                    className={`p-5 rounded-xl transition-all duration-300 hover:scale-[1.02] group ${
-                      availabilityActiveUntil ? 'bg-red-100' : 'bg-red-50 hover:bg-red-100'
-                    } ${availableTodayLoading ? 'opacity-70' : ''}`}
-                  >
-                    <Clock className="w-7 h-7 text-red-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-                    <p className="text-sm font-semibold text-gray-800">
-                      {availableTodayLoading ? 'Updating...' : availableTodayLabel}
-                    </p>
-                    <p className="mt-1 text-[10px] text-gray-500">{availableTodayHint}</p>
-                  </button>
-                </div>
-              )}
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </NavLink>
+                );
+              })}
             </div>
-
-            <div className="grid gap-6 lg:grid-cols-3 items-start">
-              <div className="rounded-2xl border border-red-200 bg-white p-5 shadow-sm">
-                {isLoading ? (
-                  <div className="space-y-4">
-                    <div className="h-4 w-32 rounded-full bg-gray-100 animate-pulse" />
-                    <div className="h-6 w-64 rounded-full bg-gray-100 animate-pulse" />
-                    <div className="h-4 w-72 rounded-full bg-gray-100 animate-pulse" />
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-                      <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
-                      <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
-                      <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className="p-3 rounded-2xl bg-red-600">
-                          {eligibleToDonate ? (
-                            <CheckCircle className="w-6 h-6 text-white" />
-                          ) : (
-                            <Clock className="w-6 h-6 text-white" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-red-600">Eligibility</p>
-                          <h3 className="text-lg font-bold text-gray-900">
-                            {eligibleToDonate ? 'You\'re Eligible to Donate!' : 'Not Eligible to Donate'}
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            {lastDonationDate
-                              ? eligibleToDonate
-                                ? 'You can donate now. Thank you for staying ready!'
-                                : nextEligibleDate
-                                  ? `Next eligible on ${formatDate(nextEligibleDate)}`
-                                  : 'Record your last donation date to track eligibility.'
-                              : 'Record your last donation date to track eligibility.'}
-                          </p>
-                          {!eligibleToDonate && (
-                            <p className="text-xs text-gray-500 mt-1">Minimum recovery window is 90 days.</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-center">
-                        <p className="text-[10px] uppercase tracking-wide text-red-600">Next Eligible In</p>
-                        <p className="text-2xl font-bold text-red-700">
-                          {eligibleToDonate ? 0 : daysUntilEligible}
-                        </p>
-                        <p className="text-[11px] text-red-600/80">
-                          {eligibleToDonate ? 'days' : 'days remaining'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-                      <div>
-                        <label className="text-xs font-semibold text-gray-600">Last Donation Date</label>
-                        <input
-                          type="date"
-                          value={lastDonationInput}
-                          onChange={(event) => setLastDonationInput(event.target.value)}
-                          className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
-                        />
-                      </div>
-                      <div className="flex flex-col items-center gap-2 sm:items-end">
-                        <button
-                          type="button"
-                          onClick={handleSaveLastDonation}
-                          disabled={lastDonationSaving}
-                          className="w-full sm:w-auto px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-all duration-300 disabled:opacity-50"
-                        >
-                          {lastDonationSaving ? 'Saving...' : 'Save'}
-                        </button>
-                        {lastDonationSaved && (
-                          <span className="text-[11px] font-semibold text-red-600">Saved</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                        <p className="text-[10px] uppercase tracking-wide text-gray-500">Last Donation</p>
-                        <p className="text-sm font-semibold text-gray-800">
-                          {normalizedLastDonation ? formatDate(normalizedLastDonation) : 'Not set'}
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                        <p className="text-[10px] uppercase tracking-wide text-gray-500">Recovery Window</p>
-                        <p className="text-sm font-semibold text-gray-800">90 days</p>
-                      </div>
-                      <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                        <p className="text-[10px] uppercase tracking-wide text-gray-500">Eligible On</p>
-                        <p className="text-sm font-semibold text-gray-800">
-                          {nextEligibleDate ? formatDate(nextEligibleDate) : 'Now'}
-                        </p>
-                      </div>
-                    </div>
-                  </>
-                )}
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-800">Eligibility Checklist</h2>
-                  <p className="text-xs text-gray-500">Quick self-check before donating.</p>
-                </div>
-                <span className="text-xs font-semibold text-red-600">{checklistCompleted}/3 ready</span>
-              </div>
-              <div className="mt-4 space-y-3">
-                <button
-                  type="button"
-                  onClick={() => handleChecklistToggle('hydrated')}
-                  disabled={checklistSaving}
-                  className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-left transition-all duration-300 hover:bg-gray-100"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">Hydrated</p>
-                    <p className="text-xs text-gray-500">Had enough water in the last 24 hours.</p>
-                  </div>
-                  <CheckCircle className={`w-5 h-5 ${eligibilityChecklist.hydrated ? 'text-red-600' : 'text-gray-300'}`} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleChecklistToggle('weightOk')}
-                  disabled={checklistSaving}
-                  className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-left transition-all duration-300 hover:bg-gray-100"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">Weight Check</p>
-                    <p className="text-xs text-gray-500">Above 50 kg and feeling well.</p>
-                  </div>
-                  <CheckCircle className={`w-5 h-5 ${eligibilityChecklist.weightOk ? 'text-red-600' : 'text-gray-300'}`} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleChecklistToggle('hemoglobinOk')}
-                  disabled={checklistSaving}
-                  className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-left transition-all duration-300 hover:bg-gray-100"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">Hemoglobin Ready</p>
-                    <p className="text-xs text-gray-500">Hemoglobin above required level.</p>
-                  </div>
-                  <CheckCircle className={`w-5 h-5 ${eligibilityChecklist.hemoglobinOk ? 'text-red-600' : 'text-gray-300'}`} />
-                </button>
-              </div>
-              <div className="mt-4 flex items-center justify-between text-[11px] text-gray-500">
-                <span>
-                  {checklistUpdatedAt ? `Updated ${formatDateTime(checklistUpdatedAt)}` : 'Not updated yet'}
-                </span>
-                {checklistSaving && <span className="text-red-600">Saving...</span>}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-800">Referral Impact</h2>
-                  <p className="text-xs text-gray-500">Track donors who joined through you.</p>
-                </div>
-                <div className="p-2 rounded-lg bg-red-50">
-                  <Users className="w-5 h-5 text-red-600" />
-                </div>
-              </div>
-              {referralLoading ? (
-                <div className="mt-4 space-y-3">
-                  <div className="h-4 w-24 rounded-full bg-gray-100 animate-pulse" />
-                  <div className="h-8 w-16 rounded-full bg-gray-100 animate-pulse" />
-                  <div className="h-3 w-40 rounded-full bg-gray-100 animate-pulse" />
-                  <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-                </div>
-              ) : (
-                <>
-                  <div className="mt-4 flex items-end justify-between">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-gray-500">Total Referrals</p>
-                      <p className="text-3xl font-bold text-gray-900">{referralCount}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[11px] uppercase tracking-wide text-gray-500">Milestone</p>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {referralMilestone.next ? `${referralMilestone.next} donors` : referralMilestone.label}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-xs text-gray-600">
-                    {referralMilestone.next
-                      ? `${referralMilestone.remaining} more donor${referralMilestone.remaining === 1 ? '' : 's'} to reach the next milestone.`
-                      : 'You are a Legend Referrer!'}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={copyInviteLink}
-                    className="mt-4 w-full rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition-all duration-300 hover:bg-red-50"
-                  >
-                    Copy Referral Link
-                  </button>
-                </>
-              )}
-            </div>
-            </div>
+          </aside>
+          <div className="lg:hidden mb-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm"
+            >
+              <Menu className="h-4 w-4 text-red-600" />
+              Menu
+            </button>
+            <span className="text-xs uppercase tracking-[0.2em] text-red-600">Dashboard</span>
           </div>
-        </div>
-
-        {/* Urgent Nearby */}
-        <div className="mb-10">
-          <div className="mb-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-red-600">Urgent Nearby</p>
-            <h2 className="text-xl font-bold text-gray-900">Emergency requests</h2>
-          </div>
-          <div className="bg-white rounded-2xl shadow-xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-800 flex items-center">
-                <AlertCircle className="w-6 h-6 mr-2 text-red-500" />
-                Nearby Emergency Requests
-              </h2>
-              <span className="px-3 py-1 bg-red-100 text-red-600 rounded-full text-sm font-semibold">
-                {emergencyRequests.length} Active
-              </span>
-            </div>
-            <div className="space-y-4">
-              {isLoading ? (
-                Array.from({ length: 3 }).map((_, index) => (
-                  <div
-                    key={`request-skeleton-${index}`}
-                    className="p-4 border-2 border-gray-100 rounded-xl bg-gray-50"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="p-3 rounded-xl bg-gray-100 animate-pulse w-12 h-12" />
-                        <div className="space-y-2">
-                          <div className="h-4 w-48 rounded-full bg-gray-100 animate-pulse" />
-                          <div className="h-3 w-40 rounded-full bg-gray-100 animate-pulse" />
-                          <div className="h-3 w-24 rounded-full bg-gray-100 animate-pulse" />
-                        </div>
-                      </div>
-                      <div className="h-8 w-20 rounded-xl bg-gray-100 animate-pulse" />
-                    </div>
-                  </div>
-                ))
-              ) : emergencyRequests.length > 0 ? (
-                emergencyRequests.map((request) => (
-                  <div
-                    key={request.id}
-                    className={`p-4 border-2 rounded-xl transition-all duration-300 cursor-pointer ${
-                      request.urgency === 'critical'
-                        ? 'border-red-300 bg-red-50 hover:bg-red-100'
-                        : request.urgency === 'high'
-                        ? 'border-red-200 bg-red-50/70 hover:bg-red-100/80'
-                        : 'border-red-100 bg-white hover:bg-red-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className={`p-3 rounded-xl ${
-                          request.urgency === 'critical' ? 'bg-red-600' :
-                          request.urgency === 'high' ? 'bg-red-500' : 'bg-red-400'
-                        }`}>
-                          <Droplet className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-gray-800 mb-1">
-                            Urgent: {request.bloodType} - {request.units} Units needed
-                          </h3>
-                          <p className="text-sm text-gray-600 flex items-center">
-                            <MapPin className="w-4 h-4 mr-1" />
-                            {request.hospitalName}, {request.city}
-                            {request.distance && ` - ${request.distance.toFixed(1)} km away`}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Posted {formatTime(request.requestedAt)}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleRespondToRequest(request.id)}
-                        disabled={responding}
-                        className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all duration-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-                      >
-                        {responding ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Sending...</span>
-                          </>
-                        ) : (
-                          <span>Respond</span>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-8">
-                  <CheckCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-                  <p className="text-gray-600">No emergency requests matching your blood type at the moment.</p>
-                </div>
-              )}
-            </div>
-            {emergencyRequests.length > 0 && (
-              <button
-                onClick={handleViewAllRequests}
-                className="w-full mt-4 py-3 text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300"
-              >
-                View All Requests →
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Your Journey */}
-        <div className="mb-10">
-          <div className="mb-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-red-600">Your Journey</p>
-            <h2 className="text-xl font-bold text-gray-900">Donations and achievements</h2>
-          </div>
-          <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                <Activity className="w-6 h-6 mr-2 text-red-600" />
-                Donation History
-              </h2>
-              {isLoading ? (
-                <div className="space-y-4">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div
-                      key={`donation-skeleton-${index}`}
-                      className="p-4 bg-gray-50 rounded-xl border border-gray-100"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className="h-12 w-12 rounded-xl bg-gray-100 animate-pulse" />
-                        <div className="flex-1 space-y-2">
-                          <div className="h-4 w-40 rounded-full bg-gray-100 animate-pulse" />
-                          <div className="h-3 w-32 rounded-full bg-gray-100 animate-pulse" />
-                          <div className="h-3 w-24 rounded-full bg-gray-100 animate-pulse" />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : donationHistory.length > 0 ? (
-                <div className="space-y-4">
-                  {donationHistory.map((donation) => {
-                    const isSelfReported = donation.source === 'manual';
-                    const feedbackEntry = donationFeedbackMap[donation.id];
-                    const isFeedbackOpen = feedbackOpenId === donation.id;
-                    const displayCertificateUrl = donation.certificateUrl || feedbackEntry?.certificateUrl;
-                    const hasFeedback = Boolean(
-                      feedbackEntry?.rating || feedbackEntry?.notes || feedbackEntry?.certificateUrl
-                    );
-                    return (
-                      <div
-                        key={donation.id}
-                        className="rounded-xl border border-gray-100 bg-gray-50 p-4 transition-all duration-300 hover:bg-gray-100"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-start space-x-4">
-                            <div className="p-3 bg-red-100 rounded-xl">
-                              <Droplet className="w-6 h-6 text-red-600" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="font-semibold text-gray-800">
-                                  {donation.bloodBank || 'Donation'}
-                                </h3>
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-white border border-red-200 text-red-600">
-                                  {isSelfReported ? 'Self Reported' : 'Verified'}
-                                </span>
-                              </div>
-                              <p className="text-sm text-gray-600">{donation.location || 'Location not set'}</p>
-                              <p className="text-xs text-gray-500">
-                                {formatDate(donation.date)} • {donation.units} unit{donation.units === 1 ? '' : 's'}
-                              </p>
-                              {donation.notes && (
-                                <p className="text-xs text-gray-500 mt-1">{donation.notes}</p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleStartDonationEdit(donation)}
-                              className="p-2 hover:bg-white rounded-lg transition-all duration-300"
-                              title="Edit donation"
-                            >
-                              <Edit3 className="w-4 h-4 text-gray-600" />
-                            </button>
-                            {displayCertificateUrl && (
-                              <button
-                                onClick={() => handleDownloadCertificate(displayCertificateUrl || '')}
-                                className="p-2 hover:bg-white rounded-lg transition-all duration-300"
-                                title="Download certificate"
-                              >
-                                <Download className="w-5 h-5 text-gray-600" />
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenFeedback(donation.id)}
-                              className="p-2 hover:bg-white rounded-lg transition-all duration-300"
-                              title={hasFeedback ? 'Edit feedback' : 'Add feedback'}
-                            >
-                              <MessageCircle className="w-4 h-4 text-gray-600" />
-                            </button>
-                          </div>
-                        </div>
-                        {editingDonationId === donation.id && (
-                          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                            <div className="sm:col-span-2">
-                              <label className="text-xs font-semibold text-gray-600">Location</label>
-                              <input
-                                type="text"
-                                value={editingDonationData.location}
-                                onChange={(event) => setEditingDonationData((prev) => ({
-                                  ...prev,
-                                  location: event.target.value,
-                                }))}
-                                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs font-semibold text-gray-600">Units</label>
-                              <input
-                                type="number"
-                                min="1"
-                                value={editingDonationData.units}
-                                onChange={(event) => setEditingDonationData((prev) => ({
-                                  ...prev,
-                                  units: Number(event.target.value),
-                                }))}
-                                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
-                              />
-                            </div>
-                            <div className="sm:col-span-3">
-                              <label className="text-xs font-semibold text-gray-600">Notes</label>
-                              <textarea
-                                value={editingDonationData.notes}
-                                onChange={(event) => setEditingDonationData((prev) => ({
-                                  ...prev,
-                                  notes: event.target.value,
-                                }))}
-                                rows={2}
-                                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
-                              />
-                            </div>
-                            <div className="flex flex-col sm:flex-row gap-2 sm:col-span-3">
-                              <button
-                                type="button"
-                                onClick={handleDonationEditSave}
-                                disabled={donationEditSaving}
-                                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-all duration-300 disabled:opacity-50"
-                              >
-                                <Save className="w-4 h-4" />
-                                {donationEditSaving ? 'Saving...' : 'Save Changes'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleCancelDonationEdit}
-                                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-all duration-300"
-                              >
-                                <XCircle className="w-4 h-4" />
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                        {!isFeedbackOpen && hasFeedback && (
-                          <div className="mt-4 rounded-xl border border-red-100 bg-white/80 px-4 py-3">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-[10px] uppercase tracking-wide text-gray-500">Feedback</p>
-                                <div className="mt-1 flex items-center gap-1">
-                                  {[1, 2, 3, 4, 5].map((value) => (
-                                    <Star
-                                      key={`feedback-star-${donation.id}-${value}`}
-                                      className={`h-4 w-4 ${
-                                        (feedbackEntry?.rating || 0) >= value
-                                          ? 'text-yellow-400 fill-yellow-400'
-                                          : 'text-gray-300'
-                                      }`}
-                                    />
-                                  ))}
-                                </div>
-                                {feedbackEntry?.notes && (
-                                  <p className="text-xs text-gray-600 mt-1">{feedbackEntry.notes}</p>
-                                )}
-                              </div>
-                              {displayCertificateUrl && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDownloadCertificate(displayCertificateUrl || '')}
-                                  className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-50 transition-all duration-300"
-                                >
-                                  <Download className="h-3 w-3" />
-                                  Certificate
-                                </button>
-                              )}
-                            </div>
-                            {feedbackEntry?.updatedAt && (
-                              <p className="mt-2 text-[11px] text-gray-500">
-                                Updated {formatDateTime(feedbackEntry.updatedAt)}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                        {isFeedbackOpen && (
-                          <div className="mt-4 rounded-xl border border-red-100 bg-white px-4 py-4">
-                            <p className="text-[11px] uppercase tracking-wide text-red-600">Post-donation feedback</p>
-                            <div className="mt-3 flex items-center justify-between">
-                              <span className="text-sm font-semibold text-gray-800">Rating</span>
-                              <div className="flex items-center gap-1">
-                                {[1, 2, 3, 4, 5].map((value) => (
-                                  <button
-                                    key={`rating-${donation.id}-${value}`}
-                                    type="button"
-                                    onClick={() => setFeedbackForm((prev) => ({ ...prev, rating: value }))}
-                                    className="rounded-full p-1"
-                                  >
-                                    <Star
-                                      className={`h-5 w-5 ${
-                                        feedbackForm.rating >= value
-                                          ? 'text-yellow-400 fill-yellow-400'
-                                          : 'text-gray-300'
-                                      }`}
-                                    />
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="mt-3">
-                              <label className="text-xs font-semibold text-gray-600">Notes</label>
-                              <textarea
-                                value={feedbackForm.notes}
-                                onChange={(event) => setFeedbackForm((prev) => ({
-                                  ...prev,
-                                  notes: event.target.value,
-                                }))}
-                                rows={3}
-                                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
-                                placeholder="Share your experience"
-                              />
-                            </div>
-                            <div className="mt-3">
-                              <label className="text-xs font-semibold text-gray-600">Certificate URL</label>
-                              <input
-                                type="url"
-                                value={feedbackForm.certificateUrl}
-                                onChange={(event) => setFeedbackForm((prev) => ({
-                                  ...prev,
-                                  certificateUrl: event.target.value,
-                                }))}
-                                className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
-                                placeholder="https://"
-                              />
-                            </div>
-                            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                              <button
-                                type="button"
-                                onClick={() => handleSaveFeedback(donation.id)}
-                                disabled={feedbackSaving}
-                                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-all duration-300 disabled:opacity-50"
-                              >
-                                <MessageCircle className="h-4 w-4" />
-                                {feedbackSaving ? 'Saving...' : 'Save Feedback'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleCancelFeedback}
-                                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-all duration-300"
-                              >
-                                <XCircle className="h-4 w-4" />
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="p-4 bg-gray-100 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
-                    <Activity className="w-10 h-10 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">No Donations Yet</h3>
-                  <p className="text-gray-600 mb-4">Start your journey as a lifesaver today!</p>
-                  <button
-                    onClick={handleBookDonation}
-                    className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:from-red-700 hover:to-red-800 transition-all duration-300"
-                  >
-                    Book Your First Donation
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                <Trophy className="w-5 h-5 mr-2 text-red-600" />
-                Achievements
-              </h2>
-              {isLoading ? (
-                <div className="grid grid-cols-3 gap-3">
-                  {Array.from({ length: 6 }).map((_, index) => (
-                    <div key={`badge-skeleton-${index}`} className="h-16 rounded-xl bg-gray-100 animate-pulse" />
-                  ))}
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-3 gap-3">
-                    {badges.map((badge) => (
-                      <div
-                        key={badge.id}
-                        className={`p-4 rounded-xl text-center transition-all duration-300 ${
-                          badge.earned
-                            ? 'bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-200 hover:scale-110'
-                            : 'bg-gray-50 opacity-50'
-                        }`}
-                        title={badge.description}
-                      >
-                        <div className="text-3xl mb-2">{badge.icon}</div>
-                        <p className="text-xs font-semibold text-gray-700">{badge.name}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={handleViewAllBadges}
-                    className="w-full mt-4 py-2 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300"
-                  >
-                    View All Badges →
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Community & Account */}
-        <div className="mb-10">
-          <div className="mb-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-red-600">Community & Account</p>
-            <h2 className="text-xl font-bold text-gray-900">Stay connected and manage your profile</h2>
-          </div>
-          <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-            <div className="space-y-6">
-              <div className="bg-white rounded-2xl shadow-xl p-6">
-                <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                  <MapPinned className="w-5 h-5 mr-2 text-red-600" />
-                  Nearby Blood Camps
-                </h2>
-                {isLoading ? (
-                  <div className="space-y-3">
-                    {Array.from({ length: 3 }).map((_, index) => (
-                      <div key={`camp-skeleton-${index}`} className="h-16 rounded-xl bg-gray-100 animate-pulse" />
-                    ))}
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-3">
-                      {bloodCamps.length > 0 ? (
-                        bloodCamps.map((camp) => (
-                          <div key={camp.id} className="p-3 bg-red-50 rounded-xl border-2 border-red-200 hover:bg-red-100 transition-all duration-300 cursor-pointer">
-                            <h3 className="font-semibold text-gray-800 text-sm mb-1">{camp.name}</h3>
-                            <p className="text-xs text-gray-600 flex items-center mb-1">
-                              <MapPin className="w-3 h-3 mr-1" />
-                              {camp.location}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {formatDate(camp.date)}, {camp.startTime} - {camp.endTime}
-                            </p>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-gray-500 text-center py-4">No upcoming blood camps in your area</p>
-                      )}
-                    </div>
-                    {bloodCamps.length > 0 && (
-                      <button
-                        onClick={handleViewAllCamps}
-                        className="w-full mt-4 py-2 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300"
-                      >
-                        View All Camps →
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-xl p-6 border-2 border-red-100">
-                <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center">
-                  <BookOpen className="w-5 h-5 mr-2 text-red-600" />
-                  Today's Health Tip
-                </h2>
-                {isLoading ? (
-                  <div className="space-y-3">
-                    <div className="h-4 w-full rounded-full bg-gray-100 animate-pulse" />
-                    <div className="h-4 w-3/4 rounded-full bg-gray-100 animate-pulse" />
-                    <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-sm text-gray-700 mb-4">
-                      💧 Drink plenty of water before and after donation to help your body replenish fluids quickly. Aim for 8-10 glasses of water daily!
-                    </p>
-                    <button
-                      onClick={handleLearnMore}
-                      className="w-full py-2 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-all duration-300"
-                    >
-                      Learn More
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="relative overflow-hidden rounded-2xl border border-red-200 bg-gradient-to-br from-white via-red-50 to-white p-6 shadow-xl transition-transform duration-300 hover:-translate-y-1 animate-fadeIn">
-                <div className="absolute -top-20 -right-20 w-40 h-40 bg-red-100/70 rounded-full blur-2xl"></div>
-                <div className="absolute -bottom-24 -left-24 w-44 h-44 bg-red-100/60 rounded-full blur-2xl"></div>
-                {isLoading ? (
-                  <div className="relative space-y-5">
-                    <div className="h-3 w-40 rounded-full bg-gray-100 animate-pulse" />
-                    <div className="h-6 w-48 rounded-full bg-gray-100 animate-pulse" />
-                    <div className="h-4 w-32 rounded-full bg-gray-100 animate-pulse" />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-                      <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-                      <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-                      <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-                    </div>
-                    <div className="h-6 w-28 rounded-full bg-gray-100 animate-pulse" />
-                  </div>
-                ) : (
-                  <div className="relative space-y-6">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.25em] text-red-600">BloodHub Donor Card</p>
-                        <h2 className="mt-2 text-2xl font-bold text-gray-900">
-                          {user?.displayName || 'Donor'}
-                        </h2>
-                        <p className="text-sm text-gray-500">{user?.city || 'Location not set'}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <span className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                          availabilityEnabled
-                            ? 'bg-red-600 text-white'
-                            : 'bg-gray-200 text-gray-700'
-                        }`}>
-                          {availabilityEnabled ? 'Available' : 'On Break'}
-                        </span>
-                        <span className="rounded-full border border-red-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600">
-                          Verified Donor
-                        </span>
-                        <div className="rounded-2xl bg-red-600 px-4 py-3 text-white text-xl font-bold shadow-lg">
-                          {user?.bloodType || '—'}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                      {shareOptions.showBhId && (
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-gray-500">BH ID</p>
-                          <p className="font-semibold text-gray-900">{user?.bhId || 'Pending'}</p>
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-gray-500">Last Donation</p>
-                        <p className="font-semibold text-gray-900">
-                          {normalizedLastDonation ? formatDate(normalizedLastDonation) : 'Not recorded'}
-                        </p>
-                      </div>
-                      {shareOptions.showPhone && (
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-gray-500">Phone</p>
-                          <p className="font-semibold text-gray-900 text-xs break-all">
-                            {user?.phoneNumber || 'Not set'}
-                          </p>
-                        </div>
-                      )}
-                      {shareOptions.showEmail && (
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-gray-500">Email</p>
-                          <p className="font-semibold text-gray-900 text-xs break-all">
-                            {user?.email || 'Not set'}
-                          </p>
-                        </div>
-                      )}
-                      {shareOptions.showQr && qrCodeDataUrl && (
-                        <div className="sm:col-span-2 flex items-center justify-between rounded-xl border border-red-100 bg-white/80 px-4 py-3">
-                          <div>
-                            <p className="text-[11px] uppercase tracking-wide text-gray-500">Share QR</p>
-                            <p className="text-xs text-gray-600">Scan to open your donor profile link.</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setQrPreviewOpen(true)}
-                            className="rounded-lg border border-red-100 bg-white p-1 transition-transform duration-300 hover:scale-105"
-                            aria-label="Open QR preview"
-                          >
-                            <img
-                              src={qrCodeDataUrl}
-                              alt="BH ID QR"
-                              className="h-16 w-16 shrink-0"
-                            />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] uppercase tracking-[0.2em] text-gray-400">
-                      <span>BloodHub India</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setShareOptionsOpen(true)}
-                          className="flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600 transition-all duration-300 hover:bg-red-50"
-                        >
-                          <SlidersHorizontal className="w-3 h-3" />
-                          Customize
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleShareDonorCard}
-                          disabled={shareCardLoading}
-                          className="flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600 transition-all duration-300 hover:bg-red-50 disabled:opacity-50"
-                        >
-                          <Share2 className="w-3 h-3" />
-                          {shareCardLoading ? 'Preparing' : 'Share Card'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-xl p-6">
-                <h2 className="text-lg font-bold text-gray-800 mb-4">Linked Accounts</h2>
-                {isLoading ? (
-                  <div className="space-y-4">
-                    <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
-                    <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
-                    <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">Availability</p>
-                        <p className="text-xs text-gray-500">Control emergency notifications.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleAvailabilityToggle}
-                        disabled={availabilitySaving}
-                        role="switch"
-                        aria-checked={availabilityEnabled}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 ${
-                          availabilityEnabled ? 'bg-red-600' : 'bg-gray-300'
-                        } ${availabilitySaving ? 'opacity-60' : ''}`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                            availabilityEnabled ? 'translate-x-5' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                    {availabilityExpiryLabel && availabilityEnabled && (
-                      <p className="text-[11px] text-gray-500">
-                        Available until {availabilityExpiryLabel}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">Emergency Alerts</p>
-                        <p className="text-xs text-gray-500">Get notified about urgent requests.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleEmergencyAlertsToggle}
-                        disabled={emergencyAlertsSaving || !availabilityEnabled}
-                        role="switch"
-                        aria-checked={emergencyAlertsEnabled}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 ${
-                          emergencyAlertsEnabled ? 'bg-red-600' : 'bg-gray-300'
-                        } ${emergencyAlertsSaving || !availabilityEnabled ? 'opacity-60' : ''}`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                            emergencyAlertsEnabled ? 'translate-x-5' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600 flex items-center">
-                        <Phone className="w-4 h-4 mr-2 text-red-600" />
-                        Phone
-                      </span>
-                      <span className={`text-xs font-semibold ${isPhoneLinked ? 'text-red-600' : 'text-gray-400'}`}>
-                        {isPhoneLinked ? 'Linked' : 'Not linked'}
-                      </span>
-                    </div>
-                    {isPhoneLinked && (
-                      <button
-                        type="button"
-                        onClick={handlePhoneUnlink}
-                        disabled={!canUnlinkPhone || unlinkPhoneLoading}
-                        className="w-full py-2 px-4 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all duration-300 disabled:opacity-50"
-                      >
-                        {unlinkPhoneLoading ? 'Unlinking...' : 'Unlink Phone'}
-                      </button>
-                    )}
-                    {!isPhoneLinked && (
-                      <div className="space-y-3">
-                        <PhoneInput
-                          international
-                          defaultCountry="IN"
-                          countryCallingCodeEditable={false}
-                          value={linkPhoneNumber}
-                          onChange={(value) => setLinkPhoneNumber(value || '')}
-                          className="block w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors text-sm"
-                        />
-                        <button
-                          type="button"
-                          onClick={handlePhoneLinkStart}
-                          disabled={linkPhoneLoading}
-                          className="w-full py-2 px-4 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-all duration-300 disabled:opacity-50"
-                        >
-                          {linkPhoneLoading ? 'Sending OTP...' : 'Send OTP'}
-                        </button>
-                        {linkConfirmation && (
-                          <div className="space-y-2">
-                            <input
-                              type="text"
-                              value={linkOtp}
-                              onChange={(e) => setLinkOtp(e.target.value)}
-                              maxLength={6}
-                              placeholder="Enter OTP"
-                              className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors text-center text-sm font-semibold tracking-widest"
-                            />
-                            <button
-                              type="button"
-                              onClick={handlePhoneLinkConfirm}
-                              disabled={linkPhoneLoading}
-                              className="w-full py-2 px-4 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all duration-300 disabled:opacity-50"
-                            >
-                              {linkPhoneLoading ? 'Verifying...' : 'Verify & Link'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handlePhoneLinkResend}
-                              disabled={linkPhoneLoading}
-                              className="w-full py-2 px-4 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300 disabled:opacity-50"
-                            >
-                              Resend OTP
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600 flex items-center">
-                        <Chrome className="w-4 h-4 mr-2 text-red-600" />
-                        Google
-                      </span>
-                      <span className={`text-xs font-semibold ${isGoogleLinked ? 'text-red-600' : 'text-gray-400'}`}>
-                        {isGoogleLinked ? 'Linked' : 'Not linked'}
-                      </span>
-                    </div>
-                    {isGoogleLinked && (
-                      <button
-                        type="button"
-                        onClick={handleGoogleUnlink}
-                        disabled={!canUnlinkGoogle || unlinkGoogleLoading}
-                        className="w-full py-2 px-4 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all duration-300 disabled:opacity-50"
-                      >
-                        {unlinkGoogleLoading ? 'Unlinking...' : 'Unlink Google'}
-                      </button>
-                    )}
-                    {!isGoogleLinked && (
-                      <button
-                        type="button"
-                        onClick={handleGoogleLink}
-                        disabled={linkGoogleLoading}
-                        className="w-full py-2 px-4 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-all duration-300 disabled:opacity-50"
-                      >
-                        {linkGoogleLoading ? 'Linking...' : 'Link Google'}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <main className="min-w-0 flex-1">
+            <Outlet context={dashboardContext} />
+          </main>
         </div>
       </div>
-
+      <div
+        className={`fixed inset-0 z-50 lg:hidden transition-opacity duration-300 ${
+          mobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        aria-hidden={!mobileMenuOpen}
+      >
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-label="Close menu overlay"
+        />
+        <div
+          className={`absolute left-0 top-0 h-full w-72 bg-white p-4 shadow-2xl transition-transform duration-300 ${
+            mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-900">Donor Menu</p>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(false)}
+              className="rounded-full p-2 hover:bg-gray-100"
+              aria-label="Close menu"
+            >
+              <X className="h-5 w-5 text-gray-600" />
+            </button>
+          </div>
+          <nav className="space-y-2">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={`mobile-${item.id}`}
+                  to={item.to}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={({ isActive }) => (
+                    `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-all ${isActive ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md' : 'text-gray-600 hover:bg-red-50'}`
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </NavLink>
+              );
+            })}
+          </nav>
+        </div>
+      </div>
       {/* Modals */}
       {/* View All Emergency Requests Modal */}
       {showAllRequests && (
