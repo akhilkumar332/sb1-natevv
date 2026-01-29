@@ -35,7 +35,7 @@ const resolveReferrerByBhId = async (bhId?: string | null): Promise<ResolveResul
   };
 };
 
-export const applyReferralTrackingForUser = async (newUserUid: string): Promise<ReferralApplyResult | null> => {
+export const resolveReferralContext = async (newUserUid: string): Promise<ReferralApplyResult | null> => {
   let referralBhId = getReferralTracking();
   let referralUid = getReferralReferrerUid();
 
@@ -57,45 +57,53 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
 
   if (!referralBhId && !referralUid) return null;
 
-  try {
-    let referrerUid: string | null = referralUid;
-    let referrerBhId: string | undefined = referralBhId || undefined;
+  let referrerUid: string | null = referralUid;
+  let referrerBhId: string | undefined = referralBhId || undefined;
 
-    if (referrerUid) {
-      try {
-        const referrerDoc = await getDoc(doc(db, 'users', referrerUid));
-        if (referrerDoc.exists()) {
-          const referrerData = referrerDoc.data();
-          referrerBhId = referrerData?.bhId || referrerBhId;
-        } else if (referrerBhId) {
-          const bhIdFallback = await resolveReferrerByBhId(referrerBhId);
-          if (bhIdFallback) {
-            referrerUid = bhIdFallback.uid;
-            referrerBhId = bhIdFallback.bhId;
-          }
+  if (referrerUid) {
+    try {
+      const referrerDoc = await getDoc(doc(db, 'users', referrerUid));
+      if (referrerDoc.exists()) {
+        const referrerData = referrerDoc.data();
+        referrerBhId = referrerData?.bhId || referrerBhId;
+      } else if (referrerBhId) {
+        const bhIdFallback = await resolveReferrerByBhId(referrerBhId);
+        if (bhIdFallback) {
+          referrerUid = bhIdFallback.uid;
+          referrerBhId = bhIdFallback.bhId;
         }
-      } catch (error) {
-        console.warn('Failed to resolve referrer by UID, proceeding with UID fallback:', error);
       }
-    } else if (referralBhId) {
-      const bhIdLookup = await resolveReferrerByBhId(referralBhId);
-      if (!bhIdLookup) {
-        clearReferralTracking();
-        return null;
-      }
-      referrerUid = bhIdLookup.uid;
-      referrerBhId = bhIdLookup.bhId;
+    } catch (error) {
+      console.warn('Failed to resolve referrer by UID, proceeding with UID fallback:', error);
     }
-
-    if (!referrerUid) {
+  } else if (referralBhId) {
+    const bhIdLookup = await resolveReferrerByBhId(referralBhId);
+    if (!bhIdLookup) {
       clearReferralTracking();
       return null;
     }
+    referrerUid = bhIdLookup.uid;
+    referrerBhId = bhIdLookup.bhId;
+  }
 
-    if (referrerUid === newUserUid) {
-      clearReferralTracking();
-      return null;
-    }
+  if (!referrerUid) {
+    clearReferralTracking();
+    return null;
+  }
+
+  if (referrerUid === newUserUid) {
+    clearReferralTracking();
+    return null;
+  }
+
+  return { referrerUid, referrerBhId };
+};
+
+export const applyReferralTrackingForUser = async (newUserUid: string): Promise<ReferralApplyResult | null> => {
+  try {
+    const resolved = await resolveReferralContext(newUserUid);
+    if (!resolved) return null;
+    const { referrerUid, referrerBhId } = resolved;
 
     const referralDocId = `${referrerUid}_${newUserUid}`;
     const referralRef = doc(db, 'ReferralTracking', referralDocId);
