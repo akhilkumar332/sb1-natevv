@@ -32,8 +32,8 @@ const DonorReadiness = () => {
         <p className="text-xs uppercase tracking-[0.3em] text-red-600">Readiness</p>
         <h2 className="text-xl font-bold text-gray-900">Eligibility and preparation</h2>
       </div>
-      <div className="grid gap-6 lg:grid-cols-3 items-start">
-        <div className="rounded-2xl border border-red-200 bg-white p-5 shadow-sm">
+      <div className="grid gap-6 md:grid-cols-2 items-stretch">
+        <div className="rounded-2xl border border-red-200 bg-white p-5 shadow-sm h-full">
           {isLoading ? (
             <div className="space-y-4">
               <div className="h-4 w-32 rounded-full bg-gray-100 animate-pulse" />
@@ -135,7 +135,7 @@ const DonorReadiness = () => {
           )}
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-6">
+        <div className="bg-white rounded-2xl shadow-xl p-6 h-full">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-lg font-bold text-gray-800">Eligibility Checklist</h2>
@@ -189,7 +189,7 @@ const DonorReadiness = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-6 border-2 border-red-100">
+        <div className="bg-white rounded-2xl shadow-xl p-6 border-2 border-red-100 h-full">
           <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center">
             <BookOpen className="w-5 h-5 mr-2 text-red-600" />
             Today's Health Tip

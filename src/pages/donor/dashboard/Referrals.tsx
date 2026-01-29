@@ -20,7 +20,7 @@ const DonorReferrals = () => {
         <p className="text-xs uppercase tracking-[0.3em] text-red-600">Referrals</p>
         <h2 className="text-xl font-bold text-gray-900">Your referral impact</h2>
       </div>
-      <div className="space-y-6">
+      <div className="grid gap-6 md:grid-cols-2">
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex items-start justify-between">
             <div>
