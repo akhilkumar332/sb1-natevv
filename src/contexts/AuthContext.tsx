@@ -132,6 +132,66 @@ export class PhoneAuthError extends Error {
 }
 
 const pendingPhoneLinkKey = 'pendingPhoneLink';
+const userCacheKey = 'bh_user_cache';
+const userCacheAtKey = 'bh_user_cache_at';
+const userCacheTtlMs = 24 * 60 * 60 * 1000;
+
+const parseCachedDate = (value?: string | null) => {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+};
+
+const serializeUserForCache = (user: User) => ({
+  ...user,
+  createdAt: user.createdAt ? user.createdAt.toISOString() : undefined,
+  lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : undefined,
+  lastDonation: user.lastDonation ? user.lastDonation.toISOString() : undefined,
+  dateOfBirth: user.dateOfBirth ? user.dateOfBirth.toISOString() : undefined,
+  availableUntil: user.availableUntil ? user.availableUntil.toISOString() : null,
+  eligibilityChecklist: user.eligibilityChecklist
+    ? {
+        ...user.eligibilityChecklist,
+        updatedAt: user.eligibilityChecklist.updatedAt
+          ? user.eligibilityChecklist.updatedAt.toISOString()
+          : undefined,
+      }
+    : undefined,
+});
+
+const hydrateCachedUser = (raw: any): User => ({
+  ...raw,
+  createdAt: parseCachedDate(raw?.createdAt),
+  lastLoginAt: parseCachedDate(raw?.lastLoginAt),
+  lastDonation: parseCachedDate(raw?.lastDonation),
+  dateOfBirth: parseCachedDate(raw?.dateOfBirth),
+  availableUntil: raw?.availableUntil ? parseCachedDate(raw.availableUntil) || null : null,
+  eligibilityChecklist: raw?.eligibilityChecklist
+    ? {
+        ...raw.eligibilityChecklist,
+        updatedAt: parseCachedDate(raw.eligibilityChecklist?.updatedAt),
+      }
+    : undefined,
+});
+
+const readCachedUser = (): User | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const authToken = localStorage.getItem('authToken');
+    if (!authToken) return null;
+    const cachedAt = localStorage.getItem(userCacheAtKey);
+    if (cachedAt && Date.now() - Number(cachedAt) > userCacheTtlMs) {
+      localStorage.removeItem(userCacheKey);
+      localStorage.removeItem(userCacheAtKey);
+      return null;
+    }
+    const raw = localStorage.getItem(userCacheKey);
+    if (!raw) return null;
+    return hydrateCachedUser(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+};
 
 const savePendingPhoneLink = (data: {
   verificationId: string;
@@ -287,8 +347,9 @@ const updateUserInFirestore = async (
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const initialCachedUser = readCachedUser();
+  const [user, setUser] = useState<User | null>(initialCachedUser);
+  const [loading, setLoading] = useState(!initialCachedUser);
   const [authLoading, setAuthLoading] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const logoutChannel = new BroadcastChannel('auth_logout');
@@ -387,6 +448,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logoutChannel.close();
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const authToken = localStorage.getItem('authToken');
+      if (!authToken || !user) {
+        localStorage.removeItem(userCacheKey);
+        localStorage.removeItem(userCacheAtKey);
+        return;
+      }
+      localStorage.setItem(userCacheKey, JSON.stringify(serializeUserForCache(user)));
+      localStorage.setItem(userCacheAtKey, Date.now().toString());
+    } catch (error) {
+      console.warn('Failed to update user cache:', error);
+    }
+  }, [user]);
 
   const loginWithPhone = async (phoneNumber: string): Promise<ConfirmationResult> => {
     setLoginLoading(true);
@@ -978,6 +1055,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Clear any other auth-related storage
       localStorage.removeItem('user');
       localStorage.removeItem('lastLoginTime');
+      localStorage.removeItem(userCacheKey);
+      localStorage.removeItem(userCacheAtKey);
       
       // Optional: Clear any cached data
       indexedDB.deleteDatabase('firebaseLocalStorageDb');

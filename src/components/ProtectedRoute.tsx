@@ -5,11 +5,11 @@ import Loading from './Loading';
 import { toast } from 'react-hot-toast';
 
 const ProtectedRoute = () => {
-  const { user, authLoading } = useAuth();
+  const { user, authLoading, loading } = useAuth();
   const location = useLocation();
   const lastDeniedRef = useRef<string | null>(null);
 
-  if (authLoading) {
+  if (authLoading || loading) {
     return <Loading />;
   }
 
