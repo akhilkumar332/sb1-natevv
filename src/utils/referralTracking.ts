@@ -1,6 +1,8 @@
 const referralCookieName = 'bh_referrer';
 const referralStorageKey = 'bh_referrer_meta';
 const referralUidStorageKey = 'bh_referrer_uid';
+const referralSessionKey = 'bh_referrer_meta_session';
+const referralUidSessionKey = 'bh_referrer_uid_session';
 const referralMaxAgeDays = 30;
 
 type ReferralMeta = {
@@ -31,6 +33,33 @@ const removeCookie = () => {
   document.cookie = `${referralCookieName}=; max-age=0; path=/`;
 };
 
+const safeSet = (storage: Storage | undefined, key: string, value: string) => {
+  if (!storage) return;
+  try {
+    storage.setItem(key, value);
+  } catch {
+    // Storage may be unavailable (private mode, quota, etc.)
+  }
+};
+
+const safeGet = (storage: Storage | undefined, key: string) => {
+  if (!storage) return null;
+  try {
+    return storage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const safeRemove = (storage: Storage | undefined, key: string) => {
+  if (!storage) return;
+  try {
+    storage.removeItem(key);
+  } catch {
+    // Ignore removal errors.
+  }
+};
+
 export const setReferralTracking = (bhId: string) => {
   if (!bhId) return;
   writeCookie(bhId);
@@ -39,14 +68,17 @@ export const setReferralTracking = (bhId: string) => {
       bhId,
       capturedAt: Date.now(),
     };
-    localStorage.setItem(referralStorageKey, JSON.stringify(meta));
+    const payload = JSON.stringify(meta);
+    safeSet(localStorage, referralStorageKey, payload);
+    safeSet(sessionStorage, referralSessionKey, payload);
   }
 };
 
 export const setReferralReferrerUid = (referrerUid: string) => {
   if (!referrerUid) return;
   if (typeof window !== 'undefined') {
-    localStorage.setItem(referralUidStorageKey, referrerUid);
+    safeSet(localStorage, referralUidStorageKey, referrerUid);
+    safeSet(sessionStorage, referralUidSessionKey, referrerUid);
   }
 };
 
@@ -54,7 +86,9 @@ export const getReferralTracking = () => {
   const now = Date.now();
   const maxAgeMs = referralMaxAgeDays * 24 * 60 * 60 * 1000;
   if (typeof window !== 'undefined') {
-    const raw = localStorage.getItem(referralStorageKey);
+    const raw =
+      safeGet(localStorage, referralStorageKey)
+      || safeGet(sessionStorage, referralSessionKey);
     if (raw) {
       try {
         const meta = JSON.parse(raw) as ReferralMeta;
@@ -78,14 +112,18 @@ export const getReferralTracking = () => {
 
 export const getReferralReferrerUid = () => {
   if (typeof window === 'undefined') return null;
-  const value = localStorage.getItem(referralUidStorageKey);
+  const value =
+    safeGet(localStorage, referralUidStorageKey)
+    || safeGet(sessionStorage, referralUidSessionKey);
   return value || null;
 };
 
 export const clearReferralTracking = () => {
   removeCookie();
   if (typeof window !== 'undefined') {
-    localStorage.removeItem(referralStorageKey);
-    localStorage.removeItem(referralUidStorageKey);
+    safeRemove(localStorage, referralStorageKey);
+    safeRemove(localStorage, referralUidStorageKey);
+    safeRemove(sessionStorage, referralSessionKey);
+    safeRemove(sessionStorage, referralUidSessionKey);
   }
 };
