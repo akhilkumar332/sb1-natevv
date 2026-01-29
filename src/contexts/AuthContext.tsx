@@ -1,5 +1,5 @@
 // src/contexts/AuthContext.tsx
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { NavigateFunction } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -34,6 +34,8 @@ import { auth, db, googleProvider } from '../firebase';
 import { generateBhId } from '../utils/bhId';
 import { normalizePhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
+import { applyReferralTrackingForUser } from '../services/referral.service';
+import { getReferralReferrerUid, getReferralTracking } from '../utils/referralTracking';
 
 // Define window recaptcha type
 declare global {
@@ -353,6 +355,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authLoading, setAuthLoading] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const logoutChannel = new BroadcastChannel('auth_logout');
+  const referralApplyAttemptedRef = useRef(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -448,6 +451,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logoutChannel.close();
     };
   }, []);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (user.referredByUid || user.referredByBhId) return;
+    const hasReferral = Boolean(getReferralTracking() || getReferralReferrerUid());
+    if (!hasReferral) return;
+    if (referralApplyAttemptedRef.current) return;
+    referralApplyAttemptedRef.current = true;
+
+    applyReferralTrackingForUser(user.uid)
+      .then((result) => {
+        if (result?.referrerUid) {
+          setUser(prev => prev ? {
+            ...prev,
+            referredByUid: result.referrerUid,
+            referredByBhId: result.referrerBhId || prev.referredByBhId,
+          } as User : prev);
+        }
+      })
+      .catch((error) => {
+        console.warn('Deferred referral apply failed:', error);
+      });
+  }, [user?.uid, user?.referredByUid, user?.referredByBhId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
