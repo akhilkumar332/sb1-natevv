@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { countries, getStatesByCountry, getCitiesByState } from '../../data/locations';
 import { db } from '../../firebase';
+import { applyReferralTrackingForUser } from '../../services/referral.service';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -500,6 +501,10 @@ export function DonorOnboarding() {
               { merge: true }
             );
           }
+        }
+
+        if (user?.uid) {
+          await applyReferralTrackingForUser(user.uid);
         }
 
         setShowConfetti(true);
