@@ -45,29 +45,46 @@ export const useRegister = () => {
       let referrerUid: string | null = referralUid;
       let referrerBhId: string | undefined = referralBhId || undefined;
 
-      if (referrerUid) {
-        const referrerDoc = await getDoc(doc(db, 'users', referrerUid));
-        if (!referrerDoc.exists()) {
-          clearReferralTracking();
-          return;
-        }
-        const referrerData = referrerDoc.data();
-        referrerBhId = referrerData?.bhId || referrerBhId;
-      } else if (referralBhId) {
+      const resolveReferrerByBhId = async (bhId?: string | null) => {
+        if (!bhId) return null;
         const referrerSnapshot = await getDocs(query(
           collection(db, 'users'),
-          where('bhId', '==', referralBhId),
+          where('bhId', '==', bhId),
           limit(1)
         ));
-
         if (referrerSnapshot.empty) {
+          return null;
+        }
+        const referrerDoc = referrerSnapshot.docs[0];
+        return {
+          uid: referrerDoc.id,
+          bhId: referrerDoc.data()?.bhId || bhId,
+        };
+      };
+
+      if (referrerUid) {
+        const referrerDoc = await getDoc(doc(db, 'users', referrerUid));
+        if (referrerDoc.exists()) {
+          const referrerData = referrerDoc.data();
+          referrerBhId = referrerData?.bhId || referrerBhId;
+        } else {
+          const bhIdFallback = await resolveReferrerByBhId(referrerBhId || referrerUid);
+          if (bhIdFallback) {
+            referrerUid = bhIdFallback.uid;
+            referrerBhId = bhIdFallback.bhId;
+          } else {
+            clearReferralTracking();
+            return;
+          }
+        }
+      } else if (referralBhId) {
+        const bhIdLookup = await resolveReferrerByBhId(referralBhId);
+        if (!bhIdLookup) {
           clearReferralTracking();
           return;
         }
-
-        const referrerDoc = referrerSnapshot.docs[0];
-        referrerUid = referrerDoc.id;
-        referrerBhId = referrerDoc.data()?.bhId || referrerBhId;
+        referrerUid = bhIdLookup.uid;
+        referrerBhId = bhIdLookup.bhId;
       }
 
       if (!referrerUid) {

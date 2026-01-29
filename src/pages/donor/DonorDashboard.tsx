@@ -680,15 +680,16 @@ function DonorDashboard() {
   const buildInviteLink = () => {
     const baseUrl = window.location.origin;
     const bhId = user?.bhId?.trim();
-    if (!bhId) {
-      return baseUrl;
-    }
     const referrerUid = user?.uid;
-    const params = new URLSearchParams({ BHID: bhId });
+    const params = new URLSearchParams();
+    if (bhId) {
+      params.set('BHID', bhId);
+    }
     if (referrerUid) {
       params.set('ref', referrerUid);
     }
-    return `${baseUrl}/?${params.toString()}`;
+    const queryString = params.toString();
+    return queryString ? `${baseUrl}/?${queryString}` : baseUrl;
   };
 
   const createQrCodeDataUrl = async () => {
