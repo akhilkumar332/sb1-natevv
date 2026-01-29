@@ -1249,7 +1249,32 @@ function DonorDashboard() {
       ? user.eligibilityChecklist.updatedAt
       : new Date(user.eligibilityChecklist.updatedAt as any)
     : null;
-  const referralMilestone = getReferralMilestone(referralCount);
+  const toDateValue = (value: any): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === 'function') return value.toDate();
+    if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
+    return null;
+  };
+  const referralDetails = referralEntries.map((entry) => {
+    const referredUser = referralUsers[entry.referredUid];
+    const referredAt = entry.referredAt;
+    const createdAt = toDateValue(referredUser?.createdAt);
+    const lastLoginAt = toDateValue(referredUser?.lastLoginAt);
+    const baseDate = referredAt || createdAt || lastLoginAt;
+    const ageDays = baseDate ? Math.floor((Date.now() - baseDate.getTime()) / (24 * 60 * 60 * 1000)) : null;
+    const isDeleted = referredUser?.status === 'deleted';
+    const isEligible = !isDeleted && typeof ageDays === 'number' && ageDays >= 7;
+    return {
+      ...entry,
+      user: referredUser,
+      referralAgeDays: ageDays,
+      isEligible,
+      isDeleted,
+    };
+  });
+  const eligibleReferralCount = referralDetails.filter(entry => entry.isEligible).length;
+  const referralMilestone = getReferralMilestone(eligibleReferralCount);
   const referralUsersLoadingCombined = referralUsersLoading || fallbackReferralLoading;
   const profileFields = [
     { label: 'Name', value: user?.displayName },
@@ -1263,10 +1288,6 @@ function DonorDashboard() {
   const profileCompletionPercent = Math.round((completedProfileFields / profileFields.length) * 100);
   const missingProfileFields = profileFields.filter(field => !field.value).map(field => field.label);
   const isLoading = loading;
-  const referralDetails = referralEntries.map((entry) => ({
-    ...entry,
-    user: referralUsers[entry.referredUid],
-  }));
   const menuItems = [
     { id: 'overview', label: 'Overview', to: 'overview', icon: Activity },
     { id: 'readiness', label: 'Readiness', to: 'readiness', icon: CheckCircle },
@@ -1319,6 +1340,7 @@ function DonorDashboard() {
     referralUsersLoading: referralUsersLoadingCombined,
     referralMilestone,
     referralDetails,
+    eligibleReferralCount,
     donorLevel,
     nextMilestone,
     shareOptions,

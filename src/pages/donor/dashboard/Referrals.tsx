@@ -10,6 +10,7 @@ const DonorReferrals = () => {
     referralCount,
     referralMilestone,
     referralDetails,
+    eligibleReferralCount,
     copyInviteLink,
     formatDate,
   } = dashboard;
@@ -42,8 +43,8 @@ const DonorReferrals = () => {
             <>
               <div className="mt-4 flex items-end justify-between">
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Total Referrals</p>
-                  <p className="text-3xl font-bold text-gray-900">{referralCount}</p>
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Eligible Referrals</p>
+                  <p className="text-3xl font-bold text-gray-900">{eligibleReferralCount}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[11px] uppercase tracking-wide text-gray-500">Milestone</p>
@@ -52,6 +53,7 @@ const DonorReferrals = () => {
                   </p>
                 </div>
               </div>
+              <p className="mt-2 text-xs text-gray-500">{referralCount} total referrals. Eligibility unlocks after 7 days.</p>
               <p className="mt-3 text-xs text-gray-600">
                 {referralMilestone.next
                   ? `${referralMilestone.remaining} more donor${referralMilestone.remaining === 1 ? '' : 's'} to reach the next milestone.`
@@ -96,6 +98,15 @@ const DonorReferrals = () => {
                   .map((part: string) => part[0]?.toUpperCase())
                   .join('') || 'D';
                 const referredAtLabel = referral.referredAt ? formatDate(referral.referredAt) : 'Pending';
+                const statusLabel = referral.isDeleted
+                  ? 'Deleted'
+                  : referredUser.onboardingCompleted
+                    ? 'Onboarded'
+                    : referral.status || 'Registered';
+                const notEligible = !referral.isEligible;
+                const daysRemaining = typeof referral.referralAgeDays === 'number'
+                  ? Math.max(0, 7 - referral.referralAgeDays)
+                  : null;
                 return (
                   <div key={referral.id} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                     <div className="flex items-start justify-between gap-4">
@@ -122,10 +133,15 @@ const DonorReferrals = () => {
                       <div className="text-right">
                         <p className="text-[10px] uppercase tracking-wide text-gray-500">Referred</p>
                         <p className="text-xs font-semibold text-gray-700">{referredAtLabel}</p>
-                        {referral.status && (
+                        {statusLabel && (
                           <span className="mt-2 inline-block rounded-full bg-red-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600">
-                            {referral.status}
+                            {statusLabel}
                           </span>
+                        )}
+                        {notEligible && (
+                          <div className="mt-2 text-[10px] uppercase tracking-wide text-gray-500">
+                            Not eligible{typeof daysRemaining === 'number' && daysRemaining > 0 ? ` (${daysRemaining}d)` : ''}
+                          </div>
                         )}
                       </div>
                     </div>
