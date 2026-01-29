@@ -9,7 +9,13 @@ import { signInWithPopup, signOut } from 'firebase/auth';
 import { authStorage } from '../utils/authStorage';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
-import { clearReferralTracking, getReferralReferrerUid, getReferralTracking } from '../utils/referralTracking';
+import {
+  clearReferralTracking,
+  getReferralReferrerUid,
+  getReferralTracking,
+  setReferralReferrerUid,
+  setReferralTracking,
+} from '../utils/referralTracking';
 
 interface RegisterFormData {
   identifier: string;
@@ -37,8 +43,25 @@ export const useRegister = () => {
   };
 
   const applyReferralTracking = async (newUserUid: string) => {
-    const referralBhId = getReferralTracking();
-    const referralUid = getReferralReferrerUid();
+    let referralBhId = getReferralTracking();
+    let referralUid = getReferralReferrerUid();
+
+    if (!referralBhId && !referralUid && typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const bhIdParam = params.get('BHID') || params.get('bhid');
+      const refParam = params.get('ref') || params.get('referrer');
+      if (bhIdParam) {
+        const trimmed = bhIdParam.trim();
+        setReferralTracking(trimmed);
+        referralBhId = trimmed;
+      }
+      if (refParam) {
+        const trimmed = refParam.trim();
+        setReferralReferrerUid(trimmed);
+        referralUid = trimmed;
+      }
+    }
+
     if (!referralBhId && !referralUid) return;
 
     try {
@@ -100,31 +123,50 @@ export const useRegister = () => {
       const referralDocId = `${referrerUid}_${newUserUid}`;
       const referralRef = doc(db, 'ReferralTracking', referralDocId);
       const referralExisting = await getDoc(referralRef);
+      const userRef = doc(db, 'users', newUserUid);
 
       if (referralExisting.exists()) {
+        await setDoc(
+          userRef,
+          {
+            referredByUid: referrerUid,
+            referredByBhId: referralBhId,
+          },
+          { merge: true }
+        );
         clearReferralTracking();
         return;
       }
 
-      await setDoc(referralRef, {
-        referrerUid,
-        referredUid: newUserUid,
-        referrerBhId: referrerBhId,
-        referredAt: serverTimestamp(),
-        status: 'registered',
-        createdAt: serverTimestamp(),
-      });
+      const [referralResult, userResult] = await Promise.allSettled([
+        setDoc(referralRef, {
+          referrerUid,
+          referredUid: newUserUid,
+          referrerBhId: referrerBhId,
+          referredAt: serverTimestamp(),
+          status: 'registered',
+          createdAt: serverTimestamp(),
+        }),
+        setDoc(
+          userRef,
+          {
+            referredByUid: referrerUid,
+            referredByBhId: referralBhId,
+          },
+          { merge: true }
+        ),
+      ]);
 
-      await setDoc(
-        doc(db, 'users', newUserUid),
-        {
-          referredByUid: referrerUid,
-          referredByBhId: referralBhId,
-        },
-        { merge: true }
-      );
+      if (referralResult.status === 'rejected') {
+        console.warn('Failed to write referral tracking doc:', referralResult.reason);
+      }
+      if (userResult.status === 'rejected') {
+        console.warn('Failed to update referred-by fields:', userResult.reason);
+      }
 
-      clearReferralTracking();
+      if (referralResult.status === 'fulfilled' || userResult.status === 'fulfilled') {
+        clearReferralTracking();
+      }
     } catch (error) {
       console.warn('Failed to apply referral tracking:', error);
     }

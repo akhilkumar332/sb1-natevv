@@ -8,6 +8,7 @@ import 'react-phone-number-input/style.css';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { Timestamp, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import {
   User,
   MapPin,
@@ -23,6 +24,7 @@ import {
   Loader
 } from 'lucide-react';
 import { countries, getStatesByCountry, getCitiesByState } from '../../data/locations';
+import { db } from '../../firebase';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -33,6 +35,17 @@ L.Icon.Default.mergeOptions({
 });
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+const normalizeToMidnight = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const readDonationEntryDate = (entry: any) => {
+  const value = entry?.date || entry?.donationDate;
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === 'function') return value.toDate();
+  if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
+  return null;
+};
 
 interface OnboardingFormData {
   name: string;
@@ -437,6 +450,57 @@ export function DonorOnboarding() {
         }
 
         await updateUserProfile(profileData);
+
+        if (formData.lastDonation && user?.uid) {
+          const parsedDate = new Date(formData.lastDonation);
+          if (!Number.isNaN(parsedDate.getTime())) {
+            const historyRef = doc(db, 'DonationHistory', user.uid);
+            const historySnapshot = await getDoc(historyRef);
+            const existingDonations = historySnapshot.exists() && Array.isArray(historySnapshot.data().donations)
+              ? historySnapshot.data().donations
+              : [];
+            const normalizedInputDate = normalizeToMidnight(parsedDate);
+            const hasSameDate = existingDonations.some((entry: any) => {
+              const entryDate = readDonationEntryDate(entry);
+              if (!entryDate) return false;
+              return normalizeToMidnight(entryDate).getTime() === normalizedInputDate.getTime();
+            });
+            const nextDonations = [...existingDonations];
+            if (!hasSameDate) {
+              nextDonations.push({
+                id: `onboarding-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+                date: Timestamp.fromDate(parsedDate),
+                location: formData.city || '',
+                bloodBank: 'Self Reported',
+                hospitalId: '',
+                hospitalName: 'Self Reported',
+                quantity: '450ml',
+                status: 'completed',
+                units: 1,
+                source: 'manual',
+                notes: '',
+                createdAt: Timestamp.now(),
+              });
+            }
+            const sortedDonations = nextDonations
+              .sort((a: any, b: any) => {
+                const dateA = readDonationEntryDate(a)?.getTime() || 0;
+                const dateB = readDonationEntryDate(b)?.getTime() || 0;
+                return dateB - dateA;
+              })
+              .slice(0, 20);
+            await setDoc(
+              historyRef,
+              {
+                userId: user.uid,
+                lastDonationDate: Timestamp.fromDate(parsedDate),
+                donations: sortedDonations,
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true }
+            );
+          }
+        }
 
         setShowConfetti(true);
         toast.success('Welcome to the BloodHub family! 🎉');

@@ -1,5 +1,5 @@
 // src/pages/donor/DonorDashboard.tsx
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   User as LucideUser,
   MapPin,
@@ -134,6 +134,8 @@ function DonorDashboard() {
   const [referralEntries, setReferralEntries] = useState<ReferralEntry[]>([]);
   const [referralUsers, setReferralUsers] = useState<Record<string, any>>({});
   const [referralUsersLoading, setReferralUsersLoading] = useState(false);
+  const [fallbackReferralLoading, setFallbackReferralLoading] = useState(false);
+  const fallbackReferralAppliedRef = useRef(false);
   const [eligibilityChecklist, setEligibilityChecklist] = useState({
     hydrated: false,
     weightOk: false,
@@ -394,6 +396,59 @@ function DonorDashboard() {
     });
     return () => unsubscribe();
   }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (referralLoading) return;
+    if (referralEntries.length > 0) return;
+    if (fallbackReferralAppliedRef.current) return;
+    let isActive = true;
+    setFallbackReferralLoading(true);
+    const fetchFallbackReferrals = async () => {
+      try {
+        const fallbackQuery = query(
+          collection(db, 'users'),
+          where('referredByUid', '==', user.uid)
+        );
+        const snapshot = await getDocs(fallbackQuery);
+        if (!isActive) return;
+        if (snapshot.empty) {
+          return;
+        }
+        const fallbackEntries = snapshot.docs.map((docSnapshot) => {
+          const data = docSnapshot.data() as any;
+          const createdAt = data?.createdAt?.toDate
+            ? data.createdAt.toDate()
+            : typeof data?.createdAt?.seconds === 'number'
+              ? new Date(data.createdAt.seconds * 1000)
+              : null;
+          return {
+            id: `fallback_${docSnapshot.id}`,
+            referredUid: docSnapshot.id,
+            referredAt: createdAt,
+            status: data?.onboardingCompleted ? 'onboarded' : 'registered',
+            referrerBhId: user.bhId,
+          } as ReferralEntry;
+        }).filter(entry => Boolean(entry.referredUid));
+        if (fallbackEntries.length > 0) {
+          fallbackEntries.sort((a, b) => (b.referredAt?.getTime() || 0) - (a.referredAt?.getTime() || 0));
+          setReferralEntries(fallbackEntries);
+          setReferralCount(fallbackEntries.length);
+        }
+      } catch (error) {
+        console.warn('Failed to load referral fallback data:', error);
+      } finally {
+        if (isActive) {
+          fallbackReferralAppliedRef.current = true;
+          setFallbackReferralLoading(false);
+        }
+      }
+    };
+    fetchFallbackReferrals();
+    return () => {
+      isActive = false;
+    };
+  }, [user?.uid, referralLoading, referralEntries.length]);
 
   useEffect(() => {
     if (referralEntries.length === 0) {
@@ -777,7 +832,7 @@ function DonorDashboard() {
           units: 1,
           source: 'manual',
           notes: '',
-          createdAt: serverTimestamp(),
+          createdAt: Timestamp.now(),
         });
       }
 
@@ -861,7 +916,7 @@ function DonorDashboard() {
           location: editingDonationData.location,
           units: unitsValue,
           notes: editingDonationData.notes,
-          updatedAt: serverTimestamp(),
+          updatedAt: Timestamp.now(),
         };
       });
 
@@ -1128,7 +1183,7 @@ function DonorDashboard() {
             return {
               ...entry,
               certificateUrl: feedbackForm.certificateUrl,
-              updatedAt: serverTimestamp(),
+              updatedAt: Timestamp.now(),
             };
           });
           await setDoc(
@@ -1195,6 +1250,7 @@ function DonorDashboard() {
       : new Date(user.eligibilityChecklist.updatedAt as any)
     : null;
   const referralMilestone = getReferralMilestone(referralCount);
+  const referralUsersLoadingCombined = referralUsersLoading || fallbackReferralLoading;
   const profileFields = [
     { label: 'Name', value: user?.displayName },
     { label: 'Blood type', value: user?.bloodType },
@@ -1260,7 +1316,7 @@ function DonorDashboard() {
     checklistUpdatedAt,
     referralCount,
     referralLoading,
-    referralUsersLoading,
+    referralUsersLoading: referralUsersLoadingCombined,
     referralMilestone,
     referralDetails,
     donorLevel,
