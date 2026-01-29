@@ -9,7 +9,7 @@ import { signInWithPopup, signOut } from 'firebase/auth';
 import { authStorage } from '../utils/authStorage';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
-import { applyReferralTrackingForUser } from '../services/referral.service';
+import { applyReferralTrackingForUser, resolveReferralContext } from '../services/referral.service';
 
 interface RegisterFormData {
   identifier: string;
@@ -132,6 +132,7 @@ export const useRegister = () => {
       }
 
       // Create new user document with Donor role
+      const referralContext = await resolveReferralContext(userCredential.user.uid);
       await setDoc(userRef, {
         uid: userCredential.user.uid,
         phoneNumber: userCredential.user.phoneNumber,
@@ -140,6 +141,12 @@ export const useRegister = () => {
         onboardingCompleted: false,
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
+        ...(referralContext
+          ? {
+              referredByUid: referralContext.referrerUid,
+              referredByBhId: referralContext.referrerBhId,
+            }
+          : {}),
       });
 
       await applyReferralTrackingForUser(userCredential.user.uid);
@@ -239,6 +246,7 @@ export const useRegister = () => {
       console.log('🔵 Creating new user document...');
 
       // Create new user document with Donor role
+      const referralContext = await resolveReferralContext(result.user.uid);
       await setDoc(userRef, {
         uid: result.user.uid,
         email: result.user.email,
@@ -248,6 +256,12 @@ export const useRegister = () => {
         onboardingCompleted: false,
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
+        ...(referralContext
+          ? {
+              referredByUid: referralContext.referrerUid,
+              referredByBhId: referralContext.referrerBhId,
+            }
+          : {}),
       }).catch((error) => {
         console.error('🔴 Error creating user document:', error);
         throw new Error(`Failed to create user: ${error.message}`);
