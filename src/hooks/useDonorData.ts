@@ -84,6 +84,7 @@ export interface DonorStats {
   daysUntilEligible: number;
   impactScore: number;
   streak: number;
+  emergencyResponses: number;
   rank?: number;
   badges: Badge[];
 }
@@ -403,6 +404,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
         daysUntilEligible,
         impactScore,
         streak: userStats.currentStreak || 0,
+        emergencyResponses: userStats.emergencyResponses || 0,
         rank: userStats.rank,
         badges: userBadges,
       });

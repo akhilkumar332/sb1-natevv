@@ -647,12 +647,12 @@ function DonorDashboard() {
 
   const getDonationLevel = (donations: number = 0) => {
     if (donations === 0) return { level: 'New Donor', color: 'gray', icon: '🌱' };
-    if (donations < 3) return { level: 'Rookie Donor', color: 'blue', icon: '🎯' };
+    if (donations < 5) return { level: 'First Timer', color: 'blue', icon: '🎯' };
     if (donations < 10) return { level: 'Regular Donor', color: 'green', icon: '⭐' };
     if (donations < 25) return { level: 'Super Donor', color: 'purple', icon: '🚀' };
     if (donations < 50) return { level: 'Hero Donor', color: 'orange', icon: '🦸' };
     if (donations < 100) return { level: 'Legend Donor', color: 'red', icon: '👑' };
-    return { level: 'Champion Donor', color: 'yellow', icon: '🏆' };
+    return { level: 'Century Club', color: 'yellow', icon: '💯' };
   };
 
   const getReferralMilestone = (count: number) => {
@@ -1214,7 +1214,9 @@ function DonorDashboard() {
     }));
   };
 
-  const donorLevel = getDonationLevel(stats?.totalDonations || 0);
+  const donationCount = Array.isArray(donationHistory) ? donationHistory.length : 0;
+  const donationsForLevel = Math.max(stats?.totalDonations || 0, donationCount);
+  const donorLevel = getDonationLevel(donationsForLevel);
   const nextMilestone = getNextMilestone(stats?.totalDonations || 0);
   const lastDonationDate = parseDateInput(lastDonationInput)
     || (user?.lastDonation ? new Date(user.lastDonation) : null);
@@ -1288,6 +1290,42 @@ function DonorDashboard() {
   const profileCompletionPercent = Math.round((completedProfileFields / profileFields.length) * 100);
   const missingProfileFields = profileFields.filter(field => !field.value).map(field => field.label);
   const isLoading = loading;
+  const streakCount = typeof stats?.streak === 'number' && stats.streak > 0
+    ? stats.streak
+    : donationCount;
+  const emergencyResponses = typeof stats?.emergencyResponses === 'number'
+    ? stats.emergencyResponses
+    : 0;
+  const rareBloodTypes = ['AB-', 'B-', 'O-'];
+  const isRareBlood = rareBloodTypes.includes(user?.bloodType || '');
+  const computedBadges = badges.map((badge: any) => {
+    const requirement = badge.requirement || 0;
+    if (badge.category === 'donation') {
+      const progress = Math.min(donationCount, requirement);
+      return { ...badge, earned: donationCount >= requirement, progress };
+    }
+    if (badge.category === 'streak') {
+      const progress = Math.min(streakCount, requirement);
+      return { ...badge, earned: streakCount >= requirement, progress };
+    }
+    if (badge.category === 'emergency') {
+      const progress = Math.min(emergencyResponses, requirement);
+      return { ...badge, earned: emergencyResponses >= requirement, progress };
+    }
+    if (badge.category === 'special' && badge.id === 'rare_hero') {
+      return { ...badge, earned: isRareBlood, progress: isRareBlood ? 1 : 0 };
+    }
+    return badge;
+  });
+  const bestBadgeByCategory = (category: string) => {
+    const earned = computedBadges.filter((badge: any) => badge.category === category && badge.earned);
+    if (earned.length === 0) return null;
+    return earned.sort((a: any, b: any) => (a.requirement || 0) - (b.requirement || 0)).pop() || null;
+  };
+  const bestDonationBadge = bestBadgeByCategory('donation');
+  const bestStreakBadge = bestBadgeByCategory('streak');
+  const bestEmergencyBadge = bestBadgeByCategory('emergency');
+  const rareHeroBadge = computedBadges.find((badge: any) => badge.id === 'rare_hero' && badge.earned) || null;
   const menuItems = [
     { id: 'overview', label: 'Overview', to: 'overview', icon: Activity },
     { id: 'readiness', label: 'Readiness', to: 'readiness', icon: CheckCircle },
@@ -1303,7 +1341,7 @@ function DonorDashboard() {
     emergencyRequests,
     bloodCamps,
     stats,
-    badges,
+    badges: computedBadges,
     loading,
     error,
     refreshData,
@@ -1444,10 +1482,40 @@ function DonorDashboard() {
               )}
               <div>
                 <h1 className="text-2xl font-bold">Welcome back, {user?.displayName?.split(' ')[0] || 'Donor'}!</h1>
-                <p className="text-white/80 flex items-center">
-                  <span className="text-2xl mr-2">{donorLevel.icon}</span>
-                  {donorLevel.level}
-                </p>
+                {(bestDonationBadge || bestStreakBadge || bestEmergencyBadge || rareHeroBadge) && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {bestDonationBadge && (
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+                        <span className="text-base">{bestDonationBadge.icon}</span>
+                        <span>{bestDonationBadge.name}</span>
+                      </span>
+                    )}
+                    {bestStreakBadge && (
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+                        <span className="text-base">{bestStreakBadge.icon}</span>
+                        <span>{bestStreakBadge.name}</span>
+                      </span>
+                    )}
+                    {bestEmergencyBadge && (
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+                        <span className="text-base">{bestEmergencyBadge.icon}</span>
+                        <span>{bestEmergencyBadge.name}</span>
+                      </span>
+                    )}
+                    {rareHeroBadge && (
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+                        <span className="text-base">{rareHeroBadge.icon}</span>
+                        <span>{rareHeroBadge.name}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
+                {donationCount === 0 && (
+                  <p className="text-white/80 flex items-center">
+                    <span className="text-2xl mr-2">{donorLevel.icon}</span>
+                    {donorLevel.level}
+                  </p>
+                )}
               </div>
             </div>
             <div className="hidden md:flex items-center space-x-4">
@@ -1652,7 +1720,7 @@ function DonorDashboard() {
             </div>
             <div className="p-6">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {badges.map((badge) => (
+                {computedBadges.map((badge) => (
                   <div
                     key={badge.id}
                     className={`p-6 rounded-xl text-center transition-all ${
