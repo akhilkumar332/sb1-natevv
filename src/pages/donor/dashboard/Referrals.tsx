@@ -119,7 +119,7 @@ const DonorReferrals = () => {
                             <p className="font-semibold text-gray-800">{displayName}</p>
                             {referredUser.bhId && (
                               <span className="rounded-full border border-red-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-600">
-                                BH {referredUser.bhId}
+                                {referredUser.bhId}
                               </span>
                             )}
                             {referredUser.bloodType && (
