@@ -357,6 +357,35 @@ const updateUserInFirestore = async (
   }
 };
 
+const updateSessionMetadata = async (firebaseUser: FirebaseUser, knownUser?: User) => {
+  try {
+    const userRef = doc(db, 'users', firebaseUser.uid);
+    const updatePayload: Record<string, any> = { lastLoginAt: serverTimestamp() };
+    const rawPhone = knownUser?.phoneNumber
+      || (knownUser as any)?.phone
+      || firebaseUser.phoneNumber;
+    if (!knownUser?.phoneNumberNormalized && rawPhone) {
+      const normalizedPhone = normalizePhoneNumber(rawPhone);
+      if (normalizedPhone) {
+        updatePayload.phoneNumberNormalized = normalizedPhone;
+      }
+    }
+    if (!knownUser?.bhId && knownUser?.dateOfBirth && knownUser?.postalCode) {
+      const generatedBhId = generateBhId({
+        dateOfBirth: knownUser.dateOfBirth,
+        postalCode: knownUser.postalCode,
+        uid: firebaseUser.uid,
+      });
+      if (generatedBhId) {
+        updatePayload.bhId = generatedBhId;
+      }
+    }
+    await updateDoc(userRef, updatePayload);
+  } catch (error) {
+    console.warn('Failed to update session metadata:', error);
+  }
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const initialCachedUser = readCachedUser();
   const [user, setUser] = useState<User | null>(initialCachedUser);
@@ -365,11 +394,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loginLoading, setLoginLoading] = useState(false);
   const logoutChannel = new BroadcastChannel('auth_logout');
   const referralApplyAttemptedRef = useRef(false);
+  const recentLoginRef = useRef<{ uid: string; at: number; user?: User } | null>(null);
+  const userRef = useRef<User | null>(initialCachedUser);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       try {
         if (firebaseUser) {
+          const now = Date.now();
+          const recentLogin = recentLoginRef.current;
+          const currentUser = userRef.current;
+          const cachedUser = readCachedUser();
+
+          if (recentLogin && recentLogin.uid === firebaseUser.uid && now - recentLogin.at < 15000) {
+            if (!currentUser || currentUser.uid !== firebaseUser.uid) {
+              setUser(recentLogin.user || cachedUser || currentUser || null);
+            }
+            setLoading(false);
+            void updateSessionMetadata(firebaseUser, recentLogin.user || cachedUser || currentUser || undefined);
+            return;
+          }
+
+          if (currentUser && currentUser.uid === firebaseUser.uid) {
+            setLoading(false);
+            void updateSessionMetadata(firebaseUser, currentUser);
+            return;
+          }
+
+          if (cachedUser && cachedUser.uid === firebaseUser.uid) {
+            setUser(cachedUser);
+            setLoading(false);
+            void updateSessionMetadata(firebaseUser, cachedUser);
+            void updateUserInFirestore(firebaseUser).then((userData) => {
+              const isRegistrationRoute =
+                typeof window !== 'undefined' &&
+                (window.location.pathname.includes('/register') ||
+                  window.location.pathname.includes('/onboarding'));
+              if (userData) {
+                setUser(userData);
+              } else if (!isRegistrationRoute) {
+                console.warn('User document not found, signing out');
+                auth.signOut().catch(() => null);
+                setUser(null);
+              }
+            });
+            return;
+          }
+
           // Check if user is newly created (within last 30 seconds)
           const creationTime = new Date(firebaseUser.metadata.creationTime!).getTime();
           const currentTime = Date.now();
@@ -686,6 +761,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Update user state immediately for navigation
       setUser(userDataToReturn);
+      recentLoginRef.current = { uid: userDataToReturn.uid, at: Date.now(), user: userDataToReturn };
 
       // Return user data for immediate navigation
       return userDataToReturn;
@@ -894,6 +970,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Update user state immediately
       setUser(userDataToReturn);
+      recentLoginRef.current = { uid: userDataToReturn.uid, at: Date.now(), user: userDataToReturn };
 
       return {
         token,
@@ -1090,6 +1167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Update user state immediately for navigation
       setUser(userDataToReturn);
+      recentLoginRef.current = { uid: userDataToReturn.uid, at: Date.now(), user: userDataToReturn };
 
       return {
         token,
