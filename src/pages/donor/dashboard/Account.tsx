@@ -98,6 +98,7 @@ const DonorAccount = () => {
   const [phoneUpdateConfirmation, setPhoneUpdateConfirmation] = useState<any>(null);
   const [phoneUpdateLoading, setPhoneUpdateLoading] = useState(false);
   const [phoneUpdateError, setPhoneUpdateError] = useState('');
+  const [phoneUpdateLockedNumber, setPhoneUpdateLockedNumber] = useState('');
 
   const {
     isLoading,
@@ -211,6 +212,7 @@ const DonorAccount = () => {
     setPhoneUpdateOtp('');
     setPhoneUpdateConfirmation(null);
     setPhoneUpdateError('');
+    setPhoneUpdateLockedNumber('');
   }, [user, isEditingPhone]);
 
   useEffect(() => {
@@ -248,6 +250,13 @@ const DonorAccount = () => {
 
   const handleAddressChange = (value: string) => {
     setBasicInfoForm(prev => ({ ...prev, address: value }));
+    if (basicInfoErrors.address) {
+      setBasicInfoErrors(prev => {
+        const next = { ...prev };
+        delete next.address;
+        return next;
+      });
+    }
 
     if (searchTimeout) {
       clearTimeout(searchTimeout);
@@ -296,18 +305,39 @@ const DonorAccount = () => {
         );
         if (matchedState) {
           setBasicInfoForm(prev => ({ ...prev, state: matchedState.name }));
+          if (basicInfoErrors.state) {
+            setBasicInfoErrors(prev => {
+              const next = { ...prev };
+              delete next.state;
+              return next;
+            });
+          }
           const stateCities = getCitiesByState(basicInfoForm.country || 'IN', matchedState.name);
           const matchedCity = stateCities.find(c =>
             c.toLowerCase() === (addr.city || addr.town || addr.village || '').toLowerCase()
           );
           if (matchedCity) {
             setBasicInfoForm(prev => ({ ...prev, city: matchedCity }));
+            if (basicInfoErrors.city) {
+              setBasicInfoErrors(prev => {
+                const next = { ...prev };
+                delete next.city;
+                return next;
+              });
+            }
           }
         }
       }
 
       if (addr.postcode) {
         setBasicInfoForm(prev => ({ ...prev, postalCode: addr.postcode }));
+        if (basicInfoErrors.postalCode) {
+          setBasicInfoErrors(prev => {
+            const next = { ...prev };
+            delete next.postalCode;
+            return next;
+          });
+        }
       }
     }
   };
@@ -338,6 +368,14 @@ const DonorAccount = () => {
               address: data.display_name || prev.address,
               postalCode: address.postcode || prev.postalCode,
             }));
+            if (basicInfoErrors.address || basicInfoErrors.postalCode) {
+              setBasicInfoErrors(prev => {
+                const next = { ...prev };
+                delete next.address;
+                delete next.postalCode;
+                return next;
+              });
+            }
 
             if (address.state) {
               const matchedState = availableStates.find(s =>
@@ -345,12 +383,26 @@ const DonorAccount = () => {
               );
               if (matchedState) {
                 setBasicInfoForm(prev => ({ ...prev, state: matchedState.name }));
+                if (basicInfoErrors.state) {
+                  setBasicInfoErrors(prev => {
+                    const next = { ...prev };
+                    delete next.state;
+                    return next;
+                  });
+                }
                 const stateCities = getCitiesByState(basicInfoForm.country || 'IN', matchedState.name);
                 const matchedCity = stateCities.find(c =>
                   c.toLowerCase() === (address.city || address.town || address.village || '').toLowerCase()
                 );
                 if (matchedCity) {
                   setBasicInfoForm(prev => ({ ...prev, city: matchedCity }));
+                  if (basicInfoErrors.city) {
+                    setBasicInfoErrors(prev => {
+                      const next = { ...prev };
+                      delete next.city;
+                      return next;
+                    });
+                  }
                 }
               }
             }
@@ -398,6 +450,14 @@ const DonorAccount = () => {
           address: data.display_name || prev.address,
           postalCode: address.postcode || prev.postalCode,
         }));
+        if (basicInfoErrors.address || basicInfoErrors.postalCode) {
+          setBasicInfoErrors(prev => {
+            const next = { ...prev };
+            delete next.address;
+            delete next.postalCode;
+            return next;
+          });
+        }
 
         if (address.state) {
           const matchedState = availableStates.find(s =>
@@ -405,12 +465,26 @@ const DonorAccount = () => {
           );
           if (matchedState) {
             setBasicInfoForm(prev => ({ ...prev, state: matchedState.name }));
+            if (basicInfoErrors.state) {
+              setBasicInfoErrors(prev => {
+                const next = { ...prev };
+                delete next.state;
+                return next;
+              });
+            }
             const stateCities = getCitiesByState(basicInfoForm.country || 'IN', matchedState.name);
             const matchedCity = stateCities.find(c =>
               c.toLowerCase() === (address.city || address.town || address.village || '').toLowerCase()
             );
             if (matchedCity) {
               setBasicInfoForm(prev => ({ ...prev, city: matchedCity }));
+              if (basicInfoErrors.city) {
+                setBasicInfoErrors(prev => {
+                  const next = { ...prev };
+                  delete next.city;
+                  return next;
+                });
+              }
             }
           }
         }
@@ -536,6 +610,7 @@ const DonorAccount = () => {
       setPhoneUpdateLoading(true);
       const confirmation = await startPhoneUpdate(normalized);
       setPhoneUpdateConfirmation(confirmation);
+      setPhoneUpdateLockedNumber(normalized);
       toast.success('OTP sent successfully!');
     } catch (error: any) {
       console.error('Phone update error:', error);
@@ -564,10 +639,11 @@ const DonorAccount = () => {
     setPhoneUpdateError('');
     try {
       setPhoneUpdateLoading(true);
-      const normalized = normalizePhoneNumber(phoneUpdateNumber);
+      const normalized = phoneUpdateLockedNumber || normalizePhoneNumber(phoneUpdateNumber);
       await confirmPhoneUpdate(phoneUpdateConfirmation, sanitizedOtp, normalized);
       setPhoneUpdateConfirmation(null);
       setPhoneUpdateOtp('');
+      setPhoneUpdateLockedNumber('');
       setIsEditingPhone(false);
       toast.success('Phone number updated successfully!');
     } catch (error: any) {
@@ -1135,7 +1211,10 @@ const DonorAccount = () => {
                     <input
                       type="email"
                       value={emailInput}
-                      onChange={(event) => setEmailInput(event.target.value)}
+                      onChange={(event) => {
+                        setEmailInput(event.target.value);
+                        if (emailError) setEmailError('');
+                      }}
                       className={`w-full rounded-xl border bg-white px-3 py-2 text-sm focus:outline-none ${
                         emailError ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-red-500'
                       }`}
@@ -1192,7 +1271,11 @@ const DonorAccount = () => {
                       defaultCountry="IN"
                       countryCallingCodeEditable={false}
                       value={phoneUpdateNumber}
-                      onChange={(value) => setPhoneUpdateNumber(value || '')}
+                      onChange={(value) => {
+                        setPhoneUpdateNumber(value || '');
+                        if (phoneUpdateError) setPhoneUpdateError('');
+                      }}
+                      disabled={Boolean(phoneUpdateConfirmation)}
                       className="block w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors text-sm"
                     />
                     {phoneUpdateError && (
@@ -1217,6 +1300,18 @@ const DonorAccount = () => {
                           placeholder="Enter OTP"
                           className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none text-center text-sm font-semibold tracking-widest"
                         />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPhoneUpdateConfirmation(null);
+                            setPhoneUpdateOtp('');
+                            setPhoneUpdateError('');
+                            setPhoneUpdateLockedNumber('');
+                          }}
+                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                        >
+                          Change phone number
+                        </button>
                         <button
                           type="button"
                           onClick={handlePhoneUpdateConfirm}
