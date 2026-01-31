@@ -1024,6 +1024,165 @@ const DonorAccount = () => {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-6">
+          <h2 className="text-lg font-bold text-gray-800 mb-4">Linked Accounts</h2>
+          {isLoading ? (
+            <div className="space-y-4">
+              <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
+              <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
+              <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Availability</p>
+                  <p className="text-xs text-gray-500">Control emergency notifications.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAvailabilityToggle}
+                  disabled={availabilitySaving}
+                  role="switch"
+                  aria-checked={availabilityEnabled}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 ${
+                    availabilityEnabled ? 'bg-red-600' : 'bg-gray-300'
+                  } ${availabilitySaving ? 'opacity-60' : ''}`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                      availabilityEnabled ? 'translate-x-5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              {availabilityExpiryLabel && availabilityEnabled && (
+                <p className="text-[11px] text-gray-500">
+                  Available until {availabilityExpiryLabel}
+                </p>
+              )}
+              <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Emergency Alerts</p>
+                  <p className="text-xs text-gray-500">Get notified about urgent requests.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleEmergencyAlertsToggle}
+                  disabled={emergencyAlertsSaving || !availabilityEnabled}
+                  role="switch"
+                  aria-checked={emergencyAlertsEnabled}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 ${
+                    emergencyAlertsEnabled ? 'bg-red-600' : 'bg-gray-300'
+                  } ${emergencyAlertsSaving || !availabilityEnabled ? 'opacity-60' : ''}`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                      emergencyAlertsEnabled ? 'translate-x-5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600 flex items-center">
+                  <Phone className="w-4 h-4 mr-2 text-red-600" />
+                  Phone
+                </span>
+                <span className={`text-xs font-semibold ${isPhoneLinked ? 'text-red-600' : 'text-gray-400'}`}>
+                  {isPhoneLinked ? 'Linked' : 'Not linked'}
+                </span>
+              </div>
+              {isPhoneLinked && (
+                <button
+                  type="button"
+                  onClick={handlePhoneUnlink}
+                  disabled={!canUnlinkPhone || unlinkPhoneLoading}
+                  className="w-full py-2 px-4 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all duration-300 disabled:opacity-50"
+                >
+                  {unlinkPhoneLoading ? 'Unlinking...' : 'Unlink Phone'}
+                </button>
+              )}
+              {!isPhoneLinked && (
+                <div className="space-y-3">
+                  <PhoneInput
+                    international
+                    defaultCountry="IN"
+                    countryCallingCodeEditable={false}
+                    value={linkPhoneNumber}
+                    onChange={(value) => setLinkPhoneNumber(value || '')}
+                    className="block w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handlePhoneLinkStart}
+                    disabled={linkPhoneLoading}
+                    className="w-full py-2 px-4 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-all duration-300 disabled:opacity-50"
+                  >
+                    {linkPhoneLoading ? 'Sending OTP...' : 'Send OTP'}
+                  </button>
+                  {linkConfirmation && (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={linkOtp}
+                        onChange={(e) => setLinkOtp(e.target.value)}
+                        maxLength={6}
+                        placeholder="Enter OTP"
+                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors text-center text-sm font-semibold tracking-widest"
+                      />
+                      <button
+                        type="button"
+                        onClick={handlePhoneLinkConfirm}
+                        disabled={linkPhoneLoading}
+                        className="w-full py-2 px-4 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all duration-300 disabled:opacity-50"
+                      >
+                        {linkPhoneLoading ? 'Verifying...' : 'Verify & Link'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePhoneLinkResend}
+                        disabled={linkPhoneLoading}
+                        className="w-full py-2 px-4 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300 disabled:opacity-50"
+                      >
+                        Resend OTP
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600 flex items-center">
+                  <Chrome className="w-4 h-4 mr-2 text-red-600" />
+                  Google
+                </span>
+                <span className={`text-xs font-semibold ${isGoogleLinked ? 'text-red-600' : 'text-gray-400'}`}>
+                  {isGoogleLinked ? 'Linked' : 'Not linked'}
+                </span>
+              </div>
+              {isGoogleLinked && (
+                <button
+                  type="button"
+                  onClick={handleGoogleUnlink}
+                  disabled={!canUnlinkGoogle || unlinkGoogleLoading}
+                  className="w-full py-2 px-4 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all duration-300 disabled:opacity-50"
+                >
+                  {unlinkGoogleLoading ? 'Unlinking...' : 'Unlink Google'}
+                </button>
+              )}
+              {!isGoogleLinked && (
+                <button
+                  type="button"
+                  onClick={handleGoogleLink}
+                  disabled={linkGoogleLoading}
+                  className="w-full py-2 px-4 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-all duration-300 disabled:opacity-50"
+                >
+                  {linkGoogleLoading ? 'Linking...' : 'Link Google'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-lg font-bold text-gray-800">Contact Info</h2>
@@ -1202,165 +1361,6 @@ const DonorAccount = () => {
               </div>
             </div>
           )}
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-xl p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Linked Accounts</h2>
-          {isLoading ? (
-            <div className="space-y-4">
-              <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
-              <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
-              <div className="h-12 rounded-xl bg-gray-100 animate-pulse" />
-            </div>
-          ) : (
-            <div className="space-y-4">
-                <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">Availability</p>
-                    <p className="text-xs text-gray-500">Control emergency notifications.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAvailabilityToggle}
-                    disabled={availabilitySaving}
-                    role="switch"
-                    aria-checked={availabilityEnabled}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 ${
-                      availabilityEnabled ? 'bg-red-600' : 'bg-gray-300'
-                    } ${availabilitySaving ? 'opacity-60' : ''}`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                        availabilityEnabled ? 'translate-x-5' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-                {availabilityExpiryLabel && availabilityEnabled && (
-                  <p className="text-[11px] text-gray-500">
-                    Available until {availabilityExpiryLabel}
-                  </p>
-                )}
-                <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">Emergency Alerts</p>
-                    <p className="text-xs text-gray-500">Get notified about urgent requests.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleEmergencyAlertsToggle}
-                    disabled={emergencyAlertsSaving || !availabilityEnabled}
-                    role="switch"
-                    aria-checked={emergencyAlertsEnabled}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 ${
-                      emergencyAlertsEnabled ? 'bg-red-600' : 'bg-gray-300'
-                    } ${emergencyAlertsSaving || !availabilityEnabled ? 'opacity-60' : ''}`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                        emergencyAlertsEnabled ? 'translate-x-5' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 flex items-center">
-                    <Phone className="w-4 h-4 mr-2 text-red-600" />
-                    Phone
-                  </span>
-                  <span className={`text-xs font-semibold ${isPhoneLinked ? 'text-red-600' : 'text-gray-400'}`}>
-                    {isPhoneLinked ? 'Linked' : 'Not linked'}
-                  </span>
-                </div>
-                {isPhoneLinked && (
-                  <button
-                    type="button"
-                    onClick={handlePhoneUnlink}
-                    disabled={!canUnlinkPhone || unlinkPhoneLoading}
-                    className="w-full py-2 px-4 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all duration-300 disabled:opacity-50"
-                  >
-                    {unlinkPhoneLoading ? 'Unlinking...' : 'Unlink Phone'}
-                  </button>
-                )}
-                {!isPhoneLinked && (
-                  <div className="space-y-3">
-                    <PhoneInput
-                      international
-                      defaultCountry="IN"
-                      countryCallingCodeEditable={false}
-                      value={linkPhoneNumber}
-                      onChange={(value) => setLinkPhoneNumber(value || '')}
-                      className="block w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={handlePhoneLinkStart}
-                      disabled={linkPhoneLoading}
-                      className="w-full py-2 px-4 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-all duration-300 disabled:opacity-50"
-                    >
-                      {linkPhoneLoading ? 'Sending OTP...' : 'Send OTP'}
-                    </button>
-                    {linkConfirmation && (
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          value={linkOtp}
-                          onChange={(e) => setLinkOtp(e.target.value)}
-                          maxLength={6}
-                          placeholder="Enter OTP"
-                          className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors text-center text-sm font-semibold tracking-widest"
-                        />
-                        <button
-                          type="button"
-                          onClick={handlePhoneLinkConfirm}
-                          disabled={linkPhoneLoading}
-                          className="w-full py-2 px-4 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all duration-300 disabled:opacity-50"
-                        >
-                          {linkPhoneLoading ? 'Verifying...' : 'Verify & Link'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handlePhoneLinkResend}
-                          disabled={linkPhoneLoading}
-                          className="w-full py-2 px-4 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300 disabled:opacity-50"
-                        >
-                          Resend OTP
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 flex items-center">
-                    <Chrome className="w-4 h-4 mr-2 text-red-600" />
-                    Google
-                  </span>
-                  <span className={`text-xs font-semibold ${isGoogleLinked ? 'text-red-600' : 'text-gray-400'}`}>
-                    {isGoogleLinked ? 'Linked' : 'Not linked'}
-                  </span>
-                </div>
-                {isGoogleLinked && (
-                  <button
-                    type="button"
-                    onClick={handleGoogleUnlink}
-                    disabled={!canUnlinkGoogle || unlinkGoogleLoading}
-                    className="w-full py-2 px-4 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all duration-300 disabled:opacity-50"
-                  >
-                    {unlinkGoogleLoading ? 'Unlinking...' : 'Unlink Google'}
-                  </button>
-                )}
-                {!isGoogleLinked && (
-                  <button
-                    type="button"
-                    onClick={handleGoogleLink}
-                    disabled={linkGoogleLoading}
-                    className="w-full py-2 px-4 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-all duration-300 disabled:opacity-50"
-                  >
-                    {linkGoogleLoading ? 'Linking...' : 'Link Google'}
-                  </button>
-                )}
-              </div>
-            )}
         </div>
 
         <div className="rounded-2xl border border-red-200 bg-red-50/60 p-6 shadow-sm">
