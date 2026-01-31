@@ -90,6 +90,12 @@ export interface User {
 
   // Preferences
   preferredLanguage?: string;
+  donorCardShareOptions?: {
+    showPhone: boolean;
+    showEmail: boolean;
+    showBhId: boolean;
+    showQr: boolean;
+  };
   notificationPreferences?: {
     email: boolean;
     sms: boolean;

@@ -92,36 +92,11 @@ function DonorDashboard() {
   const [availableTodayLoading, setAvailableTodayLoading] = useState(false);
   const [qrPreviewOpen, setQrPreviewOpen] = useState(false);
   const [shareOptionsOpen, setShareOptionsOpen] = useState(false);
-  const [shareOptions, setShareOptions] = useState<ShareOptions>(() => {
-    if (typeof window === 'undefined') {
-      return {
-        showPhone: true,
-        showEmail: true,
-        showBhId: true,
-        showQr: true,
-      };
-    }
-    try {
-      const raw = localStorage.getItem('donorCardShareOptions');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return {
-          showPhone: true,
-          showEmail: true,
-          showBhId: true,
-          showQr: true,
-          ...parsed,
-        };
-      }
-    } catch (error) {
-      console.warn('Failed to load donor card share options', error);
-    }
-    return {
-      showPhone: true,
-      showEmail: true,
-      showBhId: true,
-      showQr: true,
-    };
+  const [shareOptions, setShareOptions] = useState<ShareOptions>({
+    showPhone: true,
+    showEmail: true,
+    showBhId: true,
+    showQr: true,
   });
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [referralQrDataUrl, setReferralQrDataUrl] = useState<string | null>(null);
@@ -540,14 +515,35 @@ function DonorDashboard() {
     return () => unsubscribe();
   }, [user?.uid]);
 
+  const shareOptionsSyncRef = useRef<string | null>(null);
+  const shareOptionsLoadedRef = useRef(false);
+
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem('donorCardShareOptions', JSON.stringify(shareOptions));
-    } catch (error) {
-      console.warn('Failed to save donor card share options', error);
+    if (!user?.uid) return;
+    const nextOptions = {
+      showPhone: true,
+      showEmail: true,
+      showBhId: true,
+      showQr: true,
+      ...(user.donorCardShareOptions || {}),
+    };
+    const serialized = JSON.stringify(nextOptions);
+    if (serialized !== shareOptionsSyncRef.current) {
+      shareOptionsSyncRef.current = serialized;
+      setShareOptions(nextOptions);
     }
-  }, [shareOptions]);
+    shareOptionsLoadedRef.current = true;
+  }, [user?.uid, user?.donorCardShareOptions]);
+
+  useEffect(() => {
+    if (!user?.uid || !shareOptionsLoadedRef.current) return;
+    const serialized = JSON.stringify(shareOptions);
+    if (serialized === shareOptionsSyncRef.current) return;
+    shareOptionsSyncRef.current = serialized;
+    updateUserProfile({ donorCardShareOptions: shareOptions }).catch((error) => {
+      console.warn('Failed to save donor card share options', error);
+    });
+  }, [shareOptions, user?.uid, updateUserProfile]);
 
   const providerIds = auth.currentUser?.providerData?.map(provider => provider.providerId) || [];
   const isPhoneLinked = providerIds.includes('phone');
