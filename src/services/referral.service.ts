@@ -165,8 +165,12 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
       console.warn('Failed to update referred-by fields:', userResult.reason);
     }
 
-    if (referralResult.status === 'fulfilled' || userResult.status === 'fulfilled') {
+    const referralWritten = referralResult.status === 'fulfilled';
+    const userWritten = userResult.status === 'fulfilled';
+    if (referralWritten) {
       await sendReferralNotification(referrerUid, 'registered', newUserUid, undefined, newUserUid);
+    }
+    if (referralWritten || userWritten) {
       clearReferralTracking();
       return { referrerUid, referrerBhId };
     }
