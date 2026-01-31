@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Chrome, Phone, Share2, SlidersHorizontal, Trash2, MapPin, Locate, Loader } from 'lucide-react';
+import { Chrome, Phone, Trash2, MapPin, Locate, Loader } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
@@ -110,14 +110,7 @@ const DonorAccount = () => {
     emergencyAlertsSaving,
     handleAvailabilityToggle,
     handleEmergencyAlertsToggle,
-    shareOptions,
-    qrCodeDataUrl,
-    normalizedLastDonation,
     formatDate,
-    setShareOptionsOpen,
-    handleShareDonorCard,
-    shareCardLoading,
-    setQrPreviewOpen,
     isPhoneLinked,
     canUnlinkPhone,
     unlinkPhoneLoading,
@@ -695,7 +688,7 @@ const DonorAccount = () => {
         <p className="text-xs uppercase tracking-[0.3em] text-red-600">Account</p>
         <h2 className="text-xl font-bold text-gray-900">Manage profile and sharing</h2>
       </div>
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -1025,124 +1018,6 @@ const DonorAccount = () => {
               </div>
               <div className="sm:col-span-2 text-[11px] uppercase tracking-wide text-gray-400">
                 Email and phone updates are available in Contact Info.
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="relative overflow-hidden rounded-2xl border border-red-200 bg-gradient-to-br from-white via-red-50 to-white p-4 shadow-lg transition-transform duration-300 hover:-translate-y-1 animate-fadeIn min-h-[260px] sm:min-h-0">
-          <div className="absolute -top-16 -right-16 w-32 h-32 bg-red-100/70 rounded-full blur-2xl"></div>
-          <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-red-100/60 rounded-full blur-2xl"></div>
-          {isLoading ? (
-            <div className="relative space-y-5">
-              <div className="h-3 w-40 rounded-full bg-gray-100 animate-pulse" />
-              <div className="h-6 w-48 rounded-full bg-gray-100 animate-pulse" />
-              <div className="h-4 w-32 rounded-full bg-gray-100 animate-pulse" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-                <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-                <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-                <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
-              </div>
-              <div className="h-6 w-28 rounded-full bg-gray-100 animate-pulse" />
-            </div>
-          ) : (
-            <div className="relative space-y-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.25em] text-red-600">BloodHub Donor Card</p>
-                  <h2 className="mt-1 text-xl font-bold text-gray-900">
-                    {user?.displayName || 'Donor'}
-                  </h2>
-                  <p className="text-xs text-gray-500">{user?.city || 'Location not set'}</p>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <span className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                    availabilityEnabled
-                      ? 'bg-red-600 text-white'
-                      : 'bg-gray-200 text-gray-700'
-                  }`}>
-                    {availabilityEnabled ? 'Available' : 'On Break'}
-                  </span>
-                  <span className="rounded-full border border-red-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600">
-                    Verified Donor
-                  </span>
-                  <div className="rounded-2xl bg-red-600 px-3 py-2 text-white text-lg font-bold shadow-lg">
-                    {user?.bloodType || '—'}
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                {shareOptions.showBhId && (
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-gray-500">BH ID</p>
-                    <p className="font-semibold text-gray-900">{user?.bhId || 'Pending'}</p>
-                  </div>
-                )}
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Last Donation</p>
-                  <p className="font-semibold text-gray-900">
-                    {normalizedLastDonation ? formatDate(normalizedLastDonation) : 'Not recorded'}
-                  </p>
-                </div>
-                {shareOptions.showPhone && (
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Phone</p>
-                    <p className="font-semibold text-gray-900 text-xs break-all">
-                      {user?.phoneNumber || 'Not set'}
-                    </p>
-                  </div>
-                )}
-                {shareOptions.showEmail && (
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Email</p>
-                    <p className="font-semibold text-gray-900 text-xs break-all">
-                      {user?.email || 'Not set'}
-                    </p>
-                  </div>
-                )}
-                {shareOptions.showQr && qrCodeDataUrl && (
-                  <div className="sm:col-span-2 flex items-center justify-between rounded-xl border border-red-100 bg-white/80 px-3 py-2">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-gray-500">Share QR</p>
-                      <p className="text-xs text-gray-600">Scan to open your donor profile link.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setQrPreviewOpen(true)}
-                      className="rounded-lg border border-red-100 bg-white p-1 transition-transform duration-300 hover:scale-105"
-                      aria-label="Open QR preview"
-                    >
-                      <img
-                        src={qrCodeDataUrl}
-                        alt="BH ID QR"
-                        className="h-12 w-12 shrink-0"
-                      />
-                    </button>
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] uppercase tracking-[0.2em] text-gray-400">
-                <span>BloodHub India</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShareOptionsOpen(true)}
-                    className="flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600 transition-all duration-300 hover:bg-red-50"
-                  >
-                    <SlidersHorizontal className="w-3 h-3" />
-                    Customize
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleShareDonorCard}
-                    disabled={shareCardLoading}
-                    className="flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600 transition-all duration-300 hover:bg-red-50 disabled:opacity-50"
-                  >
-                    <Share2 className="w-3 h-3" />
-                    {shareCardLoading ? 'Preparing' : 'Share Card'}
-                  </button>
-                </div>
               </div>
             </div>
           )}
