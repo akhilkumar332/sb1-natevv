@@ -24,6 +24,8 @@ export interface DonationHistory {
   id: string;
   date: Date;
   location: string;
+  latitude?: number | null;
+  longitude?: number | null;
   bloodBank: string;
   hospitalId: string;
   hospitalName: string;
@@ -92,6 +94,7 @@ export interface DonorStats {
 
 interface UseDonorDataReturn {
   donationHistory: DonationHistory[];
+  firstDonationDate: Date | null;
   emergencyRequests: EmergencyRequest[];
   bloodCamps: BloodCamp[];
   stats: DonorStats | null;
@@ -103,6 +106,7 @@ interface UseDonorDataReturn {
 
 export const useDonorData = (userId: string, bloodType?: string, city?: string): UseDonorDataReturn => {
   const [donationHistory, setDonationHistory] = useState<DonationHistory[]>([]);
+  const [firstDonationDate, setFirstDonationDate] = useState<Date | null>(null);
   const [emergencyRequests, setEmergencyRequests] = useState<EmergencyRequest[]>([]);
   const [bloodCamps, setBloodCamps] = useState<BloodCamp[]>([]);
   const [stats, setStats] = useState<DonorStats | null>(null);
@@ -130,8 +134,8 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     const combined = `${rawTypeString} ${quantityString}`;
     if (combined.includes('platelet')) return 'platelets';
     if (combined.includes('plasma')) return 'plasma';
-    if (combined.includes('whole') || combined.includes('blood')) return 'whole';
-    return 'whole';
+    if (combined.includes('whole') || combined.includes('blood') || quantityString.includes('ml')) return 'whole';
+    return undefined;
   };
 
   const mapDonationEntry = (entry: any, fallbackId: string): DonationHistory => {
@@ -144,6 +148,8 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       id: entry?.id || entry?.legacyId || fallbackId,
       date: dateValue || new Date(),
       location: locationValue,
+      latitude: typeof entry?.latitude === 'number' ? entry.latitude : null,
+      longitude: typeof entry?.longitude === 'number' ? entry.longitude : null,
       bloodBank: entry?.bloodBank || entry?.hospitalName || '',
       hospitalId: entry?.hospitalId || '',
       hospitalName: entry?.hospitalName || '',
@@ -276,6 +282,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       const unsubscribe = onSnapshot(historyRef, (snapshot) => {
         if (!snapshot.exists()) {
           setDonationHistory([]);
+          setFirstDonationDate(null);
           return;
         }
 
@@ -285,11 +292,22 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
           mapDonationEntry(entry, `donation-${index}`)
         ));
 
-        const sortedDonations = mapped
+        if (mapped.length === 0) {
+          setDonationHistory([]);
+          setFirstDonationDate(null);
+          return;
+        }
+
+        const sortedDonations = [...mapped]
           .sort((a, b) => b.date.getTime() - a.date.getTime())
-          .slice(0, 10);
+          .slice(0, 20);
+
+        const oldestDonation = mapped.reduce((oldest, donation) => (
+          donation.date < oldest ? donation.date : oldest
+        ), mapped[0].date);
 
         setDonationHistory(sortedDonations);
+        setFirstDonationDate(oldestDonation);
       });
 
       return unsubscribe;
@@ -511,6 +529,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
 
   return {
     donationHistory,
+    firstDonationDate,
     emergencyRequests,
     bloodCamps,
     stats,

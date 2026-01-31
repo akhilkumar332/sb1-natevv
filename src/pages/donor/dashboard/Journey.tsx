@@ -53,12 +53,14 @@ function MapUpdater({ center }: { center: MapPosition }) {
 function LocationPicker({
   value,
   onChange,
+  onManualInput,
   position,
   onPositionChange,
   placeholder,
 }: {
   value: string;
   onChange: (value: string) => void;
+  onManualInput?: (value: string) => void;
   position: MapPosition;
   onPositionChange: (pos: MapPosition) => void;
   placeholder?: string;
@@ -66,11 +68,15 @@ function LocationPicker({
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [noResults, setNoResults] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestIdRef = useRef(0);
+  const mountedRef = useRef(true);
 
   const handleAddressChange = (event: ChangeEvent<HTMLInputElement>) => {
     const inputValue = event.target.value;
     onChange(inputValue);
+    onManualInput?.(inputValue);
 
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -79,19 +85,27 @@ function LocationPicker({
     if (!inputValue.trim()) {
       setShowSuggestions(false);
       setSuggestions([]);
+      setNoResults(false);
       return;
     }
 
+    const requestId = ++searchRequestIdRef.current;
     searchTimeoutRef.current = setTimeout(async () => {
       try {
         const response = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(inputValue)}&limit=5&addressdetails=1`
         );
         const data = await response.json();
+        if (!mountedRef.current || requestId !== searchRequestIdRef.current) return;
         setSuggestions(data);
-        setShowSuggestions(data.length > 0);
+        setNoResults(data.length === 0);
+        setShowSuggestions(true);
       } catch (error) {
         console.error('Address search error:', error);
+        if (!mountedRef.current || requestId !== searchRequestIdRef.current) return;
+        setSuggestions([]);
+        setNoResults(true);
+        setShowSuggestions(true);
       }
     }, 400);
   };
@@ -102,6 +116,7 @@ function LocationPicker({
     onPositionChange(nextPosition);
     setShowSuggestions(false);
     setSuggestions([]);
+    setNoResults(false);
   };
 
   const handleUseCurrentLocation = () => {
@@ -113,12 +128,14 @@ function LocationPicker({
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
+        if (!mountedRef.current) return;
         onPositionChange([latitude, longitude]);
         try {
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
           );
           const data = await response.json();
+          if (!mountedRef.current) return;
           if (data?.display_name) {
             onChange(data.display_name);
           }
@@ -126,12 +143,16 @@ function LocationPicker({
           console.error('Reverse geocoding error:', error);
           toast.error('Could not fetch address details');
         }
-        setIsLocating(false);
+        if (mountedRef.current) {
+          setIsLocating(false);
+        }
       },
       (error) => {
         console.error('Geolocation error:', error);
         toast.error('Unable to retrieve your location. Please enable location services.');
-        setIsLocating(false);
+        if (mountedRef.current) {
+          setIsLocating(false);
+        }
       },
       {
         enableHighAccuracy: true,
@@ -148,6 +169,7 @@ function LocationPicker({
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos[0]}&lon=${pos[1]}`
       );
       const data = await response.json();
+      if (!mountedRef.current) return;
       if (data?.display_name) {
         onChange(data.display_name);
       }
@@ -158,7 +180,9 @@ function LocationPicker({
   };
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
@@ -199,7 +223,7 @@ function LocationPicker({
           autoComplete="off"
         />
         {showSuggestions && suggestions.length > 0 && (
-          <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-lg">
+          <div className="absolute z-20 mt-2 max-h-48 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
             {suggestions.map((suggestion) => (
               <button
                 key={`${suggestion.place_id}`}
@@ -210,6 +234,11 @@ function LocationPicker({
                 {suggestion.display_name}
               </button>
             ))}
+          </div>
+        )}
+        {showSuggestions && suggestions.length === 0 && noResults && (
+          <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-500 shadow-lg">
+            No results found. Try a different search.
           </div>
         )}
       </div>
@@ -226,6 +255,7 @@ const DonorJourney = () => {
     user,
     isLoading,
     donationHistory,
+    firstDonationDate,
     donationFeedbackMap,
     feedbackOpenId,
     editingDonationId,
@@ -261,6 +291,7 @@ const DonorJourney = () => {
 
   const [deleteCandidate, setDeleteCandidate] = useState<any | null>(null);
   const [logDonationMapPosition, setLogDonationMapPosition] = useState<MapPosition>(defaultPosition);
+  const [logDonationCoords, setLogDonationCoords] = useState<MapPosition | null>(defaultPosition);
   const [editDonationMapPosition, setEditDonationMapPosition] = useState<MapPosition>(defaultPosition);
 
   const filteredDonations = useMemo(() => {
@@ -277,6 +308,16 @@ const DonorJourney = () => {
   }, [donationHistory]);
 
   const livesSaved = typeof stats?.livesSaved === 'number' ? stats.livesSaved : donationHistory.length * 3;
+  const fallbackOldestDonationDate = useMemo(() => {
+    if (!donationHistory.length) return null;
+    return donationHistory.reduce((oldest: Date, donation: any) => {
+      const currentDate = donation?.date instanceof Date ? donation.date : new Date(donation.date);
+      if (!oldest) return currentDate;
+      return currentDate < oldest ? currentDate : oldest;
+    }, donationHistory[0].date);
+  }, [donationHistory]);
+
+  const oldestDonationDate = firstDonationDate || fallbackOldestDonationDate;
 
   const filteredBadges = useMemo(() => {
     return badges.filter((badge: any) => badge.category === badgeCategory);
@@ -307,6 +348,9 @@ const DonorJourney = () => {
   });
 
   const openLogDonation = () => {
+    setDeleteCandidate(null);
+    handleCancelDonationEdit();
+    handleCancelFeedback();
     setLogDonationForm({
       date: '',
       location: user?.city || '',
@@ -316,6 +360,7 @@ const DonorJourney = () => {
       notes: '',
     });
     setLogDonationMapPosition(defaultPosition);
+    setLogDonationCoords(defaultPosition);
     setLogDonationOpen(true);
   };
 
@@ -324,8 +369,40 @@ const DonorJourney = () => {
     setLogDonationOpen(false);
   };
 
+  const handleLogPositionChange = (pos: MapPosition) => {
+    setLogDonationMapPosition(pos);
+    setLogDonationCoords(pos);
+  };
+
+  const handleEditPositionChange = (pos: MapPosition) => {
+    setEditDonationMapPosition(pos);
+    setEditingDonationData((prev: any) => ({
+      ...prev,
+      latitude: pos[0],
+      longitude: pos[1],
+    }));
+  };
+
+  const clearLogCoordinates = () => {
+    setLogDonationCoords(null);
+  };
+
+  const clearEditCoordinates = () => {
+    setEditingDonationData((prev: any) => ({
+      ...prev,
+      latitude: null,
+      longitude: null,
+    }));
+  };
+
   useEffect(() => {
     if (!editingDonationId) return;
+    const latitude = typeof editingDonationData?.latitude === 'number' ? editingDonationData.latitude : null;
+    const longitude = typeof editingDonationData?.longitude === 'number' ? editingDonationData.longitude : null;
+    if (latitude !== null && longitude !== null) {
+      setEditDonationMapPosition([latitude, longitude]);
+      return;
+    }
     if (!editingDonationData?.location) {
       setEditDonationMapPosition(defaultPosition);
       return;
@@ -339,7 +416,13 @@ const DonorJourney = () => {
         const data = await response.json();
         if (!active || !data?.length) return;
         const result = data[0];
-        setEditDonationMapPosition([parseFloat(result.lat), parseFloat(result.lon)]);
+        const nextPosition: MapPosition = [parseFloat(result.lat), parseFloat(result.lon)];
+        setEditDonationMapPosition(nextPosition);
+        setEditingDonationData((prev: any) => ({
+          ...prev,
+          latitude: nextPosition[0],
+          longitude: nextPosition[1],
+        }));
       } catch (error) {
         console.error('Edit location lookup error:', error);
       }
@@ -348,7 +431,7 @@ const DonorJourney = () => {
     return () => {
       active = false;
     };
-  }, [editingDonationId, editingDonationData?.location, defaultPosition]);
+  }, [editingDonationId, defaultPosition]);
 
   const handleLogDonationSubmit = async () => {
     if (!logDonationForm.date) {
@@ -376,6 +459,7 @@ const DonorJourney = () => {
     }
     try {
       setLogDonationSaving(true);
+      const coords = logDonationCoords;
       await handleLogDonation({
         date: parsedDate,
         location: logDonationForm.location,
@@ -383,6 +467,8 @@ const DonorJourney = () => {
         units: logDonationForm.units,
         donationType: logDonationForm.donationType,
         notes: logDonationForm.notes,
+        latitude: coords ? coords[0] : null,
+        longitude: coords ? coords[1] : null,
       });
       setLogDonationOpen(false);
     } catch (error: any) {
@@ -518,7 +604,11 @@ const DonorJourney = () => {
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => handleStartDonationEdit(donation)}
+                              onClick={() => {
+                                setDeleteCandidate(null);
+                                handleCancelFeedback();
+                                handleStartDonationEdit(donation);
+                              }}
                               className="p-2 hover:bg-white rounded-lg transition-all duration-300"
                               title="Edit donation"
                             >
@@ -526,7 +616,11 @@ const DonorJourney = () => {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setDeleteCandidate(donation)}
+                              onClick={() => {
+                                handleCancelDonationEdit();
+                                handleCancelFeedback();
+                                setDeleteCandidate(donation);
+                              }}
                               disabled={donationDeleteId === donation.id}
                               className="p-2 hover:bg-white rounded-lg transition-all duration-300 disabled:opacity-60"
                               title="Delete donation"
@@ -544,7 +638,11 @@ const DonorJourney = () => {
                             )}
                             <button
                               type="button"
-                              onClick={() => handleOpenFeedback(donation.id)}
+                              onClick={() => {
+                                setDeleteCandidate(null);
+                                handleCancelDonationEdit();
+                                handleOpenFeedback(donation.id);
+                              }}
                               className="p-2 hover:bg-white rounded-lg transition-all duration-300"
                               title={hasFeedback ? 'Edit feedback' : 'Add feedback'}
                             >
@@ -774,7 +872,7 @@ const DonorJourney = () => {
               </div>
             </div>
             <p className="mt-3 text-xs text-gray-500">
-              Since {donationHistory[donationHistory.length - 1]?.date ? formatDate(donationHistory[donationHistory.length - 1].date) : 'joining'}
+              Since {oldestDonationDate ? formatDate(oldestDonationDate) : 'joining'}
             </p>
           </div>
 
@@ -807,7 +905,7 @@ const DonorJourney = () => {
           role="presentation"
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -879,8 +977,9 @@ const DonorJourney = () => {
                 <LocationPicker
                   value={logDonationForm.location}
                   onChange={(value) => setLogDonationForm((prev) => ({ ...prev, location: value }))}
+                  onManualInput={clearLogCoordinates}
                   position={logDonationMapPosition}
-                  onPositionChange={setLogDonationMapPosition}
+                  onPositionChange={handleLogPositionChange}
                   placeholder="City or donation location"
                 />
               </div>
@@ -934,7 +1033,7 @@ const DonorJourney = () => {
           role="presentation"
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -964,8 +1063,9 @@ const DonorJourney = () => {
                     ...prev,
                     location: value,
                   }))}
+                  onManualInput={clearEditCoordinates}
                   position={editDonationMapPosition}
-                  onPositionChange={setEditDonationMapPosition}
+                  onPositionChange={handleEditPositionChange}
                   placeholder="City or donation location"
                 />
               </div>
@@ -1039,7 +1139,7 @@ const DonorJourney = () => {
           role="presentation"
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
