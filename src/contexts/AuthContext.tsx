@@ -82,6 +82,12 @@ interface User {
   howHeardAboutUs?: string;
   interestedInVolunteering?: boolean;
   emailVerified?: boolean;
+  donorCardShareOptions?: {
+    showPhone: boolean;
+    showEmail: boolean;
+    showBhId: boolean;
+    showQr: boolean;
+  };
   notificationPreferences?: {
     emergencyAlerts?: boolean;
   };
@@ -166,6 +172,7 @@ const serializeUserForCache = (user: User) => ({
   lastDonation: user.lastDonation ? user.lastDonation.toISOString() : undefined,
   dateOfBirth: user.dateOfBirth ? user.dateOfBirth.toISOString() : undefined,
   availableUntil: user.availableUntil ? user.availableUntil.toISOString() : null,
+  donorCardShareOptions: user.donorCardShareOptions ? { ...user.donorCardShareOptions } : undefined,
   eligibilityChecklist: user.eligibilityChecklist
     ? {
         ...user.eligibilityChecklist,
@@ -183,6 +190,7 @@ const hydrateCachedUser = (raw: any): User => ({
   lastDonation: parseCachedDate(raw?.lastDonation),
   dateOfBirth: parseCachedDate(raw?.dateOfBirth),
   availableUntil: raw?.availableUntil ? parseCachedDate(raw.availableUntil) || null : null,
+  donorCardShareOptions: raw?.donorCardShareOptions ? { ...raw.donorCardShareOptions } : undefined,
   eligibilityChecklist: raw?.eligibilityChecklist
     ? {
         ...raw.eligibilityChecklist,
