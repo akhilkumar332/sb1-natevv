@@ -28,6 +28,7 @@ export interface DonationHistory {
   hospitalId: string;
   hospitalName: string;
   quantity: string;
+  donationType?: 'whole' | 'platelets' | 'plasma';
   status: 'completed' | 'scheduled' | 'cancelled';
   certificateUrl?: string;
   units: number;
@@ -118,6 +119,21 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     return null;
   };
 
+  const inferDonationType = (entry: any): DonationHistory['donationType'] => {
+    const rawType = entry?.donationType
+      || entry?.type
+      || entry?.component
+      || entry?.componentType
+      || entry?.donationComponent;
+    const rawTypeString = typeof rawType === 'string' ? rawType.toLowerCase() : '';
+    const quantityString = typeof entry?.quantity === 'string' ? entry.quantity.toLowerCase() : '';
+    const combined = `${rawTypeString} ${quantityString}`;
+    if (combined.includes('platelet')) return 'platelets';
+    if (combined.includes('plasma')) return 'plasma';
+    if (combined.includes('whole') || combined.includes('blood')) return 'whole';
+    return 'whole';
+  };
+
   const mapDonationEntry = (entry: any, fallbackId: string): DonationHistory => {
     const dateValue = parseDonationDate(entry?.date ?? entry?.donationDate);
     const sourceValue = entry?.source || (entry?.legacyId || entry?.hospitalId ? 'verified' : 'manual');
@@ -132,6 +148,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       hospitalId: entry?.hospitalId || '',
       hospitalName: entry?.hospitalName || '',
       quantity: entry?.quantity || '450ml',
+      donationType: entry?.donationType || inferDonationType(entry),
       status: entry?.status || 'completed',
       certificateUrl: entry?.certificateUrl,
       units: entry?.units || 1,

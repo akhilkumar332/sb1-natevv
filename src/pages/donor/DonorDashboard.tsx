@@ -106,8 +106,10 @@ function DonorDashboard() {
     location: '',
     units: 1,
     notes: '',
+    donationType: 'whole' as 'whole' | 'platelets' | 'plasma',
   });
   const [donationEditSaving, setDonationEditSaving] = useState(false);
+  const [donationDeleteId, setDonationDeleteId] = useState<string | null>(null);
   const [referralCount, setReferralCount] = useState(0);
   const [referralLoading, setReferralLoading] = useState(true);
   const [referralEntries, setReferralEntries] = useState<ReferralEntry[]>([]);
@@ -117,6 +119,7 @@ function DonorDashboard() {
   const fallbackReferralAppliedRef = useRef(false);
   const referralNotificationSyncRef = useRef<Set<string>>(new Set());
   const referralStatusSyncRef = useRef<Set<string>>(new Set());
+  const donationTypeBackfillRef = useRef(false);
   const [eligibilityChecklist, setEligibilityChecklist] = useState({
     hydrated: false,
     weightOk: false,
@@ -201,6 +204,21 @@ function DonorDashboard() {
     if (typeof value?.toDate === 'function') return value.toDate();
     if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
     return null;
+  };
+
+  const inferDonationTypeFromEntry = (entry: any) => {
+    const rawType = entry?.donationType
+      || entry?.type
+      || entry?.component
+      || entry?.componentType
+      || entry?.donationComponent;
+    const rawTypeString = typeof rawType === 'string' ? rawType.toLowerCase() : '';
+    const quantityString = typeof entry?.quantity === 'string' ? entry.quantity.toLowerCase() : '';
+    const combined = `${rawTypeString} ${quantityString}`;
+    if (combined.includes('platelet')) return 'platelets';
+    if (combined.includes('plasma')) return 'plasma';
+    if (combined.includes('whole') || combined.includes('blood')) return 'whole';
+    return 'whole';
   };
 
   const generateDonationEntryId = () => {
@@ -513,6 +531,53 @@ function DonorDashboard() {
       console.warn('Failed to load donation feedback:', error);
     });
     return () => unsubscribe();
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid || donationTypeBackfillRef.current) return;
+    donationTypeBackfillRef.current = true;
+
+    const backfillDonationTypes = async () => {
+      try {
+        const historyRef = doc(db, 'DonationHistory', user.uid);
+        const historySnapshot = await getDoc(historyRef);
+        if (!historySnapshot.exists()) return;
+        const existingDonations = Array.isArray(historySnapshot.data().donations)
+          ? historySnapshot.data().donations
+          : [];
+        let hasChanges = false;
+        const updatedDonations = existingDonations.map((entry: any) => {
+          if (entry?.donationType) return entry;
+          const inferred = inferDonationTypeFromEntry(entry);
+          hasChanges = true;
+          const quantity = entry?.quantity || (
+            inferred === 'platelets'
+              ? 'Platelets'
+              : inferred === 'plasma'
+                ? 'Plasma'
+                : '450ml'
+          );
+          return {
+            ...entry,
+            donationType: inferred,
+            quantity,
+          };
+        });
+        if (!hasChanges) return;
+        await setDoc(
+          historyRef,
+          {
+            donations: updatedDonations,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (error) {
+        console.warn('Donation type backfill failed:', error);
+      }
+    };
+
+    void backfillDonationTypes();
   }, [user?.uid]);
 
   const shareOptionsSyncRef = useRef<string | null>(null);
@@ -957,6 +1022,83 @@ function DonorDashboard() {
     }
   };
 
+  const handleLogDonation = async (payload: {
+    date: Date;
+    location?: string;
+    units?: number;
+    notes?: string;
+    bloodBank?: string;
+    donationType?: 'whole' | 'platelets' | 'plasma';
+  }) => {
+    if (!user?.uid) {
+      throw new Error('User not available.');
+    }
+    const donationDate = payload.date;
+    if (!(donationDate instanceof Date) || Number.isNaN(donationDate.getTime())) {
+      throw new Error('Invalid donation date.');
+    }
+    const historyRef = doc(db, 'DonationHistory', user.uid);
+    const historySnapshot = await getDoc(historyRef);
+    const existingDonations = historySnapshot.exists() && Array.isArray(historySnapshot.data().donations)
+      ? historySnapshot.data().donations
+      : [];
+
+    const resolvedLocation = payload.location || user.city || '';
+    const resolvedBloodBank = payload.bloodBank || 'Self Reported';
+    const unitsValue = payload.units && payload.units > 0 ? payload.units : 1;
+    const donationType = payload.donationType || 'whole';
+    const quantityLabel = donationType === 'platelets'
+      ? 'Platelets'
+      : donationType === 'plasma'
+        ? 'Plasma'
+        : '450ml';
+
+    const nextDonations = [
+      ...existingDonations,
+      {
+        id: generateDonationEntryId(),
+        date: Timestamp.fromDate(donationDate),
+        location: resolvedLocation,
+        bloodBank: resolvedBloodBank,
+        hospitalId: '',
+        hospitalName: resolvedBloodBank,
+        quantity: quantityLabel,
+        donationType,
+        status: 'completed',
+        units: unitsValue,
+        source: 'manual',
+        notes: payload.notes || '',
+        createdAt: Timestamp.now(),
+      },
+    ];
+
+    const sortedDonations = nextDonations
+      .sort((a: any, b: any) => {
+        const dateA = readEntryDate(a)?.getTime() || 0;
+        const dateB = readEntryDate(b)?.getTime() || 0;
+        return dateB - dateA;
+      })
+      .slice(0, 20);
+
+    const latestDonationDate = sortedDonations.length > 0 ? readEntryDate(sortedDonations[0]) : null;
+
+    await setDoc(
+      historyRef,
+      {
+        userId: user.uid,
+        lastDonationDate: latestDonationDate ? Timestamp.fromDate(latestDonationDate) : null,
+        donations: sortedDonations,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    if (latestDonationDate) {
+      await updateUserProfile({ lastDonation: latestDonationDate });
+    }
+    toast.success('Donation logged successfully.');
+  };
+
   const handleDownloadCertificate = (certificateUrl: string) => {
     if (certificateUrl) {
       window.open(certificateUrl, '_blank');
@@ -968,10 +1110,12 @@ function DonorDashboard() {
 
   const handleStartDonationEdit = (donation: any) => {
     setEditingDonationId(donation.id);
+    const donationType = donation.donationType || inferDonationTypeFromEntry(donation);
     setEditingDonationData({
       location: donation.location || '',
       units: donation.units || 1,
       notes: donation.notes || '',
+      donationType,
     });
   };
 
@@ -989,6 +1133,12 @@ function DonorDashboard() {
 
     try {
       setDonationEditSaving(true);
+      const donationType = editingDonationData.donationType || 'whole';
+      const quantityLabel = donationType === 'platelets'
+        ? 'Platelets'
+        : donationType === 'plasma'
+          ? 'Plasma'
+          : '450ml';
       const historyRef = doc(db, 'DonationHistory', user.uid);
       const historySnapshot = await getDoc(historyRef);
       if (!historySnapshot.exists()) {
@@ -1006,6 +1156,8 @@ function DonorDashboard() {
           location: editingDonationData.location,
           units: unitsValue,
           notes: editingDonationData.notes,
+          donationType,
+          quantity: quantityLabel,
           updatedAt: Timestamp.now(),
         };
       });
@@ -1026,6 +1178,125 @@ function DonorDashboard() {
       toast.error(error?.message || 'Failed to update donation.');
     } finally {
       setDonationEditSaving(false);
+    }
+  };
+
+  const handleUndoDonationDelete = async (entry: any) => {
+    if (!user?.uid || !entry) return;
+    try {
+      const historyRef = doc(db, 'DonationHistory', user.uid);
+      const historySnapshot = await getDoc(historyRef);
+      if (!historySnapshot.exists()) {
+        throw new Error('Donation history not found.');
+      }
+      const existingDonations = Array.isArray(historySnapshot.data().donations)
+        ? historySnapshot.data().donations
+        : [];
+      const entryId = entry?.id || entry?.legacyId;
+      const alreadyExists = existingDonations.some((item: any, index: number) => {
+        const currentId = item?.id || item?.legacyId || `donation-${index}`;
+        return entryId ? currentId === entryId : item === entry;
+      });
+      if (alreadyExists) {
+        toast.success('Donation already restored.');
+        return;
+      }
+      const nextDonations = [...existingDonations, entry];
+      const sortedDonations = nextDonations
+        .sort((a: any, b: any) => {
+          const dateA = readEntryDate(a)?.getTime() || 0;
+          const dateB = readEntryDate(b)?.getTime() || 0;
+          return dateB - dateA;
+        })
+        .slice(0, 20);
+      const latestDonationDate = sortedDonations.length > 0 ? readEntryDate(sortedDonations[0]) : null;
+
+      await setDoc(
+        historyRef,
+        {
+          donations: sortedDonations,
+          lastDonationDate: latestDonationDate ? Timestamp.fromDate(latestDonationDate) : null,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      await updateUserProfile({ lastDonation: latestDonationDate || null });
+      toast.success('Donation restored.');
+    } catch (error: any) {
+      console.error('Donation restore error:', error);
+      toast.error(error?.message || 'Failed to restore donation.');
+    }
+  };
+
+  const handleDeleteDonation = async (donationId: string, options?: { skipConfirm?: boolean }) => {
+    if (!user?.uid) return;
+    if (!options?.skipConfirm) {
+      const confirmed = window.confirm('Delete this donation? You can undo for a short time.');
+      if (!confirmed) return;
+    }
+    try {
+      setDonationDeleteId(donationId);
+      const historyRef = doc(db, 'DonationHistory', user.uid);
+      const historySnapshot = await getDoc(historyRef);
+      if (!historySnapshot.exists()) {
+        throw new Error('Donation history not found.');
+      }
+      const existingDonations = Array.isArray(historySnapshot.data().donations)
+        ? historySnapshot.data().donations
+        : [];
+      let removedEntry: any | null = null;
+      const filteredDonations = existingDonations.filter((entry: any, index: number) => {
+        const entryId = entry?.id || entry?.legacyId || `donation-${index}`;
+        if (entryId === donationId) {
+          removedEntry = entry;
+          return false;
+        }
+        return entryId !== donationId;
+      });
+      if (!removedEntry) {
+        throw new Error('Donation not found.');
+      }
+      const sortedDonations = filteredDonations
+        .sort((a: any, b: any) => {
+          const dateA = readEntryDate(a)?.getTime() || 0;
+          const dateB = readEntryDate(b)?.getTime() || 0;
+          return dateB - dateA;
+        })
+        .slice(0, 20);
+      const latestDonationDate = sortedDonations.length > 0 ? readEntryDate(sortedDonations[0]) : null;
+
+      await setDoc(
+        historyRef,
+        {
+          donations: sortedDonations,
+          lastDonationDate: latestDonationDate ? Timestamp.fromDate(latestDonationDate) : null,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      await updateUserProfile({ lastDonation: latestDonationDate || null });
+      toast.custom((toastInstance) => (
+        <div className="rounded-xl border border-red-100 bg-white px-4 py-3 shadow-lg flex items-center gap-3">
+          <span className="text-sm text-gray-700">Donation deleted.</span>
+          <button
+            type="button"
+            onClick={() => {
+              toast.dismiss(toastInstance.id);
+              void handleUndoDonationDelete(removedEntry);
+            }}
+            className="text-sm font-semibold text-red-600 hover:text-red-700"
+          >
+            Undo
+          </button>
+        </div>
+      ), { duration: 5000 });
+    } catch (error: any) {
+      console.error('Donation delete error:', error);
+      toast.error(error?.message || 'Failed to delete donation.');
+    } finally {
+      setDonationDeleteId(null);
     }
   };
 
@@ -1605,6 +1876,7 @@ function DonorDashboard() {
     editingDonationData,
     setEditingDonationData,
     donationEditSaving,
+    donationDeleteId,
     feedbackOpenId,
     feedbackForm,
     setFeedbackForm,
@@ -1615,6 +1887,7 @@ function DonorDashboard() {
     handleInviteFriends,
     handleAvailableToday,
     handleSaveLastDonation,
+    handleLogDonation,
     handleChecklistToggle,
     handleViewAllRequests,
     handleRespondToRequest,
@@ -1625,6 +1898,7 @@ function DonorDashboard() {
     handleStartDonationEdit,
     handleDonationEditSave,
     handleCancelDonationEdit,
+    handleDeleteDonation,
     handleOpenFeedback,
     handleSaveFeedback,
     handleCancelFeedback,

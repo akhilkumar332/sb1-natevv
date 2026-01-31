@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { BookOpen, CheckCircle, Clock } from 'lucide-react';
 
@@ -24,7 +25,24 @@ const DonorReadiness = () => {
     formatDate,
     formatDateTime,
     handleLearnMore,
+    donationHistory,
   } = dashboard;
+
+  const latestDonationType = useMemo(() => {
+    if (!Array.isArray(donationHistory) || donationHistory.length === 0) return null;
+    const sorted = [...donationHistory]
+      .filter((entry) => entry?.date)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return sorted[0]?.donationType || null;
+  }, [donationHistory]);
+
+  const latestDonationTypeLabel = latestDonationType
+    ? latestDonationType === 'whole'
+      ? 'Whole Blood'
+      : latestDonationType === 'platelets'
+        ? 'Platelets'
+        : 'Plasma'
+    : 'Not set';
 
   return (
     <>
@@ -119,6 +137,7 @@ const DonorReadiness = () => {
                   <p className="text-sm font-semibold text-gray-800">
                     {normalizedLastDonation ? formatDate(normalizedLastDonation) : 'Not set'}
                   </p>
+                  <p className="mt-1 text-xs text-gray-500">Type: {latestDonationTypeLabel}</p>
                 </div>
                 <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
                   <p className="text-[10px] uppercase tracking-wide text-gray-500">Recovery Window</p>
