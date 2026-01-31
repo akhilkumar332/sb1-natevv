@@ -468,6 +468,7 @@ export type NotificationType =
   | 'donation_confirmation'
   | 'verification_status'
   | 'achievement'
+  | 'referral'
   | 'general';
 
 export type NotificationPriority = 'high' | 'medium' | 'low';
@@ -498,6 +499,10 @@ export interface Notification {
   // Reference
   relatedId?: string;
   relatedType?: string;
+  referralId?: string;
+  referrerUid?: string;
+  referredUid?: string;
+  createdBy?: string;
 
   // Priority
   priority: NotificationPriority;

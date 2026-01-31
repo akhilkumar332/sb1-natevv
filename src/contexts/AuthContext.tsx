@@ -34,7 +34,7 @@ import { auth, db, googleProvider } from '../firebase';
 import { generateBhId } from '../utils/bhId';
 import { normalizePhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
-import { applyReferralTrackingForUser } from '../services/referral.service';
+import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../services/referral.service';
 import { getReferralReferrerUid, getReferralTracking } from '../utils/referralTracking';
 
 // Define window recaptcha type
@@ -474,6 +474,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn('Deferred referral apply failed:', error);
       });
   }, [user?.uid, user?.referredByUid, user?.referredByBhId]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (!user.referredByUid) return;
+    ensureReferralTrackingForExistingReferral(user).catch((error) => {
+      console.warn('Referral status sync failed:', error);
+    });
+  }, [user?.uid, user?.referredByUid, user?.onboardingCompleted, user?.status]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

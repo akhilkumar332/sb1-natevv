@@ -99,7 +99,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         return { bg: 'bg-blue-100', text: 'text-blue-600', border: 'border-blue-200' };
       case 'badge_earned':
       case 'milestone_reached':
-        return { bg: 'bg-yellow-100', text: 'text-yellow-600', border: 'border-yellow-200' };
+      return { bg: 'bg-yellow-100', text: 'text-yellow-600', border: 'border-yellow-200' };
+      case 'referral':
+        return { bg: 'bg-red-100', text: 'text-red-600', border: 'border-red-200' };
       case 'donation_completed':
         return { bg: 'bg-green-100', text: 'text-green-600', border: 'border-green-200' };
       default:

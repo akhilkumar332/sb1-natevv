@@ -79,6 +79,53 @@ service cloud.firestore {
       return isAuthenticated() && getUserData().status == 'active';
     }
 
+    /**
+     * Validate referral status updates from referred users
+     */
+    function isValidReferralStatusUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.status in ['registered', 'onboarded', 'eligible', 'deleted'];
+    }
+
+    /**
+     * Allow referral notifications only if the auth user is the referred donor
+     */
+    function isReferralNotificationCreate() {
+      return request.resource.data.type == 'referral'
+        && request.resource.data.referralId is string
+        && exists(/databases/$(database)/documents/ReferralTracking/$(request.resource.data.referralId))
+        && get(/databases/$(database)/documents/ReferralTracking/$(request.resource.data.referralId)).data.referrerUid
+          == request.resource.data.userId
+        && get(/databases/$(database)/documents/ReferralTracking/$(request.resource.data.referralId)).data.referredUid
+          == request.auth.uid;
+    }
+
+    /**
+     * Donor -> hospital appointment updates
+     */
+    function isAppointmentNotificationForHospital() {
+      return request.resource.data.relatedType == 'appointment'
+        && request.resource.data.relatedId is string
+        && exists(/databases/$(database)/documents/appointments/$(request.resource.data.relatedId))
+        && get(/databases/$(database)/documents/appointments/$(request.resource.data.relatedId)).data.donorId
+          == request.auth.uid
+        && get(/databases/$(database)/documents/appointments/$(request.resource.data.relatedId)).data.hospitalId
+          == request.resource.data.userId;
+    }
+
+    /**
+     * Donor -> requester updates for blood requests
+     */
+    function isBloodRequestNotificationForRequester() {
+      return request.resource.data.relatedType == 'blood_request'
+        && request.resource.data.relatedId is string
+        && exists(/databases/$(database)/documents/bloodRequests/$(request.resource.data.relatedId))
+        && get(/databases/$(database)/documents/bloodRequests/$(request.resource.data.relatedId)).data.requesterId
+          == request.resource.data.userId
+        && get(/databases/$(database)/documents/bloodRequests/$(request.resource.data.relatedId)).data.respondedDonors != null
+        && request.auth.uid in get(/databases/$(database)/documents/bloodRequests/$(request.resource.data.relatedId)).data.respondedDonors;
+    }
+
     // ========================================================================
     // COLLECTION: users
     // ========================================================================
@@ -128,7 +175,12 @@ service cloud.firestore {
         isAdmin()
       );
       allow create: if isAuthenticated() && request.resource.data.referredUid == request.auth.uid;
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        resource.data.referredUid == request.auth.uid &&
+        isValidReferralStatusUpdate()
+      );
+      allow delete: if isAdmin();
     }
 
     // ========================================================================
@@ -356,7 +408,17 @@ service cloud.firestore {
 
       // System and admins can create notifications
       // In practice, this should be done via Cloud Functions
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isHospital() ||
+        isNGO() ||
+        (isDonor() && (
+          isReferralNotificationCreate() ||
+          isAppointmentNotificationForHospital() ||
+          isBloodRequestNotificationForRequester()
+        ))
+      );
 
       // Recipient can update (mark as read), admin can update any
       allow update: if isAuthenticated() && (

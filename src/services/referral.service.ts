@@ -7,6 +7,7 @@ import {
   setReferralReferrerUid,
   setReferralTracking,
 } from '../utils/referralTracking';
+import { REFERRAL_RULES, computeReferralStatus, normalizeReferralDate } from '../utils/referralRules';
 
 type ReferralApplyResult = {
   referrerUid: string;
@@ -17,6 +18,18 @@ type ResolveResult = {
   uid: string;
   bhId?: string;
 };
+
+type ReferralStatusUpdate = {
+  status: 'registered' | 'onboarded' | 'eligible' | 'deleted';
+  statusLabel: string;
+  isEligible: boolean;
+};
+
+const buildReferralNotificationId = (
+  referrerUid: string,
+  referredUid: string,
+  status: ReferralStatusUpdate['status']
+) => `referral_${referrerUid}_${referredUid}_${status}`;
 
 const resolveReferrerByBhId = async (bhId?: string | null): Promise<ResolveResult | null> => {
   if (!bhId) return null;
@@ -116,9 +129,11 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
         {
           referredByUid: referrerUid,
           referredByBhId: referrerBhId,
+          referralCapturedAt: serverTimestamp(),
         },
         { merge: true }
       );
+      await sendReferralNotification(referrerUid, 'registered', newUserUid, undefined);
       clearReferralTracking();
       return { referrerUid, referrerBhId };
     }
@@ -137,6 +152,7 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
         {
           referredByUid: referrerUid,
           referredByBhId: referrerBhId,
+          referralCapturedAt: serverTimestamp(),
         },
         { merge: true }
       ),
@@ -150,6 +166,7 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
     }
 
     if (referralResult.status === 'fulfilled' || userResult.status === 'fulfilled') {
+      await sendReferralNotification(referrerUid, 'registered', newUserUid, undefined);
       clearReferralTracking();
       return { referrerUid, referrerBhId };
     }
@@ -158,4 +175,131 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
   }
 
   return null;
+};
+
+const buildNotificationContent = (
+  status: ReferralStatusUpdate['status'],
+  referredUser?: any
+) => {
+  const name = referredUser?.displayName || referredUser?.name || 'A donor';
+  if (status === 'registered') {
+    return {
+      title: 'New referral registered',
+      message: `${name} just signed up using your referral link.`,
+    };
+  }
+  if (status === 'onboarded') {
+    return {
+      title: 'Referral completed onboarding',
+      message: `${name} finished onboarding. You're one step closer to your milestone.`,
+    };
+  }
+  if (status === 'eligible') {
+    return {
+      title: 'Referral is now eligible',
+      message: `${name} has crossed the eligibility window and now counts towards your milestones.`,
+    };
+  }
+  return {
+    title: 'Referral update',
+    message: `${name} has an update on their referral status.`,
+  };
+};
+
+const sendReferralNotification = async (
+  referrerUid: string,
+  status: ReferralStatusUpdate['status'],
+  referredUid: string,
+  referredUser?: any,
+  createdByUid?: string
+): Promise<boolean> => {
+  try {
+    const notificationId = buildReferralNotificationId(referrerUid, referredUid, status);
+    const notificationRef = doc(db, 'notifications', notificationId);
+    const existing = await getDoc(notificationRef);
+    if (existing.exists()) {
+      return true;
+    }
+    const content = buildNotificationContent(status, referredUser);
+    const referralId = `${referrerUid}_${referredUid}`;
+    await setDoc(notificationRef, {
+      userId: referrerUid,
+      userRole: 'donor',
+      type: 'referral',
+      title: content.title,
+      message: content.message,
+      read: false,
+      priority: 'medium',
+      relatedId: referredUid,
+      relatedType: 'referral',
+      referralId,
+      referrerUid,
+      referredUid,
+      createdBy: createdByUid || referredUid,
+      actionUrl: '/donor/dashboard/referrals',
+      createdAt: serverTimestamp(),
+    });
+    return true;
+  } catch (error) {
+    console.warn('Failed to create referral notification:', error);
+  }
+  return false;
+};
+
+export const ensureReferralTrackingForExistingReferral = async (user: any): Promise<void> => {
+  const referrerUid = user?.referredByUid;
+  if (!referrerUid || !user?.uid) return;
+
+  const referralDocId = `${referrerUid}_${user.uid}`;
+  const referralRef = doc(db, 'ReferralTracking', referralDocId);
+  const referralSnap = await getDoc(referralRef);
+
+  if (!referralSnap.exists()) {
+    await setDoc(referralRef, {
+      referrerUid,
+      referredUid: user.uid,
+      referrerBhId: user.referredByBhId,
+      referredAt: serverTimestamp(),
+      status: 'registered',
+      createdAt: serverTimestamp(),
+    });
+    await sendReferralNotification(referrerUid, 'registered', user.uid, user, user.uid);
+  }
+
+  const referralData = referralSnap.exists() ? referralSnap.data() : null;
+  const referredAt = normalizeReferralDate(referralData?.referredAt) || normalizeReferralDate(user?.createdAt);
+  const currentStatus = (referralData?.status || 'registered') as ReferralStatusUpdate['status'];
+  const computed = computeReferralStatus({
+    referredAt,
+    referredUser: user,
+    entryStatus: currentStatus,
+    rules: REFERRAL_RULES,
+  });
+
+  if (computed.status !== currentStatus) {
+    await setDoc(
+      referralRef,
+      {
+        status: computed.status,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+    if (computed.status === 'onboarded' || computed.status === 'eligible') {
+      await sendReferralNotification(referrerUid, computed.status, user.uid, user, user.uid);
+    }
+  }
+};
+
+export const ensureReferralNotificationsForReferrer = async (
+  referrerUid: string,
+  referrals: Array<{ referredUid: string; referralStatus?: string; user?: any }>
+): Promise<void> => {
+  if (!referrerUid || referrals.length === 0) return;
+  const notifyStatuses: ReferralStatusUpdate['status'][] = ['onboarded', 'eligible'];
+  await Promise.all(referrals.map(async (entry) => {
+    const status = (entry.referralStatus || 'registered') as ReferralStatusUpdate['status'];
+    if (!notifyStatuses.includes(status)) return;
+    await sendReferralNotification(referrerUid, status, entry.referredUid, entry.user, referrerUid);
+  }));
 };

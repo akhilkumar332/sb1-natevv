@@ -27,6 +27,8 @@ import BhIdBanner from '../../components/BhIdBanner';
 import { collection, doc, getDoc, getDocs, setDoc, serverTimestamp, Timestamp, query, where, onSnapshot, documentId } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
+import { REFERRAL_RULES, computeReferralStatus } from '../../utils/referralRules';
+import { ensureReferralNotificationsForReferrer } from '../../services/referral.service';
 import type { ConfirmationResult } from 'firebase/auth';
 
 type ShareOptions = {
@@ -122,6 +124,8 @@ function DonorDashboard() {
     };
   });
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  const [referralQrDataUrl, setReferralQrDataUrl] = useState<string | null>(null);
+  const [referralQrLoading, setReferralQrLoading] = useState(false);
   const [editingDonationId, setEditingDonationId] = useState<string | null>(null);
   const [editingDonationData, setEditingDonationData] = useState({
     location: '',
@@ -136,6 +140,7 @@ function DonorDashboard() {
   const [referralUsersLoading, setReferralUsersLoading] = useState(false);
   const [fallbackReferralLoading, setFallbackReferralLoading] = useState(false);
   const fallbackReferralAppliedRef = useRef(false);
+  const referralNotificationSyncRef = useRef<Set<string>>(new Set());
   const [eligibilityChecklist, setEligibilityChecklist] = useState({
     hydrated: false,
     weightOk: false,
@@ -732,6 +737,31 @@ function DonorDashboard() {
     toast.success('Invite link copied to clipboard!');
   };
 
+  const shareInviteLink = async () => {
+    const inviteLink = buildInviteLink();
+    const message = 'Join BloodHub and save lives. Use my referral link to get started.';
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: 'BloodHub Referral',
+          text: message,
+          url: inviteLink,
+        });
+        return;
+      } catch (error) {
+        console.warn('Share canceled or failed:', error);
+      }
+    }
+    copyInviteLink();
+  };
+
+  const openWhatsAppInvite = () => {
+    const inviteLink = buildInviteLink();
+    const text = `Join BloodHub and save lives. Use my referral link to get started: ${inviteLink}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   const buildInviteLink = () => {
     const baseUrl = window.location.origin;
     const bhId = user?.bhId?.trim();
@@ -765,6 +795,32 @@ function DonorDashboard() {
       reader.onerror = () => reject(new Error('Failed to read QR data.'));
       reader.readAsDataURL(blob);
     });
+  };
+
+  const loadReferralQr = async () => {
+    if (referralQrLoading || referralQrDataUrl) return;
+    setReferralQrLoading(true);
+    try {
+      const inviteLink = buildInviteLink();
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(inviteLink)}`;
+      const response = await fetch(qrUrl);
+      if (!response.ok) {
+        throw new Error('Failed to generate referral QR code.');
+      }
+      const blob = await response.blob();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read QR data.'));
+        reader.readAsDataURL(blob);
+      });
+      setReferralQrDataUrl(dataUrl);
+    } catch (error) {
+      console.warn('Referral QR generation failed', error);
+      toast.error('Unable to generate QR code.');
+    } finally {
+      setReferralQrLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -1251,33 +1307,78 @@ function DonorDashboard() {
       ? user.eligibilityChecklist.updatedAt
       : new Date(user.eligibilityChecklist.updatedAt as any)
     : null;
-  const toDateValue = (value: any): Date | null => {
-    if (!value) return null;
-    if (value instanceof Date) return value;
-    if (typeof value?.toDate === 'function') return value.toDate();
-    if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
-    return null;
-  };
   const referralDetails = referralEntries.map((entry) => {
     const referredUser = referralUsers[entry.referredUid];
-    const referredAt = entry.referredAt;
-    const createdAt = toDateValue(referredUser?.createdAt);
-    const lastLoginAt = toDateValue(referredUser?.lastLoginAt);
-    const baseDate = referredAt || createdAt || lastLoginAt;
-    const ageDays = baseDate ? Math.floor((Date.now() - baseDate.getTime()) / (24 * 60 * 60 * 1000)) : null;
-    const isDeleted = referredUser?.status === 'deleted';
-    const isEligible = !isDeleted && typeof ageDays === 'number' && ageDays >= 7;
+    const computed = computeReferralStatus({
+      referredAt: entry.referredAt,
+      referredUser,
+      entryStatus: entry.status,
+      rules: REFERRAL_RULES,
+    });
     return {
       ...entry,
       user: referredUser,
-      referralAgeDays: ageDays,
-      isEligible,
-      isDeleted,
+      referralAgeDays: computed.ageDays,
+      remainingDays: computed.remainingDays,
+      isEligible: computed.isEligible,
+      isDeleted: computed.isDeleted,
+      statusLabel: computed.statusLabel,
+      referralStatus: computed.status,
+      sortDate: computed.baseDate,
     };
   });
   const eligibleReferralCount = referralDetails.filter(entry => entry.isEligible).length;
+  const referralSummary = referralDetails.reduce((acc: Record<string, number>, entry: any) => {
+    const status = entry.referralStatus || 'registered';
+    acc.total += 1;
+    if (status === 'eligible') acc.eligible += 1;
+    if (status === 'onboarded') acc.onboarded += 1;
+    if (status === 'registered') acc.registered += 1;
+    if (status === 'deleted') acc.deleted += 1;
+    return acc;
+  }, {
+    total: 0,
+    eligible: 0,
+    onboarded: 0,
+    registered: 0,
+    deleted: 0,
+  });
+  referralSummary.notEligible = Math.max(
+    0,
+    referralSummary.total - referralSummary.eligible - referralSummary.deleted
+  );
   const referralMilestone = getReferralMilestone(eligibleReferralCount);
   const referralUsersLoadingCombined = referralUsersLoading || fallbackReferralLoading;
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (referralLoading || referralUsersLoadingCombined) return;
+    if (referralDetails.length === 0) return;
+
+    const candidates = referralDetails.filter(entry =>
+      entry.referralStatus === 'onboarded' || entry.referralStatus === 'eligible'
+    );
+    const pending = candidates.filter(entry => {
+      const key = `${entry.referredUid}_${entry.referralStatus}`;
+      return !referralNotificationSyncRef.current.has(key);
+    });
+    if (pending.length === 0) return;
+
+    let isActive = true;
+    (async () => {
+      await ensureReferralNotificationsForReferrer(user.uid, pending);
+      if (!isActive) return;
+      pending.forEach(entry => {
+        const key = `${entry.referredUid}_${entry.referralStatus}`;
+        referralNotificationSyncRef.current.add(key);
+      });
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [user?.uid, referralDetails, referralLoading, referralUsersLoadingCombined]);
+
   const profileFields = [
     { label: 'Name', value: user?.displayName },
     { label: 'Blood type', value: user?.bloodType },
@@ -1379,6 +1480,7 @@ function DonorDashboard() {
     referralMilestone,
     referralDetails,
     eligibleReferralCount,
+    referralSummary,
     donorLevel,
     nextMilestone,
     shareOptions,
@@ -1438,6 +1540,11 @@ function DonorDashboard() {
     handleGoogleLink,
     handleGoogleUnlink,
     copyInviteLink,
+    shareInviteLink,
+    openWhatsAppInvite,
+    referralQrDataUrl,
+    referralQrLoading,
+    loadReferralQr,
   } as const;
 
   if (error && !loading) {

@@ -50,6 +50,8 @@ export const NotificationList: React.FC<NotificationListProps> = ({
         return <CheckCircle className={`${iconClass} text-green-600`} />;
       case 'achievement':
         return <CheckCircle className={`${iconClass} text-yellow-600`} />;
+      case 'referral':
+        return <Heart className={`${iconClass} text-red-600`} />;
       default:
         return <Info className={`${iconClass} text-gray-600`} />;
     }
