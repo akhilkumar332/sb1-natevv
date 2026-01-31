@@ -427,11 +427,11 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
         const unsubscribeDonations = await fetchDonationHistory();
         const unsubscribeRequests = await fetchEmergencyRequests();
 
-        // Fetch camps and stats
-        await fetchBloodCamps();
-        await fetchStatsAndBadges();
-
         setLoading(false);
+
+        // Fetch camps and stats in background
+        void fetchBloodCamps();
+        void fetchStatsAndBadges();
 
         // Cleanup listeners on unmount
         return () => {
