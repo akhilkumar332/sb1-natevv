@@ -24,7 +24,7 @@ import { useBloodRequest } from '../../hooks/useBloodRequest';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import BhIdBanner from '../../components/BhIdBanner';
-import { collection, doc, getDoc, getDocs, setDoc, serverTimestamp, Timestamp, query, where, onSnapshot, documentId } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp, Timestamp, query, where, onSnapshot, documentId } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
 import { REFERRAL_RULES, computeReferralStatus } from '../../utils/referralRules';
@@ -141,6 +141,7 @@ function DonorDashboard() {
   const [fallbackReferralLoading, setFallbackReferralLoading] = useState(false);
   const fallbackReferralAppliedRef = useRef(false);
   const referralNotificationSyncRef = useRef<Set<string>>(new Set());
+  const referralStatusSyncRef = useRef<Set<string>>(new Set());
   const [eligibilityChecklist, setEligibilityChecklist] = useState({
     hydrated: false,
     weightOk: false,
@@ -393,7 +394,7 @@ function DonorDashboard() {
       }).filter(entry => Boolean(entry.referredUid));
       nextEntries.sort((a, b) => (b.referredAt?.getTime() || 0) - (a.referredAt?.getTime() || 0));
       setReferralEntries(nextEntries);
-      setReferralCount(snapshot.size);
+      setReferralCount(nextEntries.length);
       setReferralLoading(false);
     }, (error) => {
       console.warn('Failed to load referrals:', error);
@@ -733,6 +734,10 @@ function DonorDashboard() {
 
   const copyInviteLink = async () => {
     const inviteLink = buildInviteLink();
+    if (!inviteLink) {
+      toast.error('Unable to generate referral link.');
+      return;
+    }
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(inviteLink);
@@ -748,6 +753,10 @@ function DonorDashboard() {
 
   const shareInviteLink = async () => {
     const inviteLink = buildInviteLink();
+    if (!inviteLink) {
+      toast.error('Unable to generate referral link.');
+      return;
+    }
     const message = 'Join BloodHub and save lives. Use my referral link to get started.';
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
@@ -766,13 +775,21 @@ function DonorDashboard() {
 
   const openWhatsAppInvite = () => {
     const inviteLink = buildInviteLink();
+    if (!inviteLink) {
+      toast.error('Unable to generate referral link.');
+      return;
+    }
     const text = `Join BloodHub and save lives. Use my referral link to get started: ${inviteLink}`;
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const buildInviteLink = () => {
+    if (typeof window === 'undefined') {
+      return '';
+    }
     const baseUrl = window.location.origin;
+    if (!baseUrl) return '';
     const bhId = user?.bhId?.trim();
     const referrerUid = user?.uid;
     const params = new URLSearchParams();
@@ -1365,7 +1382,8 @@ function DonorDashboard() {
     if (referralDetails.length === 0) return;
 
     const candidates = referralDetails.filter(entry =>
-      entry.referralStatus === 'onboarded' || entry.referralStatus === 'eligible'
+      (entry.referralStatus === 'onboarded' || entry.referralStatus === 'eligible')
+      && !String(entry.id || '').startsWith('fallback_')
     );
     const pending = candidates.filter(entry => {
       const key = `${entry.referredUid}_${entry.referralStatus}`;
@@ -1380,6 +1398,44 @@ function DonorDashboard() {
       pending.forEach(entry => {
         const key = `${entry.referredUid}_${entry.referralStatus}`;
         referralNotificationSyncRef.current.add(key);
+      });
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [user?.uid, referralDetails, referralLoading, referralUsersLoadingCombined]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (referralLoading || referralUsersLoadingCombined) return;
+    if (referralDetails.length === 0) return;
+
+    const pending = referralDetails.filter((entry) => {
+      if (String(entry.id || '').startsWith('fallback_')) return false;
+      if (!entry.referredUid) return false;
+      if (!entry.user) return false;
+      if (!entry.referralStatus) return false;
+      if (entry.referralStatus === entry.status) return false;
+      const key = `${entry.id}_${entry.referralStatus}`;
+      return !referralStatusSyncRef.current.has(key);
+    });
+
+    if (pending.length === 0) return;
+
+    let isActive = true;
+    (async () => {
+      await Promise.allSettled(pending.map((entry) => {
+        const referralRef = doc(db, 'ReferralTracking', entry.id);
+        return updateDoc(referralRef, {
+          status: entry.referralStatus,
+          updatedAt: serverTimestamp(),
+        });
+      }));
+      if (!isActive) return;
+      pending.forEach((entry) => {
+        const key = `${entry.id}_${entry.referralStatus}`;
+        referralStatusSyncRef.current.add(key);
       });
     })();
 

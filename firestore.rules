@@ -96,8 +96,14 @@ service cloud.firestore {
             request.resource.data.status == 'eligible'
             && get(/databases/$(database)/documents/users/$(resource.data.referredUid)).data.onboardingCompleted == true
             && get(/databases/$(database)/documents/users/$(resource.data.referredUid)).data.status != 'deleted'
-            && resource.data.referredAt != null
-            && request.time >= resource.data.referredAt + duration.value(7, 'd')
+            && (
+              (resource.data.referredAt != null
+                && request.time >= resource.data.referredAt + duration.value(7, 'd'))
+              || (resource.data.referredAt == null
+                && get(/databases/$(database)/documents/users/$(resource.data.referredUid)).data.createdAt != null
+                && request.time >= get(/databases/$(database)/documents/users/$(resource.data.referredUid)).data.createdAt
+                  + duration.value(7, 'd'))
+            )
           )
           || (
             request.resource.data.status == 'deleted'
@@ -117,6 +123,19 @@ service cloud.firestore {
           == request.resource.data.userId
         && get(/databases/$(database)/documents/ReferralTracking/$(request.resource.data.referralId)).data.referredUid
           == request.auth.uid;
+    }
+
+    /**
+     * Allow referrer to create referral notifications for themselves
+     */
+    function isReferralNotificationForReferrer() {
+      return request.resource.data.type == 'referral'
+        && request.resource.data.referralId is string
+        && exists(/databases/$(database)/documents/ReferralTracking/$(request.resource.data.referralId))
+        && get(/databases/$(database)/documents/ReferralTracking/$(request.resource.data.referralId)).data.referrerUid
+          == request.auth.uid
+        && get(/databases/$(database)/documents/ReferralTracking/$(request.resource.data.referralId)).data.referrerUid
+          == request.resource.data.userId;
     }
 
     /**
@@ -143,6 +162,18 @@ service cloud.firestore {
           == request.resource.data.userId
         && get(/databases/$(database)/documents/bloodRequests/$(request.resource.data.relatedId)).data.respondedDonors != null
         && request.auth.uid in get(/databases/$(database)/documents/bloodRequests/$(request.resource.data.relatedId)).data.respondedDonors;
+    }
+
+    /**
+     * Donor -> self appointment reminders
+     */
+    function isAppointmentNotificationForDonor() {
+      return request.resource.data.relatedType == 'appointment'
+        && request.resource.data.relatedId is string
+        && exists(/databases/$(database)/documents/appointments/$(request.resource.data.relatedId))
+        && get(/databases/$(database)/documents/appointments/$(request.resource.data.relatedId)).data.donorId
+          == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
     }
 
     // ========================================================================
@@ -196,7 +227,10 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.resource.data.referredUid == request.auth.uid;
       allow update: if isAdmin() || (
         isAuthenticated() &&
-        resource.data.referredUid == request.auth.uid &&
+        (
+          resource.data.referredUid == request.auth.uid ||
+          resource.data.referrerUid == request.auth.uid
+        ) &&
         isValidReferralStatusUpdate()
       );
       allow delete: if isAdmin();
@@ -428,12 +462,13 @@ service cloud.firestore {
       // System and admins can create notifications
       // In practice, this should be done via Cloud Functions
       allow create: if isAuthenticated() && (
-        request.resource.data.userId == request.auth.uid ||
         isAdmin() ||
         isHospital() ||
         isNGO() ||
         (isDonor() && (
           isReferralNotificationCreate() ||
+          isReferralNotificationForReferrer() ||
+          isAppointmentNotificationForDonor() ||
           isAppointmentNotificationForHospital() ||
           isBloodRequestNotificationForRequester()
         ))

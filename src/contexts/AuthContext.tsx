@@ -35,7 +35,7 @@ import { generateBhId } from '../utils/bhId';
 import { normalizePhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
 import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../services/referral.service';
-import { getReferralReferrerUid, getReferralTracking } from '../utils/referralTracking';
+import { clearReferralTracking, getReferralReferrerUid, getReferralTracking } from '../utils/referralTracking';
 
 // Define window recaptcha type
 declare global {
@@ -92,6 +92,14 @@ interface User {
   referredByUid?: string;
   referredByBhId?: string;
 }
+
+const normalizeUserDate = (value?: any): Date | null => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === 'function') return value.toDate();
+  if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
+  return null;
+};
 
 interface AuthContextType {
   user: User | null;
@@ -460,6 +468,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!hasReferral) return;
     if (referralApplyAttemptedRef.current) return;
     referralApplyAttemptedRef.current = true;
+
+    const createdAt = normalizeUserDate(user.createdAt);
+    const now = Date.now();
+    const accountAgeHours = createdAt ? (now - createdAt.getTime()) / 3600000 : null;
+    if (accountAgeHours === null) {
+      clearReferralTracking();
+      return;
+    }
+    if (accountAgeHours > 24) {
+      clearReferralTracking();
+      return;
+    }
+    if (!createdAt && user.onboardingCompleted) {
+      clearReferralTracking();
+      return;
+    }
 
     applyReferralTrackingForUser(user.uid)
       .then((result) => {

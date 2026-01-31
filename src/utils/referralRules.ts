@@ -32,8 +32,7 @@ export const computeReferralStatus = ({
   rules?: ReferralRules;
 }) => {
   const createdAt = normalizeReferralDate(referredUser?.createdAt);
-  const lastLoginAt = normalizeReferralDate(referredUser?.lastLoginAt);
-  const baseDate = referredAt || createdAt || lastLoginAt;
+  const baseDate = referredAt || createdAt;
   const ageDays = baseDate
     ? Math.floor((Date.now() - baseDate.getTime()) / (24 * 60 * 60 * 1000))
     : null;
