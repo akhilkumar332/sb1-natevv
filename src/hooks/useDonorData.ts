@@ -220,6 +220,33 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     legacySyncRef.current = false;
   }, [userId]);
 
+  // Real-time stats listener
+  useEffect(() => {
+    if (!userId) return;
+    const userStatsRef = doc(db, 'userStats', userId);
+    const unsubscribe = onSnapshot(userStatsRef, (snapshot) => {
+      if (!snapshot.exists()) return;
+      const data = snapshot.data();
+      setStats((prev) => {
+        const totalDonationsValue = data.totalDonations ?? prev?.totalDonations ?? 0;
+        const pointsValue = typeof data.points === 'number' ? data.points : prev?.impactScore;
+        const impactScoreValue = pointsValue && pointsValue > 0 ? pointsValue : totalDonationsValue * 100;
+        return {
+          totalDonations: totalDonationsValue,
+          livesSaved: totalDonationsValue * 3,
+          nextEligibleDate: prev?.nextEligibleDate ?? null,
+          daysUntilEligible: prev?.daysUntilEligible ?? 0,
+          impactScore: impactScoreValue,
+          streak: data.currentStreak ?? prev?.streak ?? 0,
+          emergencyResponses: data.emergencyResponses ?? prev?.emergencyResponses ?? 0,
+          rank: data.rank ?? prev?.rank,
+          badges: prev?.badges ?? [],
+        };
+      });
+    });
+    return () => unsubscribe();
+  }, [userId]);
+
   // Fetch donation history
   const fetchDonationHistory = async () => {
     try {

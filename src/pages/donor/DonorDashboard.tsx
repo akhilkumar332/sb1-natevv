@@ -351,21 +351,33 @@ function DonorDashboard() {
   }, [user?.isAvailable]);
 
   useEffect(() => {
-    if (!user?.availableUntil || !user?.isAvailable) return;
+    if (!user?.availableUntil) return;
     const expiry = user.availableUntil instanceof Date
       ? user.availableUntil
       : new Date(user.availableUntil);
     if (Number.isNaN(expiry.getTime())) return;
     if (expiry.getTime() <= Date.now()) {
-      updateUserProfile({
-        isAvailable: false,
-        availableUntil: null,
-        notificationPreferences: {
-          emergencyAlerts: false,
-        },
-      }).catch(error => {
-        console.warn('Failed to auto-disable availability:', error);
-      });
+      if (user?.isAvailable) {
+        updateUserProfile({
+          isAvailable: false,
+          availableUntil: null,
+          notificationPreferences: {
+            emergencyAlerts: false,
+          },
+        }).catch(error => {
+          console.warn('Failed to auto-disable availability:', error);
+        });
+      } else {
+        updateUserProfile({
+          isAvailable: true,
+          availableUntil: null,
+          notificationPreferences: {
+            emergencyAlerts: true,
+          },
+        }).catch(error => {
+          console.warn('Failed to auto-enable availability:', error);
+        });
+      }
     }
   }, [user?.availableUntil, user?.isAvailable, updateUserProfile]);
 
@@ -1173,20 +1185,43 @@ function DonorDashboard() {
     if (!user?.uid) return;
     try {
       setAvailableTodayLoading(true);
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      setAvailabilityEnabled(true);
-      setEmergencyAlertsEnabled(true);
-      await updateUserProfile({
-        isAvailable: true,
-        availableUntil: expiresAt,
-        notificationPreferences: {
-          emergencyAlerts: true,
-        },
-      });
-      toast.success('You are available for the next 24 hours.');
+      const expiry = user?.availableUntil
+        ? user.availableUntil instanceof Date
+          ? user.availableUntil
+          : new Date(user.availableUntil as any)
+        : null;
+      const breakActive = !availabilityEnabled
+        && expiry
+        && !Number.isNaN(expiry.getTime())
+        && expiry.getTime() > Date.now();
+
+      if (breakActive) {
+        setAvailabilityEnabled(true);
+        setEmergencyAlertsEnabled(true);
+        await updateUserProfile({
+          isAvailable: true,
+          availableUntil: null,
+          notificationPreferences: {
+            emergencyAlerts: true,
+          },
+        });
+        toast.success('You are now available.');
+      } else {
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        setAvailabilityEnabled(false);
+        setEmergencyAlertsEnabled(false);
+        await updateUserProfile({
+          isAvailable: false,
+          availableUntil: expiresAt,
+          notificationPreferences: {
+            emergencyAlerts: false,
+          },
+        });
+        toast.success('You are on break for the next 24 hours.');
+      }
     } catch (error: any) {
       console.error('Available today update error:', error);
-      toast.error(error?.message || 'Failed to update availability.');
+      toast.error(error?.message || 'Failed to update break status.');
     } finally {
       setAvailableTodayLoading(false);
     }
@@ -1310,7 +1345,7 @@ function DonorDashboard() {
   const daysSinceDonation = normalizedLastDonation
     ? Math.max(0, Math.floor((today.getTime() - normalizedLastDonation.getTime()) / 86400000))
     : null;
-  const eligibleToDonate = daysSinceDonation === null ? true : daysSinceDonation > 90;
+  const eligibleToDonate = daysSinceDonation === null ? true : daysSinceDonation >= 90;
   const daysUntilEligible = daysSinceDonation === null ? 0 : Math.max(0, 90 - daysSinceDonation);
   const nextEligibleDate = normalizedLastDonation
     ? new Date(normalizedLastDonation.getTime() + 90 * 86400000)
@@ -1323,10 +1358,13 @@ function DonorDashboard() {
   const availabilityExpiryValid = availabilityExpiry && !Number.isNaN(availabilityExpiry.getTime());
   const availabilityActiveUntil = Boolean(availabilityExpiryValid && availabilityExpiry!.getTime() > Date.now());
   const availabilityExpiryLabel = availabilityActiveUntil ? formatDateTime(availabilityExpiry as Date) : null;
-  const availableTodayLabel = availabilityActiveUntil ? 'Extend 24h' : 'I\'m Available Today';
-  const availableTodayHint = availabilityExpiryLabel
-    ? `Active until ${availabilityExpiryLabel}`
-    : 'Auto-off after 24h';
+  const isBreakActive = availabilityActiveUntil && !availabilityEnabled;
+  const availableTodayLabel = isBreakActive ? 'Resume now' : 'Pause 24h';
+  const availableTodayHint = isBreakActive
+    ? `Paused until ${availabilityExpiryLabel}`
+    : availabilityExpiryLabel && availabilityEnabled
+      ? `Active until ${availabilityExpiryLabel}`
+      : 'Auto-resume after 24h';
   const checklistCompleted = Object.values(eligibilityChecklist).filter(Boolean).length;
   const checklistUpdatedAt = user?.eligibilityChecklist?.updatedAt
     ? user.eligibilityChecklist.updatedAt instanceof Date
