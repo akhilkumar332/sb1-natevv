@@ -19,6 +19,8 @@ import {
   linkWithCredential,
   linkWithPopup,
   linkWithPhoneNumber,
+  updateEmail,
+  updatePhoneNumber,
   unlink,
 } from 'firebase/auth';
 import { 
@@ -79,6 +81,7 @@ interface User {
   preferredLanguage?: string;
   howHeardAboutUs?: string;
   interestedInVolunteering?: boolean;
+  emailVerified?: boolean;
   notificationPreferences?: {
     emergencyAlerts?: boolean;
   };
@@ -119,6 +122,9 @@ interface AuthContextType {
   linkGoogleProvider: () => Promise<void>;
   startPhoneLink: (phoneNumber: string) => Promise<ConfirmationResult>;
   confirmPhoneLink: (confirmationResult: ConfirmationResult, otp: string) => Promise<void>;
+  startPhoneUpdate: (phoneNumber: string) => Promise<ConfirmationResult>;
+  confirmPhoneUpdate: (confirmationResult: ConfirmationResult, otp: string, phoneNumber: string) => Promise<void>;
+  updateEmailAddress: (email: string) => Promise<void>;
   unlinkGoogleProvider: () => Promise<void>;
   unlinkPhoneProvider: () => Promise<void>;
 }
@@ -339,6 +345,7 @@ const updateUserInFirestore = async (
       ...existingUserData,
       uid: firebaseUser.uid,
       email: firebaseUser.email || existingUserData.email,
+      emailVerified: firebaseUser.emailVerified,
       displayName: firebaseUser.displayName || existingUserData.displayName,
       photoURL: firebaseUser.photoURL || existingUserData.photoURL,
       phoneNumber: firebaseUser.phoneNumber || existingUserData.phoneNumber,
@@ -757,6 +764,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bhId: existingBhId || generatedBhId || undefined,
         availableUntil: convertTimestampToDate(userData?.availableUntil) || null,
         eligibilityChecklist: normalizeEligibilityChecklist(userData?.eligibilityChecklist),
+        emailVerified: userCredential.user.emailVerified,
       } as User;
 
       // Update user state immediately for navigation
@@ -881,6 +889,108 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const startPhoneUpdate = async (phoneNumber: string): Promise<ConfirmationResult> => {
+    if (!auth.currentUser) {
+      throw new Error('No user logged in');
+    }
+
+    if (window.recaptchaVerifier) {
+      try {
+        window.recaptchaVerifier.clear();
+      } catch (e) {
+        console.warn('Error clearing recaptcha:', e);
+      }
+      window.recaptchaVerifier = undefined;
+    }
+
+    const existingContainer = document.getElementById('recaptcha-container');
+    if (existingContainer) {
+      existingContainer.remove();
+    }
+
+    const container = document.createElement('div');
+    container.id = 'recaptcha-container';
+    document.body.appendChild(container);
+
+    const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+      'size': 'invisible',
+      'callback': () => {
+        console.log('reCAPTCHA solved');
+      },
+      'expired-callback': () => {
+        toast.error('reCAPTCHA expired. Please try again.');
+      }
+    });
+
+    window.recaptchaVerifier = recaptchaVerifier;
+
+    try {
+      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+      return confirmation;
+    } catch (error) {
+      cleanupRecaptcha();
+      throw error;
+    }
+  };
+
+  const confirmPhoneUpdate = async (
+    confirmationResult: ConfirmationResult,
+    otp: string,
+    phoneNumber: string
+  ): Promise<void> => {
+    if (!auth.currentUser) {
+      throw new Error('No user logged in');
+    }
+
+    try {
+      const credential = PhoneAuthProvider.credential(confirmationResult.verificationId, otp);
+      await updatePhoneNumber(auth.currentUser, credential);
+      cleanupRecaptcha();
+
+      const normalizedPhone = normalizePhoneNumber(phoneNumber || auth.currentUser.phoneNumber || '');
+      const updatePayload: Record<string, any> = {};
+      if (phoneNumber) {
+        updatePayload.phoneNumber = phoneNumber;
+      }
+      if (normalizedPhone) {
+        updatePayload.phoneNumberNormalized = normalizedPhone;
+      }
+
+      if (Object.keys(updatePayload).length > 0) {
+        await updateDoc(doc(db, 'users', auth.currentUser.uid), updatePayload);
+        setUser(prev => prev ? {
+          ...prev,
+          phoneNumber: updatePayload.phoneNumber || prev.phoneNumber,
+          phoneNumberNormalized: updatePayload.phoneNumberNormalized || prev.phoneNumberNormalized
+        } : prev);
+      }
+    } catch (error) {
+      cleanupRecaptcha();
+      throw error;
+    }
+  };
+
+  const updateEmailAddress = async (email: string): Promise<void> => {
+    if (!auth.currentUser) {
+      throw new Error('No user logged in');
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      throw new Error('Email is required');
+    }
+    try {
+      await updateEmail(auth.currentUser, normalizedEmail);
+      await sendEmailVerification(auth.currentUser);
+      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        email: normalizedEmail,
+        updatedAt: serverTimestamp(),
+      });
+      setUser(prev => prev ? { ...prev, email: normalizedEmail } : prev);
+    } catch (error) {
+      throw error;
+    }
+  };
+
   const ensureAnotherProvider = () => {
     const providers = auth.currentUser?.providerData?.map(provider => provider.providerId) || [];
     if (providers.length <= 1) {
@@ -948,6 +1058,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bhId: existingBhId || generatedBhId || undefined,
         availableUntil: convertTimestampToDate(userDocData?.availableUntil) || null,
         eligibilityChecklist: normalizeEligibilityChecklist(userDocData?.eligibilityChecklist),
+        emailVerified: result.user.emailVerified,
       } as User;
 
       // Update last login time and optional bhId in background
@@ -1146,6 +1257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bhId: existingBhId || generatedBhId || undefined,
         availableUntil: convertTimestampToDate(userDocData?.availableUntil) || null,
         eligibilityChecklist: normalizeEligibilityChecklist(userDocData?.eligibilityChecklist),
+        emailVerified: result.user.emailVerified,
       } as User;
 
       const updatePayload: Record<string, any> = { lastLoginAt: serverTimestamp() };
@@ -1292,6 +1404,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       linkGoogleProvider,
       startPhoneLink,
       confirmPhoneLink,
+      startPhoneUpdate,
+      confirmPhoneUpdate,
+      updateEmailAddress,
       unlinkGoogleProvider,
       unlinkPhoneProvider
     }}>
