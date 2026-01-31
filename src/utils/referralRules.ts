@@ -55,6 +55,7 @@ export const computeReferralStatus = ({
     status = 'onboarded';
   } else if (typeof entryStatus === 'string') {
     const normalized = entryStatus.toLowerCase();
+    if (normalized === 'deleted') status = 'deleted';
     if (normalized === 'onboarded') status = 'onboarded';
     if (normalized === 'eligible') status = 'eligible';
   }
