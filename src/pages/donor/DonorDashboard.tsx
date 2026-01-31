@@ -900,8 +900,7 @@ function DonorDashboard() {
 
   // Handler functions for all interactive elements
   const handleBookDonation = () => {
-    toast.success('Redirecting to appointment booking...');
-    navigate('/request-blood'); // Navigate to blood request page
+    navigate('/donor/dashboard/requests');
   };
 
   const handleEmergencyRequests = () => {
