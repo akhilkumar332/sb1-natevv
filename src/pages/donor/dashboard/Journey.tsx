@@ -884,7 +884,7 @@ const DonorJourney = () => {
                 onClick={handleBookDonation}
                 className="w-full rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-all duration-300"
               >
-                Schedule Next Donation
+                Make a Donation
               </button>
               <button
                 type="button"
