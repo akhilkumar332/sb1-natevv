@@ -985,7 +985,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: normalizedEmail,
         updatedAt: serverTimestamp(),
       });
-      setUser(prev => prev ? { ...prev, email: normalizedEmail } : prev);
+      setUser(prev => prev ? { ...prev, email: normalizedEmail, emailVerified: false } : prev);
     } catch (error) {
       throw error;
     }
