@@ -107,6 +107,8 @@ function DonorDashboard() {
     units: 1,
     notes: '',
     donationType: 'whole' as 'whole' | 'platelets' | 'plasma',
+    latitude: null as number | null,
+    longitude: null as number | null,
   });
   const [donationEditSaving, setDonationEditSaving] = useState(false);
   const [donationDeleteId, setDonationDeleteId] = useState<string | null>(null);
@@ -120,6 +122,7 @@ function DonorDashboard() {
   const referralNotificationSyncRef = useRef<Set<string>>(new Set());
   const referralStatusSyncRef = useRef<Set<string>>(new Set());
   const donationTypeBackfillRef = useRef(false);
+  const locationBackfillRef = useRef(false);
   const [eligibilityChecklist, setEligibilityChecklist] = useState({
     hydrated: false,
     weightOk: false,
@@ -138,6 +141,7 @@ function DonorDashboard() {
   // Use custom hook to fetch all donor data
   const {
     donationHistory,
+    firstDonationDate,
     emergencyRequests,
     bloodCamps,
     stats,
@@ -217,8 +221,8 @@ function DonorDashboard() {
     const combined = `${rawTypeString} ${quantityString}`;
     if (combined.includes('platelet')) return 'platelets';
     if (combined.includes('plasma')) return 'plasma';
-    if (combined.includes('whole') || combined.includes('blood')) return 'whole';
-    return 'whole';
+    if (combined.includes('whole') || combined.includes('blood') || quantityString.includes('ml')) return 'whole';
+    return null;
   };
 
   const generateDonationEntryId = () => {
@@ -226,6 +230,24 @@ function DonorDashboard() {
       return crypto.randomUUID();
     }
     return `manual-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  };
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const geocodeLocation = async (location: string) => {
+    const trimmed = location.trim();
+    if (!trimmed) return null;
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trimmed)}&limit=1&addressdetails=1`
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+    const result = data[0];
+    const latitude = parseFloat(result.lat);
+    const longitude = parseFloat(result.lon);
+    if (Number.isNaN(latitude) || Number.isNaN(longitude)) return null;
+    return { latitude, longitude };
   };
 
   const escapeXml = (value: string) => value.replace(/[<>&'"]/g, (char) => {
@@ -547,21 +569,36 @@ function DonorDashboard() {
           : [];
         let hasChanges = false;
         const updatedDonations = existingDonations.map((entry: any) => {
-          if (entry?.donationType) return entry;
-          const inferred = inferDonationTypeFromEntry(entry);
-          hasChanges = true;
+          const entryId = entry?.id || entry?.legacyId || generateDonationEntryId();
+          const needsId = !entry?.id;
+          const needsType = !entry?.donationType;
+          const inferred = needsType ? inferDonationTypeFromEntry(entry) : entry?.donationType;
+          const resolvedType = inferred || entry?.donationType;
           const quantity = entry?.quantity || (
-            inferred === 'platelets'
-              ? 'Platelets'
-              : inferred === 'plasma'
-                ? 'Plasma'
-                : '450ml'
+            resolvedType
+              ? resolvedType === 'platelets'
+                ? 'Platelets'
+                : resolvedType === 'plasma'
+                  ? 'Plasma'
+                  : '450ml'
+              : undefined
           );
-          return {
-            ...entry,
-            donationType: inferred,
-            quantity,
-          };
+
+          const nextEntry: any = { ...entry, id: entryId };
+          if (resolvedType) {
+            nextEntry.donationType = resolvedType;
+          }
+          if (quantity) {
+            nextEntry.quantity = quantity;
+          }
+
+          const entryChanged = needsId
+            || (needsType && Boolean(resolvedType))
+            || (!entry?.quantity && Boolean(quantity));
+          if (entryChanged) {
+            hasChanges = true;
+          }
+          return entryChanged ? nextEntry : entry;
         });
         if (!hasChanges) return;
         await setDoc(
@@ -578,6 +615,80 @@ function DonorDashboard() {
     };
 
     void backfillDonationTypes();
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid || locationBackfillRef.current) return;
+    const storageKey = `bh_geo_backfill_v1_${user.uid}`;
+    if (typeof window !== 'undefined' && window.localStorage.getItem(storageKey) === 'done') {
+      locationBackfillRef.current = true;
+      return;
+    }
+    locationBackfillRef.current = true;
+
+    const backfillLocations = async () => {
+      try {
+        const historyRef = doc(db, 'DonationHistory', user.uid);
+        const historySnapshot = await getDoc(historyRef);
+        if (!historySnapshot.exists()) return;
+        const existingDonations = Array.isArray(historySnapshot.data().donations)
+          ? historySnapshot.data().donations
+          : [];
+
+        const candidates = existingDonations
+          .map((entry: any, index: number) => ({
+            entry,
+            index,
+            location: typeof entry?.location === 'string' ? entry.location : '',
+          }))
+          .filter((item: { entry: any; index: number; location: string }) => {
+            const hasCoords = typeof item.entry?.latitude === 'number' && typeof item.entry?.longitude === 'number';
+            return !hasCoords && item.location.trim().length > 3;
+          })
+          .slice(0, 10);
+
+        if (candidates.length === 0) {
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(storageKey, 'done');
+          }
+          return;
+        }
+
+        const updatedDonations = [...existingDonations];
+        let updatedCount = 0;
+        for (const candidate of candidates) {
+          const coords = await geocodeLocation(candidate.location);
+          if (coords) {
+            updatedDonations[candidate.index] = {
+              ...candidate.entry,
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+            };
+            updatedCount += 1;
+          }
+          await sleep(700);
+        }
+
+        if (updatedCount > 0) {
+          await setDoc(
+            historyRef,
+            {
+              donations: updatedDonations,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        }
+
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(storageKey, 'done');
+        }
+      } catch (error) {
+        console.warn('Donation location backfill failed:', error);
+      }
+    };
+
+    void backfillLocations();
   }, [user?.uid]);
 
   const shareOptionsSyncRef = useRef<string | null>(null);
@@ -1029,6 +1140,8 @@ function DonorDashboard() {
     notes?: string;
     bloodBank?: string;
     donationType?: 'whole' | 'platelets' | 'plasma';
+    latitude?: number | null;
+    longitude?: number | null;
   }) => {
     if (!user?.uid) {
       throw new Error('User not available.');
@@ -1059,6 +1172,8 @@ function DonorDashboard() {
         id: generateDonationEntryId(),
         date: Timestamp.fromDate(donationDate),
         location: resolvedLocation,
+        latitude: typeof payload.latitude === 'number' ? payload.latitude : null,
+        longitude: typeof payload.longitude === 'number' ? payload.longitude : null,
         bloodBank: resolvedBloodBank,
         hospitalId: '',
         hospitalName: resolvedBloodBank,
@@ -1109,13 +1224,18 @@ function DonorDashboard() {
   };
 
   const handleStartDonationEdit = (donation: any) => {
+    setFeedbackOpenId(null);
     setEditingDonationId(donation.id);
-    const donationType = donation.donationType || inferDonationTypeFromEntry(donation);
+    const donationType = donation.donationType || inferDonationTypeFromEntry(donation) || 'whole';
+    const latitude = typeof donation?.latitude === 'number' ? donation.latitude : null;
+    const longitude = typeof donation?.longitude === 'number' ? donation.longitude : null;
     setEditingDonationData({
       location: donation.location || '',
       units: donation.units || 1,
       notes: donation.notes || '',
       donationType,
+      latitude,
+      longitude,
     });
   };
 
@@ -1151,9 +1271,17 @@ function DonorDashboard() {
       const updatedDonations = existingDonations.map((entry: any, index: number) => {
         const entryId = entry?.id || entry?.legacyId || `donation-${index}`;
         if (entryId !== editingDonationId) return entry;
+        const latitude = typeof editingDonationData.latitude === 'number'
+          ? editingDonationData.latitude
+          : null;
+        const longitude = typeof editingDonationData.longitude === 'number'
+          ? editingDonationData.longitude
+          : null;
         return {
           ...entry,
           location: editingDonationData.location,
+          latitude,
+          longitude,
           units: unitsValue,
           notes: editingDonationData.notes,
           donationType,
@@ -1517,6 +1645,7 @@ function DonorDashboard() {
   };
 
   const handleOpenFeedback = (donationId: string) => {
+    setEditingDonationId(null);
     const existing = donationFeedbackMap[donationId];
     setFeedbackForm({
       rating: existing?.rating || 0,
@@ -1538,6 +1667,21 @@ function DonorDashboard() {
     }
     try {
       setFeedbackSaving(true);
+      const historyRef = doc(db, 'DonationHistory', user.uid);
+      const historySnapshot = await getDoc(historyRef);
+      if (!historySnapshot.exists()) {
+        throw new Error('Donation history not found.');
+      }
+      const existingDonations = Array.isArray(historySnapshot.data().donations)
+        ? historySnapshot.data().donations
+        : [];
+      const donationExists = existingDonations.some((entry: any, index: number) => {
+        const entryId = entry?.id || entry?.legacyId || `donation-${index}`;
+        return entryId === donationId;
+      });
+      if (!donationExists) {
+        throw new Error('Donation no longer exists.');
+      }
       const feedbackRef = doc(db, 'DonationFeedback', `${user.uid}_${donationId}`);
       const existing = donationFeedbackMap[donationId];
       await setDoc(
@@ -1555,30 +1699,23 @@ function DonorDashboard() {
       );
 
       if (feedbackForm.certificateUrl) {
-        const historyRef = doc(db, 'DonationHistory', user.uid);
-        const historySnapshot = await getDoc(historyRef);
-        if (historySnapshot.exists()) {
-          const existingDonations = Array.isArray(historySnapshot.data().donations)
-            ? historySnapshot.data().donations
-            : [];
-          const updatedDonations = existingDonations.map((entry: any, index: number) => {
-            const entryId = entry?.id || entry?.legacyId || `donation-${index}`;
-            if (entryId !== donationId) return entry;
-            return {
-              ...entry,
-              certificateUrl: feedbackForm.certificateUrl,
-              updatedAt: Timestamp.now(),
-            };
-          });
-          await setDoc(
-            historyRef,
-            {
-              donations: updatedDonations,
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          );
-        }
+        const updatedDonations = existingDonations.map((entry: any, index: number) => {
+          const entryId = entry?.id || entry?.legacyId || `donation-${index}`;
+          if (entryId !== donationId) return entry;
+          return {
+            ...entry,
+            certificateUrl: feedbackForm.certificateUrl,
+            updatedAt: Timestamp.now(),
+          };
+        });
+        await setDoc(
+          historyRef,
+          {
+            donations: updatedDonations,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
       }
 
       toast.success('Feedback saved.');
@@ -1809,6 +1946,7 @@ function DonorDashboard() {
     user,
     isLoading,
     donationHistory,
+    firstDonationDate,
     emergencyRequests,
     bloodCamps,
     stats,
