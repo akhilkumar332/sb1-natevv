@@ -133,7 +133,7 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
         },
         { merge: true }
       );
-      await sendReferralNotification(referrerUid, 'registered', newUserUid, undefined);
+      await sendReferralNotification(referrerUid, 'registered', newUserUid, undefined, newUserUid);
       clearReferralTracking();
       return { referrerUid, referrerBhId };
     }
@@ -166,7 +166,7 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
     }
 
     if (referralResult.status === 'fulfilled' || userResult.status === 'fulfilled') {
-      await sendReferralNotification(referrerUid, 'registered', newUserUid, undefined);
+      await sendReferralNotification(referrerUid, 'registered', newUserUid, undefined, newUserUid);
       clearReferralTracking();
       return { referrerUid, referrerBhId };
     }
@@ -216,9 +216,11 @@ const sendReferralNotification = async (
   try {
     const notificationId = buildReferralNotificationId(referrerUid, referredUid, status);
     const notificationRef = doc(db, 'notifications', notificationId);
-    const existing = await getDoc(notificationRef);
-    if (existing.exists()) {
-      return true;
+    if (createdByUid && createdByUid === referrerUid) {
+      const existing = await getDoc(notificationRef);
+      if (existing.exists()) {
+        return true;
+      }
     }
     const content = buildNotificationContent(status, referredUser);
     const referralId = `${referrerUid}_${referredUid}`;
@@ -240,8 +242,10 @@ const sendReferralNotification = async (
       createdAt: serverTimestamp(),
     });
     return true;
-  } catch (error) {
-    console.warn('Failed to create referral notification:', error);
+  } catch (error: any) {
+    if (error?.code !== 'permission-denied') {
+      console.warn('Failed to create referral notification:', error);
+    }
   }
   return false;
 };

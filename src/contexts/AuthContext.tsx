@@ -58,6 +58,7 @@ interface User {
   createdAt?: Date;
   lastLoginAt?: Date;
   role?: 'donor' | 'ngo' | 'hospital' | 'admin';
+  status?: 'active' | 'inactive' | 'suspended' | 'pending_verification' | 'deleted';
   address?: string;
   city?: string;
   state?: string;

@@ -728,13 +728,22 @@ function DonorDashboard() {
   };
 
   const handleInviteFriends = async () => {
-    copyInviteLink();
+    await copyInviteLink();
   };
 
-  const copyInviteLink = () => {
+  const copyInviteLink = async () => {
     const inviteLink = buildInviteLink();
-    navigator.clipboard.writeText(inviteLink);
-    toast.success('Invite link copied to clipboard!');
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(inviteLink);
+        toast.success('Invite link copied to clipboard!');
+        return;
+      }
+      throw new Error('Clipboard not available');
+    } catch (error) {
+      console.warn('Clipboard copy failed:', error);
+      toast.error('Unable to copy link. Please try again.');
+    }
   };
 
   const shareInviteLink = async () => {
@@ -752,7 +761,7 @@ function DonorDashboard() {
         console.warn('Share canceled or failed:', error);
       }
     }
-    copyInviteLink();
+    await copyInviteLink();
   };
 
   const openWhatsAppInvite = () => {

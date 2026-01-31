@@ -84,7 +84,26 @@ service cloud.firestore {
      */
     function isValidReferralStatusUpdate() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-        && request.resource.data.status in ['registered', 'onboarded', 'eligible', 'deleted'];
+        && request.resource.data.status in ['registered', 'onboarded', 'eligible', 'deleted']
+        && exists(/databases/$(database)/documents/users/$(resource.data.referredUid))
+        && (
+          request.resource.data.status == 'registered'
+          || (
+            request.resource.data.status == 'onboarded'
+            && get(/databases/$(database)/documents/users/$(resource.data.referredUid)).data.onboardingCompleted == true
+          )
+          || (
+            request.resource.data.status == 'eligible'
+            && get(/databases/$(database)/documents/users/$(resource.data.referredUid)).data.onboardingCompleted == true
+            && get(/databases/$(database)/documents/users/$(resource.data.referredUid)).data.status != 'deleted'
+            && resource.data.referredAt != null
+            && request.time >= resource.data.referredAt + duration.value(7, 'd')
+          )
+          || (
+            request.resource.data.status == 'deleted'
+            && get(/databases/$(database)/documents/users/$(resource.data.referredUid)).data.status == 'deleted'
+          )
+        );
     }
 
     /**
