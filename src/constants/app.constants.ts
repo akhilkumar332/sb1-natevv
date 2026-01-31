@@ -388,6 +388,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   'donation_confirmation',
   'verification_status',
   'achievement',
+  'referral',
   'general',
 ] as const;
 
@@ -398,6 +399,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   donation_confirmation: 'Donation Confirmation',
   verification_status: 'Verification Status',
   achievement: 'Achievement Unlocked',
+  referral: 'Referral Update',
   general: 'General',
 };
 

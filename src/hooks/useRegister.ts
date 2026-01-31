@@ -145,6 +145,7 @@ export const useRegister = () => {
           ? {
               referredByUid: referralContext.referrerUid,
               referredByBhId: referralContext.referrerBhId,
+              referralCapturedAt: serverTimestamp(),
             }
           : {}),
       });
@@ -260,6 +261,7 @@ export const useRegister = () => {
           ? {
               referredByUid: referralContext.referrerUid,
               referredByBhId: referralContext.referrerBhId,
+              referralCapturedAt: serverTimestamp(),
             }
           : {}),
       }).catch((error) => {
