@@ -59,6 +59,7 @@ function FindDonors() {
   const pageSize = 12;
   const cacheTTL = 60000;
   const donorCacheRef = useRef<Map<string, { timestamp: number; donors: Donor[] }>>(new Map());
+  const selfRequestToastRef = useRef<string | null>(null);
 
   const requestLocation = () => {
     if (!navigator?.geolocation) {
@@ -172,6 +173,7 @@ function FindDonors() {
         };
 
         let rawResults: any[] = [];
+        let usedFallback = false;
         try {
           rawResults = await fetchCollection('publicDonors');
         } catch (publicError) {
@@ -179,11 +181,12 @@ function FindDonors() {
             throw publicError;
           }
           rawResults = await fetchCollection('users', true);
+          usedFallback = true;
         }
 
         if (!isActive) return;
 
-        const mappedDonors = rawResults
+        const mapDonorRows = (rows: any[]) => rows
           .filter((donor: any) => donor && (donor.uid || donor.id))
           .filter((donor: any) => donor.status !== 'deleted' && donor.onboardingCompleted !== false)
           .filter((donor: any) => !donor.status || donor.status === 'active')
@@ -229,6 +232,16 @@ function FindDonors() {
               donationTypes: donationTypesFromProfile.length > 0 ? donationTypesFromProfile : ['whole'],
             } as Donor;
           });
+
+        let mappedDonors = mapDonorRows(rawResults);
+
+        if (!usedFallback && user?.uid) {
+          const nonSelfCount = mappedDonors.filter((donor) => donor.id !== user.uid).length;
+          if (nonSelfCount === 0) {
+            const fallbackRows = await fetchCollection('users', true);
+            mappedDonors = mapDonorRows(fallbackRows);
+          }
+        }
 
         donorCacheRef.current.set(cacheKey, {
           timestamp: Date.now(),
@@ -313,6 +326,15 @@ function FindDonors() {
       }
       const pending = await loadPendingDonorRequestDoc(user.uid);
       if (!pending) return;
+      if (pending.targetDonorId === user.uid) {
+        const selfKey = `${pending.targetDonorId}:${pending.createdAt}`;
+        if (selfRequestToastRef.current !== selfKey) {
+          selfRequestToastRef.current = selfKey;
+          toast.error('You cannot request yourself.', { id: 'self-request' });
+        }
+        await clearPendingDonorRequestDoc(user.uid);
+        return;
+      }
       setRequestSubmittingId(pending.targetDonorId);
       await submitDonorRequest(user, pending);
       await clearPendingDonorRequestDoc(user.uid);
@@ -357,7 +379,7 @@ function FindDonors() {
       targetLocation: donor.location,
       donationType,
       createdAt: Date.now(),
-      returnTo: `${location.pathname}${location.search}`,
+      returnTo: '/donor/dashboard/requests',
     };
 
     if (!user || user.role !== 'donor') {

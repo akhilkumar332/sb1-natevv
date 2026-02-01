@@ -1,7 +1,7 @@
 // src/hooks/useLogin.ts
 import { useState } from 'react';
 import { PhoneAuthError, useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { FirebaseError } from 'firebase/app';
 import { authStorage } from '../utils/authStorage';
@@ -24,6 +24,7 @@ export const useLogin = () => {
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
 
   const navigate = useNavigate();
+  const location = useLocation();
   const { loginWithGoogle, loginWithPhone, verifyOTP, logout, user, authLoading } = useAuth();
 
   const handleIdentifierChange = (value: string) => {
@@ -173,12 +174,14 @@ export const useLogin = () => {
         toast.success('Successfully logged in with Google!');
 
         // Navigate based on onboarding status - if not explicitly true, go to onboarding
+        const pendingSearch = location.search || '';
+        const hasPendingRequest = new URLSearchParams(location.search).has('pendingRequest');
         if (result.user.onboardingCompleted === true) {
           console.log('Navigating to dashboard');
-          navigate('/donor/dashboard');
+          navigate(`/donor/${hasPendingRequest ? 'dashboard/requests' : 'dashboard'}${pendingSearch}`);
         } else {
           console.log('Navigating to onboarding');
-          navigate('/donor/onboarding');
+          navigate(`/donor/onboarding${pendingSearch}`);
         }
       } else {
         throw new Error('No token received');

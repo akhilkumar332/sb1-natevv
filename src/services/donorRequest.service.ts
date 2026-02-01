@@ -86,6 +86,9 @@ export const clearPendingDonorRequestDoc = async (uid: string) => {
 };
 
 export const submitDonorRequest = async (requester: RequesterProfile, payload: PendingDonorRequest) => {
+  if (requester.uid === payload.targetDonorId) {
+    throw new Error('self_request');
+  }
   return await addDoc(collection(db, 'donorRequests'), {
     requesterUid: requester.uid,
     requesterBhId: requester.bhId || '',

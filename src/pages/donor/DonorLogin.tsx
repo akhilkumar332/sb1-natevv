@@ -39,12 +39,26 @@ export function DonorLogin() {
 
     hasNavigated.current = true;
     const pendingSearch = location.search || '';
+    const hasPendingRequest = new URLSearchParams(location.search).has('pendingRequest');
     if (!user.onboardingCompleted) {
       navigate(`/donor/onboarding${pendingSearch}`);
+    } else if (hasPendingRequest) {
+      navigate(`/donor/dashboard/requests${pendingSearch}`);
     } else {
       navigate(`/donor/dashboard${pendingSearch}`);
     }
   }, [user, navigate, location.search]);
+
+  if (authLoading || (user && user.role === 'donor')) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex items-center gap-3 text-gray-600">
+          <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-medium">Signing you in…</span>
+        </div>
+      </div>
+    );
+  }
 
   const renderInitialForm = () => (
     <div className="space-y-6">

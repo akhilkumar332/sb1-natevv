@@ -787,14 +787,25 @@ function DonorDashboard() {
 
     const submitPending = async () => {
       if (pendingFromUrl) {
+        const targetReturnTo = pendingFromUrl.returnTo || '/donor/dashboard/requests';
         await savePendingDonorRequestDoc(user.uid, pendingFromUrl);
         params.delete('pendingRequest');
         const nextSearch = params.toString();
-        navigate(nextSearch ? `${location.pathname}?${nextSearch}` : location.pathname, { replace: true });
+        const fallbackPath = nextSearch ? `${location.pathname}?${nextSearch}` : location.pathname;
+        navigate(nextSearch ? `${targetReturnTo}?${nextSearch}` : targetReturnTo || fallbackPath, { replace: true });
       }
 
       const pending = await loadPendingDonorRequestDoc(user.uid);
       if (!pending) return;
+      if (pending.targetDonorId === user.uid) {
+        const selfKey = `self:${pending.targetDonorId}:${pending.createdAt}`;
+        if (pendingRequestProcessedRef.current !== selfKey) {
+          pendingRequestProcessedRef.current = selfKey;
+          toast.error('You cannot request yourself.', { id: 'self-request' });
+        }
+        await clearPendingDonorRequestDoc(user.uid);
+        return;
+      }
       const pendingKey = `${pending.targetDonorId}:${pending.createdAt}`;
       if (pendingRequestProcessedRef.current === pendingKey || pendingRequestProcessedRef.current === pendingKeyFromUrl) {
         return;
@@ -1066,7 +1077,19 @@ function DonorDashboard() {
         createdBy: user.uid,
       });
 
-      toast.success(decision === 'accepted' ? 'Request accepted.' : 'Request rejected.');
+      await addDoc(collection(db, 'notifications'), {
+        userId: user.uid,
+        userRole: 'donor',
+        type: 'donor_request',
+        title: decision === 'accepted' ? 'You accepted a donor request' : 'You declined a donor request',
+        message: `You ${decision} a request from ${requestData.requesterName || 'a donor'}.`,
+        read: false,
+        priority: 'low',
+        relatedId: requestId,
+        relatedType: 'donor_request',
+        createdAt: serverTimestamp(),
+        createdBy: user.uid,
+      });
     } catch (error) {
       console.error('Failed to update donor request:', error);
       toast.error('Unable to update request. Please try again.');

@@ -1389,23 +1389,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const handleLogout = async () => {
+    let signOutFailed = false;
     try {
       await auth.signOut();
+    } catch (error) {
+      signOutFailed = true;
+      console.warn('Sign out failed, proceeding with local cleanup:', error);
+    }
+
+    try {
       setUser(null);
       localStorage.removeItem('authToken');
       sessionStorage.clear();
-      
       // Clear any other auth-related storage
       localStorage.removeItem('user');
       localStorage.removeItem('lastLoginTime');
       localStorage.removeItem(userCacheKey);
       localStorage.removeItem(userCacheAtKey);
-      
       // Optional: Clear any cached data
       indexedDB.deleteDatabase('firebaseLocalStorageDb');
     } catch (error) {
-      console.error('Logout error:', error);
-      throw error;
+      console.warn('Local logout cleanup failed:', error);
+    }
+
+    if (signOutFailed) {
+      return;
     }
   };
 
@@ -1414,23 +1422,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     options: { redirectTo?: string; showToast?: boolean } = {}
   ) => {
     const { redirectTo = '/donor/login', showToast = true } = options;
+    let hadError = false;
     try {
       await handleLogout();
-      
+    } catch (error) {
+      hadError = true;
+      console.error('Logout error:', error);
+    }
+
+    try {
       // Broadcast logout event to other tabs
       logoutChannel.postMessage('logout');
-      
-      if (showToast) {
+    } catch (error) {
+      console.warn('Failed to broadcast logout event:', error);
+    }
+
+    if (showToast) {
+      if (hadError) {
+        toast.error('Failed to log out. Please try again.');
+      } else {
         toast.success('Successfully logged out!');
       }
-      if (redirectTo) {
-        navigate(redirectTo);
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-      if (showToast) {
-        toast.error('Failed to log out. Please try again.');
-      }
+    }
+
+    if (redirectTo) {
+      navigate(redirectTo);
     }
   };
 
