@@ -49,7 +49,7 @@ export function DonorLogin() {
     }
   }, [user, navigate, location.search]);
 
-  if (authLoading || (user && user.role === 'donor')) {
+  if (user && user.role === 'donor') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex items-center gap-3 text-gray-600">
