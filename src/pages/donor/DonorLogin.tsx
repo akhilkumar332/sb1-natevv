@@ -1,6 +1,6 @@
 // src/pages/auth/DonorLogin.tsx
 import { useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Phone, Droplet, Heart, Shield, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import PhoneInput from 'react-phone-number-input';
@@ -10,6 +10,7 @@ import LogoMark from '../../components/LogoMark';
 
 export function DonorLogin() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const hasNavigated = useRef(false);
   const {
@@ -37,12 +38,13 @@ export function DonorLogin() {
     }
 
     hasNavigated.current = true;
+    const pendingSearch = location.search || '';
     if (!user.onboardingCompleted) {
-      navigate('/donor/onboarding');
+      navigate(`/donor/onboarding${pendingSearch}`);
     } else {
-      navigate('/donor/dashboard');
+      navigate(`/donor/dashboard${pendingSearch}`);
     }
-  }, [user, navigate]);
+  }, [user, navigate, location.search]);
 
   const renderInitialForm = () => (
     <div className="space-y-6">

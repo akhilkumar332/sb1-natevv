@@ -383,6 +383,7 @@ export const PARTNERSHIP_STATUS_LABELS: Record<PartnershipStatus, string> = {
 
 export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   'emergency_request',
+  'donor_request',
   'appointment_reminder',
   'campaign_invite',
   'donation_confirmation',
@@ -394,6 +395,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
 
 export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   emergency_request: 'Emergency Request',
+  donor_request: 'Donor Request',
   appointment_reminder: 'Appointment Reminder',
   campaign_invite: 'Campaign Invitation',
   donation_confirmation: 'Donation Confirmation',

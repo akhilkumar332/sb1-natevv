@@ -230,15 +230,67 @@ app.post('/api/v1/auth/login', async (req, res) => {
  *                   bloodType:
  *                     type: string
  */
-app.get('/api/v1/donors', async (req, res) => {
-  // Simulated donor data
-  const donors = [
-    { id: '1', name: 'John Doe', bloodType: 'A+' },
-    { id: '2', name: 'Jane Smith', bloodType: 'O-' },
-  ];
-  
-  res.status(200).json(donors);
-});
+const listDonorsHandler = async (req, res) => {
+  try {
+    const { bloodType } = req.query || {};
+    const usersRef = admin.firestore().collection('users').where('role', '==', 'donor');
+    let snapshot;
+    try {
+      snapshot = bloodType
+        ? await usersRef.where('bloodType', '==', bloodType).limit(200).get()
+        : await usersRef.limit(200).get();
+    } catch (error) {
+      if (bloodType) {
+        console.warn('Blood type filtered query failed, falling back to unfiltered query:', error);
+        snapshot = await usersRef.limit(200).get();
+      } else {
+        throw error;
+      }
+    }
+    let donors = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .filter((donor) => donor.status !== 'deleted' && donor.onboardingCompleted !== false)
+      .map((donor) => ({
+        uid: donor.uid || donor.id,
+        bhId: donor.bhId || null,
+        displayName: donor.displayName || donor.name || null,
+        bloodType: donor.bloodType || null,
+        gender: donor.gender || null,
+        city: donor.city || null,
+        state: donor.state || null,
+        address: donor.address || null,
+        latitude: typeof donor.latitude === 'number' ? donor.latitude : null,
+        longitude: typeof donor.longitude === 'number' ? donor.longitude : null,
+        isAvailable: donor.isAvailable !== false,
+        availableUntil: donor.availableUntil?.toDate
+          ? donor.availableUntil.toDate().toISOString()
+          : donor.availableUntil || null,
+        lastDonation: donor.lastDonation?.toDate
+          ? donor.lastDonation.toDate().toISOString()
+          : donor.lastDonation || null,
+        donationTypes: Array.isArray(donor.donationTypes)
+          ? donor.donationTypes
+          : donor.donationType
+            ? [donor.donationType]
+            : ['whole'],
+      }));
+
+    if (bloodType) {
+      donors = donors.filter((donor) => donor.bloodType === bloodType);
+    }
+
+    res.status(200).json(donors);
+  } catch (error) {
+    console.error('Failed to fetch donors:', error);
+    res.status(500).json({
+      message: 'Failed to fetch donors',
+      details: process.env.NODE_ENV === 'production' ? undefined : String(error?.message || error),
+    });
+  }
+};
+
+app.get('/api/v1/donors', listDonorsHandler);
+app.get('/v1/donors', listDonorsHandler);
 
 /**
  * @swagger

@@ -21,14 +21,21 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useDonorData } from '../../hooks/useDonorData';
 import { useBloodRequest } from '../../hooks/useBloodRequest';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import BhIdBanner from '../../components/BhIdBanner';
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp, Timestamp, query, where, onSnapshot, documentId } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp, Timestamp, query, where, onSnapshot, documentId } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
 import { REFERRAL_RULES, computeReferralStatus } from '../../utils/referralRules';
 import { ensureReferralNotificationsForReferrer } from '../../services/referral.service';
+import {
+  clearPendingDonorRequestDoc,
+  decodePendingDonorRequest,
+  loadPendingDonorRequestDoc,
+  savePendingDonorRequestDoc,
+  submitDonorRequest,
+} from '../../services/donorRequest.service';
 import type { ConfirmationResult } from 'firebase/auth';
 
 type ShareOptions = {
@@ -67,6 +74,7 @@ function DonorDashboard() {
     unlinkPhoneProvider
   } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // State for modals and UI
   const [showNotifications, setShowNotifications] = useState(false);
@@ -101,6 +109,11 @@ function DonorDashboard() {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [referralQrDataUrl, setReferralQrDataUrl] = useState<string | null>(null);
   const [referralQrLoading, setReferralQrLoading] = useState(false);
+  const [incomingDonorRequests, setIncomingDonorRequests] = useState<any[]>([]);
+  const [outgoingDonorRequests, setOutgoingDonorRequests] = useState<any[]>([]);
+  const [incomingRequestsLoading, setIncomingRequestsLoading] = useState(true);
+  const [outgoingRequestsLoading, setOutgoingRequestsLoading] = useState(true);
+  const [donorRequestActionId, setDonorRequestActionId] = useState<string | null>(null);
   const [editingDonationId, setEditingDonationId] = useState<string | null>(null);
   const [editingDonationData, setEditingDonationData] = useState({
     location: '',
@@ -123,6 +136,7 @@ function DonorDashboard() {
   const referralStatusSyncRef = useRef<Set<string>>(new Set());
   const donationTypeBackfillRef = useRef(false);
   const locationBackfillRef = useRef(false);
+  const pendingRequestProcessedRef = useRef<string | null>(null);
   const [eligibilityChecklist, setEligibilityChecklist] = useState({
     hydrated: false,
     weightOk: false,
@@ -171,7 +185,8 @@ function DonorDashboard() {
     return d.toLocaleString();
   };
 
-  const formatTime = (date: Date) => {
+  const formatTime = (date?: Date | null) => {
+    if (!date) return 'N/A';
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const minutes = Math.floor(diff / 60000);
@@ -695,6 +710,109 @@ function DonorDashboard() {
     void backfillLocations();
   }, [user?.uid]);
 
+  useEffect(() => {
+    if (!user?.uid) {
+      setIncomingDonorRequests([]);
+      setOutgoingDonorRequests([]);
+      setIncomingRequestsLoading(false);
+      setOutgoingRequestsLoading(false);
+      return;
+    }
+
+    const incomingQuery = query(
+      collection(db, 'donorRequests'),
+      where('targetDonorUid', '==', user.uid)
+    );
+    const outgoingQuery = query(
+      collection(db, 'donorRequests'),
+      where('requesterUid', '==', user.uid)
+    );
+
+    const mapRequest = (docSnapshot: any) => {
+      const data = docSnapshot.data();
+      const requestedAt = data.requestedAt?.toDate ? data.requestedAt.toDate() : undefined;
+      const respondedAt = data.respondedAt?.toDate ? data.respondedAt.toDate() : undefined;
+      return {
+        id: docSnapshot.id,
+        ...data,
+        requestedAt,
+        respondedAt,
+      };
+    };
+
+    setIncomingRequestsLoading(true);
+    const unsubscribeIncoming = onSnapshot(incomingQuery, (snapshot) => {
+      const items = snapshot.docs.map(mapRequest)
+        .sort((a: any, b: any) => {
+          const aTime = a.requestedAt ? new Date(a.requestedAt).getTime() : 0;
+          const bTime = b.requestedAt ? new Date(b.requestedAt).getTime() : 0;
+          return bTime - aTime;
+        });
+      setIncomingDonorRequests(items);
+      setIncomingRequestsLoading(false);
+    }, (error) => {
+      console.warn('Failed to load incoming donor requests:', error);
+      setIncomingRequestsLoading(false);
+    });
+
+    setOutgoingRequestsLoading(true);
+    const unsubscribeOutgoing = onSnapshot(outgoingQuery, (snapshot) => {
+      const items = snapshot.docs.map(mapRequest)
+        .sort((a: any, b: any) => {
+          const aTime = a.requestedAt ? new Date(a.requestedAt).getTime() : 0;
+          const bTime = b.requestedAt ? new Date(b.requestedAt).getTime() : 0;
+          return bTime - aTime;
+        });
+      setOutgoingDonorRequests(items);
+      setOutgoingRequestsLoading(false);
+    }, (error) => {
+      console.warn('Failed to load outgoing donor requests:', error);
+      setOutgoingRequestsLoading(false);
+    });
+
+    return () => {
+      unsubscribeIncoming();
+      unsubscribeOutgoing();
+    };
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid || user.role !== 'donor' || !user.onboardingCompleted) return;
+    const params = new URLSearchParams(location.search);
+    const encoded = params.get('pendingRequest');
+    const pendingFromUrl = encoded ? decodePendingDonorRequest(encoded) : null;
+    const pendingKeyFromUrl = pendingFromUrl
+      ? `${pendingFromUrl.targetDonorId}:${pendingFromUrl.createdAt}`
+      : null;
+
+    const submitPending = async () => {
+      if (pendingFromUrl) {
+        await savePendingDonorRequestDoc(user.uid, pendingFromUrl);
+        params.delete('pendingRequest');
+        const nextSearch = params.toString();
+        navigate(nextSearch ? `${location.pathname}?${nextSearch}` : location.pathname, { replace: true });
+      }
+
+      const pending = await loadPendingDonorRequestDoc(user.uid);
+      if (!pending) return;
+      const pendingKey = `${pending.targetDonorId}:${pending.createdAt}`;
+      if (pendingRequestProcessedRef.current === pendingKey || pendingRequestProcessedRef.current === pendingKeyFromUrl) {
+        return;
+      }
+      pendingRequestProcessedRef.current = pendingKey;
+      await submitDonorRequest(user, pending);
+      await clearPendingDonorRequestDoc(user.uid);
+      toast.success('Your donor request has been submitted.');
+    };
+
+    submitPending()
+      .catch((error) => {
+        console.error('Pending donor request submission failed:', error);
+        toast.error('Failed to submit your donor request.');
+        pendingRequestProcessedRef.current = null;
+      });
+  }, [user?.uid, user?.role, user?.onboardingCompleted, location.search, navigate, location.pathname]);
+
   const shareOptionsSyncRef = useRef<string | null>(null);
   const shareOptionsLoadedRef = useRef(false);
 
@@ -899,6 +1017,61 @@ function DonorDashboard() {
 
     if (success) {
       refreshData();
+    }
+  };
+
+  const handleDonorRequestDecision = async (requestId: string, decision: 'accepted' | 'rejected') => {
+    if (!user?.uid) {
+      toast.error('Please log in to respond.');
+      return;
+    }
+    if (donorRequestActionId) {
+      return;
+    }
+    try {
+      setDonorRequestActionId(requestId);
+      const requestRef = doc(db, 'donorRequests', requestId);
+      const requestSnap = await getDoc(requestRef);
+      if (!requestSnap.exists()) {
+        toast.error('Request not found.');
+        return;
+      }
+      const requestData = requestSnap.data() as any;
+      if (requestData.targetDonorUid !== user.uid) {
+        toast.error('You are not allowed to update this request.');
+        return;
+      }
+      if (requestData.status !== 'pending') {
+        toast.error('This request has already been handled.');
+        return;
+      }
+
+      await updateDoc(requestRef, {
+        status: decision,
+        respondedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      await addDoc(collection(db, 'notifications'), {
+        userId: requestData.requesterUid,
+        userRole: 'donor',
+        type: 'donor_request',
+        title: decision === 'accepted' ? 'Donor request accepted' : 'Donor request declined',
+        message: `${requestData.targetDonorName || 'A donor'} has ${decision} your donor request.`,
+        read: false,
+        priority: 'high',
+        relatedId: requestId,
+        relatedType: 'donor_request',
+        createdAt: serverTimestamp(),
+        createdBy: user.uid,
+      });
+
+      toast.success(decision === 'accepted' ? 'Request accepted.' : 'Request rejected.');
+    } catch (error) {
+      console.error('Failed to update donor request:', error);
+      toast.error('Unable to update request. Please try again.');
+    } finally {
+      setDonorRequestActionId(null);
     }
   };
 
@@ -1568,6 +1741,17 @@ function DonorDashboard() {
           emergencyAlerts: nextAlertsValue,
         },
       });
+      if (user?.uid) {
+        await setDoc(
+          doc(db, 'publicDonors', user.uid),
+          {
+            isAvailable: nextValue,
+            availableUntil: null,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
       toast.success(nextValue ? 'You are now available for requests.' : 'You are on break.');
     } catch (error: any) {
       console.error('Availability update error:', error);
@@ -1603,6 +1787,15 @@ function DonorDashboard() {
             emergencyAlerts: true,
           },
         });
+        await setDoc(
+          doc(db, 'publicDonors', user.uid),
+          {
+            isAvailable: true,
+            availableUntil: null,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
         toast.success('You are now available.');
       } else {
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -1615,6 +1808,15 @@ function DonorDashboard() {
             emergencyAlerts: false,
           },
         });
+        await setDoc(
+          doc(db, 'publicDonors', user.uid),
+          {
+            isAvailable: false,
+            availableUntil: expiresAt,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
         toast.success('You are on break for the next 24 hours.');
       }
     } catch (error: any) {
@@ -1978,6 +2180,11 @@ function DonorDashboard() {
     donationHistory,
     firstDonationDate,
     emergencyRequests,
+    incomingDonorRequests,
+    outgoingDonorRequests,
+    incomingRequestsLoading,
+    outgoingRequestsLoading,
+    donorRequestActionId,
     bloodCamps,
     stats,
     badges: computedBadges,
@@ -2060,6 +2267,7 @@ function DonorDashboard() {
     handleChecklistReset,
     handleViewAllRequests,
     handleRespondToRequest,
+    handleDonorRequestDecision,
     handleViewAllBadges,
     handleViewAllCamps,
     handleBookDonation,

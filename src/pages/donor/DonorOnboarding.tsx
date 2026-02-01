@@ -1,6 +1,6 @@
 // src/pages/donor/DonorOnboarding.tsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import PhoneInput from 'react-phone-number-input';
@@ -106,6 +106,7 @@ function MapUpdater({ center }: { center: [number, number] }) {
 
 export function DonorOnboarding() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, updateUserProfile } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<OnboardingFormData>({
@@ -515,7 +516,7 @@ export function DonorOnboarding() {
         toast.success('Welcome to the BloodHub family! 🎉');
 
         setTimeout(() => {
-          navigate('/donor/dashboard');
+          navigate(`/donor/dashboard${location.search || ''}`);
         }, 2000);
       } catch (error: any) {
         console.error('Onboarding submission error:', error);

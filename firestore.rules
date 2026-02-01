@@ -165,6 +165,21 @@ service cloud.firestore {
     }
 
     /**
+     * Donor -> requester updates for donor-to-donor requests
+     */
+    function isDonorRequestNotificationForRequester() {
+      return request.resource.data.relatedType == 'donor_request'
+        && request.resource.data.relatedId is string
+        && exists(/databases/$(database)/documents/donorRequests/$(request.resource.data.relatedId))
+        && get(/databases/$(database)/documents/donorRequests/$(request.resource.data.relatedId)).data.targetDonorUid
+          == request.auth.uid
+        && get(/databases/$(database)/documents/donorRequests/$(request.resource.data.relatedId)).data.requesterUid
+          == request.resource.data.userId
+        && get(/databases/$(database)/documents/donorRequests/$(request.resource.data.relatedId)).data.status
+          in ['accepted', 'rejected'];
+    }
+
+    /**
      * Donor -> self appointment reminders
      */
     function isAppointmentNotificationForDonor() {
@@ -308,6 +323,48 @@ service cloud.firestore {
         resource.data.requesterId == request.auth.uid ||
         isAdmin()
       );
+    }
+
+    // ========================================================================
+    // COLLECTION: donorRequests
+    // ========================================================================
+
+    match /donorRequests/{requestId} {
+      // Only requester, target donor, or admin can read
+      allow read: if isAuthenticated() && (
+        resource.data.requesterUid == request.auth.uid ||
+        resource.data.targetDonorUid == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Only authenticated donors can create requests for themselves
+      allow create: if isAuthenticated() && isDonor() && (
+        request.resource.data.requesterUid == request.auth.uid &&
+        request.resource.data.targetDonorUid is string &&
+        request.resource.data.status == 'pending'
+      );
+
+      // Requester can cancel; target donor can accept/reject
+      allow update: if isAuthenticated() && (
+        (resource.data.requesterUid == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+          request.resource.data.status in ['cancelled']) ||
+        (resource.data.targetDonorUid == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt', 'updatedAt']) &&
+          request.resource.data.status in ['accepted', 'rejected']) ||
+        isAdmin()
+      );
+
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: pendingDonorRequests
+    // ========================================================================
+
+    match /pendingDonorRequests/{userId} {
+      allow read, write: if isAuthenticated() && isOwner(userId);
     }
 
     // ========================================================================
@@ -470,7 +527,8 @@ service cloud.firestore {
           isReferralNotificationForReferrer() ||
           isAppointmentNotificationForDonor() ||
           isAppointmentNotificationForHospital() ||
-          isBloodRequestNotificationForRequester()
+          isBloodRequestNotificationForRequester() ||
+          isDonorRequestNotificationForRequester()
         ))
       );
 
@@ -485,6 +543,20 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid ||
         isAdmin()
       );
+    }
+
+    // ========================================================================
+    // COLLECTION: publicDonors (sanitized public donor profiles)
+    // ========================================================================
+
+    match /publicDonors/{donorId} {
+      allow read: if true;
+
+      allow create, update: if isAuthenticated() && (
+        isOwner(donorId) || isAdmin()
+      );
+
+      allow delete: if isAdmin();
     }
 
     // ========================================================================

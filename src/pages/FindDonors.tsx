@@ -1,41 +1,81 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Search, MapPin, Filter, Phone, Mail, AlertCircle, Clock, Heart, X } from 'lucide-react';
+import { Search, MapPin, Filter, AlertCircle, Clock, Heart, Send, X } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { calculateDistance, CITY_COORDINATES } from '../utils/geolocation';
+import type { Coordinates } from '../types/database.types';
+import { db } from '../firebase';
+import {
+  decodePendingDonorRequest,
+  encodePendingDonorRequest,
+  loadPendingDonorRequestDoc,
+  savePendingDonorRequestDoc,
+  clearPendingDonorRequestDoc,
+  submitDonorRequest,
+  type DonationComponent,
+  type PendingDonorRequest,
+} from '../services/donorRequest.service';
 import toast from 'react-hot-toast';
 
 interface Donor {
   id: string;
+  bhId?: string;
   name: string;
   bloodType: string;
   location: string;
-  distance: number;
-  lastDonation: string;
-  phone: string;
-  email: string;
+  distance: number | null;
+  lastDonation: Date | null;
+  phone: string | null;
+  email: string | null;
   availability: 'Available' | 'Unavailable';
-  gender: 'Male' | 'Female' | 'Other';
+  gender: 'Male' | 'Female' | 'Other' | string;
+  donationTypes: DonationComponent[];
 }
 
 function FindDonors() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const query = new URLSearchParams(location.search);
+  const urlParams = new URLSearchParams(location.search);
 
-  const [searchTerm, setSearchTerm] = useState<string>(query.get('searchTerm') || '');
-  const [selectedBloodType, setSelectedBloodType] = useState<string>(query.get('bloodType') || '');
-  const [selectedDistance, setSelectedDistance] = useState<string>(query.get('distance') || '');
-  const [selectedAvailability, setSelectedAvailability] = useState<string>(query.get('availability') || '');
-  const [selectedGender, setSelectedGender] = useState<string>(query.get('gender') || '');
+  const [searchTerm, setSearchTerm] = useState<string>(urlParams.get('searchTerm') || '');
+  const [selectedBloodType, setSelectedBloodType] = useState<string>(urlParams.get('bloodType') || '');
+  const [selectedDistance, setSelectedDistance] = useState<string>(urlParams.get('distance') || '');
+  const [selectedAvailability, setSelectedAvailability] = useState<string>(urlParams.get('availability') || '');
+  const [selectedGender, setSelectedGender] = useState<string>(urlParams.get('gender') || '');
+  const [selectedDonationType, setSelectedDonationType] = useState<string>(urlParams.get('donationType') || '');
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const [donorError, setDonorError] = useState<string | null>(null);
+  const [donors, setDonors] = useState<Donor[]>([]);
+  const [viewerLocation, setViewerLocation] = useState<Coordinates | null>(null);
+  const [requestSubmittingId, setRequestSubmittingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 12;
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
+    if (user?.latitude && user?.longitude) {
+      setViewerLocation({ latitude: user.latitude, longitude: user.longitude });
+      return;
+    }
+    if (user?.city && CITY_COORDINATES[user.city]) {
+      setViewerLocation(CITY_COORDINATES[user.city]);
+      return;
+    }
+    if (!navigator?.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setViewerLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      },
+      () => null,
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+  }, [user?.latitude, user?.longitude, user?.city]);
 
   const updateURL = () => {
     const params = new URLSearchParams();
@@ -44,97 +84,246 @@ function FindDonors() {
     if (selectedDistance) params.set('distance', selectedDistance);
     if (selectedAvailability) params.set('availability', selectedAvailability);
     if (selectedGender) params.set('gender', selectedGender);
+    if (selectedDonationType) params.set('donationType', selectedDonationType);
 
     navigate({ search: params.toString() });
   };
 
   useEffect(() => {
     updateURL();
-  }, [searchTerm, selectedBloodType, selectedDistance, selectedAvailability, selectedGender]);
+  }, [searchTerm, selectedBloodType, selectedDistance, selectedAvailability, selectedGender, selectedDonationType]);
 
-  const donors: Donor[] = [
-    {
-      id: '1',
-      name: 'Rajesh Kumar',
-      bloodType: 'A+',
-      location: 'Mumbai, Maharashtra',
-      distance: 2.5,
-      lastDonation: '2024-01-15',
-      phone: '+91 98765 43210',
-      email: 'rajesh.kumar@example.com',
-      availability: 'Available',
-      gender: 'Male',
-    },
-    {
-      id: '2',
-      name: 'Priya Sharma',
-      bloodType: 'O-',
-      location: 'Delhi, NCR',
-      distance: 3.8,
-      lastDonation: '2024-02-01',
-      phone: '+91 98765 43211',
-      email: 'priya.sharma@example.com',
-      availability: 'Available',
-      gender: 'Female',
-    },
-    {
-      id: '3',
-      name: 'Amit Patel',
-      bloodType: 'B+',
-      location: 'Bangalore, Karnataka',
-      distance: 5.2,
-      lastDonation: '2024-01-20',
-      phone: '+91 98765 43212',
-      email: 'amit.patel@example.com',
-      availability: 'Unavailable',
-      gender: 'Male',
-    },
-    {
-      id: '4',
-      name: 'Sneha Reddy',
-      bloodType: 'AB+',
-      location: 'Hyderabad, Telangana',
-      distance: 4.1,
-      lastDonation: '2024-01-10',
-      phone: '+91 98765 43213',
-      email: 'sneha.reddy@example.com',
-      availability: 'Available',
-      gender: 'Female',
-    },
-  ];
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedBloodType, selectedDistance, selectedAvailability, selectedGender, selectedDonationType]);
+
+  useEffect(() => {
+    let isActive = true;
+    const loadDonors = async () => {
+      setLoading(true);
+      setDonorError(null);
+      try {
+        let results: any[] = [];
+        try {
+          const donorsQuery = selectedBloodType
+            ? query(collection(db, 'publicDonors'), where('bloodType', '==', selectedBloodType), limit(200))
+            : query(collection(db, 'publicDonors'), limit(200));
+          const snapshot = await getDocs(donorsQuery);
+          results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          if (results.length === 0 && user) {
+            throw new Error('publicDonors empty');
+          }
+        } catch (publicError) {
+          if (!user) {
+            throw publicError;
+          }
+          let fallbackSnapshot;
+          try {
+            const fallbackQuery = selectedBloodType
+              ? query(collection(db, 'users'), where('role', '==', 'donor'), where('bloodType', '==', selectedBloodType), limit(200))
+              : query(collection(db, 'users'), where('role', '==', 'donor'), limit(200));
+            fallbackSnapshot = await getDocs(fallbackQuery);
+          } catch (fallbackError) {
+            if (selectedBloodType) {
+              const fallbackQuery = query(collection(db, 'users'), where('role', '==', 'donor'), limit(200));
+              fallbackSnapshot = await getDocs(fallbackQuery);
+              results = fallbackSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+                .filter((donor: any) => donor.bloodType === selectedBloodType);
+            } else {
+              throw fallbackError;
+            }
+          }
+          if (!results.length && fallbackSnapshot) {
+            results = fallbackSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          }
+        }
+
+        if (!isActive) return;
+
+        const mapped = results
+          .filter((donor: any) => donor && (donor.uid || donor.id))
+          .filter((donor: any) => (donor.uid || donor.id) !== user?.uid)
+          .filter((donor: any) => donor.status !== 'deleted' && donor.onboardingCompleted !== false)
+          .filter((donor: any) => !donor.status || donor.status === 'active')
+          .map((donor: any) => {
+            const donationTypesFromProfile = Array.isArray(donor.donationTypes)
+              ? donor.donationTypes
+              : donor.donationType
+                ? [donor.donationType]
+                : ['whole'];
+            const donorCoords = typeof donor.latitude === 'number' && typeof donor.longitude === 'number'
+              ? { latitude: donor.latitude, longitude: donor.longitude }
+              : null;
+            const distance = viewerLocation && donorCoords
+              ? calculateDistance(viewerLocation, donorCoords)
+              : null;
+            const locationParts = [donor.city, donor.state].filter(Boolean).join(', ');
+            const availableUntil = donor.availableUntil?.toDate
+              ? donor.availableUntil.toDate()
+              : donor.availableUntil
+                ? new Date(donor.availableUntil)
+                : null;
+            const breakActive = Boolean(
+              availableUntil && !Number.isNaN(availableUntil.getTime()) && availableUntil.getTime() > Date.now()
+            );
+            const isAvailable = donor.isAvailable !== false && !breakActive;
+            const lastDonationDate = donor.lastDonation?.toDate
+              ? donor.lastDonation.toDate()
+              : donor.lastDonation
+                ? new Date(donor.lastDonation)
+                : null;
+            return {
+              id: donor.uid || donor.id,
+              bhId: donor.bhId,
+              name: donor.displayName || donor.name || 'Anonymous Donor',
+              bloodType: donor.bloodType || 'Unknown',
+              location: locationParts || donor.address || 'Location unavailable',
+              distance,
+              lastDonation: lastDonationDate && !Number.isNaN(lastDonationDate.getTime()) ? lastDonationDate : null,
+              phone: donor.phoneNumber || donor.phone || null,
+              email: donor.email || null,
+              availability: isAvailable ? 'Available' : 'Unavailable',
+              gender: donor.gender || 'Not specified',
+              donationTypes: donationTypesFromProfile.length > 0 ? donationTypesFromProfile : ['whole'],
+            } as Donor;
+          });
+
+        setDonors(mapped);
+      } catch (error) {
+        console.error('Failed to load donors:', error);
+        setDonors([]);
+        setDonorError('Unable to load donors right now.');
+      } finally {
+        if (isActive) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadDonors();
+
+    return () => {
+      isActive = false;
+    };
+  }, [user, selectedBloodType, viewerLocation]);
+
+  useEffect(() => {
+    if (!user || user.role !== 'donor' || !user.onboardingCompleted) return;
+    if (requestSubmittingId) return;
+    const params = new URLSearchParams(location.search);
+    const encoded = params.get('pendingRequest');
+    const pendingFromUrl = encoded ? decodePendingDonorRequest(encoded) : null;
+
+    const submitPending = async () => {
+      if (pendingFromUrl) {
+        await savePendingDonorRequestDoc(user.uid, pendingFromUrl);
+        const nextParams = new URLSearchParams(location.search);
+        nextParams.delete('pendingRequest');
+        navigate({ pathname: location.pathname, search: nextParams.toString() }, { replace: true });
+      }
+      const pending = await loadPendingDonorRequestDoc(user.uid);
+      if (!pending) return;
+      setRequestSubmittingId(pending.targetDonorId);
+      await submitDonorRequest(user, pending);
+      await clearPendingDonorRequestDoc(user.uid);
+      toast.success('Request submitted successfully.');
+    };
+
+    submitPending()
+      .catch((error) => {
+        console.error('Failed to submit pending donor request:', error);
+        toast.error('Failed to submit your request.');
+      })
+      .finally(() => {
+        setRequestSubmittingId(null);
+      });
+  }, [user, requestSubmittingId, location.search, navigate]);
 
   const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  const donationTypes: { label: string; value: DonationComponent }[] = [
+    { label: 'Whole Blood', value: 'whole' },
+    { label: 'Plasma', value: 'plasma' },
+    { label: 'Platelets', value: 'platelets' },
+  ];
   const distances = ['5', '10', '15', '20', '25', '30'];
   const availabilityOptions = ['Available', 'Unavailable'];
   const genderOptions = ['Male', 'Female', 'Other'];
 
-  const handleCallDonor = (donor: Donor) => {
-    if (donor.availability === 'Available') {
-      window.location.href = `tel:${donor.phone}`;
-    } else {
+  const handleRequestDonor = (donor: Donor) => {
+    if (donor.availability !== 'Available') {
       toast.error('This donor is currently unavailable');
+      return;
     }
-  };
+    if (user?.uid && donor.id === user.uid) {
+      toast.error('You cannot request yourself.');
+      return;
+    }
+    const donationType = (selectedDonationType || donor.donationTypes[0] || 'whole') as DonationComponent;
+    const pendingPayload: PendingDonorRequest = {
+      targetDonorId: donor.id,
+      targetDonorBhId: donor.bhId,
+      targetDonorName: donor.name,
+      targetDonorBloodType: donor.bloodType,
+      targetLocation: donor.location,
+      donationType,
+      createdAt: Date.now(),
+      returnTo: `${location.pathname}${location.search}`,
+    };
 
-  const handleMessageDonor = (donor: Donor) => {
-    if (donor.availability === 'Available') {
-      window.location.href = `mailto:${donor.email}`;
-    } else {
-      toast.error('This donor is currently unavailable');
+    if (!user || user.role !== 'donor') {
+      toast.error('Please login as a donor to send a request.');
+      const encoded = encodePendingDonorRequest(pendingPayload);
+      navigate(`/donor/login?pendingRequest=${encodeURIComponent(encoded)}`);
+      return;
     }
+
+    if (!user.onboardingCompleted) {
+      const encoded = encodePendingDonorRequest(pendingPayload);
+      navigate(`/donor/onboarding?pendingRequest=${encodeURIComponent(encoded)}`);
+      return;
+    }
+
+    setRequestSubmittingId(donor.id);
+    submitDonorRequest(user, pendingPayload)
+      .then(() => {
+        toast.success('Request submitted successfully.');
+      })
+      .catch((error) => {
+        console.error('Failed to submit donor request:', error);
+        toast.error('Failed to submit your request.');
+      })
+      .finally(() => {
+        setRequestSubmittingId(null);
+      });
   };
 
   const filteredDonors = donors.filter(donor => {
     const matchesSearch = donor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         donor.location.toLowerCase().includes(searchTerm.toLowerCase());
+      donor.location.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesBloodType = !selectedBloodType || donor.bloodType === selectedBloodType;
-    const matchesDistance = !selectedDistance || donor.distance <= parseInt(selectedDistance);
+    const matchesDistance = !selectedDistance ||
+      (typeof donor.distance === 'number'
+        ? donor.distance <= parseInt(selectedDistance, 10)
+        : true);
     const matchesAvailability = !selectedAvailability || donor.availability === selectedAvailability;
     const matchesGender = !selectedGender || donor.gender === selectedGender;
+    const matchesDonationType = !selectedDonationType ||
+      donor.donationTypes.includes(selectedDonationType as DonationComponent);
 
     return matchesSearch && matchesBloodType && matchesDistance &&
-           matchesAvailability && matchesGender;
+      matchesAvailability && matchesGender && matchesDonationType;
   });
+
+  const sortedDonors = [...filteredDonors].sort((a, b) => {
+    const aDistance = typeof a.distance === 'number' ? a.distance : Number.POSITIVE_INFINITY;
+    const bDistance = typeof b.distance === 'number' ? b.distance : Number.POSITIVE_INFINITY;
+    return aDistance - bDistance;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sortedDonors.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const pagedDonors = sortedDonors.slice(startIndex, startIndex + pageSize);
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -142,6 +331,7 @@ function FindDonors() {
     setSelectedDistance('');
     setSelectedAvailability('');
     setSelectedGender('');
+    setSelectedDonationType('');
   };
 
   return (
@@ -208,7 +398,7 @@ function FindDonors() {
               {/* Filter Options */}
               {showFilters && (
                 <div className="mt-6 pt-6 border-t border-gray-200">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                     {/* Blood Type Filter */}
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -276,6 +466,23 @@ function FindDonors() {
                         ))}
                       </select>
                     </div>
+
+                    {/* Donation Type Filter */}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Donation Type
+                      </label>
+                      <select
+                        value={selectedDonationType}
+                        onChange={(e) => setSelectedDonationType(e.target.value)}
+                        className="w-full border-2 border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all"
+                      >
+                        <option value="">All Types</option>
+                        {donationTypes.map(type => (
+                          <option key={type.value} value={type.value}>{type.label}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <button
@@ -291,9 +498,17 @@ function FindDonors() {
             {/* Results Header */}
             <div className="flex items-center justify-between mb-6">
               <p className="text-gray-600">
-                Found <span className="font-bold text-red-600">{filteredDonors.length}</span> donors
+                Found <span className="font-bold text-red-600">{sortedDonors.length}</span> donors
+              </p>
+              <p className="text-sm text-gray-500">
+                Page {safePage} of {totalPages}
               </p>
             </div>
+            {donorError && !loading && (
+              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                {donorError}
+              </div>
+            )}
 
             {/* Donors Grid */}
             {loading ? (
@@ -310,9 +525,9 @@ function FindDonors() {
                   </div>
                 ))}
               </div>
-            ) : filteredDonors.length > 0 ? (
+            ) : pagedDonors.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredDonors.map((donor) => (
+                {pagedDonors.map((donor) => (
                   <div
                     key={donor.id}
                     className="group bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 relative overflow-hidden"
@@ -326,7 +541,7 @@ function FindDonors() {
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center space-x-3">
                           <div className="w-12 h-12 bg-gradient-to-r from-red-600 to-red-700 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
-                            {donor.name[0]}
+                            {(donor.name?.trim()?.[0] || '?')}
                           </div>
                           <div>
                             <h3 className="font-bold text-gray-900 text-lg">{donor.name}</h3>
@@ -353,39 +568,42 @@ function FindDonors() {
                       <div className="space-y-2 mb-4">
                         <div className="flex items-center text-gray-600">
                           <MapPin className="w-4 h-4 mr-2 text-red-600" />
-                          <span className="text-sm">{donor.location} ({donor.distance} km)</span>
+                          <span className="text-sm">
+                            {donor.location}
+                            {typeof donor.distance === 'number' ? ` (${donor.distance} km)` : ' (distance unavailable)'}
+                          </span>
                         </div>
                         <div className="flex items-center text-gray-600">
                           <Clock className="w-4 h-4 mr-2 text-red-600" />
-                          <span className="text-sm">Last donation: {new Date(donor.lastDonation).toLocaleDateString()}</span>
+                          <span className="text-sm">
+                            Last donation: {donor.lastDonation ? donor.lastDonation.toLocaleDateString() : 'Not yet'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {donor.donationTypes.map((type) => (
+                            <span
+                              key={`${donor.id}-${type}`}
+                              className="rounded-full bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-600"
+                            >
+                              {donationTypes.find((item) => item.value === type)?.label || type}
+                            </span>
+                          ))}
                         </div>
                       </div>
 
                       {/* Actions */}
-                      <div className="flex gap-2">
+                      <div className="flex">
                         <button
-                          onClick={() => handleCallDonor(donor)}
-                          disabled={donor.availability === 'Unavailable'}
+                          onClick={() => handleRequestDonor(donor)}
+                          disabled={donor.availability === 'Unavailable' || requestSubmittingId === donor.id}
                           className={`flex-1 flex items-center justify-center py-3 rounded-xl font-semibold transition-all ${
                             donor.availability === 'Available'
                               ? 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:shadow-lg transform hover:scale-105'
                               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           }`}
                         >
-                          <Phone className="w-4 h-4 mr-2" />
-                          Call
-                        </button>
-                        <button
-                          onClick={() => handleMessageDonor(donor)}
-                          disabled={donor.availability === 'Unavailable'}
-                          className={`flex-1 flex items-center justify-center py-3 rounded-xl font-semibold transition-all ${
-                            donor.availability === 'Available'
-                              ? 'bg-white text-red-600 border-2 border-red-600 hover:bg-red-50 transform hover:scale-105'
-                              : 'bg-gray-100 text-gray-400 cursor-not-allowed border-2 border-gray-200'
-                          }`}
-                        >
-                          <Mail className="w-4 h-4 mr-2" />
-                          Email
+                          <Send className="w-4 h-4 mr-2" />
+                          {requestSubmittingId === donor.id ? 'Requesting...' : 'Request'}
                         </button>
                       </div>
                     </div>
@@ -404,6 +622,41 @@ function FindDonors() {
                   className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-full font-semibold hover:shadow-lg transform hover:scale-105 transition-all"
                 >
                   Clear Filters
+                </button>
+              </div>
+            )}
+            {!loading && sortedDonors.length > pageSize && (
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={safePage === 1}
+                  className="px-4 py-2 rounded-full border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Prev
+                </button>
+                {Array.from({ length: totalPages }).map((_, index) => {
+                  const page = index + 1;
+                  const isActive = page === safePage;
+                  return (
+                    <button
+                      key={`page-${page}`}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold ${
+                        isActive
+                          ? 'bg-red-600 text-white'
+                          : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={safePage === totalPages}
+                  className="px-4 py-2 rounded-full border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
                 </button>
               </div>
             )}

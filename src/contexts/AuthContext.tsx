@@ -38,6 +38,7 @@ import { normalizePhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
 import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../services/referral.service';
 import { clearReferralTracking, getReferralReferrerUid, getReferralTracking } from '../utils/referralTracking';
+import { buildPublicDonorPayload } from '../utils/publicDonor';
 
 // Define window recaptcha type
 declare global {
@@ -68,6 +69,8 @@ interface User {
   bhId?: string;
   country?: string;
   bloodType?: string;
+  latitude?: number;
+  longitude?: number;
   location?: {
     latitude?: number;
     longitude?: number;
@@ -352,8 +355,7 @@ const updateUserInFirestore = async (
       // Continue even if update fails - not critical
     }
 
-    // Return user data without extra fetch
-    return {
+    const resolvedUser = {
       ...existingUserData,
       uid: firebaseUser.uid,
       email: firebaseUser.email || existingUserData.email,
@@ -370,6 +372,28 @@ const updateUserInFirestore = async (
       eligibilityChecklist: normalizeEligibilityChecklist(existingUserData?.eligibilityChecklist),
       ...additionalData
     } as User;
+
+    const publishStatus = resolvedUser.status;
+    const canPublishPublicDonor = resolvedUser.role === 'donor'
+      && resolvedUser.onboardingCompleted === true
+      && (!publishStatus || publishStatus === 'active');
+
+    if (canPublishPublicDonor) {
+      try {
+        await setDoc(
+          doc(db, 'publicDonors', firebaseUser.uid),
+          {
+            ...buildPublicDonorPayload(resolvedUser),
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (publicError) {
+        console.warn('Failed to sync public donor record:', publicError);
+      }
+    }
+
+    return resolvedUser;
   } catch (error) {
     console.error('Error in updateUserInFirestore:', error);
     throw error;
@@ -415,10 +439,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const referralApplyAttemptedRef = useRef(false);
   const recentLoginRef = useRef<{ uid: string; at: number; user?: User } | null>(null);
   const userRef = useRef<User | null>(initialCachedUser);
+  const publicDonorSyncRef = useRef<string | null>(null);
 
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.uid || user.role !== 'donor') return;
+    if (user.onboardingCompleted !== true) return;
+    if (user.status && user.status !== 'active') return;
+    const payload = buildPublicDonorPayload(user);
+    const payloadKey = JSON.stringify({
+      uid: user.uid,
+      bhId: payload.bhId,
+      displayName: payload.displayName,
+      bloodType: payload.bloodType,
+      gender: payload.gender,
+      city: payload.city,
+      state: payload.state,
+      address: payload.address,
+      latitude: payload.latitude,
+      longitude: payload.longitude,
+      isAvailable: payload.isAvailable,
+      availableUntil: payload.availableUntil,
+      lastDonation: payload.lastDonation,
+      donationTypes: payload.donationTypes,
+      donationType: payload.donationType,
+      status: payload.status,
+      onboardingCompleted: payload.onboardingCompleted,
+    });
+    if (publicDonorSyncRef.current === payloadKey) return;
+    publicDonorSyncRef.current = payloadKey;
+    setDoc(
+      doc(db, 'publicDonors', user.uid),
+      {
+        ...payload,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    ).catch((error) => {
+      console.warn('Failed to sync public donor record:', error);
+    });
+  }, [
+    user?.uid,
+    user?.role,
+    user?.bhId,
+    user?.displayName,
+    user?.bloodType,
+    user?.gender,
+    user?.city,
+    user?.state,
+    user?.address,
+    user?.latitude,
+    user?.longitude,
+    user?.isAvailable,
+    user?.availableUntil,
+    user?.lastDonation,
+    (user as any)?.donationTypes,
+    (user as any)?.donationType,
+    user?.status,
+    user?.onboardingCompleted,
+  ]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -1384,6 +1466,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
         { merge: true }
       );
+      const nextUser = {
+        ...user,
+        ...data,
+        ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
+        onboardingCompleted: true,
+        bhId: user.bhId || generatedBhId || undefined
+      } as User;
+
+      const nextRole = data.role ?? user.role;
+      const nextStatus = data.status ?? user.status;
+      const nextOnboarding = data.onboardingCompleted ?? true;
+      const canPublishPublicDonor = nextRole === 'donor'
+        && nextOnboarding === true
+        && (!nextStatus || nextStatus === 'active');
+
+      if (canPublishPublicDonor) {
+        try {
+          await setDoc(
+            doc(db, 'publicDonors', user.uid),
+            {
+              ...buildPublicDonorPayload(nextUser),
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        } catch (publicError) {
+          console.warn('Failed to update public donor record:', publicError);
+        }
+      }
+
       setUser(prev => ({
         ...prev,
         ...data,

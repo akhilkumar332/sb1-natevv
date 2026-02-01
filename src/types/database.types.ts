@@ -375,6 +375,65 @@ export interface Appointment {
 }
 
 // ============================================================================
+// COLLECTION: donorRequests
+// ============================================================================
+
+export type DonationComponent = 'whole' | 'platelets' | 'plasma';
+export type DonorRequestStatus = 'pending' | 'accepted' | 'rejected' | 'expired' | 'cancelled';
+
+export interface DonorRequest {
+  id?: string;
+
+  requesterUid: string;
+  requesterBhId?: string;
+  requesterName?: string;
+  requesterPhone?: string;
+  requesterBloodType?: BloodType;
+
+  targetDonorUid: string;
+  targetDonorBhId?: string;
+  targetDonorName?: string;
+  targetDonorBloodType?: BloodType;
+
+  donationType: DonationComponent;
+  message?: string;
+
+  status: DonorRequestStatus;
+  requestedAt: Timestamp;
+  respondedAt?: Timestamp;
+
+  requesterLocation?: {
+    city?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+  targetLocation?: {
+    city?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+}
+
+// ============================================================================
+// COLLECTION: pendingDonorRequests
+// ============================================================================
+
+export interface PendingDonorRequest {
+  id?: string;
+  targetDonorId: string;
+  targetDonorBhId?: string;
+  targetDonorName: string;
+  targetDonorBloodType: BloodType;
+  targetLocation: string;
+  donationType: DonationComponent;
+  status?: 'pending';
+  createdAt: Timestamp;
+  expiresAt?: Timestamp;
+  updatedAt?: Timestamp;
+  returnTo?: string;
+}
+
+// ============================================================================
 // COLLECTION: volunteers
 // ============================================================================
 
@@ -469,6 +528,7 @@ export interface Partnership {
 
 export type NotificationType =
   | 'emergency_request'
+  | 'donor_request'
   | 'appointment_reminder'
   | 'campaign_invite'
   | 'donation_confirmation'
