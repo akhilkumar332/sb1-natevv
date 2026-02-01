@@ -95,6 +95,8 @@ interface User {
     hydrated?: boolean;
     weightOk?: boolean;
     hemoglobinOk?: boolean;
+    rested?: boolean;
+    ateMeal?: boolean;
     updatedAt?: Date;
   };
   availableUntil?: Date | null;
@@ -294,6 +296,8 @@ const normalizeEligibilityChecklist = (checklist: any) => {
     hydrated: Boolean(checklist.hydrated),
     weightOk: Boolean(checklist.weightOk),
     hemoglobinOk: Boolean(checklist.hemoglobinOk),
+    rested: Boolean(checklist.rested),
+    ateMeal: Boolean(checklist.ateMeal),
     ...(updatedAt ? { updatedAt } : {}),
   };
 };

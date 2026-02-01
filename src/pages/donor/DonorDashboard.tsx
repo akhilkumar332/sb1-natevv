@@ -127,6 +127,8 @@ function DonorDashboard() {
     hydrated: false,
     weightOk: false,
     hemoglobinOk: false,
+    rested: false,
+    ateMeal: false,
   });
   const [checklistSaving, setChecklistSaving] = useState(false);
   const [feedbackOpenId, setFeedbackOpenId] = useState<string | null>(null);
@@ -354,6 +356,8 @@ function DonorDashboard() {
       hydrated: Boolean(user.eligibilityChecklist.hydrated),
       weightOk: Boolean(user.eligibilityChecklist.weightOk),
       hemoglobinOk: Boolean(user.eligibilityChecklist.hemoglobinOk),
+      rested: Boolean(user.eligibilityChecklist.rested),
+      ateMeal: Boolean(user.eligibilityChecklist.ateMeal),
     });
   }, [user?.eligibilityChecklist]);
 
@@ -1621,7 +1625,7 @@ function DonorDashboard() {
     }
   };
 
-  const handleChecklistToggle = async (key: 'hydrated' | 'weightOk' | 'hemoglobinOk') => {
+  const handleChecklistToggle = async (key: 'hydrated' | 'weightOk' | 'hemoglobinOk' | 'rested' | 'ateMeal') => {
     const nextChecklist = {
       ...eligibilityChecklist,
       [key]: !eligibilityChecklist[key],
@@ -1638,6 +1642,31 @@ function DonorDashboard() {
     } catch (error: any) {
       console.error('Checklist update error:', error);
       toast.error(error?.message || 'Failed to update checklist.');
+    } finally {
+      setChecklistSaving(false);
+    }
+  };
+
+  const handleChecklistReset = async () => {
+    const resetChecklist = {
+      hydrated: false,
+      weightOk: false,
+      hemoglobinOk: false,
+      rested: false,
+      ateMeal: false,
+    };
+    setEligibilityChecklist(resetChecklist);
+    try {
+      setChecklistSaving(true);
+      await updateUserProfile({
+        eligibilityChecklist: {
+          ...resetChecklist,
+          updatedAt: new Date(),
+        },
+      });
+    } catch (error: any) {
+      console.error('Checklist reset error:', error);
+      toast.error(error?.message || 'Failed to reset checklist.');
     } finally {
       setChecklistSaving(false);
     }
@@ -1768,7 +1797,9 @@ function DonorDashboard() {
     : availabilityExpiryLabel && availabilityEnabled
       ? `Active until ${availabilityExpiryLabel}`
       : 'Auto-resume after 24h';
-  const checklistCompleted = Object.values(eligibilityChecklist).filter(Boolean).length;
+  const requiredChecklistCompleted = ['hydrated', 'weightOk', 'hemoglobinOk']
+    .filter((key) => eligibilityChecklist[key as keyof typeof eligibilityChecklist])
+    .length;
   const checklistUpdatedAt = user?.eligibilityChecklist?.updatedAt
     ? user.eligibilityChecklist.updatedAt instanceof Date
       ? user.eligibilityChecklist.updatedAt
@@ -1979,7 +2010,7 @@ function DonorDashboard() {
     emergencyAlertsSaving,
     eligibilityChecklist,
     checklistSaving,
-    checklistCompleted,
+    checklistCompleted: requiredChecklistCompleted,
     checklistUpdatedAt,
     referralCount,
     referralLoading,
@@ -2026,6 +2057,7 @@ function DonorDashboard() {
     handleSaveLastDonation,
     handleLogDonation,
     handleChecklistToggle,
+    handleChecklistReset,
     handleViewAllRequests,
     handleRespondToRequest,
     handleViewAllBadges,

@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { BookOpen, CheckCircle, Clock } from 'lucide-react';
 
 const DonorReadiness = () => {
   const dashboard = useOutletContext<any>();
+  const navigate = useNavigate();
 
   const {
     isLoading,
@@ -22,11 +23,33 @@ const DonorReadiness = () => {
     checklistSaving,
     checklistUpdatedAt,
     checklistCompleted,
+    handleChecklistReset,
     formatDate,
     formatDateTime,
     handleLearnMore,
     donationHistory,
   } = dashboard;
+
+  const recoveryWindowDays = 90;
+  const todayMidnight = useMemo(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  }, []);
+
+  const lastDonationMidnight = useMemo(() => {
+    if (!lastDonationDate) return null;
+    const date = lastDonationDate instanceof Date ? lastDonationDate : new Date(lastDonationDate);
+    if (Number.isNaN(date.getTime())) return null;
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }, [lastDonationDate]);
+
+  const daysSinceDonation = lastDonationMidnight
+    ? Math.max(0, Math.floor((todayMidnight.getTime() - lastDonationMidnight.getTime()) / 86400000))
+    : 0;
+  const cappedDaysSince = Math.min(daysSinceDonation, recoveryWindowDays);
+  const recoveryProgress = lastDonationMidnight
+    ? Math.min(100, Math.round((cappedDaysSince / recoveryWindowDays) * 100))
+    : 0;
 
   const latestDonationType = useMemo(() => {
     if (!Array.isArray(donationHistory) || donationHistory.length === 0) return null;
@@ -43,6 +66,13 @@ const DonorReadiness = () => {
         ? 'Platelets'
         : 'Plasma'
     : 'Not set';
+
+  const niceToHaveCompleted = ['rested', 'ateMeal']
+    .filter((key) => eligibilityChecklist?.[key])
+    .length;
+  const checklistStale = checklistUpdatedAt
+    ? (Date.now() - new Date(checklistUpdatedAt).getTime()) > 7 * 86400000
+    : false;
 
   return (
     <>
@@ -107,6 +137,25 @@ const DonorReadiness = () => {
                   </p>
                 </div>
               </div>
+              <div className="mt-4 rounded-xl border border-red-100 bg-white px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-gray-600">
+                  <span>Recovery progress</span>
+                  <span>{lastDonationMidnight ? `${cappedDaysSince}/${recoveryWindowDays} days` : 'Add a date to track'}</span>
+                </div>
+                <div className="mt-2 h-2 rounded-full bg-red-100">
+                  <div
+                    className="h-2 rounded-full bg-red-600 transition-all duration-300"
+                    style={{ width: `${recoveryProgress}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-[11px] text-gray-500">
+                  Next eligible date:{' '}
+                  {nextEligibleDate ? formatDate(nextEligibleDate) : eligibleToDonate ? 'Now' : 'Not set'}
+                </p>
+                <p className="text-[11px] text-gray-500">
+                  Why 90 days? Standard recovery window for whole-blood donations.
+                </p>
+              </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
                 <div>
                   <label className="text-xs font-semibold text-gray-600">Last Donation Date</label>
@@ -128,6 +177,15 @@ const DonorReadiness = () => {
                   </button>
                   {lastDonationSaved && (
                     <span className="text-[11px] font-semibold text-red-600">Saved</span>
+                  )}
+                  {!lastDonationDate && (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/donor/dashboard/journey')}
+                      className="text-[11px] font-semibold text-red-600 hover:text-red-700"
+                    >
+                      Log a donation in Journey
+                    </button>
                   )}
                 </div>
               </div>
@@ -155,14 +213,19 @@ const DonorReadiness = () => {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-6 h-full">
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold text-gray-800">Eligibility Checklist</h2>
               <p className="text-xs text-gray-500">Quick self-check before donating.</p>
             </div>
-            <span className="text-xs font-semibold text-red-600">{checklistCompleted}/3 ready</span>
+            <div className="text-right text-xs font-semibold text-red-600">
+              <div>{checklistCompleted}/3 required</div>
+              <div className="text-[10px] font-medium text-gray-400">{niceToHaveCompleted}/2 nice-to-have</div>
+            </div>
           </div>
-          <div className="mt-4 space-y-3">
+          <div className="mt-4">
+            <p className="text-[10px] uppercase tracking-wide text-gray-500">Required</p>
+            <div className="mt-2 space-y-3">
             <button
               type="button"
               onClick={() => handleChecklistToggle('hydrated')}
@@ -171,7 +234,7 @@ const DonorReadiness = () => {
             >
               <div>
                 <p className="text-sm font-semibold text-gray-800">Hydrated</p>
-                <p className="text-xs text-gray-500">Had enough water in the last 24 hours.</p>
+                <p className="text-xs text-gray-500">Had 6–8 glasses of water in the last 24 hours.</p>
               </div>
               <CheckCircle className={`w-5 h-5 ${eligibilityChecklist.hydrated ? 'text-red-600' : 'text-gray-300'}`} />
             </button>
@@ -183,7 +246,7 @@ const DonorReadiness = () => {
             >
               <div>
                 <p className="text-sm font-semibold text-gray-800">Weight Check</p>
-                <p className="text-xs text-gray-500">Above 50 kg and feeling well.</p>
+                <p className="text-xs text-gray-500">Above 50 kg and feeling well today.</p>
               </div>
               <CheckCircle className={`w-5 h-5 ${eligibilityChecklist.weightOk ? 'text-red-600' : 'text-gray-300'}`} />
             </button>
@@ -195,16 +258,61 @@ const DonorReadiness = () => {
             >
               <div>
                 <p className="text-sm font-semibold text-gray-800">Hemoglobin Ready</p>
-                <p className="text-xs text-gray-500">Hemoglobin above required level.</p>
+                <p className="text-xs text-gray-500">Hemoglobin within your local eligibility range.</p>
               </div>
               <CheckCircle className={`w-5 h-5 ${eligibilityChecklist.hemoglobinOk ? 'text-red-600' : 'text-gray-300'}`} />
             </button>
+            </div>
+          </div>
+          <div className="mt-4">
+            <p className="text-[10px] uppercase tracking-wide text-gray-500">Nice-to-have</p>
+            <div className="mt-2 space-y-3">
+              <button
+                type="button"
+                onClick={() => handleChecklistToggle('rested')}
+                disabled={checklistSaving}
+                className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-left transition-all duration-300 hover:bg-gray-100"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Well Rested</p>
+                  <p className="text-xs text-gray-500">Slept 6–8 hours for a smoother donation.</p>
+                </div>
+                <CheckCircle className={`w-5 h-5 ${eligibilityChecklist.rested ? 'text-red-600' : 'text-gray-300'}`} />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChecklistToggle('ateMeal')}
+                disabled={checklistSaving}
+                className="w-full flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-left transition-all duration-300 hover:bg-gray-100"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Ate a Light Meal</p>
+                  <p className="text-xs text-gray-500">Avoids dizziness; keep it light and balanced.</p>
+                </div>
+                <CheckCircle className={`w-5 h-5 ${eligibilityChecklist.ateMeal ? 'text-red-600' : 'text-gray-300'}`} />
+              </button>
+            </div>
           </div>
           <div className="mt-4 flex items-center justify-between text-[11px] text-gray-500">
-            <span>
-              {checklistUpdatedAt ? `Updated ${formatDateTime(checklistUpdatedAt)}` : 'Not updated yet'}
-            </span>
-            {checklistSaving && <span className="text-red-600">Saving...</span>}
+            <div className="space-y-1">
+              <span>
+                {checklistUpdatedAt ? `Updated ${formatDateTime(checklistUpdatedAt)}` : 'Not updated yet'}
+              </span>
+              {checklistStale && (
+                <p className="text-[10px] text-red-600">It’s been over a week since your last check-in.</p>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {checklistSaving && <span className="text-red-600">Saving...</span>}
+              <button
+                type="button"
+                onClick={handleChecklistReset}
+                disabled={checklistSaving}
+                className="text-[11px] font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
+              >
+                Reset
+              </button>
+            </div>
           </div>
         </div>
 
