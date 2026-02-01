@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, MapPin, Filter, AlertCircle, Clock, Heart, Send, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { collection, getDocs, limit, query, where } from 'firebase/firestore';
-import { calculateDistance, CITY_COORDINATES } from '../utils/geolocation';
+import { collection, getDocs, limit, orderBy, query, startAfter, where } from 'firebase/firestore';
+import { calculateDistance } from '../utils/geolocation';
 import type { Coordinates } from '../types/database.types';
 import { db } from '../firebase';
 import {
@@ -49,33 +49,54 @@ function FindDonors() {
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [donorError, setDonorError] = useState<string | null>(null);
-  const [donors, setDonors] = useState<Donor[]>([]);
+  const [baseDonors, setBaseDonors] = useState<Donor[]>([]);
   const [viewerLocation, setViewerLocation] = useState<Coordinates | null>(null);
+  const [locationEnabled, setLocationEnabled] = useState(false);
+  const [locationRequesting, setLocationRequesting] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [requestSubmittingId, setRequestSubmittingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 12;
+  const cacheTTL = 60000;
+  const donorCacheRef = useRef<Map<string, { timestamp: number; donors: Donor[] }>>(new Map());
 
-  useEffect(() => {
-    if (user?.latitude && user?.longitude) {
-      setViewerLocation({ latitude: user.latitude, longitude: user.longitude });
+  const requestLocation = () => {
+    if (!navigator?.geolocation) {
+      setLocationEnabled(false);
+      setLocationError('Location services are not supported in this browser.');
       return;
     }
-    if (user?.city && CITY_COORDINATES[user.city]) {
-      setViewerLocation(CITY_COORDINATES[user.city]);
-      return;
-    }
-    if (!navigator?.geolocation) return;
+    setLocationRequesting(true);
+    setLocationError(null);
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setViewerLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         });
+        setLocationEnabled(true);
+        setLocationRequesting(false);
       },
-      () => null,
+      (error) => {
+        setLocationEnabled(false);
+        setLocationRequesting(false);
+        if (error.code === 1) {
+          setLocationError('Location access is blocked. Please enable location to find donors.');
+        } else if (error.code === 2) {
+          setLocationError('Unable to determine your location. Please try again.');
+        } else if (error.code === 3) {
+          setLocationError('Location request timed out. Please try again.');
+        } else {
+          setLocationError('Enable location to use Find Donors.');
+        }
+      },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
     );
-  }, [user?.latitude, user?.longitude, user?.city]);
+  };
+
+  useEffect(() => {
+    requestLocation();
+  }, []);
 
   const updateURL = () => {
     const params = new URLSearchParams();
@@ -95,61 +116,82 @@ function FindDonors() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedBloodType, selectedDistance, selectedAvailability, selectedGender, selectedDonationType]);
+  }, [
+    searchTerm,
+    selectedBloodType,
+    selectedDistance,
+    selectedAvailability,
+    selectedGender,
+    selectedDonationType,
+    viewerLocation?.latitude,
+    viewerLocation?.longitude,
+  ]);
 
   useEffect(() => {
     let isActive = true;
     const loadDonors = async () => {
+      if (!locationEnabled) {
+        setLoading(false);
+        setBaseDonors([]);
+        return;
+      }
       setLoading(true);
       setDonorError(null);
       try {
-        let results: any[] = [];
-        try {
-          const donorsQuery = selectedBloodType
-            ? query(collection(db, 'publicDonors'), where('bloodType', '==', selectedBloodType), limit(200))
-            : query(collection(db, 'publicDonors'), limit(200));
-          const snapshot = await getDocs(donorsQuery);
-          results = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          if (results.length === 0 && user) {
-            throw new Error('publicDonors empty');
+        const cacheKey = viewerLocation
+          ? `${viewerLocation.latitude.toFixed(4)}:${viewerLocation.longitude.toFixed(4)}`
+          : 'none';
+        const cached = donorCacheRef.current.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < cacheTTL) {
+          setBaseDonors(cached.donors);
+          setLoading(false);
+          return;
+        }
+
+        const batchSize = 200;
+        const fetchCollection = async (collectionName: string, roleFilter?: boolean) => {
+          const docs: any[] = [];
+          let lastDoc: any = null;
+          let keepGoing = true;
+
+          while (keepGoing) {
+            const constraints: any[] = [orderBy('__name__'), limit(batchSize)];
+            if (roleFilter) {
+              constraints.unshift(where('role', '==', 'donor'));
+            }
+            if (lastDoc) {
+              constraints.push(startAfter(lastDoc));
+            }
+            const snapshot = await getDocs(query(collection(db, collectionName), ...constraints));
+            snapshot.docs.forEach((doc) => docs.push({ id: doc.id, ...doc.data() }));
+            lastDoc = snapshot.docs[snapshot.docs.length - 1] || null;
+            keepGoing = snapshot.size === batchSize;
           }
+
+          return docs;
+        };
+
+        let rawResults: any[] = [];
+        try {
+          rawResults = await fetchCollection('publicDonors');
         } catch (publicError) {
           if (!user) {
             throw publicError;
           }
-          let fallbackSnapshot;
-          try {
-            const fallbackQuery = selectedBloodType
-              ? query(collection(db, 'users'), where('role', '==', 'donor'), where('bloodType', '==', selectedBloodType), limit(200))
-              : query(collection(db, 'users'), where('role', '==', 'donor'), limit(200));
-            fallbackSnapshot = await getDocs(fallbackQuery);
-          } catch (fallbackError) {
-            if (selectedBloodType) {
-              const fallbackQuery = query(collection(db, 'users'), where('role', '==', 'donor'), limit(200));
-              fallbackSnapshot = await getDocs(fallbackQuery);
-              results = fallbackSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-                .filter((donor: any) => donor.bloodType === selectedBloodType);
-            } else {
-              throw fallbackError;
-            }
-          }
-          if (!results.length && fallbackSnapshot) {
-            results = fallbackSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          }
+          rawResults = await fetchCollection('users', true);
         }
 
         if (!isActive) return;
 
-        const mapped = results
+        const mappedDonors = rawResults
           .filter((donor: any) => donor && (donor.uid || donor.id))
-          .filter((donor: any) => (donor.uid || donor.id) !== user?.uid)
           .filter((donor: any) => donor.status !== 'deleted' && donor.onboardingCompleted !== false)
           .filter((donor: any) => !donor.status || donor.status === 'active')
           .map((donor: any) => {
             const donationTypesFromProfile = Array.isArray(donor.donationTypes)
-              ? donor.donationTypes
+              ? donor.donationTypes.filter(Boolean)
               : donor.donationType
-                ? [donor.donationType]
+                ? [donor.donationType].filter(Boolean)
                 : ['whole'];
             const donorCoords = typeof donor.latitude === 'number' && typeof donor.longitude === 'number'
               ? { latitude: donor.latitude, longitude: donor.longitude }
@@ -188,10 +230,14 @@ function FindDonors() {
             } as Donor;
           });
 
-        setDonors(mapped);
+        donorCacheRef.current.set(cacheKey, {
+          timestamp: Date.now(),
+          donors: mappedDonors,
+        });
+        setBaseDonors(mappedDonors);
       } catch (error) {
         console.error('Failed to load donors:', error);
-        setDonors([]);
+        setBaseDonors([]);
         setDonorError('Unable to load donors right now.');
       } finally {
         if (isActive) {
@@ -205,7 +251,51 @@ function FindDonors() {
     return () => {
       isActive = false;
     };
-  }, [user, selectedBloodType, viewerLocation]);
+  }, [user, viewerLocation, locationEnabled]);
+
+  useEffect(() => {
+    if (!locationEnabled) {
+      setBaseDonors([]);
+      setCurrentPage(1);
+    }
+  }, [locationEnabled]);
+
+  const filteredDonors = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const maxDistance = selectedDistance ? parseInt(selectedDistance, 10) : null;
+    const selectedDonation = selectedDonationType as DonationComponent | '';
+    return baseDonors
+      .filter((donor) => (user?.uid ? donor.id !== user.uid : true))
+      .filter((donor) => (!selectedBloodType ? true : donor.bloodType === selectedBloodType))
+      .filter((donor) => {
+        if (!normalizedSearch) return true;
+        return donor.name.toLowerCase().includes(normalizedSearch) ||
+          donor.location.toLowerCase().includes(normalizedSearch);
+      })
+      .filter((donor) => (!selectedAvailability ? true : donor.availability === selectedAvailability))
+      .filter((donor) => (!selectedGender ? true : donor.gender === selectedGender))
+      .filter((donor) => (!selectedDonation ? true : donor.donationTypes.includes(selectedDonation)))
+      .filter((donor) => {
+        if (!maxDistance) return true;
+        if (typeof donor.distance !== 'number') return false;
+        return donor.distance <= maxDistance;
+      })
+      .slice()
+      .sort((a, b) => {
+        const aDistance = typeof a.distance === 'number' ? a.distance : Number.POSITIVE_INFINITY;
+        const bDistance = typeof b.distance === 'number' ? b.distance : Number.POSITIVE_INFINITY;
+        return aDistance - bDistance;
+      });
+  }, [
+    baseDonors,
+    searchTerm,
+    selectedBloodType,
+    selectedAvailability,
+    selectedGender,
+    selectedDonationType,
+    selectedDistance,
+    user?.uid,
+  ]);
 
   useEffect(() => {
     if (!user || user.role !== 'donor' || !user.onboardingCompleted) return;
@@ -297,33 +387,15 @@ function FindDonors() {
       });
   };
 
-  const filteredDonors = donors.filter(donor => {
-    const matchesSearch = donor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      donor.location.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesBloodType = !selectedBloodType || donor.bloodType === selectedBloodType;
-    const matchesDistance = !selectedDistance ||
-      (typeof donor.distance === 'number'
-        ? donor.distance <= parseInt(selectedDistance, 10)
-        : true);
-    const matchesAvailability = !selectedAvailability || donor.availability === selectedAvailability;
-    const matchesGender = !selectedGender || donor.gender === selectedGender;
-    const matchesDonationType = !selectedDonationType ||
-      donor.donationTypes.includes(selectedDonationType as DonationComponent);
-
-    return matchesSearch && matchesBloodType && matchesDistance &&
-      matchesAvailability && matchesGender && matchesDonationType;
-  });
-
-  const sortedDonors = [...filteredDonors].sort((a, b) => {
-    const aDistance = typeof a.distance === 'number' ? a.distance : Number.POSITIVE_INFINITY;
-    const bDistance = typeof b.distance === 'number' ? b.distance : Number.POSITIVE_INFINITY;
-    return aDistance - bDistance;
-  });
-
-  const totalPages = Math.max(1, Math.ceil(sortedDonors.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(filteredDonors.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
-  const startIndex = (safePage - 1) * pageSize;
-  const pagedDonors = sortedDonors.slice(startIndex, startIndex + pageSize);
+  const pageDonors = filteredDonors.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -495,10 +567,30 @@ function FindDonors() {
               )}
             </div>
 
+            {!locationEnabled && (
+              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-6 py-5 text-sm text-amber-800 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-semibold text-amber-900">Enable location to use Find Donors</p>
+                  <p className="text-amber-700">
+                    We need your location to show nearby donors and accurate distances.
+                  </p>
+                  {locationError && <p className="mt-1 text-amber-700">{locationError}</p>}
+                </div>
+                <button
+                  onClick={requestLocation}
+                  disabled={locationRequesting}
+                  className="px-4 py-2 rounded-xl bg-amber-600 text-white font-semibold hover:bg-amber-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {locationRequesting ? 'Requesting...' : 'Enable Location'}
+                </button>
+              </div>
+            )}
+
             {/* Results Header */}
             <div className="flex items-center justify-between mb-6">
               <p className="text-gray-600">
-                Found <span className="font-bold text-red-600">{sortedDonors.length}</span> donors
+                Showing <span className="font-bold text-red-600">{pageDonors.length}</span> of{' '}
+                <span className="font-bold text-red-600">{filteredDonors.length}</span> donors
               </p>
               <p className="text-sm text-gray-500">
                 Page {safePage} of {totalPages}
@@ -511,7 +603,22 @@ function FindDonors() {
             )}
 
             {/* Donors Grid */}
-            {loading ? (
+            {!locationEnabled ? (
+              <div className="text-center py-16">
+                <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <MapPin className="w-10 h-10 text-amber-600" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Location required</h3>
+                <p className="text-gray-600 mb-6">Enable location services to see nearby donors.</p>
+                <button
+                  onClick={requestLocation}
+                  disabled={locationRequesting}
+                  className="px-6 py-3 bg-amber-600 text-white rounded-full font-semibold hover:bg-amber-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {locationRequesting ? 'Requesting...' : 'Enable Location'}
+                </button>
+              </div>
+            ) : loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[...Array(6)].map((_, i) => (
                   <div key={i} className="bg-white rounded-2xl p-6 animate-pulse border border-gray-100">
@@ -525,9 +632,9 @@ function FindDonors() {
                   </div>
                 ))}
               </div>
-            ) : pagedDonors.length > 0 ? (
+            ) : filteredDonors.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {pagedDonors.map((donor) => (
+                {pageDonors.map((donor) => (
                   <div
                     key={donor.id}
                     className="group bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 relative overflow-hidden"
@@ -566,12 +673,16 @@ function FindDonors() {
 
                       {/* Details */}
                       <div className="space-y-2 mb-4">
-                        <div className="flex items-center text-gray-600">
-                          <MapPin className="w-4 h-4 mr-2 text-red-600" />
-                          <span className="text-sm">
-                            {donor.location}
-                            {typeof donor.distance === 'number' ? ` (${donor.distance} km)` : ' (distance unavailable)'}
-                          </span>
+                        <div className="flex items-start text-gray-600">
+                          <MapPin className="w-4 h-4 mr-2 text-red-600 mt-0.5" />
+                          <div className="text-sm leading-5">
+                            <p>{donor.location}</p>
+                            <p className="text-xs text-gray-500">
+                              {typeof donor.distance === 'number'
+                                ? `${donor.distance.toFixed(1)} km away`
+                                : 'Distance unavailable'}
+                            </p>
+                          </div>
                         </div>
                         <div className="flex items-center text-gray-600">
                           <Clock className="w-4 h-4 mr-2 text-red-600" />
@@ -625,7 +736,7 @@ function FindDonors() {
                 </button>
               </div>
             )}
-            {!loading && sortedDonors.length > pageSize && (
+            {!loading && totalPages > 1 && (
               <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
                 <button
                   onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
@@ -653,7 +764,7 @@ function FindDonors() {
                 })}
                 <button
                   onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  disabled={safePage === totalPages}
+                  disabled={safePage >= totalPages}
                   className="px-4 py-2 rounded-full border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next
