@@ -828,13 +828,13 @@ const DonorJourney = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-6 lg:grid-cols-3">
-          <div className="bg-white rounded-2xl shadow-xl p-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+        <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-3 items-stretch">
+          <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 h-full min-w-0">
+            <h2 className="text-base sm:text-lg font-bold text-gray-800 mb-4 flex items-center">
               <Flame className="w-5 h-5 mr-2 text-red-600" />
               Donation Streak
             </h2>
-            <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-gray-500">Current streak</p>
                 <p className="text-lg font-semibold text-gray-900">{stats?.streak || 0} donations</p>
@@ -844,7 +844,7 @@ const DonorJourney = () => {
             <div className="mt-4 space-y-2 text-xs text-gray-500">
               {donationHistory.slice(0, 3).map((donation: any) => (
                 <div key={`streak-${donation.id}`} className="flex items-center justify-between">
-                  <span>{donation.bloodBank || 'Donation'}</span>
+                  <span className="truncate">{donation.bloodBank || 'Donation'}</span>
                   <span>{formatDate(donation.date)}</span>
                 </div>
               ))}
@@ -856,12 +856,12 @@ const DonorJourney = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl p-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+          <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 h-full min-w-0">
+            <h2 className="text-base sm:text-lg font-bold text-gray-800 mb-4 flex items-center">
               <TrendingUp className="w-5 h-5 mr-2 text-red-600" />
               Impact Summary
             </h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
                 <p className="text-[11px] uppercase tracking-wide text-gray-500">Lives Saved</p>
                 <p className="text-lg font-semibold text-gray-900">{livesSaved}</p>
@@ -876,9 +876,9 @@ const DonorJourney = () => {
             </p>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl p-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Actions</h2>
-            <div className="grid gap-3">
+          <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 h-full min-w-0 flex flex-col col-span-2 lg:col-span-1">
+            <h2 className="text-base sm:text-lg font-bold text-gray-800 mb-4">Actions</h2>
+            <div className="grid gap-3 mt-auto">
               <button
                 type="button"
                 onClick={handleBookDonation}
