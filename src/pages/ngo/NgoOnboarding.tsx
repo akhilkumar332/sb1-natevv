@@ -421,7 +421,7 @@ export function NgoOnboarding() {
                 name="organizationName"
                 value={formData.organizationName}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                 placeholder="Enter organization name"
                 required
               />
@@ -436,7 +436,7 @@ export function NgoOnboarding() {
                 name="registrationNumber"
                 value={formData.registrationNumber}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                 placeholder="NGO registration number"
                 required
               />
@@ -450,7 +450,7 @@ export function NgoOnboarding() {
                 name="ngoType"
                 value={formData.ngoType}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                 required
               >
                 <option value="">Select NGO type</option>
@@ -469,7 +469,7 @@ export function NgoOnboarding() {
                 name="contactPersonName"
                 value={formData.contactPersonName}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                 placeholder="Primary contact person"
                 required
               />
@@ -490,7 +490,7 @@ export function NgoOnboarding() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                   placeholder="organization@example.com"
                   required
                 />
@@ -505,7 +505,7 @@ export function NgoOnboarding() {
                   defaultCountry="IN"
                   value={formData.phone}
                   onChange={(value) => setFormData(prev => ({ ...prev, phone: value || '' }))}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all phone-input-custom"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 transition-all phone-input-custom"
                 />
               </div>
 
@@ -518,7 +518,7 @@ export function NgoOnboarding() {
                   name="dateOfBirth"
                   value={formData.dateOfBirth}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                   required
                 />
               </div>
@@ -531,7 +531,7 @@ export function NgoOnboarding() {
                   name="country"
                   value={formData.country}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                   required
                 >
                   <option value="">Select Country</option>
@@ -552,7 +552,7 @@ export function NgoOnboarding() {
                     type="button"
                     onClick={getCurrentLocation}
                     disabled={locationLoading}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-medium rounded-lg transition-all disabled:opacity-50"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-sm font-medium rounded-lg transition-all disabled:opacity-50"
                   >
                     {locationLoading ? (
                       <>
@@ -590,7 +590,7 @@ export function NgoOnboarding() {
                     name="address"
                     value={formData.address}
                     onChange={handleAddressChange}
-                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                     placeholder="Start typing your address..."
                     required
                     autoComplete="off"
@@ -606,7 +606,7 @@ export function NgoOnboarding() {
                           className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
                         >
                           <div className="flex items-start space-x-2">
-                            <MapPin className="w-4 h-4 text-blue-500 flex-shrink-0 mt-1" />
+                            <MapPin className="w-4 h-4 text-amber-500 flex-shrink-0 mt-1" />
                             <div className="text-sm text-gray-700">{suggestion.display_name}</div>
                           </div>
                         </div>
@@ -626,7 +626,7 @@ export function NgoOnboarding() {
                   name="state"
                   value={formData.state}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                   required
                   disabled={!formData.country}
                 >
@@ -648,7 +648,7 @@ export function NgoOnboarding() {
                     name="city"
                     value={formData.city}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                     required
                     disabled={!formData.state}
                   >
@@ -670,7 +670,7 @@ export function NgoOnboarding() {
                     name="postalCode"
                     value={formData.postalCode}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                     placeholder="XXXXXX"
                     required
                   />
@@ -692,7 +692,7 @@ export function NgoOnboarding() {
                 name="website"
                 value={formData.website}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                 placeholder="https://www.example.com"
               />
             </div>
@@ -706,7 +706,7 @@ export function NgoOnboarding() {
                 name="yearEstablished"
                 value={formData.yearEstablished}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                 placeholder="YYYY"
                 min="1900"
                 max={new Date().getFullYear()}
@@ -723,7 +723,7 @@ export function NgoOnboarding() {
                 value={formData.description}
                 onChange={handleChange}
                 rows={5}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all resize-none"
                 placeholder="Brief description of your organization and its mission..."
                 required
               />
@@ -734,7 +734,7 @@ export function NgoOnboarding() {
       case 3:
         return (
           <div className="space-y-6">
-            <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
+            <div className="bg-amber-50 rounded-xl p-6 border border-amber-100">
               <h3 className="font-bold text-gray-900 mb-4">Review Your Information</h3>
               <div className="space-y-2 text-sm">
                 <p><span className="font-semibold">Organization:</span> {formData.organizationName}</p>
@@ -752,11 +752,11 @@ export function NgoOnboarding() {
                   name="termsOfServiceAgreed"
                   checked={formData.termsOfServiceAgreed}
                   onChange={handleChange}
-                  className="mt-1 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="mt-1 w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
                   required
                 />
                 <span className="text-sm text-gray-700">
-                  I agree to the <a href="#" className="text-blue-600 hover:text-blue-700 font-semibold">Terms of Service</a>
+                  I agree to the <a href="#" className="text-red-600 hover:text-red-700 font-semibold">Terms of Service</a>
                 </span>
               </label>
 
@@ -766,11 +766,11 @@ export function NgoOnboarding() {
                   name="privacyPolicyAgreed"
                   checked={formData.privacyPolicyAgreed}
                   onChange={handleChange}
-                  className="mt-1 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="mt-1 w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
                   required
                 />
                 <span className="text-sm text-gray-700">
-                  I agree to the <a href="#" className="text-blue-600 hover:text-blue-700 font-semibold">Privacy Policy</a>
+                  I agree to the <a href="#" className="text-red-600 hover:text-red-700 font-semibold">Privacy Policy</a>
                 </span>
               </label>
             </div>
@@ -793,7 +793,7 @@ export function NgoOnboarding() {
                       completedSteps.includes(index)
                         ? 'bg-green-500 text-white'
                         : index === currentStep
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-red-600 text-white'
                         : 'bg-gray-200 text-gray-400'
                     }`}
                   >
@@ -841,7 +841,7 @@ export function NgoOnboarding() {
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="ml-auto px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                  className="ml-auto px-6 py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors flex items-center space-x-2"
                 >
                   <span>Next</span>
                   <ChevronRight className="w-5 h-5" />
@@ -850,7 +850,7 @@ export function NgoOnboarding() {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="ml-auto px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  className="ml-auto px-6 py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
                   {isLoading ? (
                     <>

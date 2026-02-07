@@ -3,7 +3,7 @@
  * Fetches all NGO-related data from Firestore
  */
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { collection, query, where, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -11,16 +11,26 @@ export interface Campaign {
   id: string;
   title: string;
   type: 'blood-drive' | 'awareness' | 'fundraising' | 'volunteer';
-  status: 'active' | 'upcoming' | 'completed' | 'draft';
+  status: 'active' | 'upcoming' | 'completed' | 'draft' | 'cancelled';
   startDate: Date;
   endDate: Date;
   target: number;
   achieved: number;
+  targetType?: 'units' | 'donors' | 'funds' | 'volunteers';
   location: string;
   city?: string;
+  state?: string;
   description?: string;
   registeredDonors?: number;
   confirmedDonors?: number;
+  locationDetails?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    latitude?: number;
+    longitude?: number;
+    venue?: string;
+  };
 }
 
 export interface Volunteer {
@@ -54,6 +64,22 @@ export interface DonorCommunity {
   activeDonors: number;
   newThisMonth: number;
   retentionRate: number;
+}
+
+export interface DonorSummary {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  bloodType?: string;
+  city?: string;
+  state?: string;
+  latitude?: number;
+  longitude?: number;
+  isAvailable?: boolean;
+  lastDonation?: Date;
+  totalDonations?: number;
+  createdAt?: Date;
 }
 
 export interface NgoStats {
@@ -101,6 +127,56 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const cacheKey = useMemo(() => (ngoId ? `ngo_dashboard_cache_${ngoId}` : ''), [ngoId]);
+  const cacheTTL = 5 * 60 * 1000;
+
+  const serializeCampaigns = (items: Campaign[]) =>
+    items.map((campaign) => ({
+      ...campaign,
+      startDate: campaign.startDate?.toISOString(),
+      endDate: campaign.endDate?.toISOString(),
+    }));
+
+  const serializeVolunteers = (items: Volunteer[]) =>
+    items.map((volunteer) => ({
+      ...volunteer,
+      joinDate: volunteer.joinDate?.toISOString(),
+    }));
+
+  const serializePartnerships = (items: Partnership[]) =>
+    items.map((partner) => ({
+      ...partner,
+      since: partner.since?.toISOString(),
+    }));
+
+  const hydrateCampaigns = (items: any[] = []): Campaign[] =>
+    items.map((campaign) => ({
+      ...campaign,
+      startDate: campaign.startDate ? new Date(campaign.startDate) : new Date(),
+      endDate: campaign.endDate ? new Date(campaign.endDate) : new Date(),
+    }));
+
+  const hydrateVolunteers = (items: any[] = []): Volunteer[] =>
+    items.map((volunteer) => ({
+      ...volunteer,
+      joinDate: volunteer.joinDate ? new Date(volunteer.joinDate) : new Date(),
+    }));
+
+  const hydratePartnerships = (items: any[] = []): Partnership[] =>
+    items.map((partner) => ({
+      ...partner,
+      since: partner.since ? new Date(partner.since) : new Date(),
+    }));
+
+  const buildLocationLabel = (locationData: any): string => {
+    if (!locationData) return '';
+    if (typeof locationData === 'string') return locationData;
+    if (locationData.address) return locationData.address;
+    if (locationData.venue) return locationData.venue;
+    const parts = [locationData.city, locationData.state].filter(Boolean);
+    return parts.join(', ');
+  };
+
   // Fetch campaigns
   const fetchCampaigns = async () => {
     try {
@@ -115,6 +191,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const campaignList: Campaign[] = snapshot.docs.map(doc => {
           const data = doc.data();
+          const locationData = data.location;
           return {
             id: doc.id,
             title: data.title || data.name || '',
@@ -124,11 +201,23 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
             endDate: data.endDate?.toDate() || new Date(),
             target: data.target || data.targetDonors || 0,
             achieved: data.achieved || data.registeredDonors?.length || 0,
-            location: data.location || '',
-            city: data.city,
+            targetType: data.targetType,
+            location: buildLocationLabel(locationData) || (typeof data.location === 'string' ? data.location : ''),
+            city: data.city || locationData?.city,
+            state: data.state || locationData?.state,
             description: data.description,
             registeredDonors: data.registeredDonors?.length || 0,
             confirmedDonors: data.confirmedDonors?.length || 0,
+            locationDetails: typeof locationData === 'object'
+              ? {
+                  address: locationData.address,
+                  city: locationData.city,
+                  state: locationData.state,
+                  latitude: locationData.latitude,
+                  longitude: locationData.longitude,
+                  venue: locationData.venue,
+                }
+              : undefined,
           };
         });
         setCampaigns(campaignList);
@@ -149,7 +238,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       const q = query(
         volunteersRef,
         where('ngoId', '==', ngoId),
-        orderBy('joinDate', 'desc'),
+        orderBy('joinedAt', 'desc'),
         limit(50)
       );
 
@@ -162,7 +251,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
           email: data.email || '',
           phone: data.phone || data.phoneNumber,
           role: data.role || 'Volunteer',
-          joinDate: data.joinDate?.toDate() || data.createdAt?.toDate() || new Date(),
+          joinDate: data.joinedAt?.toDate() || data.joinDate?.toDate() || data.createdAt?.toDate() || new Date(),
           hoursContributed: data.hoursContributed || 0,
           status: data.status || 'active',
           skills: data.skills || [],
@@ -191,11 +280,11 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
         const data = doc.data();
         return {
           id: doc.id,
-          organization: data.organization || data.name || '',
+          organization: data.partnerName || data.organization || data.name || '',
           organizationId: data.organizationId || data.partnerId,
-          type: data.type || 'corporate',
-          since: data.since?.toDate() || data.createdAt?.toDate() || new Date(),
-          donations: data.donations || data.totalDonations || 0,
+          type: data.partnerType || data.type || 'corporate',
+          since: data.startDate?.toDate() || data.since?.toDate() || data.createdAt?.toDate() || new Date(),
+          donations: data.totalDonations || data.donations || 0,
           status: data.status || 'active',
           contactPerson: data.contactPerson,
           contactEmail: data.contactEmail,
@@ -208,19 +297,17 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
     }
   };
 
-  // Fetch donor community stats
   const fetchDonorCommunity = async () => {
     try {
-      // Get all donors - in production, you'd filter by NGO relationship
-      const donorsRef = collection(db, 'donors');
-      const allDonorsSnap = await getDocs(donorsRef);
+      const donorsRef = collection(db, 'users');
+      const donorsQuery = query(donorsRef, where('role', '==', 'donor'));
+      const allDonorsSnap = await getDocs(donorsQuery);
 
       const totalDonors = allDonorsSnap.size;
       const activeDonors = allDonorsSnap.docs.filter(doc =>
         doc.data().isAvailable === true
       ).length;
 
-      // Calculate new donors this month
       const oneMonthAgo = new Date();
       oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
@@ -242,22 +329,20 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
     }
   };
 
+
   // Calculate stats
   const calculateStats = () => {
     const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
     const activeVolunteers = volunteers.filter(v => v.status === 'active').length;
 
-    // Sum up blood units collected from campaigns
     const bloodUnitsCollected = campaigns
       .filter(c => c.type === 'blood-drive')
       .reduce((sum, c) => sum + c.achieved, 0);
 
-    // Sum up funds raised
     const fundsRaised = campaigns
       .filter(c => c.type === 'fundraising')
       .reduce((sum, c) => sum + c.achieved, 0);
 
-    // Calculate people impacted (blood units * 3)
     const peopleImpacted = bloodUnitsCollected * 3;
 
     setStats({
@@ -272,55 +357,98 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
     });
   };
 
-  // Initial data fetch
   useEffect(() => {
     if (!ngoId) return;
 
     const loadData = async () => {
-      setLoading(true);
+      let usedCache = false;
       setError(null);
 
-      try {
-        // Set up real-time listener for campaigns
-        const unsubscribeCampaigns = await fetchCampaigns();
+      if (typeof window !== 'undefined' && cacheKey) {
+        const cachedRaw = window.localStorage.getItem(cacheKey);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw);
+            if (cached?.timestamp && Date.now() - cached.timestamp < cacheTTL) {
+              setCampaigns(hydrateCampaigns(cached.campaigns));
+              setVolunteers(hydrateVolunteers(cached.volunteers));
+              setPartnerships(hydratePartnerships(cached.partnerships));
+              setDonorCommunity(cached.donorCommunity || donorCommunity);
+              setStats(cached.stats || stats);
+              setLoading(false);
+              usedCache = true;
+            }
+          } catch (err) {
+            console.warn('Failed to hydrate NGO dashboard cache', err);
+          }
+        }
+      }
+      if (!usedCache) {
+        setLoading(true);
+      }
 
-        // Fetch other data
-        await Promise.all([
-          fetchVolunteers(),
-          fetchPartnerships(),
-          fetchDonorCommunity(),
-        ]);
+      const runFetch = async () => {
+        try {
+          const unsubscribeCampaigns = await fetchCampaigns();
 
-        setLoading(false);
+          if (!usedCache) {
+            setLoading(false);
+          }
 
-        // Cleanup listener on unmount
-        return () => {
-          unsubscribeCampaigns();
-        };
-      } catch (err) {
-        console.error('Error loading NGO data:', err);
-        setError('Failed to load NGO data');
-        setLoading(false);
+          await fetchVolunteers();
+          await fetchPartnerships();
+          await fetchDonorCommunity();
+
+          return () => {
+            unsubscribeCampaigns();
+          };
+        } catch (err) {
+          console.error('Error loading NGO data:', err);
+          setError('Failed to load NGO data');
+          setLoading(false);
+        }
+      };
+
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(runFetch);
+      } else {
+        setTimeout(runFetch, 0);
       }
     };
 
     loadData();
   }, [ngoId]);
 
-  // Recalculate stats when data changes
   useEffect(() => {
     if (!loading && campaigns.length >= 0) {
       calculateStats();
     }
   }, [campaigns, volunteers, partnerships, loading]);
 
+  useEffect(() => {
+    if (!cacheKey || loading) return;
+    if (typeof window === 'undefined') return;
+    const payload = {
+      timestamp: Date.now(),
+      campaigns: serializeCampaigns(campaigns),
+      volunteers: serializeVolunteers(volunteers),
+      partnerships: serializePartnerships(partnerships),
+      donorCommunity,
+      stats,
+    };
+    try {
+      window.localStorage.setItem(cacheKey, JSON.stringify(payload));
+    } catch (err) {
+      console.warn('Failed to write NGO dashboard cache', err);
+    }
+  }, [cacheKey, loading, campaigns, volunteers, partnerships, donorCommunity, stats]);
+
   const refreshData = async () => {
-    setLoading(true);
-    await fetchCampaigns();
-    await fetchVolunteers();
-    await fetchPartnerships();
-    await fetchDonorCommunity();
-    setLoading(false);
+    await Promise.all([
+      fetchVolunteers(),
+      fetchPartnerships(),
+      fetchDonorCommunity(),
+    ]);
   };
 
   return {

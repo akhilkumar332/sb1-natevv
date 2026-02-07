@@ -31,6 +31,16 @@ const NgoRegister = lazy(() => lazyLoad(import('./pages/ngo/NgoRegister')));
 const NgoLogin = lazy(() => lazyLoad(import('./pages/ngo/NgoLogin')));
 const NgoDashboard = lazy(() => lazyLoad(import('./pages/ngo/NgoDashboard')));
 const NgoOnboarding = lazy(() => lazyLoad(import('./pages/ngo/NgoOnboarding')));
+const NgoOverview = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Overview')));
+const NgoCampaigns = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Campaigns')));
+const NgoCampaignDetail = lazy(() => lazyLoad(import('./pages/ngo/dashboard/CampaignDetail')));
+const NgoVolunteers = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Volunteers')));
+const NgoVolunteerDetail = lazy(() => lazyLoad(import('./pages/ngo/dashboard/VolunteerDetail')));
+const NgoPartnerships = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Partnerships')));
+const NgoPartnershipDetail = lazy(() => lazyLoad(import('./pages/ngo/dashboard/PartnershipDetail')));
+const NgoDonors = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Donors')));
+const NgoAnalytics = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Analytics')));
+const NgoAccount = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Account')));
 const AdminLogin = lazy(() => lazyLoad(import('./pages/admin/AdminLogin')));
 const AdminDashboard = lazy(() => lazyLoad(import('./pages/admin/AdminDashboard')));
 const AdminOnboarding = lazy(() => lazyLoad(import('./pages/admin/AdminOnboarding')));
@@ -75,7 +85,19 @@ const AppRoutes = () => {
         <Route path="/hospital/onboarding" element={<HospitalOnboarding />} />
         <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
         <Route path="/ngo/onboarding" element={<NgoOnboarding />} />
-        <Route path="/ngo/dashboard" element={<NgoDashboard />} />
+        <Route path="/ngo/dashboard" element={<NgoDashboard />}>
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<NgoOverview />} />
+          <Route path="campaigns" element={<NgoCampaigns />} />
+          <Route path="campaigns/:campaignId" element={<NgoCampaignDetail />} />
+          <Route path="volunteers" element={<NgoVolunteers />} />
+          <Route path="volunteers/:volunteerId" element={<NgoVolunteerDetail />} />
+          <Route path="partnerships" element={<NgoPartnerships />} />
+          <Route path="partnerships/:partnershipId" element={<NgoPartnershipDetail />} />
+          <Route path="donors" element={<NgoDonors />} />
+          <Route path="analytics" element={<NgoAnalytics />} />
+          <Route path="account" element={<NgoAccount />} />
+        </Route>
         <Route path="/admin/onboarding" element={<AdminOnboarding />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
       </Route>

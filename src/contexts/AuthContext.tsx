@@ -84,6 +84,15 @@ interface User {
   preferredLanguage?: string;
   howHeardAboutUs?: string;
   interestedInVolunteering?: boolean;
+  organizationName?: string;
+  registrationNumber?: string;
+  ngoType?: string;
+  contactPersonName?: string;
+  website?: string;
+  yearEstablished?: string;
+  description?: string;
+  privacyPolicyAgreed?: boolean;
+  termsOfServiceAgreed?: boolean;
   emailVerified?: boolean;
   donorCardShareOptions?: {
     showPhone: boolean;
@@ -1421,7 +1430,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     navigate: NavigateFunction,
     options: { redirectTo?: string; showToast?: boolean } = {}
   ) => {
-    const { redirectTo = '/donor/login', showToast = true } = options;
+    const resolvedRedirect = options.redirectTo ?? (
+      user?.role === 'ngo'
+        ? '/ngo/login'
+        : user?.role === 'hospital'
+          ? '/hospital/login'
+          : user?.role === 'admin'
+            ? '/admin/login'
+            : '/donor/login'
+    );
+    const { showToast = true } = options;
     let hadError = false;
     try {
       await handleLogout();
@@ -1445,8 +1463,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    if (redirectTo) {
-      navigate(redirectTo);
+    if (resolvedRedirect) {
+      navigate(resolvedRedirect);
     }
   };
 

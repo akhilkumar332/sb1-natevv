@@ -18,6 +18,7 @@ import {
   getDoc,
   addDoc,
   updateDoc,
+  deleteDoc,
   doc,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -167,6 +168,33 @@ export const updateCampaign = async (
     });
   } catch (error) {
     throw new DatabaseError('Failed to update campaign');
+  }
+};
+
+/**
+ * Archive campaign (sets status to cancelled)
+ * @param campaignId - Campaign ID
+ */
+export const archiveCampaign = async (campaignId: string): Promise<void> => {
+  try {
+    await updateDoc(doc(db, 'campaigns', campaignId), {
+      status: 'cancelled',
+      updatedAt: getServerTimestamp(),
+    });
+  } catch (error) {
+    throw new DatabaseError('Failed to archive campaign');
+  }
+};
+
+/**
+ * Delete campaign
+ * @param campaignId - Campaign ID
+ */
+export const deleteCampaign = async (campaignId: string): Promise<void> => {
+  try {
+    await deleteDoc(doc(db, 'campaigns', campaignId));
+  } catch (error) {
+    throw new DatabaseError('Failed to delete campaign');
   }
 };
 
@@ -430,6 +458,33 @@ export const updateVolunteer = async (
 };
 
 /**
+ * Archive volunteer (sets status to inactive)
+ * @param volunteerId - Volunteer ID
+ */
+export const archiveVolunteer = async (volunteerId: string): Promise<void> => {
+  try {
+    await updateDoc(doc(db, 'volunteers', volunteerId), {
+      status: 'inactive',
+      updatedAt: getServerTimestamp(),
+    });
+  } catch (error) {
+    throw new DatabaseError('Failed to archive volunteer');
+  }
+};
+
+/**
+ * Delete volunteer
+ * @param volunteerId - Volunteer ID
+ */
+export const deleteVolunteer = async (volunteerId: string): Promise<void> => {
+  try {
+    await deleteDoc(doc(db, 'volunteers', volunteerId));
+  } catch (error) {
+    throw new DatabaseError('Failed to delete volunteer');
+  }
+};
+
+/**
  * Assign volunteer to campaign
  * @param campaignId - Campaign ID
  * @param volunteerId - Volunteer user ID
@@ -607,6 +662,33 @@ export const updatePartnership = async (
     });
   } catch (error) {
     throw new DatabaseError('Failed to update partnership');
+  }
+};
+
+/**
+ * Archive partnership (sets status to inactive)
+ * @param partnershipId - Partnership ID
+ */
+export const archivePartnership = async (partnershipId: string): Promise<void> => {
+  try {
+    await updateDoc(doc(db, 'partnerships', partnershipId), {
+      status: 'inactive',
+      updatedAt: getServerTimestamp(),
+    });
+  } catch (error) {
+    throw new DatabaseError('Failed to archive partnership');
+  }
+};
+
+/**
+ * Delete partnership
+ * @param partnershipId - Partnership ID
+ */
+export const deletePartnership = async (partnershipId: string): Promise<void> => {
+  try {
+    await deleteDoc(doc(db, 'partnerships', partnershipId));
+  } catch (error) {
+    throw new DatabaseError('Failed to delete partnership');
   }
 };
 

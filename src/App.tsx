@@ -40,6 +40,8 @@ function App() {
   ]);
   const noFooterPrefixes = [
     '/donor/dashboard',
+    '/ngo/dashboard',
+    '/hospital/dashboard',
   ];
 
   const hideCompletely = noFooterRoutes.has(location.pathname)

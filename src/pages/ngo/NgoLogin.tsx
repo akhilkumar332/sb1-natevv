@@ -5,6 +5,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { Heart, Users, Calendar, TrendingUp, Shield } from 'lucide-react';
 import LogoMark from '../../components/LogoMark';
+import { authStorage } from '../../utils/authStorage';
+import { auth } from '../../firebase';
 
 export function NgoLogin() {
   const navigate = useNavigate();
@@ -36,6 +38,10 @@ export function NgoLogin() {
         await logout(navigate, { redirectTo: '/ngo/login', showToast: false });
         return;
       }
+      const token = response?.token ?? (await auth.currentUser?.getIdToken());
+      if (token) {
+        authStorage.setAuthToken(token);
+      }
       toast.success('Successfully logged in as NGO!');
 
       if (response.user.onboardingCompleted === true) {
@@ -50,13 +56,24 @@ export function NgoLogin() {
     }
   };
 
+  if (user && user.role === 'ngo') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex items-center gap-3 text-gray-600">
+          <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-medium">Signing you in…</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Gradient Background with Info */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-amber-600 relative overflow-hidden">
         {/* Animated Background Elements */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-900 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-red-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-amber-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
 
         <div className="relative z-10 flex flex-col justify-center px-12 py-12 text-white">
           <div className="mb-12">
@@ -69,7 +86,7 @@ export function NgoLogin() {
             </div>
             <h2 className="text-4xl font-bold mb-4">NGO Portal</h2>
             <p className="text-xl opacity-90 leading-relaxed">
-              Organize blood donation drives, coordinate with donors, and amplify your impact.
+              Organize donation drives, coordinate with volunteers, and amplify your impact.
             </p>
           </div>
 
@@ -79,8 +96,8 @@ export function NgoLogin() {
                 <Calendar className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Organize Campaigns</h3>
-                <p className="opacity-90 text-sm">Plan and manage blood donation drives efficiently</p>
+                <h3 className="font-bold text-lg mb-1">Campaign Operations</h3>
+                <p className="opacity-90 text-sm">Plan and manage donation drives with clear timelines</p>
               </div>
             </div>
 
@@ -89,8 +106,8 @@ export function NgoLogin() {
                 <Users className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Volunteer Management</h3>
-                <p className="opacity-90 text-sm">Coordinate with volunteers and donors seamlessly</p>
+                <h3 className="font-bold text-lg mb-1">Volunteer Network</h3>
+                <p className="opacity-90 text-sm">Coordinate donor outreach and on-ground teams</p>
               </div>
             </div>
 
@@ -99,8 +116,8 @@ export function NgoLogin() {
                 <TrendingUp className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Impact Tracking</h3>
-                <p className="opacity-90 text-sm">Monitor campaign performance and social impact</p>
+                <h3 className="font-bold text-lg mb-1">Impact Reporting</h3>
+                <p className="opacity-90 text-sm">Track outcomes and campaign performance</p>
               </div>
             </div>
 
@@ -109,7 +126,7 @@ export function NgoLogin() {
                 <Shield className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Verified Platform</h3>
+                <h3 className="font-bold text-lg mb-1">Verified Organization</h3>
                 <p className="opacity-90 text-sm">Build trust with verified NGO credentials</p>
               </div>
             </div>
@@ -126,7 +143,7 @@ export function NgoLogin() {
               <div className="inline-flex items-center space-x-2">
                 <LogoMark className="w-10 h-10" />
                 <div>
-                  <span className="font-extrabold text-2xl bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                  <span className="font-extrabold text-2xl bg-gradient-to-r from-red-600 to-amber-600 bg-clip-text text-transparent">
                     BloodHub
                   </span>
                 </div>
@@ -134,21 +151,21 @@ export function NgoLogin() {
             </div>
 
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-red-600 to-amber-600 rounded-2xl mb-4">
                 <Heart className="w-8 h-8 text-white" />
               </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-2">NGO Login</h2>
-              <p className="text-gray-600">Welcome back, Change-maker!</p>
+              <p className="text-gray-600">Welcome back, change-maker.</p>
             </div>
 
             <div className="space-y-6">
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-2xl p-6 border border-blue-100">
+              <div className="bg-gradient-to-r from-amber-50 to-red-50 rounded-2xl p-6 border border-amber-100">
                 <div className="flex items-start space-x-3">
-                  <Shield className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <Shield className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">Secure NGO Access</h3>
                     <p className="text-sm text-gray-600">
-                      Sign in with your organization's Google Workspace account to access campaign management tools.
+                      Sign in with your organization's Google account to access campaign management tools.
                     </p>
                   </div>
                 </div>
@@ -158,11 +175,11 @@ export function NgoLogin() {
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={googleLoading}
-                className="w-full flex items-center justify-center px-6 py-4 border-2 border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="w-full flex items-center justify-center px-6 py-4 border-2 border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 hover:border-amber-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {googleLoading ? (
                   <span className="flex items-center space-x-2">
-                    <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
                     <span>Signing in...</span>
                   </span>
                 ) : (
@@ -182,7 +199,7 @@ export function NgoLogin() {
                   Don't have an account?{' '}
                   <Link
                     to="/ngo/register"
-                    className="font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+                    className="font-semibold text-red-600 hover:text-red-700 transition-colors"
                   >
                     Register now
                   </Link>
