@@ -19,6 +19,7 @@ import {
   Loader
 } from 'lucide-react';
 import { countries, getStatesByCountry, getCitiesByState } from '../../data/locations';
+import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../../services/referral.service';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -397,6 +398,14 @@ export function NgoOnboarding() {
         dateOfBirth: new Date(formData.dateOfBirth),
         onboardingCompleted: true
       });
+      if (user?.uid) {
+        await applyReferralTrackingForUser(user.uid);
+        await ensureReferralTrackingForExistingReferral({
+          ...user,
+          onboardingCompleted: true,
+          role: user.role || 'ngo',
+        });
+      }
       toast.success('NGO profile completed successfully!');
       navigate('/ngo/dashboard');
     } catch (error) {

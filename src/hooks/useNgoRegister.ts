@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
+import { applyReferralTrackingForUser, resolveReferralContext } from '../services/referral.service';
 
 interface RegisterFormData {
   identifier: string;
@@ -114,6 +115,7 @@ export const useNgoRegister = () => {
       }
 
       // Create new user document with NGO role
+      const referralContext = await resolveReferralContext(userCredential.user.uid);
       await setDoc(userRef, {
         uid: userCredential.user.uid,
         phoneNumber: userCredential.user.phoneNumber,
@@ -121,7 +123,16 @@ export const useNgoRegister = () => {
         onboardingCompleted: false,
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
+        ...(referralContext
+          ? {
+              referredByUid: referralContext.referrerUid,
+              referredByBhId: referralContext.referrerBhId,
+              referralCapturedAt: serverTimestamp(),
+            }
+          : {}),
       });
+
+      await applyReferralTrackingForUser(userCredential.user.uid);
 
       toast.success('Registration successful!');
       navigate('/ngo/onboarding');
@@ -215,6 +226,7 @@ export const useNgoRegister = () => {
       console.log('🔵 Creating new user document...');
 
       // Create new user document with NGO role
+      const referralContext = await resolveReferralContext(result.user.uid);
       await setDoc(userRef, {
         uid: result.user.uid,
         email: result.user.email,
@@ -224,10 +236,19 @@ export const useNgoRegister = () => {
         onboardingCompleted: false,
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
+        ...(referralContext
+          ? {
+              referredByUid: referralContext.referrerUid,
+              referredByBhId: referralContext.referrerBhId,
+              referralCapturedAt: serverTimestamp(),
+            }
+          : {}),
       }).catch((error) => {
         console.error('🔴 Error creating user document:', error);
         throw new Error(`Failed to create user: ${error.message}`);
       });
+
+      await applyReferralTrackingForUser(result.user.uid);
 
       console.log('✅ User document created, navigating to onboarding');
       toast.success('Registration successful!');

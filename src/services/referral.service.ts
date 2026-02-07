@@ -12,11 +12,13 @@ import { REFERRAL_RULES, computeReferralStatus, normalizeReferralDate } from '..
 type ReferralApplyResult = {
   referrerUid: string;
   referrerBhId?: string;
+  referrerRole?: string;
 };
 
 type ResolveResult = {
   uid: string;
   bhId?: string;
+  role?: string;
 };
 
 type ReferralStatusUpdate = {
@@ -45,6 +47,7 @@ const resolveReferrerByBhId = async (bhId?: string | null): Promise<ResolveResul
   return {
     uid: referrerDoc.id,
     bhId: referrerDoc.data()?.bhId || bhId,
+    role: referrerDoc.data()?.role,
   };
 };
 
@@ -72,6 +75,7 @@ export const resolveReferralContext = async (newUserUid: string): Promise<Referr
 
   let referrerUid: string | null = referralUid;
   let referrerBhId: string | undefined = referralBhId || undefined;
+  let referrerRole: string | undefined;
 
   if (referrerUid) {
     try {
@@ -79,11 +83,13 @@ export const resolveReferralContext = async (newUserUid: string): Promise<Referr
       if (referrerDoc.exists()) {
         const referrerData = referrerDoc.data();
         referrerBhId = referrerData?.bhId || referrerBhId;
+        referrerRole = referrerData?.role;
       } else if (referrerBhId) {
         const bhIdFallback = await resolveReferrerByBhId(referrerBhId);
         if (bhIdFallback) {
           referrerUid = bhIdFallback.uid;
           referrerBhId = bhIdFallback.bhId;
+          referrerRole = bhIdFallback.role;
         }
       }
     } catch (error) {
@@ -97,6 +103,7 @@ export const resolveReferralContext = async (newUserUid: string): Promise<Referr
     }
     referrerUid = bhIdLookup.uid;
     referrerBhId = bhIdLookup.bhId;
+    referrerRole = bhIdLookup.role;
   }
 
   if (!referrerUid) {
@@ -109,19 +116,22 @@ export const resolveReferralContext = async (newUserUid: string): Promise<Referr
     return null;
   }
 
-  return { referrerUid, referrerBhId };
+  return { referrerUid, referrerBhId, referrerRole };
 };
 
 export const applyReferralTrackingForUser = async (newUserUid: string): Promise<ReferralApplyResult | null> => {
   try {
     const resolved = await resolveReferralContext(newUserUid);
     if (!resolved) return null;
-    const { referrerUid, referrerBhId } = resolved;
+    const { referrerUid, referrerBhId, referrerRole } = resolved;
 
     const referralDocId = `${referrerUid}_${newUserUid}`;
     const referralRef = doc(db, 'ReferralTracking', referralDocId);
     const referralExisting = await getDoc(referralRef);
     const userRef = doc(db, 'users', newUserUid);
+    const referredSnap = await getDoc(userRef);
+    const referredData = referredSnap.exists() ? referredSnap.data() : undefined;
+    const referredRole = referredData?.role;
 
     if (referralExisting.exists()) {
       await setDoc(
@@ -133,7 +143,7 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
         },
         { merge: true }
       );
-      await sendReferralNotification(referrerUid, 'registered', newUserUid, undefined, newUserUid);
+      await sendReferralNotification(referrerUid, 'registered', newUserUid, referredData, newUserUid, referrerRole);
       clearReferralTracking();
       return { referrerUid, referrerBhId };
     }
@@ -143,6 +153,8 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
         referrerUid,
         referredUid: newUserUid,
         referrerBhId: referrerBhId,
+        referrerRole,
+        referredRole,
         referredAt: serverTimestamp(),
         status: 'registered',
         createdAt: serverTimestamp(),
@@ -168,7 +180,7 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
     const referralWritten = referralResult.status === 'fulfilled';
     const userWritten = userResult.status === 'fulfilled';
     if (referralWritten) {
-      await sendReferralNotification(referrerUid, 'registered', newUserUid, undefined, newUserUid);
+      await sendReferralNotification(referrerUid, 'registered', newUserUid, referredData, newUserUid, referrerRole);
     }
     if (referralWritten || userWritten) {
       clearReferralTracking();
@@ -215,7 +227,8 @@ const sendReferralNotification = async (
   status: ReferralStatusUpdate['status'],
   referredUid: string,
   referredUser?: any,
-  createdByUid?: string
+  createdByUid?: string,
+  referrerRole?: string
 ): Promise<boolean> => {
   try {
     const notificationId = buildReferralNotificationId(referrerUid, referredUid, status);
@@ -228,9 +241,11 @@ const sendReferralNotification = async (
     }
     const content = buildNotificationContent(status, referredUser);
     const referralId = `${referrerUid}_${referredUid}`;
+    const resolvedRole = referrerRole || 'donor';
+    const actionUrl = resolvedRole === 'ngo' ? '/ngo/dashboard/referrals' : '/donor/dashboard/referrals';
     await setDoc(notificationRef, {
       userId: referrerUid,
-      userRole: 'donor',
+      userRole: resolvedRole,
       type: 'referral',
       title: content.title,
       message: content.message,
@@ -242,7 +257,7 @@ const sendReferralNotification = async (
       referrerUid,
       referredUid,
       createdBy: createdByUid || referredUid,
-      actionUrl: '/donor/dashboard/referrals',
+      actionUrl,
       createdAt: serverTimestamp(),
     });
     return true;
@@ -257,6 +272,15 @@ const sendReferralNotification = async (
 export const ensureReferralTrackingForExistingReferral = async (user: any): Promise<void> => {
   const referrerUid = user?.referredByUid;
   if (!referrerUid || !user?.uid) return;
+  let referrerRole: string | undefined;
+  try {
+    const referrerDoc = await getDoc(doc(db, 'users', referrerUid));
+    if (referrerDoc.exists()) {
+      referrerRole = referrerDoc.data()?.role;
+    }
+  } catch (error) {
+    console.warn('Failed to resolve referrer role:', error);
+  }
 
   const referralDocId = `${referrerUid}_${user.uid}`;
   const referralRef = doc(db, 'ReferralTracking', referralDocId);
@@ -267,11 +291,13 @@ export const ensureReferralTrackingForExistingReferral = async (user: any): Prom
       referrerUid,
       referredUid: user.uid,
       referrerBhId: user.referredByBhId,
+      referrerRole,
+      referredRole: user?.role,
       referredAt: serverTimestamp(),
       status: 'registered',
       createdAt: serverTimestamp(),
     });
-    await sendReferralNotification(referrerUid, 'registered', user.uid, user, user.uid);
+    await sendReferralNotification(referrerUid, 'registered', user.uid, user, user.uid, referrerRole);
   }
 
   const referralData = referralSnap.exists() ? referralSnap.data() : null;
@@ -294,7 +320,7 @@ export const ensureReferralTrackingForExistingReferral = async (user: any): Prom
       { merge: true }
     );
     if (computed.status === 'onboarded' || computed.status === 'eligible') {
-      await sendReferralNotification(referrerUid, computed.status, user.uid, user, user.uid);
+      await sendReferralNotification(referrerUid, computed.status, user.uid, user, user.uid, referrerRole);
     }
   }
 };
@@ -304,10 +330,19 @@ export const ensureReferralNotificationsForReferrer = async (
   referrals: Array<{ referredUid: string; referralStatus?: string; user?: any }>
 ): Promise<void> => {
   if (!referrerUid || referrals.length === 0) return;
+  let referrerRole: string | undefined;
+  try {
+    const referrerDoc = await getDoc(doc(db, 'users', referrerUid));
+    if (referrerDoc.exists()) {
+      referrerRole = referrerDoc.data()?.role;
+    }
+  } catch (error) {
+    console.warn('Failed to resolve referrer role for notifications:', error);
+  }
   const notifyStatuses: ReferralStatusUpdate['status'][] = ['onboarded', 'eligible'];
   await Promise.all(referrals.map(async (entry) => {
     const status = (entry.referralStatus || 'registered') as ReferralStatusUpdate['status'];
     if (!notifyStatuses.includes(status)) return;
-    await sendReferralNotification(referrerUid, status, entry.referredUid, entry.user, referrerUid);
+    await sendReferralNotification(referrerUid, status, entry.referredUid, entry.user, referrerUid, referrerRole);
   }));
 };

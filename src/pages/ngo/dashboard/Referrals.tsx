@@ -1,9 +1,8 @@
 import { useOutletContext } from 'react-router-dom';
 import ReferralsPanel from '../../../components/referrals/ReferralsPanel';
+import type { NgoDashboardContext } from '../NgoDashboard';
 
-const DonorReferrals = () => {
-  const dashboard = useOutletContext<any>();
-
+const NgoReferrals = () => {
   const {
     referralLoading,
     referralUsersLoading,
@@ -18,12 +17,17 @@ const DonorReferrals = () => {
     referralQrDataUrl,
     referralQrLoading,
     loadReferralQr,
-    formatDate,
-  } = dashboard;
+  } = useOutletContext<NgoDashboardContext>();
+
+  const formatDate = (date?: Date | string) => {
+    if (!date) return 'N/A';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return d.toLocaleDateString();
+  };
 
   return (
     <ReferralsPanel
-      variant="donor"
+      variant="ngo"
       referralLoading={referralLoading}
       referralUsersLoading={referralUsersLoading}
       referralCount={referralCount}
@@ -42,4 +46,4 @@ const DonorReferrals = () => {
   );
 };
 
-export default DonorReferrals;
+export default NgoReferrals;

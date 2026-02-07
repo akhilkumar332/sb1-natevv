@@ -41,6 +41,7 @@ const NgoPartnershipDetail = lazy(() => lazyLoad(import('./pages/ngo/dashboard/P
 const NgoDonors = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Donors')));
 const NgoAnalytics = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Analytics')));
 const NgoAccount = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Account')));
+const NgoReferrals = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Referrals')));
 const AdminLogin = lazy(() => lazyLoad(import('./pages/admin/AdminLogin')));
 const AdminDashboard = lazy(() => lazyLoad(import('./pages/admin/AdminDashboard')));
 const AdminOnboarding = lazy(() => lazyLoad(import('./pages/admin/AdminOnboarding')));
@@ -96,6 +97,7 @@ const AppRoutes = () => {
           <Route path="partnerships/:partnershipId" element={<NgoPartnershipDetail />} />
           <Route path="donors" element={<NgoDonors />} />
           <Route path="analytics" element={<NgoAnalytics />} />
+          <Route path="referrals" element={<NgoReferrals />} />
           <Route path="account" element={<NgoAccount />} />
         </Route>
         <Route path="/admin/onboarding" element={<AdminOnboarding />} />

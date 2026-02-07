@@ -19,6 +19,9 @@ function NgoOverview() {
     volunteers,
     donorCommunity,
     getStatusColor,
+    referralCount,
+    eligibleReferralCount,
+    referralSummary,
   } = useOutletContext<NgoDashboardContext>();
 
   const spotlightCampaigns = campaigns.slice(0, 3);
@@ -136,39 +139,68 @@ function NgoOverview() {
           )}
         </div>
 
-        <div className="bg-gradient-to-br from-red-600 to-amber-500 rounded-2xl p-6 text-white shadow-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-white/70">Donor Community</p>
-              <h2 className="text-2xl font-bold">Engagement snapshot</h2>
+        <div className="space-y-6">
+          <div className="bg-gradient-to-br from-red-600 to-amber-500 rounded-2xl p-6 text-white shadow-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-white/70">Donor Community</p>
+                <h2 className="text-2xl font-bold">Engagement snapshot</h2>
+              </div>
+              <Heart className="w-6 h-6" />
             </div>
-            <Heart className="w-6 h-6" />
+            <div className="grid grid-cols-2 gap-4 mt-6">
+              <div className="bg-white/15 rounded-xl p-4">
+                <p className="text-xs text-white/70">Total donors</p>
+                <p className="text-2xl font-bold">{donorCommunity.totalDonors.toLocaleString()}</p>
+              </div>
+              <div className="bg-white/15 rounded-xl p-4">
+                <p className="text-xs text-white/70">Active donors</p>
+                <p className="text-2xl font-bold">{donorCommunity.activeDonors.toLocaleString()}</p>
+              </div>
+              <div className="bg-white/15 rounded-xl p-4">
+                <p className="text-xs text-white/70">New this month</p>
+                <p className="text-2xl font-bold">{donorCommunity.newThisMonth}</p>
+              </div>
+              <div className="bg-white/15 rounded-xl p-4">
+                <p className="text-xs text-white/70">Retention</p>
+                <p className="text-2xl font-bold">{donorCommunity.retentionRate}%</p>
+              </div>
+            </div>
+            <Link
+              to="/ngo/dashboard/donors"
+              className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-white/90"
+            >
+              View donor details
+              <ChevronRight className="w-4 h-4" />
+            </Link>
           </div>
-          <div className="grid grid-cols-2 gap-4 mt-6">
-            <div className="bg-white/15 rounded-xl p-4">
-              <p className="text-xs text-white/70">Total donors</p>
-              <p className="text-2xl font-bold">{donorCommunity.totalDonors.toLocaleString()}</p>
+
+          <div className="bg-white rounded-2xl shadow-xl p-6 border border-amber-100">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-amber-600">Referrals</p>
+                <h3 className="text-lg font-bold text-gray-900">Referral snapshot</h3>
+              </div>
+              <Users className="w-5 h-5 text-amber-500" />
             </div>
-            <div className="bg-white/15 rounded-xl p-4">
-              <p className="text-xs text-white/70">Active donors</p>
-              <p className="text-2xl font-bold">{donorCommunity.activeDonors.toLocaleString()}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-3">
+                <p className="text-xs text-gray-500">Registered</p>
+                <p className="text-xl font-bold text-gray-900">{referralSummary?.registered || 0}</p>
+              </div>
+              <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-3">
+                <p className="text-xs text-gray-500">Eligible</p>
+                <p className="text-xl font-bold text-gray-900">{eligibleReferralCount}</p>
+              </div>
             </div>
-            <div className="bg-white/15 rounded-xl p-4">
-              <p className="text-xs text-white/70">New this month</p>
-              <p className="text-2xl font-bold">{donorCommunity.newThisMonth}</p>
-            </div>
-            <div className="bg-white/15 rounded-xl p-4">
-              <p className="text-xs text-white/70">Retention</p>
-              <p className="text-2xl font-bold">{donorCommunity.retentionRate}%</p>
+            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+              <span>{referralCount} total referrals</span>
+              <Link to="/ngo/dashboard/referrals" className="inline-flex items-center gap-1 font-semibold text-amber-600 hover:text-amber-700">
+                View details
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
           </div>
-          <Link
-            to="/ngo/dashboard/donors"
-            className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-white/90"
-          >
-            View donor details
-            <ChevronRight className="w-4 h-4" />
-          </Link>
         </div>
       </div>
 

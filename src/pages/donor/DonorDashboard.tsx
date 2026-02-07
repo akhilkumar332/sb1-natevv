@@ -24,11 +24,10 @@ import { useBloodRequest } from '../../hooks/useBloodRequest';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import BhIdBanner from '../../components/BhIdBanner';
-import { addDoc, collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp, Timestamp, query, where, onSnapshot, documentId } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, setDoc, updateDoc, serverTimestamp, Timestamp, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
-import { REFERRAL_RULES, computeReferralStatus } from '../../utils/referralRules';
-import { ensureReferralNotificationsForReferrer } from '../../services/referral.service';
+import { useReferrals } from '../../hooks/useReferrals';
 import {
   clearPendingDonorRequestDoc,
   decodePendingDonorRequest,
@@ -53,15 +52,6 @@ type DonationFeedback = {
   createdAt?: Date;
   updatedAt?: Date;
 };
-
-type ReferralEntry = {
-  id: string;
-  referredUid: string;
-  referredAt?: Date | null;
-  status?: string;
-  referrerBhId?: string;
-};
-
 
 function DonorDashboard() {
   const {
@@ -107,8 +97,6 @@ function DonorDashboard() {
     showQr: true,
   });
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
-  const [referralQrDataUrl, setReferralQrDataUrl] = useState<string | null>(null);
-  const [referralQrLoading, setReferralQrLoading] = useState(false);
   const [incomingDonorRequests, setIncomingDonorRequests] = useState<any[]>([]);
   const [outgoingDonorRequests, setOutgoingDonorRequests] = useState<any[]>([]);
   const [incomingRequestsLoading, setIncomingRequestsLoading] = useState(true);
@@ -125,15 +113,6 @@ function DonorDashboard() {
   });
   const [donationEditSaving, setDonationEditSaving] = useState(false);
   const [donationDeleteId, setDonationDeleteId] = useState<string | null>(null);
-  const [referralCount, setReferralCount] = useState(0);
-  const [referralLoading, setReferralLoading] = useState(true);
-  const [referralEntries, setReferralEntries] = useState<ReferralEntry[]>([]);
-  const [referralUsers, setReferralUsers] = useState<Record<string, any>>({});
-  const [referralUsersLoading, setReferralUsersLoading] = useState(false);
-  const [fallbackReferralLoading, setFallbackReferralLoading] = useState(false);
-  const fallbackReferralAppliedRef = useRef(false);
-  const referralNotificationSyncRef = useRef<Set<string>>(new Set());
-  const referralStatusSyncRef = useRef<Set<string>>(new Set());
   const donationTypeBackfillRef = useRef(false);
   const locationBackfillRef = useRef(false);
   const pendingRequestProcessedRef = useRef<string | null>(null);
@@ -170,6 +149,22 @@ function DonorDashboard() {
     user?.bloodType,
     user?.city
   );
+
+  const {
+    referralLoading,
+    referralUsersLoading,
+    referralCount,
+    referralDetails,
+    eligibleReferralCount,
+    referralSummary,
+    referralMilestone,
+    referralQrDataUrl,
+    referralQrLoading,
+    loadReferralQr,
+    copyInviteLink,
+    shareInviteLink,
+    openWhatsAppInvite,
+  } = useReferrals(user);
 
   const { respondToRequest, responding } = useBloodRequest();
 
@@ -414,135 +409,6 @@ function DonorDashboard() {
       }
     }
   }, [user?.availableUntil, user?.isAvailable, updateUserProfile]);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-    setReferralLoading(true);
-    const referralQuery = query(
-      collection(db, 'ReferralTracking'),
-      where('referrerUid', '==', user.uid)
-    );
-    const unsubscribe = onSnapshot(referralQuery, (snapshot) => {
-      const nextEntries = snapshot.docs.map((docSnapshot) => {
-        const data = docSnapshot.data() as any;
-        const referredAt = data?.referredAt?.toDate
-          ? data.referredAt.toDate()
-          : typeof data?.referredAt?.seconds === 'number'
-            ? new Date(data.referredAt.seconds * 1000)
-            : null;
-        return {
-          id: docSnapshot.id,
-          referredUid: data?.referredUid,
-          referredAt,
-          status: data?.status,
-          referrerBhId: data?.referrerBhId,
-        } as ReferralEntry;
-      }).filter(entry => Boolean(entry.referredUid));
-      nextEntries.sort((a, b) => (b.referredAt?.getTime() || 0) - (a.referredAt?.getTime() || 0));
-      setReferralEntries(nextEntries);
-      setReferralCount(nextEntries.length);
-      setReferralLoading(false);
-    }, (error) => {
-      console.warn('Failed to load referrals:', error);
-      setReferralLoading(false);
-    });
-    return () => unsubscribe();
-  }, [user?.uid]);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-    if (referralLoading) return;
-    if (referralEntries.length > 0) return;
-    if (fallbackReferralAppliedRef.current) return;
-    let isActive = true;
-    setFallbackReferralLoading(true);
-    const fetchFallbackReferrals = async () => {
-      try {
-        const fallbackQuery = query(
-          collection(db, 'users'),
-          where('referredByUid', '==', user.uid)
-        );
-        const snapshot = await getDocs(fallbackQuery);
-        if (!isActive) return;
-        if (snapshot.empty) {
-          return;
-        }
-        const fallbackEntries = snapshot.docs.map((docSnapshot) => {
-          const data = docSnapshot.data() as any;
-          const createdAt = data?.createdAt?.toDate
-            ? data.createdAt.toDate()
-            : typeof data?.createdAt?.seconds === 'number'
-              ? new Date(data.createdAt.seconds * 1000)
-              : null;
-          return {
-            id: `fallback_${docSnapshot.id}`,
-            referredUid: docSnapshot.id,
-            referredAt: createdAt,
-            status: data?.onboardingCompleted ? 'onboarded' : 'registered',
-            referrerBhId: user.bhId,
-          } as ReferralEntry;
-        }).filter(entry => Boolean(entry.referredUid));
-        if (fallbackEntries.length > 0) {
-          fallbackEntries.sort((a, b) => (b.referredAt?.getTime() || 0) - (a.referredAt?.getTime() || 0));
-          setReferralEntries(fallbackEntries);
-          setReferralCount(fallbackEntries.length);
-        }
-      } catch (error) {
-        console.warn('Failed to load referral fallback data:', error);
-      } finally {
-        if (isActive) {
-          fallbackReferralAppliedRef.current = true;
-          setFallbackReferralLoading(false);
-        }
-      }
-    };
-    fetchFallbackReferrals();
-    return () => {
-      isActive = false;
-    };
-  }, [user?.uid, referralLoading, referralEntries.length]);
-
-  useEffect(() => {
-    if (referralEntries.length === 0) {
-      setReferralUsers({});
-      setReferralUsersLoading(false);
-      return;
-    }
-    let isActive = true;
-    const fetchReferralUsers = async () => {
-      setReferralUsersLoading(true);
-      try {
-        const uniqueIds = Array.from(new Set(referralEntries.map(entry => entry.referredUid).filter(Boolean)));
-        const chunkSize = 10;
-        const chunks: string[][] = [];
-        for (let i = 0; i < uniqueIds.length; i += chunkSize) {
-          chunks.push(uniqueIds.slice(i, i + chunkSize));
-        }
-        const results = await Promise.all(chunks.map(async (chunk) => {
-          const usersQuery = query(collection(db, 'users'), where(documentId(), 'in', chunk));
-          const usersSnapshot = await getDocs(usersQuery);
-          const map: Record<string, any> = {};
-          usersSnapshot.forEach((userDoc) => {
-            map[userDoc.id] = userDoc.data();
-          });
-          return map;
-        }));
-        if (!isActive) return;
-        const merged = results.reduce((acc, current) => ({ ...acc, ...current }), {} as Record<string, any>);
-        setReferralUsers(merged);
-      } catch (error) {
-        console.warn('Failed to load referred users:', error);
-      } finally {
-        if (isActive) {
-          setReferralUsersLoading(false);
-        }
-      }
-    };
-    fetchReferralUsers();
-    return () => {
-      isActive = false;
-    };
-  }, [referralEntries]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -978,19 +844,6 @@ function DonorDashboard() {
     return { level: 'Century Club', color: 'yellow', icon: '💯' };
   };
 
-  const getReferralMilestone = (count: number) => {
-    const milestones = [1, 3, 5, 10, 25];
-    const next = milestones.find(milestone => count < milestone);
-    if (!next) {
-      return { next: null, remaining: 0, label: 'Legend Referrer' };
-    }
-    return {
-      next,
-      remaining: next - count,
-      label: `Next milestone at ${next}`,
-    };
-  };
-
   const getNextMilestone = (donations: number = 0) => {
     const milestones = [
       { count: 1, label: 'First Donation' },
@@ -1115,58 +968,6 @@ function DonorDashboard() {
     await copyInviteLink();
   };
 
-  const copyInviteLink = async () => {
-    const inviteLink = buildInviteLink();
-    if (!inviteLink) {
-      toast.error('Unable to generate referral link.');
-      return;
-    }
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(inviteLink);
-        toast.success('Invite link copied to clipboard!');
-        return;
-      }
-      throw new Error('Clipboard not available');
-    } catch (error) {
-      console.warn('Clipboard copy failed:', error);
-      toast.error('Unable to copy link. Please try again.');
-    }
-  };
-
-  const shareInviteLink = async () => {
-    const inviteLink = buildInviteLink();
-    if (!inviteLink) {
-      toast.error('Unable to generate referral link.');
-      return;
-    }
-    const message = 'Join BloodHub and save lives. Use my referral link to get started.';
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({
-          title: 'BloodHub Referral',
-          text: message,
-          url: inviteLink,
-        });
-        return;
-      } catch (error) {
-        console.warn('Share canceled or failed:', error);
-      }
-    }
-    await copyInviteLink();
-  };
-
-  const openWhatsAppInvite = () => {
-    const inviteLink = buildInviteLink();
-    if (!inviteLink) {
-      toast.error('Unable to generate referral link.');
-      return;
-    }
-    const text = `Join BloodHub and save lives. Use my referral link to get started: ${inviteLink}`;
-    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
   const buildInviteLink = () => {
     if (typeof window === 'undefined') {
       return '';
@@ -1204,32 +1005,6 @@ function DonorDashboard() {
       reader.onerror = () => reject(new Error('Failed to read QR data.'));
       reader.readAsDataURL(blob);
     });
-  };
-
-  const loadReferralQr = async () => {
-    if (referralQrLoading || referralQrDataUrl) return;
-    setReferralQrLoading(true);
-    try {
-      const inviteLink = buildInviteLink();
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(inviteLink)}`;
-      const response = await fetch(qrUrl);
-      if (!response.ok) {
-        throw new Error('Failed to generate referral QR code.');
-      }
-      const blob = await response.blob();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('Failed to read QR data.'));
-        reader.readAsDataURL(blob);
-      });
-      setReferralQrDataUrl(dataUrl);
-    } catch (error) {
-      console.warn('Referral QR generation failed', error);
-      toast.error('Unable to generate QR code.');
-    } finally {
-      setReferralQrLoading(false);
-    }
   };
 
   useEffect(() => {
@@ -2030,117 +1805,6 @@ function DonorDashboard() {
       ? user.eligibilityChecklist.updatedAt
       : new Date(user.eligibilityChecklist.updatedAt as any)
     : null;
-  const referralDetails = referralEntries.map((entry) => {
-    const referredUser = referralUsers[entry.referredUid];
-    const computed = computeReferralStatus({
-      referredAt: entry.referredAt,
-      referredUser,
-      entryStatus: entry.status,
-      rules: REFERRAL_RULES,
-    });
-    return {
-      ...entry,
-      user: referredUser,
-      referralAgeDays: computed.ageDays,
-      remainingDays: computed.remainingDays,
-      isEligible: computed.isEligible,
-      isDeleted: computed.isDeleted,
-      statusLabel: computed.statusLabel,
-      referralStatus: computed.status,
-      sortDate: computed.baseDate,
-    };
-  });
-  const eligibleReferralCount = referralDetails.filter(entry => entry.isEligible).length;
-  const referralSummary = referralDetails.reduce((acc: Record<string, number>, entry: any) => {
-    const status = entry.referralStatus || 'registered';
-    acc.total += 1;
-    if (status === 'eligible') acc.eligible += 1;
-    if (status === 'onboarded') acc.onboarded += 1;
-    if (status === 'registered') acc.registered += 1;
-    if (status === 'deleted') acc.deleted += 1;
-    return acc;
-  }, {
-    total: 0,
-    eligible: 0,
-    onboarded: 0,
-    registered: 0,
-    deleted: 0,
-  });
-  referralSummary.notEligible = Math.max(
-    0,
-    referralSummary.total - referralSummary.eligible - referralSummary.deleted
-  );
-  const referralMilestone = getReferralMilestone(eligibleReferralCount);
-  const referralUsersLoadingCombined = referralUsersLoading || fallbackReferralLoading;
-
-  useEffect(() => {
-    if (!user?.uid) return;
-    if (referralLoading || referralUsersLoadingCombined) return;
-    if (referralDetails.length === 0) return;
-
-    const candidates = referralDetails.filter(entry =>
-      (entry.referralStatus === 'onboarded' || entry.referralStatus === 'eligible')
-      && !String(entry.id || '').startsWith('fallback_')
-    );
-    const pending = candidates.filter(entry => {
-      const key = `${entry.referredUid}_${entry.referralStatus}`;
-      return !referralNotificationSyncRef.current.has(key);
-    });
-    if (pending.length === 0) return;
-
-    let isActive = true;
-    (async () => {
-      await ensureReferralNotificationsForReferrer(user.uid, pending);
-      if (!isActive) return;
-      pending.forEach(entry => {
-        const key = `${entry.referredUid}_${entry.referralStatus}`;
-        referralNotificationSyncRef.current.add(key);
-      });
-    })();
-
-    return () => {
-      isActive = false;
-    };
-  }, [user?.uid, referralDetails, referralLoading, referralUsersLoadingCombined]);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-    if (referralLoading || referralUsersLoadingCombined) return;
-    if (referralDetails.length === 0) return;
-
-    const pending = referralDetails.filter((entry) => {
-      if (String(entry.id || '').startsWith('fallback_')) return false;
-      if (!entry.referredUid) return false;
-      if (!entry.user) return false;
-      if (!entry.referralStatus) return false;
-      if (entry.referralStatus === entry.status) return false;
-      const key = `${entry.id}_${entry.referralStatus}`;
-      return !referralStatusSyncRef.current.has(key);
-    });
-
-    if (pending.length === 0) return;
-
-    let isActive = true;
-    (async () => {
-      await Promise.allSettled(pending.map((entry) => {
-        const referralRef = doc(db, 'ReferralTracking', entry.id);
-        return updateDoc(referralRef, {
-          status: entry.referralStatus,
-          updatedAt: serverTimestamp(),
-        });
-      }));
-      if (!isActive) return;
-      pending.forEach((entry) => {
-        const key = `${entry.id}_${entry.referralStatus}`;
-        referralStatusSyncRef.current.add(key);
-      });
-    })();
-
-    return () => {
-      isActive = false;
-    };
-  }, [user?.uid, referralDetails, referralLoading, referralUsersLoadingCombined]);
-
   const profileFields = [
     { label: 'Name', value: user?.displayName },
     { label: 'Blood type', value: user?.bloodType },
@@ -2244,7 +1908,7 @@ function DonorDashboard() {
     checklistUpdatedAt,
     referralCount,
     referralLoading,
-    referralUsersLoading: referralUsersLoadingCombined,
+    referralUsersLoading,
     referralMilestone,
     referralDetails,
     eligibleReferralCount,

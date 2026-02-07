@@ -9,6 +9,7 @@ import {
   DonorCommunity,
   NgoStats,
 } from '../../hooks/useNgoData';
+import { useReferrals } from '../../hooks/useReferrals';
 import BhIdBanner from '../../components/BhIdBanner';
 import {
   Activity,
@@ -20,6 +21,7 @@ import {
   Menu,
   Plus,
   RefreshCw,
+  Share2,
   Settings,
   Target,
   Users,
@@ -39,6 +41,19 @@ export type NgoDashboardContext = {
   getStatusColor: (status: string) => string;
   getCampaignTypeIcon: (type: string) => JSX.Element;
   getPartnershipIcon: (type: string) => JSX.Element;
+  referralCount: number;
+  referralLoading: boolean;
+  referralUsersLoading: boolean;
+  referralMilestone: { next: number | null; remaining: number; label: string };
+  referralDetails: any[];
+  eligibleReferralCount: number;
+  referralSummary: Record<string, number>;
+  referralQrDataUrl: string | null;
+  referralQrLoading: boolean;
+  loadReferralQr: () => Promise<void>;
+  copyInviteLink: () => Promise<void>;
+  shareInviteLink: () => Promise<void>;
+  openWhatsAppInvite: () => void;
 };
 
 function NgoDashboard() {
@@ -56,6 +71,22 @@ function NgoDashboard() {
     refreshData,
   } = useNgoData(user?.uid || '');
 
+  const {
+    referralLoading,
+    referralUsersLoading,
+    referralCount,
+    referralMilestone,
+    referralDetails,
+    eligibleReferralCount,
+    referralSummary,
+    referralQrDataUrl,
+    referralQrLoading,
+    loadReferralQr,
+    copyInviteLink,
+    shareInviteLink,
+    openWhatsAppInvite,
+  } = useReferrals(user);
+
   const menuItems = [
     { id: 'overview', label: 'Overview', to: 'overview', icon: Activity },
     { id: 'campaigns', label: 'Campaigns', to: 'campaigns', icon: Target },
@@ -63,6 +94,7 @@ function NgoDashboard() {
     { id: 'partnerships', label: 'Partnerships', to: 'partnerships', icon: Handshake },
     { id: 'donors', label: 'Donors', to: 'donors', icon: Heart },
     { id: 'analytics', label: 'Analytics', to: 'analytics', icon: BarChart3 },
+    { id: 'referrals', label: 'Referrals', to: 'referrals', icon: Share2 },
     { id: 'account', label: 'Account', to: 'account', icon: Settings },
   ] as const;
 
@@ -128,6 +160,19 @@ function NgoDashboard() {
     getStatusColor,
     getCampaignTypeIcon,
     getPartnershipIcon,
+    referralCount,
+    referralLoading,
+    referralUsersLoading,
+    referralMilestone,
+    referralDetails,
+    eligibleReferralCount,
+    referralSummary,
+    referralQrDataUrl,
+    referralQrLoading,
+    loadReferralQr,
+    copyInviteLink,
+    shareInviteLink,
+    openWhatsAppInvite,
   };
 
   if (loading) {
