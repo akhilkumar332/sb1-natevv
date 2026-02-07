@@ -27,7 +27,7 @@ function NgoOverview() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-red-100">
           <div className="flex items-center justify-between mb-3">
             <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center">
@@ -200,7 +200,7 @@ function NgoOverview() {
             <h3 className="text-lg font-bold text-gray-900">Quick actions</h3>
             <Plus className="w-5 h-5 text-red-500" />
           </div>
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
             <Link
               to="/ngo/dashboard/campaigns"
               className="flex items-center justify-between rounded-xl border border-red-100 px-4 py-3 text-sm font-semibold text-gray-800 hover:bg-red-50"

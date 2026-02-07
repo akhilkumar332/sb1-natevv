@@ -398,9 +398,9 @@ service cloud.firestore {
       // Anyone authenticated can read campaigns
       allow read: if isAuthenticated();
 
-      // Only verified NGOs and admins can create campaigns
+      // NGOs and admins can create campaigns
       allow create: if isAuthenticated() && (
-        (isNGO() && isVerified() && request.resource.data.ngoId == request.auth.uid) ||
+        (isNGO() && request.resource.data.ngoId == request.auth.uid) ||
         isAdmin()
       );
 
@@ -497,12 +497,16 @@ service cloud.firestore {
       // Involved parties or admin can update
       allow update: if isAuthenticated() && (
         resource.data.ngoId == request.auth.uid ||
+        request.resource.data.ngoId == request.auth.uid ||
         resource.data.partnerId == request.auth.uid ||
         isAdmin()
       );
 
-      // Only admin can delete
-      allow delete: if isAdmin();
+      // NGO owner or admin can delete
+      allow delete: if isAuthenticated() && (
+        resource.data.ngoId == request.auth.uid ||
+        isAdmin()
+      );
     }
 
     // ========================================================================

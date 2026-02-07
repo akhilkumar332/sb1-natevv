@@ -29,7 +29,7 @@ const emptyForm = {
 
 function NgoPartnershipDetail() {
   const { partnershipId } = useParams();
-  const { partnerships, getStatusColor, refreshData } = useOutletContext<NgoDashboardContext>();
+  const { partnerships, getStatusColor, refreshData, user } = useOutletContext<NgoDashboardContext>();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -116,7 +116,7 @@ function NgoPartnershipDetail() {
 
     setSaving(true);
     try {
-      const payload = {
+      const payload: Record<string, any> = {
         partnerName: form.partnerName,
         partnerType: form.partnerType as any,
         status: form.status as any,
@@ -127,6 +127,10 @@ function NgoPartnershipDetail() {
         contactEmail: form.contactEmail,
         contactPhone: form.contactPhone,
       };
+      if (user?.uid) {
+        payload.ngoId = user.uid;
+        payload.ngoName = user.organizationName || user.displayName || 'NGO';
+      }
 
       await updatePartnership(partnership.id, payload);
       toast.success('Partnership updated successfully.');
@@ -166,14 +170,21 @@ function NgoPartnershipDetail() {
               <Edit3 className="w-4 h-4" />
               Edit
             </button>
-            <button
-              type="button"
-              onClick={handleArchive}
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-            >
-              <Archive className="w-4 h-4" />
-              Archive
-            </button>
+            {partnership.status === 'inactive' ? (
+              <span className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-400">
+                <Archive className="w-4 h-4" />
+                Archived
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleArchive}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                <Archive className="w-4 h-4" />
+                Archive
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setDeleteOpen(true)}

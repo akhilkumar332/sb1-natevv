@@ -158,6 +158,10 @@ function NgoPartnerships() {
 
       if (editingPartnershipId) {
         const { totalDonations, totalCampaigns, totalFundsContributed, partnerId, ...updatePayload } = payload;
+        if (user?.uid) {
+          updatePayload.ngoId = user.uid;
+          updatePayload.ngoName = user.organizationName || user.displayName || 'NGO';
+        }
         await updatePartnership(editingPartnershipId, updatePayload);
         toast.success('Partnership updated successfully.');
         await refreshData();

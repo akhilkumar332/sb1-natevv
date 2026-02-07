@@ -4,7 +4,7 @@
  */
 
 import { useMemo, useState, useEffect } from 'react';
-import { collection, query, where, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, limit, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export interface Campaign {
@@ -184,8 +184,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       const q = query(
         campaignsRef,
         where('ngoId', '==', ngoId),
-        orderBy('startDate', 'desc'),
-        limit(20)
+        limit(50)
       );
 
       const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -220,7 +219,8 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
               : undefined,
           };
         });
-        setCampaigns(campaignList);
+        const sorted = [...campaignList].sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+        setCampaigns(sorted);
       });
 
       return unsubscribe;
@@ -231,6 +231,53 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
     }
   };
 
+  const fetchCampaignsOnce = async () => {
+    try {
+      const campaignsRef = collection(db, 'campaigns');
+      const q = query(
+        campaignsRef,
+        where('ngoId', '==', ngoId),
+        limit(50)
+      );
+      const snapshot = await getDocs(q);
+      const campaignList: Campaign[] = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const locationData = data.location;
+        return {
+          id: doc.id,
+          title: data.title || data.name || '',
+          type: data.type || 'blood-drive',
+          status: data.status || 'draft',
+          startDate: data.startDate?.toDate() || new Date(),
+          endDate: data.endDate?.toDate() || new Date(),
+          target: data.target || data.targetDonors || 0,
+          achieved: data.achieved || data.registeredDonors?.length || 0,
+          targetType: data.targetType,
+          location: buildLocationLabel(locationData) || (typeof data.location === 'string' ? data.location : ''),
+          city: data.city || locationData?.city,
+          state: data.state || locationData?.state,
+          description: data.description,
+          registeredDonors: data.registeredDonors?.length || 0,
+          confirmedDonors: data.confirmedDonors?.length || 0,
+          locationDetails: typeof locationData === 'object'
+            ? {
+                address: locationData.address,
+                city: locationData.city,
+                state: locationData.state,
+                latitude: locationData.latitude,
+                longitude: locationData.longitude,
+                venue: locationData.venue,
+              }
+            : undefined,
+        };
+      });
+      const sorted = [...campaignList].sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+      setCampaigns(sorted);
+    } catch (err) {
+      console.error('Error fetching campaigns:', err);
+    }
+  };
+
   // Fetch volunteers
   const fetchVolunteers = async () => {
     try {
@@ -238,7 +285,6 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       const q = query(
         volunteersRef,
         where('ngoId', '==', ngoId),
-        orderBy('joinedAt', 'desc'),
         limit(50)
       );
 
@@ -258,7 +304,8 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
           availability: data.availability,
         };
       });
-      setVolunteers(volunteerList);
+      const sorted = [...volunteerList].sort((a, b) => b.joinDate.getTime() - a.joinDate.getTime());
+      setVolunteers(sorted);
     } catch (err) {
       console.error('Error fetching volunteers:', err);
     }
@@ -271,7 +318,6 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       const q = query(
         partnershipsRef,
         where('ngoId', '==', ngoId),
-        orderBy('createdAt', 'desc'),
         limit(30)
       );
 
@@ -291,7 +337,8 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
           contactPhone: data.contactPhone,
         };
       });
-      setPartnerships(partnershipList);
+      const sorted = [...partnershipList].sort((a, b) => b.since.getTime() - a.since.getTime());
+      setPartnerships(sorted);
     } catch (err) {
       console.error('Error fetching partnerships:', err);
     }
@@ -445,6 +492,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
 
   const refreshData = async () => {
     await Promise.all([
+      fetchCampaignsOnce(),
       fetchVolunteers(),
       fetchPartnerships(),
       fetchDonorCommunity(),

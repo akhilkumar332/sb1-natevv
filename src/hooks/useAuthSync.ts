@@ -3,6 +3,8 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { auth } from '../firebase';
+import { authStorage } from '../utils/authStorage';
 
 const CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes instead of every minute
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
@@ -27,8 +29,16 @@ export const useAuthSync = () => {
       const authToken = localStorage.getItem('authToken');
 
       if (!authToken && user) {
-        // Token is missing but user is logged in - force logout
-        logout(navigate);
+        // Token is missing but user is logged in - try to recover token first
+        auth.currentUser?.getIdToken()
+          .then((token) => {
+            if (token) {
+              authStorage.setAuthToken(token);
+            } else {
+              logout(navigate);
+            }
+          })
+          .catch(() => logout(navigate));
         return;
       }
 

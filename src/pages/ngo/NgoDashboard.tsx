@@ -163,34 +163,32 @@ function NgoDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-amber-50">
       <div className="bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-xl">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center space-x-3">
               {user?.photoURL ? (
                 <img
                   src={user.photoURL}
                   alt="Profile"
-                  className="w-16 h-16 rounded-full border-4 border-white shadow-lg object-cover"
+                  className="w-12 h-12 rounded-full border-2 border-white shadow-lg object-cover"
                   onError={(e) => {
                     e.currentTarget.src = `https://ui-avatars.com/api/?background=fff&color=dc2626&name=${encodeURIComponent(user?.displayName || 'NGO')}`;
                   }}
                 />
               ) : (
-                <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm border-4 border-white flex items-center justify-center">
-                  <Heart className="w-8 h-8" />
+                <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm border-2 border-white flex items-center justify-center">
+                  <Heart className="w-6 h-6" />
                 </div>
               )}
               <div>
-                <h1 className="text-2xl font-bold">
+                <h1 className="text-lg sm:text-2xl font-bold">
                   Welcome back, {user?.displayName?.split(' ')[0] || 'NGO'}!
                 </h1>
-                <p className="text-white/80">Manage campaigns, volunteers, partnerships, and donors.</p>
-                {user?.bhId && (
-                  <p className="text-sm text-white/90 font-semibold mt-1">BH ID: {user.bhId}</p>
-                )}
-                {user?.registrationNumber && (
-                  <p className="text-sm text-white/90 font-semibold">Registration ID: {user.registrationNumber}</p>
-                )}
+                <p className="text-xs sm:text-sm text-white/80">Manage campaigns, volunteers, partnerships, and donors.</p>
+                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs sm:text-sm font-semibold text-white/90">
+                  {user?.bhId && <span>BH ID: {user.bhId}</span>}
+                  {user?.registrationNumber && <span>Reg ID: {user.registrationNumber}</span>}
+                </div>
               </div>
             </div>
             <div className="hidden md:flex items-center space-x-3">

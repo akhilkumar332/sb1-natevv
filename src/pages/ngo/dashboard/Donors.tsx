@@ -416,7 +416,7 @@ function NgoDonors() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-red-100">
           <p className="text-xs text-gray-500">Total donors</p>
           <p className="text-3xl font-bold text-gray-900 mt-2">{donorCommunity.totalDonors.toLocaleString()}</p>
