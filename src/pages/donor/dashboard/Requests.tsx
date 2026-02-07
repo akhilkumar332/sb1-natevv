@@ -39,10 +39,10 @@ const DonorRequests = () => {
 
   return (
     <>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start">
         <div className="space-y-6">
           <div className="bg-white rounded-2xl shadow-xl p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 pb-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.3em] text-amber-600">Direct Requests</p>
                 <h2 className="text-xl font-bold text-gray-900">Donor-to-donor requests</h2>
@@ -53,19 +53,19 @@ const DonorRequests = () => {
               </span>
             </div>
 
-            <div className="mt-5 space-y-3">
+            <div className="mt-6 space-y-4">
               {incomingRequestsLoading ? (
                 <div className="space-y-3">
                   {Array.from({ length: 2 }).map((_, index) => (
-                    <div key={`incoming-skeleton-${index}`} className="p-4 border border-gray-100 rounded-xl bg-gray-50 animate-pulse h-20" />
+                    <div key={`incoming-skeleton-${index}`} className="p-5 border border-gray-100 rounded-2xl bg-gray-50 animate-pulse h-24" />
                   ))}
                 </div>
               ) : pendingDonorRequests.length > 0 ? (
                 pendingDonorRequests.map((request: any) => (
-                  <div key={request.id} className="p-4 border border-amber-100 rounded-xl bg-amber-50/40">
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
+                  <div key={request.id} className="p-5 border border-amber-100 rounded-2xl bg-amber-50/40">
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="space-y-1">
                           <p className="font-semibold text-gray-800">
                             {request.requesterName || 'Anonymous Donor'}
                           </p>
@@ -73,33 +73,35 @@ const DonorRequests = () => {
                             {request.requesterBhId ? `BH ID: ${request.requesterBhId}` : 'BH ID unavailable'}
                           </p>
                         </div>
-                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-white text-amber-700 border border-amber-200">
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white text-amber-700 border border-amber-200 w-fit">
                           {getDonationLabel(request.donationType)}
                         </span>
                       </div>
-                      <div className="text-sm text-gray-600 space-y-1">
-                        <p className="flex items-center">
-                          <Droplet className="w-4 h-4 mr-1 text-red-500" />
+                      <div className="grid gap-2 text-sm text-gray-600 sm:grid-cols-2">
+                        <p className="flex items-center gap-2">
+                          <Droplet className="w-4 h-4 text-red-500" />
                           {request.requesterBloodType || 'Blood type'} request
                         </p>
-                        <p className="flex items-center text-xs text-gray-500">
-                          <MapPin className="w-4 h-4 mr-1" />
+                        <p className="flex items-center gap-2 text-xs text-gray-500 sm:justify-end">
+                          <MapPin className="w-4 h-4" />
                           {request.requesterLocation?.city || request.targetLocation?.city || 'Location shared on request'}
                         </p>
-                        <p className="text-xs text-gray-500">Requested {formatTime(request.requestedAt)}</p>
+                        <p className="text-xs text-gray-500 sm:col-span-2">
+                          Requested {formatTime(request.requestedAt)}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
                         <button
                           onClick={() => handleDonorRequestDecision(request.id, 'accepted')}
                           disabled={donorRequestActionId === request.id}
-                          className="flex-1 px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                          className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           {donorRequestActionId === request.id ? 'Working...' : 'Accept'}
                         </button>
                         <button
                           onClick={() => handleDonorRequestDecision(request.id, 'rejected')}
                           disabled={donorRequestActionId === request.id}
-                          className="flex-1 px-3 py-2 rounded-xl border border-rose-200 text-rose-600 text-sm font-semibold hover:bg-rose-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                          className="w-full sm:w-auto px-4 py-2 rounded-xl border border-rose-200 text-rose-600 text-sm font-semibold hover:bg-rose-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           {donorRequestActionId === request.id ? 'Working...' : 'Reject'}
                         </button>
@@ -108,7 +110,7 @@ const DonorRequests = () => {
                   </div>
                 ))
               ) : (
-                <div className="text-sm text-gray-500 bg-gray-50 border border-dashed border-gray-200 rounded-xl py-6 text-center">
+                <div className="text-sm text-gray-500 bg-gray-50 border border-dashed border-gray-200 rounded-2xl py-8 text-center">
                   No donor requests right now.
                 </div>
               )}
@@ -116,7 +118,7 @@ const DonorRequests = () => {
           </div>
 
           <div className="bg-white rounded-2xl shadow-xl p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 pb-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.3em] text-red-600">Urgent Nearby</p>
                 <h2 className="text-xl font-bold text-gray-900 flex items-center">
@@ -130,12 +132,12 @@ const DonorRequests = () => {
               </span>
             </div>
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, index) => (
                   <div
                     key={`request-skeleton-${index}`}
-                    className="p-4 border border-gray-100 rounded-xl bg-gray-50"
+                    className="p-5 border border-gray-100 rounded-2xl bg-gray-50"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
@@ -154,7 +156,7 @@ const DonorRequests = () => {
                 emergencyRequests.map((request: any) => (
                   <div
                     key={request.id}
-                    className={`p-4 border rounded-xl transition-all duration-300 ${
+                    className={`p-5 border rounded-2xl transition-all duration-300 ${
                       request.urgency === 'critical'
                         ? 'border-red-300 bg-red-50 hover:bg-red-100'
                         : request.urgency === 'high'
@@ -162,16 +164,16 @@ const DonorRequests = () => {
                         : 'border-red-100 bg-white hover:bg-red-50'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start space-x-4">
+                    <div className="flex h-full flex-col gap-4">
+                      <div className="flex items-start gap-4">
                         <div className={`p-3 rounded-xl ${
                           request.urgency === 'critical' ? 'bg-red-600' :
                           request.urgency === 'high' ? 'bg-red-500' : 'bg-red-400'
                         }`}>
                           <Droplet className="w-6 h-6 text-white" />
                         </div>
-                        <div>
-                          <h3 className="font-bold text-gray-800 mb-1">
+                        <div className="space-y-2">
+                          <h3 className="font-bold text-gray-800">
                             Urgent: {request.bloodType} • {request.units} Units needed
                           </h3>
                           <p className="text-sm text-gray-600 flex items-center">
@@ -179,7 +181,7 @@ const DonorRequests = () => {
                             {request.hospitalName}, {request.city}
                             {request.distance && ` · ${request.distance.toFixed(1)} km away`}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-gray-500">
                             Posted {formatTime(request.requestedAt)}
                           </p>
                         </div>
@@ -187,7 +189,7 @@ const DonorRequests = () => {
                       <button
                         onClick={() => handleRespondToRequest(request.id)}
                         disabled={responding}
-                        className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all duration-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                        className="w-full sm:w-auto sm:self-end px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all duration-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                       >
                         {responding ? (
                           <>
@@ -202,7 +204,7 @@ const DonorRequests = () => {
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8 sm:col-span-2">
+                <div className="text-center py-10 sm:col-span-2">
                   <CheckCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
                   <p className="text-gray-600">No emergency requests matching your blood type at the moment.</p>
                 </div>
@@ -212,7 +214,7 @@ const DonorRequests = () => {
             {emergencyRequests.length > 0 && (
               <button
                 onClick={handleViewAllRequests}
-                className="w-full mt-5 py-3 text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300"
+                className="w-full mt-6 py-3 text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300"
               >
                 View All Requests →
               </button>
@@ -222,7 +224,7 @@ const DonorRequests = () => {
 
         <div className="space-y-6">
           <div className="bg-white rounded-2xl shadow-xl p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-4">
               <h2 className="text-lg font-bold text-gray-800 flex items-center">
                 <MapPinned className="w-5 h-5 mr-2 text-red-600" />
                 Nearby Blood Camps
@@ -236,12 +238,12 @@ const DonorRequests = () => {
               </div>
             ) : (
               <>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {bloodCamps.length > 0 ? (
                     bloodCamps.map((camp: any) => (
-                      <div key={camp.id} className="p-3 bg-red-50 rounded-xl border border-red-200 hover:bg-red-100 transition-all duration-300 cursor-pointer">
-                        <h3 className="font-semibold text-gray-800 text-sm mb-1">{camp.name}</h3>
-                        <p className="text-xs text-gray-600 flex items-center mb-1">
+                      <div key={camp.id} className="p-4 bg-red-50 rounded-2xl border border-red-200 hover:bg-red-100 transition-all duration-300 cursor-pointer">
+                        <h3 className="font-semibold text-gray-800 text-sm mb-2">{camp.name}</h3>
+                        <p className="text-xs text-gray-600 flex items-center mb-2">
                           <MapPin className="w-3 h-3 mr-1" />
                           {camp.location}
                         </p>
@@ -257,7 +259,7 @@ const DonorRequests = () => {
                 {bloodCamps.length > 0 && (
                   <button
                     onClick={handleViewAllCamps}
-                    className="w-full mt-4 py-2 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300"
+                    className="w-full mt-4 py-2.5 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300"
                   >
                     View All Camps →
                   </button>
@@ -270,7 +272,7 @@ const DonorRequests = () => {
 
       <div className="mt-6">
         <div className="bg-white rounded-2xl shadow-xl p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-4">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-red-600">Your Outreach</p>
               <h3 className="text-xl font-bold text-gray-900">Requests you sent</h3>
@@ -286,10 +288,10 @@ const DonorRequests = () => {
               ))}
             </div>
           ) : outgoingDonorRequests?.length ? (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {outgoingDonorRequests.map((request: any) => (
-                <div key={request.id} className="p-4 rounded-xl border border-gray-100 bg-gray-50/40">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div key={request.id} className="p-5 rounded-2xl border border-gray-100 bg-gray-50/40">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
                       <p className="font-semibold text-gray-800">
                         {request.targetDonorName || 'Target donor'}
@@ -301,7 +303,7 @@ const DonorRequests = () => {
                         {getDonationLabel(request.donationType)} • {request.targetLocation?.city || 'Location shared'}
                       </p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(request.status)}`}>
                         {(request.status || 'pending').charAt(0).toUpperCase() + (request.status || 'pending').slice(1)}
                       </span>
