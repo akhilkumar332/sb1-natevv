@@ -125,7 +125,7 @@ const DonorRequests = () => {
                   <AlertCircle className="w-5 h-5 mr-2 text-red-500" />
                   Emergency requests
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">Nearby hospitals requesting blood now.</p>
+                <p className="text-sm text-gray-500 mt-1">Nearby blood banks requesting blood now.</p>
               </div>
               <span className="px-3 py-1 bg-rose-100 text-rose-600 rounded-full text-sm font-semibold">
                 {emergencyRequests.length} Active

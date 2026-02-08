@@ -46,7 +46,7 @@ import { DatabaseError, ValidationError, NotFoundError, PermissionError } from '
  * @returns Array of users
  */
 export const getAllUsers = async (
-  role?: 'donor' | 'hospital' | 'ngo' | 'admin',
+  role?: 'donor' | 'bloodbank' | 'hospital' | 'ngo' | 'admin',
   status?: 'active' | 'inactive' | 'suspended' | 'pending_verification',
   limitCount: number = 100
 ): Promise<User[]> => {
@@ -357,7 +357,7 @@ export const approveVerificationRequest = async (
     // Create notification for user
     await addDoc(collection(db, 'notifications'), {
       userId: request.userId,
-      userRole: request.organizationType === 'hospital' ? 'hospital' : 'ngo',
+      userRole: request.organizationType === 'bloodbank' || request.organizationType === 'hospital' ? 'bloodbank' : 'ngo',
       type: 'verification_status',
       title: 'Verification Approved',
       message: 'Your organization has been successfully verified',
@@ -414,7 +414,7 @@ export const rejectVerificationRequest = async (
     // Create notification for user
     await addDoc(collection(db, 'notifications'), {
       userId: request.userId,
-      userRole: request.organizationType === 'hospital' ? 'hospital' : 'ngo',
+      userRole: request.organizationType === 'bloodbank' || request.organizationType === 'hospital' ? 'bloodbank' : 'ngo',
       type: 'verification_status',
       title: 'Verification Rejected',
       message: `Your verification request was rejected: ${rejectionReason}`,
@@ -475,7 +475,7 @@ export const getPlatformStats = async () => {
 
     const usersByRole = {
       donors: users.filter(u => u.role === 'donor').length,
-      hospitals: users.filter(u => u.role === 'hospital').length,
+      hospitals: users.filter(u => u.role === 'bloodbank' || u.role === 'hospital').length,
       ngos: users.filter(u => u.role === 'ngo').length,
       admins: users.filter(u => u.role === 'admin').length,
     };

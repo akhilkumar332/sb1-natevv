@@ -81,7 +81,7 @@ export const useBloodRequest = () => {
         }
       }
 
-      toast.success('Response sent! The hospital will contact you soon.');
+      toast.success('Response sent! The blood bank will contact you soon.');
       setResponding(false);
       return true;
     } catch (err) {

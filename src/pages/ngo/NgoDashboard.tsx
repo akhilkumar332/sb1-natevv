@@ -136,6 +136,7 @@ function NgoDashboard() {
 
   const getPartnershipIcon = (type: string) => {
     switch (type) {
+      case 'bloodbank':
       case 'hospital':
         return <Heart className="w-5 h-5" />;
       case 'corporate':

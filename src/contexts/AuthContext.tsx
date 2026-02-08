@@ -60,7 +60,7 @@ interface User {
   phone?: string;
   createdAt?: Date;
   lastLoginAt?: Date;
-  role?: 'donor' | 'ngo' | 'hospital' | 'admin';
+  role?: 'donor' | 'ngo' | 'bloodbank' | 'hospital' | 'admin';
   status?: 'active' | 'inactive' | 'suspended' | 'pending_verification' | 'deleted';
   address?: string;
   city?: string;
@@ -87,6 +87,14 @@ interface User {
   organizationName?: string;
   registrationNumber?: string;
   ngoType?: string;
+  bloodBankName?: string;
+  bloodBankType?: string;
+  hospitalName?: string;
+  hospitalType?: string;
+  licenseNumber?: string;
+  contactPerson?: string;
+  operatingHours?: string;
+  facilities?: string[];
   contactPersonName?: string;
   website?: string;
   yearEstablished?: string;
@@ -1433,8 +1441,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const resolvedRedirect = options.redirectTo ?? (
       user?.role === 'ngo'
         ? '/ngo/login'
-        : user?.role === 'hospital'
-          ? '/hospital/login'
+        : user?.role === 'bloodbank'
+          ? '/bloodbank/login'
           : user?.role === 'admin'
             ? '/admin/login'
             : '/donor/login'

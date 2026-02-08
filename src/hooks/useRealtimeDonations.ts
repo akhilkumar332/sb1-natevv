@@ -134,14 +134,17 @@ export const useDonorDonationHistory = (donorId: string): UseRealtimeDonationsRe
 };
 
 /**
- * Hook for hospital's donations
+ * Hook for blood bank's donations
  */
-export const useHospitalDonations = (hospitalId: string): UseRealtimeDonationsResult => {
+export const useBloodBankDonations = (hospitalId: string): UseRealtimeDonationsResult => {
   return useRealtimeDonations({
     hospitalId,
     limitCount: 50,
   });
 };
+
+// Legacy alias
+export const useHospitalDonations = useBloodBankDonations;
 
 /**
  * Hook for donation statistics with real-time updates

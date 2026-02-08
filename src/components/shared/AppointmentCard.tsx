@@ -20,7 +20,7 @@ import {
 
 interface AppointmentCardProps {
   appointment: Appointment;
-  userRole: 'donor' | 'hospital';
+  userRole: 'donor' | 'bloodbank' | 'hospital';
   onCancel?: (appointmentId: string, reason?: string) => void;
   onReschedule?: (appointmentId: string) => void;
   onConfirm?: (appointmentId: string) => void;
@@ -85,10 +85,10 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
     onReschedule;
 
   const canConfirm =
-    appointment.status === 'scheduled' && userRole === 'hospital' && onConfirm;
+    appointment.status === 'scheduled' && (userRole === 'bloodbank' || userRole === 'hospital') && onConfirm;
 
   const canComplete =
-    appointment.status === 'confirmed' && userRole === 'hospital' && onComplete;
+    appointment.status === 'confirmed' && (userRole === 'bloodbank' || userRole === 'hospital') && onComplete;
 
   return (
     <>

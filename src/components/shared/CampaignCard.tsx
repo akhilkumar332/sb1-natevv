@@ -23,7 +23,7 @@ interface CampaignCardProps {
   onRegister?: (campaignId: string) => void;
   onViewDetails?: (campaignId: string) => void;
   isRegistered?: boolean;
-  userRole?: 'donor' | 'hospital' | 'ngo' | 'admin';
+  userRole?: 'donor' | 'bloodbank' | 'hospital' | 'ngo' | 'admin';
 }
 
 /**

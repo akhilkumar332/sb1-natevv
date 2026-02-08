@@ -80,15 +80,15 @@ export const mockDonation = {
   status: 'completed' as const,
 };
 
-// Mock hospital data
+// Mock bloodbank data
 export const mockHospital = {
-  id: 'hospital-123',
-  name: 'Test Hospital',
-  email: 'hospital@example.com',
+  id: 'bloodbank-123',
+  name: 'Test BloodBank',
+  email: 'bloodbank@example.com',
   phone: '+1234567890',
   city: 'Mumbai',
   state: 'Maharashtra',
-  role: 'hospital' as const,
+  role: 'bloodbank' as const,
 };
 
 // Mock blood request data

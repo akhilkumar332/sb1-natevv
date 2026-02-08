@@ -136,6 +136,7 @@ function AdminDashboard() {
     switch (role) {
       case 'donor':
         return <Heart className="w-4 h-4" />;
+      case 'bloodbank':
       case 'hospital':
         return <Building2 className="w-4 h-4" />;
       case 'ngo':
@@ -248,7 +249,7 @@ function AdminDashboard() {
             <h3 className="text-2xl font-bold text-gray-900">{stats.totalHospitals + stats.totalNGOs}</h3>
             <p className="text-gray-600 text-sm mt-1">Organizations</p>
             <div className="flex gap-4 mt-3 text-sm">
-              <span className="text-green-600">{stats.totalHospitals} Hospitals</span>
+              <span className="text-green-600">{stats.totalHospitals} BloodBanks</span>
               <span className="text-green-600">{stats.totalNGOs} NGOs</span>
             </div>
           </div>
@@ -599,15 +600,17 @@ function AdminDashboard() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <div className={`p-2 rounded-lg ${request.organizationType === 'hospital' ? 'bg-blue-100' : 'bg-purple-100'}`}>
-                            {request.organizationType === 'hospital' ?
+                          <div className={`p-2 rounded-lg ${request.organizationType === 'bloodbank' || request.organizationType === 'hospital' ? 'bg-blue-100' : 'bg-purple-100'}`}>
+                            {request.organizationType === 'bloodbank' || request.organizationType === 'hospital' ?
                               <Building2 className="w-5 h-5 text-blue-600" /> :
                               <Users className="w-5 h-5 text-purple-600" />
                             }
                           </div>
                           <div>
                             <h3 className="text-lg font-semibold text-gray-900">{request.organizationName}</h3>
-                            <p className="text-sm text-gray-600 capitalize">{request.organizationType}</p>
+                            <p className="text-sm text-gray-600 capitalize">
+                              {request.organizationType === 'hospital' ? 'bloodbank' : request.organizationType}
+                            </p>
                           </div>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">

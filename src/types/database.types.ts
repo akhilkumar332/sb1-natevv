@@ -14,7 +14,7 @@ import { Timestamp } from 'firebase/firestore';
 
 export type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
 export type Gender = 'Male' | 'Female' | 'Other';
-export type UserRole = 'donor' | 'hospital' | 'ngo' | 'admin';
+export type UserRole = 'donor' | 'bloodbank' | 'ngo' | 'admin' | 'hospital';
 export type UserStatus = 'active' | 'inactive' | 'suspended' | 'pending_verification';
 export type DonorLevel = 'New Donor' | 'Rookie' | 'Regular' | 'Super' | 'Hero' | 'Legend' | 'Champion';
 
@@ -73,7 +73,9 @@ export interface User {
   impactScore?: number;
   badges?: string[];
 
-  // Hospital Specific Fields
+  // BloodBank Specific Fields (legacy hospital fields retained for compatibility)
+  bloodBankName?: string;
+  bloodBankType?: 'government' | 'private' | 'trust';
   hospitalName?: string;
   hospitalType?: 'government' | 'private' | 'trust';
   licenseNumber?: string;
@@ -163,7 +165,7 @@ export interface Donation {
 
 export type BloodRequestStatus = 'active' | 'fulfilled' | 'partially_fulfilled' | 'expired' | 'cancelled';
 export type BloodRequestUrgency = 'critical' | 'high' | 'medium' | 'low';
-export type RequesterType = 'hospital' | 'individual';
+export type RequesterType = 'bloodbank' | 'individual' | 'hospital';
 
 /**
  * BloodRequest interface for emergency and regular blood requests
@@ -482,7 +484,7 @@ export interface Volunteer {
 // COLLECTION: partnerships
 // ============================================================================
 
-export type PartnerType = 'hospital' | 'corporate' | 'community' | 'government';
+export type PartnerType = 'bloodbank' | 'hospital' | 'corporate' | 'community' | 'government';
 export type PartnershipStatus = 'active' | 'pending' | 'inactive';
 
 /**
@@ -647,7 +649,7 @@ export interface UserBadge {
 
 export type VerificationStatus = 'pending' | 'under_review' | 'approved' | 'rejected';
 export type DocumentType = 'license' | 'registration' | 'tax_certificate' | 'address_proof' | 'other';
-export type OrganizationType = 'hospital' | 'ngo';
+export type OrganizationType = 'bloodbank' | 'hospital' | 'ngo';
 
 /**
  * VerificationRequest interface for tracking hospital/NGO verification requests

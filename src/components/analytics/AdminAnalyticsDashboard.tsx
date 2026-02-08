@@ -93,7 +93,7 @@ export const AdminAnalyticsDashboard: React.FC = () => {
           value: stats.totalDonors,
         },
         {
-          metric: 'Total Hospitals',
+          metric: 'Total BloodBanks',
           value: stats.totalHospitals,
         },
         {
@@ -175,9 +175,9 @@ export const AdminAnalyticsDashboard: React.FC = () => {
         />
 
         <StatsCard
-          title="Hospitals"
+          title="BloodBanks"
           value={stats?.totalHospitals || 0}
-          subtitle="Registered hospitals"
+          subtitle="Registered bloodbanks"
           icon={Building2}
           iconColor="text-green-600"
           loading={loading}
@@ -287,7 +287,7 @@ export const AdminAnalyticsDashboard: React.FC = () => {
                 {stats.totalHospitals + stats.totalNGOs}
               </p>
               <p className="text-xs text-gray-500">
-                {stats.totalHospitals} hospitals, {stats.totalNGOs} NGOs
+                {stats.totalHospitals} bloodbanks, {stats.totalNGOs} NGOs
               </p>
             </div>
           </div>
@@ -314,7 +314,7 @@ export const AdminAnalyticsDashboard: React.FC = () => {
                     Donors
                   </th>
                   <th className="text-right py-2 px-4 text-sm font-medium text-gray-600">
-                    Hospitals
+                    BloodBanks
                   </th>
                 </tr>
               </thead>

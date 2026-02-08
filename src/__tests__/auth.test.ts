@@ -33,12 +33,20 @@ describe('Authentication Utilities', () => {
       expect(isAdmin(donor)).toBe(false);
     });
 
-    it('should correctly identify hospital role', () => {
-      const hospital = mockHospital();
-      expect(isHospital(hospital)).toBe(true);
-      expect(isDonor(hospital)).toBe(false);
-      expect(isNGO(hospital)).toBe(false);
-      expect(isAdmin(hospital)).toBe(false);
+    it('should correctly identify bloodbank role', () => {
+      const bloodbank = mockHospital();
+      expect(isHospital(bloodbank)).toBe(true);
+      expect(isDonor(bloodbank)).toBe(false);
+      expect(isNGO(bloodbank)).toBe(false);
+      expect(isAdmin(bloodbank)).toBe(false);
+    });
+
+    it('should correctly identify legacy hospital role', () => {
+      const legacyHospital = mockHospital({ role: 'hospital' });
+      expect(isHospital(legacyHospital)).toBe(true);
+      expect(isDonor(legacyHospital)).toBe(false);
+      expect(isNGO(legacyHospital)).toBe(false);
+      expect(isAdmin(legacyHospital)).toBe(false);
     });
 
     it('should correctly identify NGO role', () => {
@@ -80,14 +88,14 @@ describe('Authentication Utilities', () => {
   });
 
   describe('Permissions', () => {
-    it('should allow verified hospitals to create blood requests', () => {
-      const hospital = mockHospital({ verified: true, status: 'active' });
-      expect(canCreateBloodRequest(hospital)).toBe(true);
+    it('should allow verified bloodbanks to create blood requests', () => {
+      const bloodbank = mockHospital({ verified: true, status: 'active' });
+      expect(canCreateBloodRequest(bloodbank)).toBe(true);
     });
 
-    it('should not allow unverified hospitals to create blood requests', () => {
-      const hospital = mockHospital({ verified: false });
-      expect(canCreateBloodRequest(hospital)).toBe(false);
+    it('should not allow unverified bloodbanks to create blood requests', () => {
+      const bloodbank = mockHospital({ verified: false });
+      expect(canCreateBloodRequest(bloodbank)).toBe(false);
     });
 
     it('should allow admin to create blood requests', () => {
@@ -152,12 +160,12 @@ describe('Authentication Utilities', () => {
       expect(getUserDisplayName(user)).toBe('John Doe');
     });
 
-    it('should get display name from hospital name', () => {
-      const hospital = mockHospital({
+    it('should get display name from bloodbank name', () => {
+      const bloodbank = mockHospital({
         displayName: null,
-        hospitalName: 'City Hospital',
+        bloodBankName: 'City BloodBank',
       });
-      expect(getUserDisplayName(hospital)).toBe('City Hospital');
+      expect(getUserDisplayName(bloodbank)).toBe('City BloodBank');
     });
 
     it('should get display name from organization name', () => {
@@ -197,9 +205,9 @@ describe('Authentication Utilities', () => {
       expect(getDashboardRoute(donor)).toBe('/donor/dashboard');
     });
 
-    it('should get correct hospital dashboard route', () => {
-      const hospital = mockHospital();
-      expect(getDashboardRoute(hospital)).toBe('/hospital/dashboard');
+    it('should get correct bloodbank dashboard route', () => {
+      const bloodbank = mockHospital();
+      expect(getDashboardRoute(bloodbank)).toBe('/bloodbank/dashboard');
     });
 
     it('should get correct NGO dashboard route', () => {
@@ -230,11 +238,11 @@ describe('Authentication Utilities', () => {
       expect(needsProfileCompletion(donor)).toBe(false);
     });
 
-    it('should detect incomplete hospital profile', () => {
-      const hospital = mockHospital({
-        hospitalName: undefined,
+    it('should detect incomplete bloodbank profile', () => {
+      const bloodbank = mockHospital({
+        bloodBankName: undefined,
       });
-      expect(needsProfileCompletion(hospital)).toBe(true);
+      expect(needsProfileCompletion(bloodbank)).toBe(true);
     });
 
     it('should detect incomplete NGO profile', () => {

@@ -37,7 +37,7 @@ export interface DonorStats {
   lifetimeImpact: number; // estimated lives saved
 }
 
-export interface HospitalStats {
+export interface BloodBankStats {
   totalRequests: number;
   fulfilledRequests: number;
   fulfillmentRate: number;
@@ -46,6 +46,9 @@ export interface HospitalStats {
   inventoryTurnover: number;
   criticalAlerts: number;
 }
+
+// Legacy alias
+export type HospitalStats = BloodBankStats;
 
 export interface CampaignStats {
   totalParticipants: number;
@@ -174,7 +177,7 @@ export const getDonationTrend = async (
 /**
  * Get hospital statistics
  */
-export const getHospitalStats = async (hospitalId: string): Promise<HospitalStats> => {
+export const getBloodBankStats = async (hospitalId: string): Promise<BloodBankStats> => {
   try {
     // Get blood requests
     const requestsQuery = query(
@@ -214,9 +217,12 @@ export const getHospitalStats = async (hospitalId: string): Promise<HospitalStat
       criticalAlerts: 0, // Would need alert history
     };
   } catch (error) {
-    throw new DatabaseError('Failed to get hospital stats');
+    throw new DatabaseError('Failed to get bloodbank stats');
   }
 };
+
+// Legacy alias
+export const getHospitalStats = getBloodBankStats;
 
 /**
  * Get blood request trend
@@ -352,7 +358,7 @@ export const getPlatformStats = async (): Promise<PlatformStats> => {
 
     const totalUsers = users.length;
     const totalDonors = users.filter(u => u.role === 'donor').length;
-    const totalHospitals = users.filter(u => u.role === 'hospital').length;
+    const totalHospitals = users.filter(u => u.role === 'bloodbank' || u.role === 'hospital').length;
     const totalNGOs = users.filter(u => u.role === 'ngo').length;
     const activeDonors = users.filter(u => u.role === 'donor' && u.isAvailable).length;
     const verifiedUsers = users.filter(u => u.verified).length;
@@ -390,7 +396,7 @@ export const getPlatformStats = async (): Promise<PlatformStats> => {
  */
 export const getUserGrowthTrend = async (
   dateRange: DateRange,
-  role?: 'donor' | 'hospital' | 'ngo'
+  role?: 'donor' | 'bloodbank' | 'hospital' | 'ngo'
 ): Promise<TrendData[]> => {
   try {
     const constraints: any[] = [
@@ -491,7 +497,7 @@ export const getGeographicDistribution = async (): Promise<GeographicDistributio
         if (user.role === 'donor') {
           distribution[key].donorCount++;
           distribution[key].donors++;
-        } else if (user.role === 'hospital') {
+        } else if (user.role === 'bloodbank' || user.role === 'hospital') {
           distribution[key].hospitalCount++;
           distribution[key].hospitals++;
         }

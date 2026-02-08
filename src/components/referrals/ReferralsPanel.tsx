@@ -4,7 +4,8 @@ import { Share2, QrCode, Users } from 'lucide-react';
 const ROLE_LABELS: Record<string, string> = {
   donor: 'Donor',
   ngo: 'NGO',
-  hospital: 'Hospital',
+  bloodbank: 'BloodBank',
+  hospital: 'BloodBank',
   admin: 'Admin',
 };
 

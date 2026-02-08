@@ -128,7 +128,7 @@ export const findHospitalsNearby = async (
   } = {}
 ): Promise<(User & { distance: number })[]> => {
   try {
-    const constraints: any[] = [where('role', '==', 'hospital')];
+    const constraints: any[] = [where('role', 'in', ['bloodbank', 'hospital'])];
 
     if (options.hospitalType) {
       constraints.push(where('hospitalType', '==', options.hospitalType));
@@ -162,7 +162,7 @@ export const findHospitalsNearby = async (
 
     return nearbyHospitals;
   } catch (error) {
-    throw new DatabaseError('Failed to find nearby hospitals');
+    throw new DatabaseError('Failed to find nearby blood banks');
   }
 };
 

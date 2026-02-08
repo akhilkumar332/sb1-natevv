@@ -50,7 +50,7 @@ export interface Partnership {
   id: string;
   organization: string;
   organizationId?: string;
-  type: 'hospital' | 'corporate' | 'community' | 'government';
+  type: 'bloodbank' | 'hospital' | 'corporate' | 'community' | 'government';
   since: Date;
   donations: number;
   status: 'active' | 'pending' | 'inactive';

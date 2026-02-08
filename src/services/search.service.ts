@@ -222,7 +222,7 @@ export const searchHospitals = async (
 ): Promise<SearchResult<User>> => {
   try {
     const { limitCount = 20, lastDoc } = pagination;
-    const constraints: any[] = [where('role', '==', 'hospital')];
+    const constraints: any[] = [where('role', 'in', ['bloodbank', 'hospital'])];
 
     // Add filters
     if (criteria.city) {
@@ -278,7 +278,7 @@ export const searchHospitals = async (
       totalCount: results.length,
     };
   } catch (error) {
-    throw new DatabaseError('Failed to search hospitals');
+    throw new DatabaseError('Failed to search blood banks');
   }
 };
 
@@ -554,7 +554,7 @@ export const searchActiveBloodRequests = async (
  */
 export const searchUsersByText = async (
   searchText: string,
-  role?: 'donor' | 'hospital' | 'ngo' | 'admin'
+  role?: 'donor' | 'bloodbank' | 'hospital' | 'ngo' | 'admin'
 ): Promise<User[]> => {
   try {
     const constraints: any[] = [];
@@ -583,7 +583,8 @@ export const searchUsersByText = async (
         user.displayName?.toLowerCase().includes(searchLower) ||
         user.email?.toLowerCase().includes(searchLower) ||
         user.phoneNumber?.includes(searchText) ||
-        (role === 'hospital' && user.hospitalName?.toLowerCase().includes(searchLower)) ||
+        ((role === 'bloodbank' || role === 'hospital')
+          && (user.bloodBankName || user.hospitalName || '').toLowerCase().includes(searchLower)) ||
         (role === 'ngo' && user.organizationName?.toLowerCase().includes(searchLower))
     );
 

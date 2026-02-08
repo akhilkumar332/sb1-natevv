@@ -339,7 +339,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
             bloodType: data.bloodType,
             units: data.units || data.unitsNeeded || 1,
             urgency: data.urgency || 'medium',
-            hospitalName: data.hospitalName || data.hospital || 'Hospital',
+            hospitalName: data.hospitalName || data.hospital || 'BloodBank',
             hospitalId: data.hospitalId || '',
             location: data.location || data.city || '',
             city: data.city || '',

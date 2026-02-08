@@ -251,7 +251,7 @@ function Home() {
             <StatCard
               icon={<Building2 size={32} />}
               value="Across India"
-              label="Hospital Partners"
+              label="BloodBank Partners"
               gradient="bg-gradient-to-r from-red-800 to-red-900"
             />
           </div>
@@ -430,7 +430,7 @@ function Home() {
               </div>
               <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
                 <div className="text-4xl font-bold mb-2">Trusted</div>
-                <div className="text-lg opacity-90">Hospital Network</div>
+                <div className="text-lg opacity-90">BloodBank Network</div>
               </div>
             </div>
           </div>

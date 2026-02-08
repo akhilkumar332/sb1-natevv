@@ -990,7 +990,7 @@ const DonorJourney = () => {
                   value={logDonationForm.bloodBank}
                   onChange={(event) => setLogDonationForm((prev) => ({ ...prev, bloodBank: event.target.value }))}
                   className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
-                  placeholder="Hospital or blood bank name"
+                  placeholder="BloodBank name"
                 />
               </div>
               <div className="sm:col-span-2">

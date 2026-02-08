@@ -533,7 +533,7 @@ export const sendLowInventoryAlert = async (
       units,
       criticalLevel,
       priority: 'high',
-      actionUrl: '/hospital/inventory',
+      actionUrl: '/bloodbank/dashboard/inventory',
     }
   );
 };
@@ -558,7 +558,7 @@ export const sendCriticalInventoryAlert = async (
       bloodType,
       units,
       priority: 'high',
-      actionUrl: '/hospital/inventory',
+      actionUrl: '/bloodbank/dashboard/inventory',
     }
   );
 };
@@ -677,7 +677,7 @@ export const sendVerificationRejectedNotification = async (
 export const sendSystemAnnouncement = async (
   title: string,
   message: string,
-  targetRole?: 'donor' | 'hospital' | 'ngo' | 'admin'
+  targetRole?: 'donor' | 'bloodbank' | 'hospital' | 'ngo' | 'admin'
 ): Promise<number> => {
   try {
     const constraints: any[] = [];

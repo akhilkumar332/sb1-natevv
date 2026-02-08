@@ -43,6 +43,7 @@ export interface User {
 export enum UserRole {
   DONOR = 'donor',
   NGO = 'ngo',
+  BLOODBANK = 'bloodbank',
   HOSPITAL = 'hospital',
   ADMIN = 'admin',
 }

@@ -29,7 +29,7 @@ function About() {
   const milestones = [
     { year: "2020", event: "BloodHub Launched", description: "Started with a vision to strengthen blood donation across India" },
     { year: "2021", event: "Growing Donor Community", description: "Built early momentum with dedicated donors and supporters" },
-    { year: "2022", event: "Expanding Partnerships", description: "Collaborating with hospitals and organizations nationwide" },
+    { year: "2022", event: "Expanding Partnerships", description: "Collaborating with blood banks and organizations nationwide" },
     { year: "2023", event: "Lives Touched", description: "Continuing to grow our impact one donation at a time" }
   ];
 
@@ -82,7 +82,7 @@ function About() {
       role: "Emergency Responder"
     },
     {
-      quote: "As a hospital administrator, BloodHub has revolutionized how we manage blood requests. The response time is incredible!",
+      quote: "As a blood bank administrator, BloodHub has revolutionized how we manage blood requests. The response time is incredible!",
       author: "Dr. Anjali Verma",
       role: "Medical Director"
     }
@@ -240,7 +240,7 @@ function About() {
               { icon: <Heart size={40} />, value: "Growing", label: "Lives Touched" },
               { icon: <Users size={40} />, value: "Thousands", label: "Active Donors" },
               { icon: <Droplet size={40} />, value: "Rising", label: "Units Shared" },
-              { icon: <Award size={40} />, value: "Nationwide", label: "Hospital Partners" }
+              { icon: <Award size={40} />, value: "Nationwide", label: "BloodBank Partners" }
             ].map((stat, index) => (
               <div key={index} className="text-center text-white group">
                 <div className="inline-flex items-center justify-center w-20 h-20 bg-white/10 backdrop-blur-lg rounded-2xl mb-4 shadow-lg transform group-hover:scale-110 group-hover:rotate-12 transition-all duration-300" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }}>
@@ -384,7 +384,7 @@ function About() {
               { step: "1", title: "Register", description: "Create your profile in a few minutes" },
               { step: "2", title: "Verify", description: "Complete a quick verification step" },
               { step: "3", title: "Connect", description: "Get matched with nearby requests when possible" },
-              { step: "4", title: "Donate", description: "Donate at partner hospitals and centers" }
+              { step: "4", title: "Donate", description: "Donate at partner blood banks and centers" }
             ].map((item, index) => (
               <div key={index} className="group relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-500"></div>
@@ -648,7 +648,7 @@ function About() {
               </div>
               <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-500 transform hover:scale-105">
                 <div className="text-4xl font-bold mb-2">Trusted</div>
-                <div className="text-lg opacity-90">Hospital Network</div>
+                <div className="text-lg opacity-90">BloodBank Network</div>
               </div>
             </div>
           </div>

@@ -72,11 +72,12 @@ export const BLOOD_COMPATIBILITY: Record<BloodType, BloodType[]> = {
 // USER ROLES
 // ============================================================================
 
-export const USER_ROLES: readonly UserRole[] = ['donor', 'hospital', 'ngo', 'admin'] as const;
+export const USER_ROLES: readonly UserRole[] = ['donor', 'bloodbank', 'hospital', 'ngo', 'admin'] as const;
 
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
   donor: 'Blood Donor',
-  hospital: 'Hospital',
+  bloodbank: 'BloodBank',
+  hospital: 'Hospital (Legacy)',
   ngo: 'NGO / Organization',
   admin: 'Administrator',
 };
@@ -348,6 +349,7 @@ export const VOLUNTEER_STATUS_LABELS: Record<VolunteerStatus, string> = {
 // ============================================================================
 
 export const PARTNER_TYPES: readonly PartnerType[] = [
+  'bloodbank',
   'hospital',
   'corporate',
   'community',
@@ -355,7 +357,8 @@ export const PARTNER_TYPES: readonly PartnerType[] = [
 ] as const;
 
 export const PARTNER_TYPE_LABELS: Record<PartnerType, string> = {
-  hospital: 'Hospital',
+  bloodbank: 'BloodBank',
+  hospital: 'Hospital (Legacy)',
   corporate: 'Corporate',
   community: 'Community Organization',
   government: 'Government Agency',
@@ -491,10 +494,11 @@ export const VERIFICATION_STATUS_COLORS: Record<VerificationStatus, string> = {
 // ORGANIZATION TYPES
 // ============================================================================
 
-export const ORGANIZATION_TYPES: readonly OrganizationType[] = ['hospital', 'ngo'] as const;
+export const ORGANIZATION_TYPES: readonly OrganizationType[] = ['bloodbank', 'hospital', 'ngo'] as const;
 
 export const ORGANIZATION_TYPE_LABELS: Record<OrganizationType, string> = {
-  hospital: 'Hospital',
+  bloodbank: 'BloodBank',
+  hospital: 'Hospital (Legacy)',
   ngo: 'NGO',
 };
 
@@ -607,9 +611,9 @@ export const DEFAULT_VALUES = {
 export const HOSPITAL_TYPES = ['government', 'private', 'trust'] as const;
 
 export const HOSPITAL_TYPE_LABELS: Record<typeof HOSPITAL_TYPES[number], string> = {
-  government: 'Government Hospital',
-  private: 'Private Hospital',
-  trust: 'Trust Hospital',
+  government: 'Government BloodBank',
+  private: 'Private BloodBank',
+  trust: 'Trust BloodBank',
 };
 
 // ============================================================================

@@ -14,7 +14,7 @@ interface MapMarker {
   id: string;
   position: Coordinates;
   label: string;
-  type?: 'donor' | 'hospital' | 'request' | 'campaign' | 'default';
+  type?: 'donor' | 'bloodbank' | 'hospital' | 'request' | 'campaign' | 'default';
   onClick?: () => void;
 }
 
@@ -55,6 +55,7 @@ export const MapView: React.FC<MapViewProps> = ({
     switch (type) {
       case 'donor':
         return 'text-green-600';
+      case 'bloodbank':
       case 'hospital':
         return 'text-blue-600';
       case 'request':
@@ -64,6 +65,11 @@ export const MapView: React.FC<MapViewProps> = ({
       default:
         return 'text-gray-600';
     }
+  };
+
+  const getMarkerTypeLabel = (type?: string) => {
+    if (!type) return '';
+    return type === 'hospital' ? 'bloodbank' : type;
   };
 
   // Handle marker click
@@ -119,7 +125,9 @@ export const MapView: React.FC<MapViewProps> = ({
                         {marker.label}
                       </div>
                       {marker.type && (
-                        <div className="text-xs text-gray-500 capitalize">{marker.type}</div>
+                        <div className="text-xs text-gray-500 capitalize">
+                          {getMarkerTypeLabel(marker.type)}
+                        </div>
                       )}
                       {distance !== null && (
                         <div className="text-xs text-gray-500">

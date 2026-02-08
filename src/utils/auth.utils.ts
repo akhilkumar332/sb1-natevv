@@ -24,12 +24,12 @@ export const isDonor = (user: User | null): boolean => {
 };
 
 /**
- * Check if user is a hospital
+ * Check if user is a bloodbank (legacy hospital supported)
  * @param user - User object or null
- * @returns Boolean indicating if user is a hospital
+ * @returns Boolean indicating if user is a bloodbank
  */
 export const isHospital = (user: User | null): boolean => {
-  return user?.role === 'hospital';
+  return user?.role === 'bloodbank' || user?.role === 'hospital';
 };
 
 /**
@@ -93,13 +93,13 @@ export const isPendingVerification = (user: User | null): boolean => {
 };
 
 /**
- * Check if organization (hospital or NGO) is verified
+ * Check if organization (bloodbank or NGO) is verified
  * @param user - User object or null
  * @returns Boolean indicating if organization is verified
  */
 export const isOrganizationVerified = (user: User | null): boolean => {
   if (!user) return false;
-  if (user.role === 'hospital' || user.role === 'ngo') {
+  if (user.role === 'bloodbank' || user.role === 'hospital' || user.role === 'ngo') {
     return user.verified === true && user.status === 'active';
   }
   return true; // Donors and admins don't need verification
@@ -283,8 +283,9 @@ export const getDashboardRoute = (user: User | null): string => {
   switch (user.role) {
     case 'donor':
       return '/donor/dashboard';
+    case 'bloodbank':
     case 'hospital':
-      return '/hospital/dashboard';
+      return '/bloodbank/dashboard';
     case 'ngo':
       return '/ngo/dashboard';
     case 'admin':
@@ -305,8 +306,9 @@ export const getOnboardingRoute = (user: User | null): string => {
   switch (user.role) {
     case 'donor':
       return '/donor/onboarding';
+    case 'bloodbank':
     case 'hospital':
-      return '/hospital/onboarding';
+      return '/bloodbank/onboarding';
     case 'ngo':
       return '/ngo/onboarding';
     case 'admin':
@@ -330,8 +332,8 @@ export const getUserDisplayName = (user: User | null): string => {
 
   if (user.displayName) return user.displayName;
 
-  if (user.role === 'hospital' && user.hospitalName) {
-    return user.hospitalName;
+  if ((user.role === 'bloodbank' || user.role === 'hospital') && (user.bloodBankName || user.hospitalName)) {
+    return user.bloodBankName || user.hospitalName || 'BloodBank';
   }
 
   if (user.role === 'ngo' && user.organizationName) {
@@ -396,8 +398,8 @@ export const needsProfileCompletion = (user: User | null): boolean => {
     return !hasBasicInfo || !user.bloodType || !user.gender || !user.dateOfBirth;
   }
 
-  if (user.role === 'hospital') {
-    return !hasBasicInfo || !user.hospitalName || !user.contactPerson;
+  if (user.role === 'bloodbank' || user.role === 'hospital') {
+    return !hasBasicInfo || !(user.bloodBankName || user.hospitalName) || !user.contactPerson;
   }
 
   if (user.role === 'ngo') {
@@ -415,7 +417,8 @@ export const needsProfileCompletion = (user: User | null): boolean => {
 export const getRoleDisplayText = (role: UserRole): string => {
   const roleMap: Record<UserRole, string> = {
     donor: 'Blood Donor',
-    hospital: 'Hospital',
+    bloodbank: 'BloodBank',
+    hospital: 'Hospital (Legacy)',
     ngo: 'NGO',
     admin: 'Administrator',
   };

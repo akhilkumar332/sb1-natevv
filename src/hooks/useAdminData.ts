@@ -12,7 +12,7 @@ export interface UserRecord {
   uid: string;
   displayName: string;
   email: string;
-  role: 'donor' | 'hospital' | 'ngo' | 'admin';
+  role: 'donor' | 'bloodbank' | 'hospital' | 'ngo' | 'admin';
   status: 'active' | 'inactive' | 'suspended' | 'pending_verification';
   verified: boolean;
   createdAt: Date;
@@ -24,7 +24,7 @@ export interface UserRecord {
 export interface VerificationRequest {
   id: string;
   userId: string;
-  organizationType: 'hospital' | 'ngo';
+  organizationType: 'bloodbank' | 'hospital' | 'ngo';
   organizationName: string;
   registrationNumber?: string;
   address?: string;
@@ -207,7 +207,7 @@ export const useAdminData = (): UseAdminDataReturn => {
           return {
             id: doc.id,
             userId: data.userId || '',
-            organizationType: data.organizationType || 'hospital',
+            organizationType: data.organizationType || 'bloodbank',
             organizationName: data.organizationName || data.name || '',
             registrationNumber: data.registrationNumber,
             address: data.address,
@@ -291,7 +291,7 @@ export const useAdminData = (): UseAdminDataReturn => {
           id: doc.id,
           type: isCritical ? 'critical' : 'warning',
           message: `${isCritical ? 'Critical' : 'Low'} blood shortage for ${data.bloodType} - Only ${data.units} units available`,
-          source: `Inventory Alert - Hospital ID: ${data.hospitalId}`,
+          source: `Inventory Alert - BloodBank ID: ${data.hospitalId}`,
           timestamp: data.updatedAt?.toDate() || new Date(),
           resolved: false,
           action: 'View Inventory',
@@ -389,7 +389,7 @@ export const useAdminData = (): UseAdminDataReturn => {
       // User stats
       const totalUsers = users.length;
       const totalDonors = users.filter(u => u.role === 'donor').length;
-      const totalHospitals = users.filter(u => u.role === 'hospital').length;
+      const totalHospitals = users.filter(u => u.role === 'bloodbank' || u.role === 'hospital').length;
       const totalNGOs = users.filter(u => u.role === 'ngo').length;
       const totalAdmins = users.filter(u => u.role === 'admin').length;
       const activeUsers = users.filter(u => u.status === 'active').length;

@@ -272,7 +272,7 @@ export const respondToBloodRequest = async (
     // Create notification for requester
     await addDoc(collection(db, 'notifications'), {
       userId: request.requesterId,
-      userRole: request.requesterType === 'hospital' ? 'hospital' : 'donor',
+      userRole: request.requesterType === 'bloodbank' || request.requesterType === 'hospital' ? 'bloodbank' : 'donor',
       type: 'donation_confirmation',
       title: 'Donor Responded to Your Request',
       message: `A donor has responded to your blood request for ${request.bloodType}`,
@@ -461,7 +461,7 @@ export const cancelAppointment = async (
     // Create notification for hospital
     await addDoc(collection(db, 'notifications'), {
       userId: appointment.hospitalId,
-      userRole: 'hospital',
+      userRole: 'bloodbank',
       type: 'general',
       title: 'Appointment Cancelled',
       message: `${appointment.donorName} has cancelled their appointment scheduled for ${appointment.scheduledTime}`,
@@ -532,7 +532,7 @@ export const rescheduleAppointment = async (
     // Create notification for hospital
     await addDoc(collection(db, 'notifications'), {
       userId: appointment.hospitalId,
-      userRole: 'hospital',
+      userRole: 'bloodbank',
       type: 'general',
       title: 'Appointment Rescheduled',
       message: `${appointment.donorName} has rescheduled their appointment to ${newTime}`,

@@ -39,8 +39,16 @@ service firebase.storage {
       allow delete: if isAuthenticated() && isOwner(userId);
     }
 
-    // Hospital logos and images
+    // BloodBank logos and images (legacy hospital path supported)
     match /hospitals/{hospitalId}/{fileName} {
+      allow read: if true; // Public read
+      allow write: if isAuthenticated() &&
+                     isValidImage() &&
+                     isValidImageSize();
+      allow delete: if isAuthenticated();
+    }
+
+    match /bloodbanks/{bloodbankId}/{fileName} {
       allow read: if true; // Public read
       allow write: if isAuthenticated() &&
                      isValidImage() &&
@@ -57,7 +65,7 @@ service firebase.storage {
       allow delete: if isAuthenticated();
     }
 
-    // Verification documents (hospitals, NGOs)
+    // Verification documents (bloodbanks, NGOs)
     match /verification/{userId}/{fileName} {
       allow read: if isAuthenticated() &&
                     (isOwner(userId) ||

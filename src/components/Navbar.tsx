@@ -58,7 +58,7 @@ function SigninDropdown() {
   const signinOptions = [
     { label: 'Donor', path: '/donor/login' },
     { label: 'NGO', path: '/ngo/login' },
-    { label: 'Hospital', path: '/hospital/login' },
+    { label: 'BloodBank', path: '/bloodbank/login' },
   ];
 
   return (
@@ -105,8 +105,8 @@ function UserMenu() {
     switch (user?.role) {
       case 'donor':
         return '/donor/dashboard';
-      case 'hospital':
-        return '/hospital/dashboard';
+      case 'bloodbank':
+        return '/bloodbank/dashboard';
       case 'ngo':
         return '/ngo/dashboard';
       case 'admin':
@@ -183,7 +183,7 @@ function MobileAuthMenu({ onClose }: { onClose?: () => void }) {
   const signinOptions = [
     { label: 'Donor', path: '/donor/login' },
     { label: 'NGO', path: '/ngo/login' },
-    { label: 'Hospital', path: '/hospital/login' },
+    { label: 'BloodBank', path: '/bloodbank/login' },
   ];
 
   return (
@@ -230,8 +230,8 @@ function MobileUserMenu({ onClose }: { onClose?: () => void }) {
     switch (user?.role) {
       case 'donor':
         return '/donor/dashboard';
-      case 'hospital':
-        return '/hospital/dashboard';
+      case 'bloodbank':
+        return '/bloodbank/dashboard';
       case 'ngo':
         return '/ngo/dashboard';
       case 'admin':

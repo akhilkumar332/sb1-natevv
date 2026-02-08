@@ -19,8 +19,8 @@ export function UserMenu() {
     switch (user?.role) {
       case 'donor':
         return '/donor/dashboard';
-      case 'hospital':
-        return '/hospital/dashboard';
+      case 'bloodbank':
+        return '/bloodbank/dashboard';
       case 'ngo':
         return '/ngo/dashboard';
       case 'admin':
@@ -90,8 +90,8 @@ export function MobileUserMenu() {
     switch (user?.role) {
       case 'donor':
         return '/donor/dashboard';
-      case 'hospital':
-        return '/hospital/dashboard';
+      case 'bloodbank':
+        return '/bloodbank/dashboard';
       case 'ngo':
         return '/ngo/dashboard';
       case 'admin':

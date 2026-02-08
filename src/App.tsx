@@ -27,21 +27,21 @@ function App() {
     '/donor/register',
     '/ngo/login',
     '/ngo/register',
-    '/hospital/login',
-    '/hospital/register',
+    '/bloodbank/login',
+    '/bloodbank/register',
   ]);
   const noFooterRoutes = new Set([
     '/donor/dashboard',
     '/ngo/dashboard',
-    '/hospital/dashboard',
+    '/bloodbank/dashboard',
     '/donor/onboarding',
     '/ngo/onboarding',
-    '/hospital/onboarding',
+    '/bloodbank/onboarding',
   ]);
   const noFooterPrefixes = [
     '/donor/dashboard',
     '/ngo/dashboard',
-    '/hospital/dashboard',
+    '/bloodbank/dashboard',
   ];
 
   const hideCompletely = noFooterRoutes.has(location.pathname)

@@ -18,7 +18,7 @@ const ProtectedRoute = () => {
     donor: '/donor',
     admin: '/admin',
     ngo: '/ngo',
-    hospital: '/hospital',
+    bloodbank: '/bloodbank',
   } as const;
 
   if (!user) {

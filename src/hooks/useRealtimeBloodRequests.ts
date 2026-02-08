@@ -142,9 +142,9 @@ export const useEmergencyBloodRequests = (
 };
 
 /**
- * Hook for hospital's blood requests
+ * Hook for blood bank's blood requests
  */
-export const useHospitalBloodRequests = (
+export const useBloodBankBloodRequests = (
   hospitalId: string
 ): UseRealtimeBloodRequestsResult => {
   const [requests, setRequests] = useState<BloodRequest[]>([]);
@@ -183,13 +183,13 @@ export const useHospitalBloodRequests = (
           setRequests(requestData);
           setLoading(false);
         } catch (err) {
-          console.error('Error processing hospital requests:', err);
+          console.error('Error processing bloodbank requests:', err);
           setError('Failed to load requests');
           setLoading(false);
         }
       },
       (err) => {
-        console.error('Error listening to hospital requests:', err);
+        console.error('Error listening to bloodbank requests:', err);
         setError('Failed to listen to requests');
         setLoading(false);
       }
@@ -204,6 +204,9 @@ export const useHospitalBloodRequests = (
     error,
   };
 };
+
+// Legacy alias
+export const useHospitalBloodRequests = useBloodBankBloodRequests;
 
 /**
  * Hook for active blood requests count

@@ -141,11 +141,11 @@ function Footer() {
               </li>
               <li>
                 <Link
-                  to="/hospital/login"
+                  to="/bloodbank/login"
                   className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                 >
                   <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                  Hospital Portal
+                  BloodBank Portal
                 </Link>
               </li>
               <li>
@@ -278,7 +278,7 @@ function Footer() {
             <p className="text-center text-xs text-gray-500 leading-relaxed">
               BloodHub is committed to connecting blood donors with those in need across India.
               We facilitate voluntary blood donation and do not store or sell blood.
-              All donations are made directly at registered hospitals and blood banks.
+              All donations are made directly at registered blood banks.
             </p>
           </div>
         </div>

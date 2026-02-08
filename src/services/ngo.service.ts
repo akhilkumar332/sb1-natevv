@@ -696,12 +696,12 @@ export const deletePartnership = async (partnershipId: string): Promise<void> =>
  * Add partner to campaign
  * @param campaignId - Campaign ID
  * @param partnerId - Partner ID
- * @param partnerType - Type of partner (hospital or organization)
+ * @param partnerType - Type of partner (bloodbank or organization)
  */
 export const addPartnerToCampaign = async (
   campaignId: string,
   partnerId: string,
-  partnerType: 'hospital' | 'organization'
+  partnerType: 'bloodbank' | 'hospital' | 'organization'
 ): Promise<void> => {
   try {
     const campaignDoc = await getDoc(doc(db, 'campaigns', campaignId));
@@ -713,9 +713,9 @@ export const addPartnerToCampaign = async (
 
     const updateData: any = {};
 
-    if (partnerType === 'hospital') {
+    if (partnerType === 'bloodbank' || partnerType === 'hospital') {
       if (campaign.partnerHospitals?.includes(partnerId)) {
-        throw new ValidationError('Hospital already added as partner');
+        throw new ValidationError('BloodBank already added as partner');
       }
       updateData.partnerHospitals = [...(campaign.partnerHospitals || []), partnerId];
     } else {

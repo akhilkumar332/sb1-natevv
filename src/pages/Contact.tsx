@@ -201,7 +201,7 @@ function Contact() {
                         <option value="">Select a subject</option>
                         <option value="general">General Inquiry</option>
                         <option value="donor">Donor Support</option>
-                        <option value="hospital">Hospital Partnership</option>
+                        <option value="bloodbank">BloodBank Partnership</option>
                         <option value="emergency">Emergency Request</option>
                         <option value="technical">Technical Support</option>
                       </select>

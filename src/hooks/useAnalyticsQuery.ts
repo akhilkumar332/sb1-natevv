@@ -8,7 +8,7 @@ import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 import {
   getDonorStats,
   getDonationTrend,
-  getHospitalStats,
+  getBloodBankStats,
   getBloodRequestTrend,
   getInventoryDistribution,
   getCampaignStats,
@@ -20,7 +20,7 @@ import {
   getTopDonors,
   type DateRange,
   type DonorStats,
-  type HospitalStats,
+  type BloodBankStats,
   type CampaignStats,
   type PlatformStats,
   type TrendData,
@@ -64,23 +64,26 @@ export const useDonationTrend = (
 };
 
 // ============================================================================
-// HOSPITAL ANALYTICS HOOKS
+// BLOODBANK ANALYTICS HOOKS
 // ============================================================================
 
 /**
- * Hook to get hospital statistics with caching
+ * Hook to get bloodbank statistics with caching
  */
-export const useHospitalStats = (
-  hospitalId: string,
-  options?: Omit<UseQueryOptions<HospitalStats>, 'queryKey' | 'queryFn'>
+export const useBloodBankStats = (
+  bloodBankId: string,
+  options?: Omit<UseQueryOptions<BloodBankStats>, 'queryKey' | 'queryFn'>
 ) => {
   return useQuery({
-    queryKey: ['hospitalStats', hospitalId],
-    queryFn: () => getHospitalStats(hospitalId),
-    enabled: !!hospitalId,
+    queryKey: ['bloodBankStats', bloodBankId],
+    queryFn: () => getBloodBankStats(bloodBankId),
+    enabled: !!bloodBankId,
     ...options,
   });
 };
+
+// Legacy alias
+export const useHospitalStats = useBloodBankStats;
 
 /**
  * Hook to get blood request trend with caching

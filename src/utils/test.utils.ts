@@ -76,19 +76,19 @@ export const mockDonor = (overrides?: Partial<User>): User => {
 };
 
 /**
- * Generate mock hospital user
+ * Generate mock bloodbank user (legacy hospital supported)
  * @param overrides - Optional field overrides
- * @returns Mock hospital user
+ * @returns Mock bloodbank user
  */
 export const mockHospital = (overrides?: Partial<User>): User => {
   const id = generateMockId();
   return {
     uid: id,
-    email: `hospital${id}@test.com`,
+    email: `bloodbank${id}@test.com`,
     phoneNumber: '+919876543211',
-    displayName: 'Test Hospital',
+    displayName: 'Test BloodBank',
     photoURL: null,
-    role: 'hospital',
+    role: 'bloodbank',
     status: 'active',
     verified: true,
     createdAt: mockTimestamp(60),
@@ -97,7 +97,9 @@ export const mockHospital = (overrides?: Partial<User>): User => {
     city: 'Mumbai',
     state: 'Maharashtra',
     country: 'India',
-    hospitalName: 'Test General Hospital',
+    bloodBankName: 'Test General BloodBank',
+    bloodBankType: 'government',
+    hospitalName: 'Test General BloodBank',
     hospitalType: 'government',
     licenseNumber: 'HSP12345',
     contactPerson: 'Dr. Test Admin',
@@ -211,8 +213,8 @@ export const mockBloodRequest = (overrides?: Partial<BloodRequest>): BloodReques
   return {
     id,
     requesterId: hospital.uid,
-    requesterName: hospital.hospitalName || 'Test Hospital',
-    requesterType: 'hospital',
+    requesterName: hospital.bloodBankName || hospital.hospitalName || 'Test BloodBank',
+    requesterType: 'bloodbank',
     bloodType: 'A+',
     units: 2,
     urgency: 'high',
@@ -299,8 +301,8 @@ export const mockAppointment = (overrides?: Partial<Appointment>): Appointment =
     donorBloodType: donor.bloodType || 'O+',
     donorPhone: donor.phoneNumber || '+919876543210',
     hospitalId: hospital.uid,
-    hospitalName: hospital.hospitalName || 'Test Hospital',
-    hospitalAddress: '123 Hospital Street, Mumbai',
+    hospitalName: hospital.bloodBankName || hospital.hospitalName || 'Test BloodBank',
+    hospitalAddress: '123 BloodBank Street, Mumbai',
     scheduledDate: mockTimestamp(-3), // 3 days from now
     scheduledTime: '10:00 AM',
     duration: 60,
@@ -397,12 +399,12 @@ export const mockVerificationRequest = (
   return {
     id,
     userId: hospital.uid,
-    organizationName: hospital.hospitalName || 'Test Hospital',
-    organizationType: 'hospital',
+    organizationName: hospital.bloodBankName || hospital.hospitalName || 'Test BloodBank',
+    organizationType: 'bloodbank',
     documents: [
       {
         type: 'license',
-        name: 'hospital_license.pdf',
+        name: 'bloodbank_license.pdf',
         url: 'https://example.com/license.pdf',
         uploadedAt: mockTimestamp(1),
       },
@@ -415,13 +417,13 @@ export const mockVerificationRequest = (
     ],
     status: 'pending',
     location: {
-      address: '123 Hospital Street',
+      address: '123 BloodBank Street',
       city: 'Mumbai',
       state: 'Maharashtra',
       postalCode: '400001',
     },
     contactPerson: 'Dr. Admin',
-    contactEmail: hospital.email || 'admin@hospital.com',
+    contactEmail: hospital.email || 'admin@bloodbank.com',
     contactPhone: hospital.phoneNumber || '+919876543215',
     submittedAt: mockTimestamp(1),
     updatedAt: mockTimestamp(1),
@@ -553,6 +555,6 @@ export const randomBloodType = (): BloodType => {
  * @returns Random user role
  */
 export const randomUserRole = (): UserRole => {
-  const roles: UserRole[] = ['donor', 'hospital', 'ngo', 'admin'];
+  const roles: UserRole[] = ['donor', 'bloodbank', 'hospital', 'ngo', 'admin'];
   return randomItem(roles);
 };

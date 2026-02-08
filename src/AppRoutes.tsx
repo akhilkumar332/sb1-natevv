@@ -27,6 +27,17 @@ const HospitalRegister = lazy(() => lazyLoad(import('./pages/hospital/HospitalRe
 const HospitalLogin = lazy(() => lazyLoad(import('./pages/hospital/HospitalLogin')));
 const HospitalDashboard = lazy(() => lazyLoad(import('./pages/hospital/HospitalDashboard')));
 const HospitalOnboarding = lazy(() => lazyLoad(import('./pages/hospital/HospitalOnboarding')));
+const BloodBankRegister = lazy(() => lazyLoad(import('./pages/bloodbank/BloodBankRegister')));
+const BloodBankLogin = lazy(() => lazyLoad(import('./pages/bloodbank/BloodBankLogin')));
+const BloodBankDashboard = lazy(() => lazyLoad(import('./pages/bloodbank/BloodBankDashboard')));
+const BloodBankOnboarding = lazy(() => lazyLoad(import('./pages/bloodbank/BloodBankOnboarding')));
+const BloodBankOverview = lazy(() => lazyLoad(import('./pages/bloodbank/dashboard/Overview')));
+const BloodBankRequests = lazy(() => lazyLoad(import('./pages/bloodbank/dashboard/Requests')));
+const BloodBankDonors = lazy(() => lazyLoad(import('./pages/bloodbank/dashboard/Donors')));
+const BloodBankAppointments = lazy(() => lazyLoad(import('./pages/bloodbank/dashboard/Appointments')));
+const BloodBankInventory = lazy(() => lazyLoad(import('./pages/bloodbank/dashboard/Inventory')));
+const BloodBankAnalytics = lazy(() => lazyLoad(import('./pages/bloodbank/dashboard/Analytics')));
+const BloodBankAccount = lazy(() => lazyLoad(import('./pages/bloodbank/dashboard/Account')));
 const NgoRegister = lazy(() => lazyLoad(import('./pages/ngo/NgoRegister')));
 const NgoLogin = lazy(() => lazyLoad(import('./pages/ngo/NgoLogin')));
 const NgoDashboard = lazy(() => lazyLoad(import('./pages/ngo/NgoDashboard')));
@@ -67,6 +78,8 @@ const AppRoutes = () => {
       <Route path="/donor/login" element={<DonorLogin />} />
       <Route path="/hospital/register" element={<HospitalRegister />} />
       <Route path="/hospital/login" element={<HospitalLogin />} />
+      <Route path="/bloodbank/register" element={<BloodBankRegister />} />
+      <Route path="/bloodbank/login" element={<BloodBankLogin />} />
       <Route path="/ngo/register" element={<NgoRegister />} />
       <Route path="/ngo/login" element={<NgoLogin />} />
       <Route path="/admin/login" element={<AdminLogin />} />
@@ -85,6 +98,17 @@ const AppRoutes = () => {
         </Route>
         <Route path="/hospital/onboarding" element={<HospitalOnboarding />} />
         <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
+        <Route path="/bloodbank/onboarding" element={<BloodBankOnboarding />} />
+        <Route path="/bloodbank/dashboard" element={<BloodBankDashboard />}>
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<BloodBankOverview />} />
+          <Route path="requests" element={<BloodBankRequests />} />
+          <Route path="donors" element={<BloodBankDonors />} />
+          <Route path="appointments" element={<BloodBankAppointments />} />
+          <Route path="inventory" element={<BloodBankInventory />} />
+          <Route path="analytics" element={<BloodBankAnalytics />} />
+          <Route path="account" element={<BloodBankAccount />} />
+        </Route>
         <Route path="/ngo/onboarding" element={<NgoOnboarding />} />
         <Route path="/ngo/dashboard" element={<NgoDashboard />}>
           <Route index element={<Navigate to="overview" replace />} />
