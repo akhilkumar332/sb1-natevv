@@ -418,7 +418,7 @@ export function BloodBankOnboarding() {
         bloodBankType: formData.hospitalType,
         hospitalName: formData.hospitalName,
         hospitalType: formData.hospitalType,
-        dateOfBirth: parsedDob ?? formData.dateOfBirth,
+        dateOfBirth: parsedDob ?? undefined,
         onboardingCompleted: true,
       };
       await updateUserProfile(payload);
