@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBloodBankData, BloodInventoryItem, BloodRequest, Appointment, Donation, BloodBankStats } from '../../hooks/useBloodBankData';
+import { useReferrals } from '../../hooks/useReferrals';
 import BhIdBanner from '../../components/BhIdBanner';
 import {
   Activity,
@@ -13,6 +14,7 @@ import {
   Menu,
   Package,
   RefreshCw,
+  Share2,
   Settings,
   Users,
   X,
@@ -30,6 +32,19 @@ export type BloodBankDashboardContext = {
   refreshData: () => Promise<void>;
   getStatusColor: (status: string) => string;
   getInventoryStatusColor: (status: string) => string;
+  referralCount: number;
+  referralLoading: boolean;
+  referralUsersLoading: boolean;
+  referralMilestone: { next: number | null; remaining: number; label: string };
+  referralDetails: any[];
+  eligibleReferralCount: number;
+  referralSummary: Record<string, number>;
+  referralQrDataUrl: string | null;
+  referralQrLoading: boolean;
+  loadReferralQr: () => Promise<void>;
+  copyInviteLink: () => Promise<void>;
+  shareInviteLink: () => Promise<void>;
+  openWhatsAppInvite: () => void;
 };
 
 function BloodBankDashboard() {
@@ -47,6 +62,22 @@ function BloodBankDashboard() {
     refreshData,
   } = useBloodBankData(user?.uid || '');
 
+  const {
+    referralLoading,
+    referralUsersLoading,
+    referralCount,
+    referralMilestone,
+    referralDetails,
+    eligibleReferralCount,
+    referralSummary,
+    referralQrDataUrl,
+    referralQrLoading,
+    loadReferralQr,
+    copyInviteLink,
+    shareInviteLink,
+    openWhatsAppInvite,
+  } = useReferrals(user);
+
   const menuItems = [
     { id: 'overview', label: 'Overview', to: 'overview', icon: Activity },
     { id: 'requests', label: 'Requests', to: 'requests', icon: Heart },
@@ -54,6 +85,7 @@ function BloodBankDashboard() {
     { id: 'appointments', label: 'Appointments', to: 'appointments', icon: Calendar },
     { id: 'inventory', label: 'Inventory', to: 'inventory', icon: Package },
     { id: 'analytics', label: 'Analytics', to: 'analytics', icon: BarChart3 },
+    { id: 'referrals', label: 'Referrals', to: 'referrals', icon: Share2 },
     { id: 'account', label: 'Account', to: 'account', icon: Settings },
   ] as const;
 
@@ -62,7 +94,7 @@ function BloodBankDashboard() {
       case 'active':
         return 'text-emerald-700 bg-emerald-50 border border-emerald-200';
       case 'partially_fulfilled':
-        return 'text-amber-700 bg-amber-50 border border-amber-200';
+        return 'text-yellow-700 bg-yellow-50 border border-yellow-200';
       case 'fulfilled':
         return 'text-gray-600 bg-gray-100 border border-gray-200';
       case 'expired':
@@ -70,7 +102,7 @@ function BloodBankDashboard() {
         return 'text-rose-700 bg-rose-50 border border-rose-200';
       case 'scheduled':
       case 'confirmed':
-        return 'text-amber-700 bg-amber-50 border border-amber-200';
+        return 'text-yellow-700 bg-yellow-50 border border-yellow-200';
       case 'completed':
         return 'text-emerald-700 bg-emerald-50 border border-emerald-200';
       default:
@@ -83,7 +115,7 @@ function BloodBankDashboard() {
       case 'critical':
         return 'text-rose-700 bg-rose-50 border border-rose-200';
       case 'low':
-        return 'text-amber-700 bg-amber-50 border border-amber-200';
+        return 'text-yellow-700 bg-yellow-50 border border-yellow-200';
       case 'adequate':
         return 'text-emerald-700 bg-emerald-50 border border-emerald-200';
       case 'surplus':
@@ -105,11 +137,24 @@ function BloodBankDashboard() {
     refreshData,
     getStatusColor,
     getInventoryStatusColor,
+    referralCount,
+    referralLoading,
+    referralUsersLoading,
+    referralMilestone,
+    referralDetails,
+    eligibleReferralCount,
+    referralSummary,
+    referralQrDataUrl,
+    referralQrLoading,
+    loadReferralQr,
+    copyInviteLink,
+    shareInviteLink,
+    openWhatsAppInvite,
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-amber-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-yellow-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-10 h-10 text-red-600 animate-spin mx-auto mb-4" />
           <p className="text-gray-600 font-semibold">Loading BloodBank dashboard...</p>
@@ -120,14 +165,14 @@ function BloodBankDashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-amber-50 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-yellow-50 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Data</h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
             onClick={refreshData}
-            className="bg-gradient-to-r from-red-600 to-amber-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-red-700 hover:to-amber-700 transition-all shadow-lg flex items-center gap-2 mx-auto"
+            className="bg-gradient-to-r from-red-600 to-yellow-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-red-700 hover:to-yellow-700 transition-all shadow-lg flex items-center gap-2 mx-auto"
           >
             <RefreshCw className="w-5 h-5" />
             Retry
@@ -138,8 +183,8 @@ function BloodBankDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-amber-50">
-      <div className="bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-xl">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-yellow-50">
+      <div className="bg-gradient-to-r from-red-600 to-yellow-600 text-white shadow-xl">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center space-x-3">
@@ -205,7 +250,7 @@ function BloodBankDashboard() {
                     className={({ isActive }) =>
                       `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-all ${
                         isActive
-                          ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-md'
+                          ? 'bg-gradient-to-r from-red-600 to-yellow-600 text-white shadow-md'
                           : 'text-gray-600 hover:bg-red-50'
                       }`
                     }
@@ -275,7 +320,7 @@ function BloodBankDashboard() {
                   className={({ isActive }) =>
                     `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-all ${
                       isActive
-                        ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-md'
+                        ? 'bg-gradient-to-r from-red-600 to-yellow-600 text-white shadow-md'
                         : 'text-gray-600 hover:bg-red-50'
                     }`
                   }

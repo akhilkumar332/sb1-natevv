@@ -37,6 +37,7 @@ const BloodBankDonors = lazy(() => lazyLoad(import('./pages/bloodbank/dashboard/
 const BloodBankAppointments = lazy(() => lazyLoad(import('./pages/bloodbank/dashboard/Appointments')));
 const BloodBankInventory = lazy(() => lazyLoad(import('./pages/bloodbank/dashboard/Inventory')));
 const BloodBankAnalytics = lazy(() => lazyLoad(import('./pages/bloodbank/dashboard/Analytics')));
+const BloodBankReferrals = lazy(() => lazyLoad(import('./pages/bloodbank/dashboard/Referrals')));
 const BloodBankAccount = lazy(() => lazyLoad(import('./pages/bloodbank/dashboard/Account')));
 const NgoRegister = lazy(() => lazyLoad(import('./pages/ngo/NgoRegister')));
 const NgoLogin = lazy(() => lazyLoad(import('./pages/ngo/NgoLogin')));
@@ -107,6 +108,7 @@ const AppRoutes = () => {
           <Route path="appointments" element={<BloodBankAppointments />} />
           <Route path="inventory" element={<BloodBankInventory />} />
           <Route path="analytics" element={<BloodBankAnalytics />} />
+          <Route path="referrals" element={<BloodBankReferrals />} />
           <Route path="account" element={<BloodBankAccount />} />
         </Route>
         <Route path="/ngo/onboarding" element={<NgoOnboarding />} />

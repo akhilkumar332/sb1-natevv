@@ -53,8 +53,8 @@ export function BloodBankLogin() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Gradient Background with Info */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-amber-600 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-yellow-500 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-red-800 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
 
         <div className="relative z-10 flex flex-col justify-center px-12 py-12 text-white">
@@ -117,14 +117,14 @@ export function BloodBankLogin() {
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-12 bg-gray-50">
+      <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-12 bg-gradient-to-br from-red-50 via-white to-yellow-50">
         <div className="max-w-md w-full">
           <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10 border border-gray-100">
             <div className="lg:hidden text-center mb-8">
               <div className="inline-flex items-center space-x-2">
                 <LogoMark className="w-10 h-10" />
                 <div>
-                  <span className="font-extrabold text-2xl bg-gradient-to-r from-red-600 to-amber-600 bg-clip-text text-transparent">
+                  <span className="font-extrabold text-2xl bg-gradient-to-r from-red-600 to-yellow-500 bg-clip-text text-transparent">
                     BloodHub
                   </span>
                 </div>
@@ -132,7 +132,7 @@ export function BloodBankLogin() {
             </div>
 
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-red-600 to-amber-600 rounded-2xl mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-red-600 to-yellow-500 rounded-2xl mb-4">
                 <Building2 className="w-8 h-8 text-white" />
               </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-2">BloodBank Login</h2>
@@ -140,9 +140,9 @@ export function BloodBankLogin() {
             </div>
 
             <div className="space-y-6">
-              <div className="bg-gradient-to-r from-amber-50 to-red-50 rounded-2xl p-6 border border-amber-100">
+              <div className="bg-gradient-to-r from-yellow-50 to-red-50 rounded-2xl p-6 border border-yellow-100">
                 <div className="flex items-start space-x-3">
-                  <Shield className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <Shield className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">Secure BloodBank Access</h3>
                     <p className="text-sm text-gray-600">

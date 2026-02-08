@@ -197,7 +197,12 @@ const buildNotificationContent = (
   status: ReferralStatusUpdate['status'],
   referredUser?: any
 ) => {
-  const name = referredUser?.displayName || referredUser?.name || 'A donor';
+  const name = referredUser?.organizationName
+    || referredUser?.bloodBankName
+    || referredUser?.hospitalName
+    || referredUser?.displayName
+    || referredUser?.name
+    || 'A new user';
   if (status === 'registered') {
     return {
       title: 'New referral registered',
@@ -242,7 +247,11 @@ const sendReferralNotification = async (
     const content = buildNotificationContent(status, referredUser);
     const referralId = `${referrerUid}_${referredUid}`;
     const resolvedRole = referrerRole || 'donor';
-    const actionUrl = resolvedRole === 'ngo' ? '/ngo/dashboard/referrals' : '/donor/dashboard/referrals';
+    const actionUrl = resolvedRole === 'ngo'
+      ? '/ngo/dashboard/referrals'
+      : resolvedRole === 'bloodbank' || resolvedRole === 'hospital'
+        ? '/bloodbank/dashboard/referrals'
+        : '/donor/dashboard/referrals';
     await setDoc(notificationRef, {
       userId: referrerUid,
       userRole: resolvedRole,

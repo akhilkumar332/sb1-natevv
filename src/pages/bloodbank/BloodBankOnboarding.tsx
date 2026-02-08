@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../../services/referral.service';
 import toast from 'react-hot-toast';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
@@ -64,10 +65,10 @@ interface OnboardingFormData {
 }
 
 const steps = [
-  { icon: Building2, title: 'BloodBank', subtitle: 'Basic details', color: 'amber' },
-  { icon: MapPin, title: 'Contact', subtitle: 'Location details', color: 'teal' },
+  { icon: Building2, title: 'BloodBank', subtitle: 'Basic details', color: 'yellow' },
+  { icon: MapPin, title: 'Contact', subtitle: 'Location details', color: 'yellow' },
   { icon: FileText, title: 'Facilities', subtitle: 'Services info', color: 'red' },
-  { icon: CheckCircle, title: 'Consent', subtitle: 'Agreement', color: 'amber' },
+  { icon: CheckCircle, title: 'Consent', subtitle: 'Agreement', color: 'yellow' },
 ];
 
 // Map click handler component
@@ -414,6 +415,14 @@ export function BloodBankOnboarding() {
         dateOfBirth: new Date(formData.dateOfBirth),
         onboardingCompleted: true
       });
+      if (user?.uid) {
+        await applyReferralTrackingForUser(user.uid);
+        await ensureReferralTrackingForExistingReferral({
+          ...user,
+          onboardingCompleted: true,
+          role: user.role || 'bloodbank',
+        });
+      }
       toast.success('BloodBank profile completed successfully!');
       navigate('/bloodbank/dashboard');
     } catch (error) {
@@ -438,7 +447,7 @@ export function BloodBankOnboarding() {
                 name="hospitalName"
                 value={formData.hospitalName}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                 placeholder="Enter blood bank name"
                 required
               />
@@ -453,7 +462,7 @@ export function BloodBankOnboarding() {
                 name="registrationNumber"
                 value={formData.registrationNumber}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                 placeholder="BloodBank registration number"
                 required
               />
@@ -467,7 +476,7 @@ export function BloodBankOnboarding() {
                 name="hospitalType"
                 value={formData.hospitalType}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                 required
               >
                 <option value="">Select bloodbank type</option>
@@ -486,7 +495,7 @@ export function BloodBankOnboarding() {
                 name="contactPersonName"
                 value={formData.contactPersonName}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                 placeholder="Primary contact person"
                 required
               />
@@ -507,7 +516,7 @@ export function BloodBankOnboarding() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                   placeholder="bloodbank@example.com"
                   required
                 />
@@ -522,7 +531,7 @@ export function BloodBankOnboarding() {
                   defaultCountry="IN"
                   value={formData.phone}
                   onChange={(value) => setFormData(prev => ({ ...prev, phone: value || '' }))}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 transition-all phone-input-custom"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 transition-all phone-input-custom"
                 />
               </div>
 
@@ -535,7 +544,7 @@ export function BloodBankOnboarding() {
                   name="dateOfBirth"
                   value={formData.dateOfBirth}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                   required
                 />
               </div>
@@ -548,7 +557,7 @@ export function BloodBankOnboarding() {
                   name="country"
                   value={formData.country}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                   required
                 >
                   <option value="">Select Country</option>
@@ -569,8 +578,8 @@ export function BloodBankOnboarding() {
                     type="button"
                     onClick={getCurrentLocation}
                     disabled={locationLoading}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-600 text-sm font-medium rounded-lg transition-all disabled:opacity-50"
-                  >
+                  className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 text-sm font-medium rounded-lg transition-all disabled:opacity-50"
+                >
                     {locationLoading ? (
                       <>
                         <Loader className="w-4 h-4 animate-spin" />
@@ -607,7 +616,7 @@ export function BloodBankOnboarding() {
                     name="address"
                     value={formData.address}
                     onChange={handleAddressChange}
-                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                     placeholder="Start typing your address..."
                     required
                     autoComplete="off"
@@ -623,7 +632,7 @@ export function BloodBankOnboarding() {
                           className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
                         >
                           <div className="flex items-start space-x-2">
-                            <MapPin className="w-4 h-4 text-green-500 flex-shrink-0 mt-1" />
+                            <MapPin className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-1" />
                             <div className="text-sm text-gray-700">{suggestion.display_name}</div>
                           </div>
                         </div>
@@ -643,7 +652,7 @@ export function BloodBankOnboarding() {
                   name="state"
                   value={formData.state}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                   required
                   disabled={!formData.country}
                 >
@@ -665,7 +674,7 @@ export function BloodBankOnboarding() {
                     name="city"
                     value={formData.city}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                     required
                     disabled={!formData.state}
                   >
@@ -687,7 +696,7 @@ export function BloodBankOnboarding() {
                     name="postalCode"
                     value={formData.postalCode}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                     placeholder="XXXXXX"
                     required
                   />
@@ -709,7 +718,7 @@ export function BloodBankOnboarding() {
                 name="website"
                 value={formData.website}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                 placeholder="https://www.example.com"
               />
             </div>
@@ -723,7 +732,7 @@ export function BloodBankOnboarding() {
                 name="numberOfBeds"
                 value={formData.numberOfBeds}
                 onChange={handleChange}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                 placeholder="Total number of beds"
                 min="1"
                 required
@@ -737,7 +746,7 @@ export function BloodBankOnboarding() {
                   name="hasBloodBank"
                   checked={formData.hasBloodBank}
                   onChange={handleChange}
-                  className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
                 />
                 <span className="text-sm font-semibold text-gray-700">
                   Blood Bank Available
@@ -750,7 +759,7 @@ export function BloodBankOnboarding() {
                   name="hasEmergencyServices"
                   checked={formData.hasEmergencyServices}
                   onChange={handleChange}
-                  className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
                 />
                 <span className="text-sm font-semibold text-gray-700">
                   Emergency Services Available
@@ -767,7 +776,7 @@ export function BloodBankOnboarding() {
                 value={formData.description}
                 onChange={handleChange}
                 rows={5}
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all resize-none"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all resize-none"
                 placeholder="Brief description of your bloodbank and services offered..."
                 required
               />
@@ -778,7 +787,7 @@ export function BloodBankOnboarding() {
       case 3:
         return (
           <div className="space-y-6">
-            <div className="bg-green-50 rounded-xl p-6 border border-green-100">
+            <div className="bg-yellow-50 rounded-xl p-6 border border-yellow-100">
               <h3 className="font-bold text-gray-900 mb-4">Review Your Information</h3>
               <div className="space-y-2 text-sm">
                 <p><span className="font-semibold">BloodBank:</span> {formData.hospitalName}</p>
@@ -799,11 +808,11 @@ export function BloodBankOnboarding() {
                   name="termsOfServiceAgreed"
                   checked={formData.termsOfServiceAgreed}
                   onChange={handleChange}
-                  className="mt-1 w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  className="mt-1 w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
                   required
                 />
                 <span className="text-sm text-gray-700">
-                  I agree to the <a href="#" className="text-green-600 hover:text-green-700 font-semibold">Terms of Service</a>
+                  I agree to the <a href="#" className="text-red-600 hover:text-red-700 font-semibold">Terms of Service</a>
                 </span>
               </label>
 
@@ -813,11 +822,11 @@ export function BloodBankOnboarding() {
                   name="privacyPolicyAgreed"
                   checked={formData.privacyPolicyAgreed}
                   onChange={handleChange}
-                  className="mt-1 w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  className="mt-1 w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
                   required
                 />
                 <span className="text-sm text-gray-700">
-                  I agree to the <a href="#" className="text-green-600 hover:text-green-700 font-semibold">Privacy Policy</a>
+                  I agree to the <a href="#" className="text-red-600 hover:text-red-700 font-semibold">Privacy Policy</a>
                 </span>
               </label>
             </div>
@@ -827,7 +836,7 @@ export function BloodBankOnboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-yellow-50 py-12 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Progress Stepper */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
@@ -838,9 +847,9 @@ export function BloodBankOnboarding() {
                   <div
                     className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
                       completedSteps.includes(index)
-                        ? 'bg-green-500 text-white'
+                        ? 'bg-yellow-500 text-white'
                         : index === currentStep
-                        ? 'bg-green-600 text-white'
+                        ? 'bg-red-600 text-white'
                         : 'bg-gray-200 text-gray-400'
                     }`}
                   >
@@ -858,7 +867,7 @@ export function BloodBankOnboarding() {
                 {index < steps.length - 1 && (
                   <div
                     className={`h-1 flex-1 mx-4 transition-all ${
-                      completedSteps.includes(index) ? 'bg-green-500' : 'bg-gray-200'
+                      completedSteps.includes(index) ? 'bg-yellow-500' : 'bg-gray-200'
                     }`}
                   />
                 )}
@@ -888,7 +897,7 @@ export function BloodBankOnboarding() {
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="ml-auto px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors flex items-center space-x-2"
+                  className="ml-auto px-6 py-3 bg-gradient-to-r from-red-600 to-yellow-500 text-white rounded-xl font-semibold hover:from-red-700 hover:to-yellow-600 transition-colors flex items-center space-x-2"
                 >
                   <span>Next</span>
                   <ChevronRight className="w-5 h-5" />
@@ -897,7 +906,7 @@ export function BloodBankOnboarding() {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="ml-auto px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  className="ml-auto px-6 py-3 bg-gradient-to-r from-red-600 to-yellow-500 text-white rounded-xl font-semibold hover:from-red-700 hover:to-yellow-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
                   {isLoading ? (
                     <>

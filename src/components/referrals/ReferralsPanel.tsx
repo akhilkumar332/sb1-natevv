@@ -4,13 +4,13 @@ import { Share2, QrCode, Users } from 'lucide-react';
 const ROLE_LABELS: Record<string, string> = {
   donor: 'Donor',
   ngo: 'NGO',
-  bloodbank: 'BloodBank',
-  hospital: 'BloodBank',
+  bloodbank: 'Blood Bank',
+  hospital: 'Blood Bank',
   admin: 'Admin',
 };
 
 type ReferralsPanelProps = {
-  variant: 'donor' | 'ngo';
+  variant: 'donor' | 'ngo' | 'bloodbank';
   referralLoading: boolean;
   referralUsersLoading: boolean;
   referralCount: number;
@@ -74,21 +74,37 @@ const ReferralsPanel = ({
       statusBadge: 'bg-amber-50 text-amber-700',
       bannerLabel: 'Referrals',
     }
-    : {
-      label: 'text-red-600',
-      iconWrap: 'bg-red-50',
-      icon: 'text-red-600',
-      buttonBorder: 'border-red-200',
-      buttonText: 'text-red-600',
-      buttonHover: 'hover:bg-red-50',
-      filterActive: 'border-red-200 bg-red-50 text-red-600',
-      badgeBorder: 'border-red-200',
-      badgeText: 'text-red-600',
-      avatarBg: 'bg-red-100',
-      avatarText: 'text-red-600',
-      statusBadge: 'bg-red-50 text-red-600',
-      bannerLabel: 'Referrals',
-    };
+    : variant === 'bloodbank'
+      ? {
+        label: 'text-yellow-600',
+        iconWrap: 'bg-yellow-50',
+        icon: 'text-yellow-600',
+        buttonBorder: 'border-yellow-200',
+        buttonText: 'text-yellow-700',
+        buttonHover: 'hover:bg-yellow-50',
+        filterActive: 'border-yellow-200 bg-yellow-50 text-yellow-700',
+        badgeBorder: 'border-yellow-200',
+        badgeText: 'text-yellow-700',
+        avatarBg: 'bg-yellow-100',
+        avatarText: 'text-yellow-700',
+        statusBadge: 'bg-yellow-50 text-yellow-700',
+        bannerLabel: 'Referrals',
+      }
+      : {
+        label: 'text-red-600',
+        iconWrap: 'bg-red-50',
+        icon: 'text-red-600',
+        buttonBorder: 'border-red-200',
+        buttonText: 'text-red-600',
+        buttonHover: 'hover:bg-red-50',
+        filterActive: 'border-red-200 bg-red-50 text-red-600',
+        badgeBorder: 'border-red-200',
+        badgeText: 'text-red-600',
+        avatarBg: 'bg-red-100',
+        avatarText: 'text-red-600',
+        statusBadge: 'bg-red-50 text-red-600',
+        bannerLabel: 'Referrals',
+      };
 
   return (
     <>
@@ -101,7 +117,7 @@ const ReferralsPanel = ({
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-lg font-bold text-gray-800">Referral Impact</h2>
-              <p className="text-xs text-gray-500">Track donors and NGOs who joined through you.</p>
+              <p className="text-xs text-gray-500">Track donors, NGOs, and blood banks who joined through you.</p>
             </div>
             <div className={`p-2 rounded-lg ${theme.iconWrap}`}>
               <Users className={`w-5 h-5 ${theme.icon}`} />
@@ -256,9 +272,15 @@ const ReferralsPanel = ({
                 const roleLabel = ROLE_LABELS[roleKey];
                 const displayName =
                   referredUser.organizationName
+                  || referredUser.bloodBankName
+                  || referredUser.hospitalName
                   || referredUser.displayName
                   || referredUser.name
-                  || (roleKey === 'ngo' ? 'New NGO' : 'New User');
+                  || (roleKey === 'ngo'
+                    ? 'New NGO'
+                    : roleKey === 'bloodbank' || roleKey === 'hospital'
+                      ? 'New Blood Bank'
+                      : 'New User');
                 const initials = displayName
                   .split(' ')
                   .filter(Boolean)
@@ -323,7 +345,7 @@ const ReferralsPanel = ({
               <Users className="w-10 h-10 text-gray-300 mx-auto mb-2" />
               <p className="text-sm text-gray-600">
                 {filter === 'all'
-                  ? 'No referrals yet. Share your link to invite donors or NGOs.'
+                  ? 'No referrals yet. Share your link to invite donors, NGOs, or blood banks.'
                   : 'No referrals match this filter.'}
               </p>
             </div>

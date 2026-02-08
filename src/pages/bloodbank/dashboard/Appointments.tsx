@@ -77,7 +77,7 @@ function BloodBankAppointments() {
         )}
       </div>
 
-      <div className="bg-gradient-to-br from-red-600 to-amber-500 rounded-2xl p-6 text-white shadow-xl">
+      <div className="bg-gradient-to-br from-red-600 to-yellow-500 rounded-2xl p-6 text-white shadow-xl">
         <div className="flex items-center gap-3">
           <Users className="w-6 h-6" />
           <div>

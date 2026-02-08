@@ -33,8 +33,8 @@ export function BloodBankRegister() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Gradient Background */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-amber-600 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-yellow-500 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-red-800 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
 
         <div className="relative z-10 flex flex-col justify-center px-12 py-12 text-white">
@@ -97,7 +97,7 @@ export function BloodBankRegister() {
       </div>
 
       {/* Right Side - Registration Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-12 bg-gray-50">
+      <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-12 bg-gradient-to-br from-red-50 via-white to-yellow-50">
         <div className="max-w-md w-full">
           <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10 border border-gray-100">
             {/* Mobile Logo */}
@@ -105,7 +105,7 @@ export function BloodBankRegister() {
               <div className="inline-flex items-center space-x-2">
                 <LogoMark className="w-10 h-10" />
                 <div>
-                  <span className="font-extrabold text-2xl bg-gradient-to-r from-red-600 to-amber-600 bg-clip-text text-transparent">
+                  <span className="font-extrabold text-2xl bg-gradient-to-r from-red-600 to-yellow-500 bg-clip-text text-transparent">
                     BloodHub
                   </span>
                 </div>
@@ -113,7 +113,7 @@ export function BloodBankRegister() {
             </div>
 
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-red-600 to-amber-600 rounded-2xl mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-red-600 to-yellow-500 rounded-2xl mb-4">
                 <Building2 className="w-8 h-8 text-white" />
               </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-2">BloodBank Registration</h2>
@@ -168,7 +168,7 @@ export function BloodBankRegister() {
                     type="button"
                     onClick={handlePhoneNumberSubmit}
                     disabled={authLoading}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-red-600 to-amber-600 text-white rounded-xl font-semibold hover:from-red-700 hover:to-amber-700 transition-all"
+                    className="w-full px-4 py-3 bg-gradient-to-r from-red-600 to-yellow-500 text-white rounded-xl font-semibold hover:from-red-700 hover:to-yellow-600 transition-all"
                   >
                     Send OTP
                   </button>
@@ -186,7 +186,7 @@ export function BloodBankRegister() {
                       type="button"
                       onClick={handleOTPSubmit}
                       disabled={otpLoading}
-                      className="w-full px-4 py-3 bg-gradient-to-r from-red-600 to-amber-600 text-white rounded-xl font-semibold hover:from-red-700 hover:to-amber-700 transition-all"
+                      className="w-full px-4 py-3 bg-gradient-to-r from-red-600 to-yellow-500 text-white rounded-xl font-semibold hover:from-red-700 hover:to-yellow-600 transition-all"
                     >
                       {otpLoading ? 'Verifying...' : 'Verify & Register'}
                     </button>

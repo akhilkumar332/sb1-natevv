@@ -10,6 +10,9 @@ function BloodBankOverview() {
     appointments,
     getStatusColor,
     getInventoryStatusColor,
+    referralCount,
+    eligibleReferralCount,
+    referralSummary,
   } = useOutletContext<BloodBankDashboardContext>();
 
   const criticalInventory = inventory.filter((item) => item.status === 'critical' || item.status === 'low');
@@ -33,10 +36,10 @@ function BloodBankOverview() {
           <p className="text-sm text-gray-500 mt-1">Blood inventory</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-amber-100">
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-yellow-100">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center">
-              <AlertTriangle className="w-6 h-6 text-amber-600" />
+            <div className="w-12 h-12 rounded-2xl bg-yellow-100 flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6 text-yellow-600" />
             </div>
             <span className="text-xs font-semibold text-rose-600">Alerts {stats.criticalTypes + stats.lowTypes}</span>
           </div>
@@ -55,10 +58,10 @@ function BloodBankOverview() {
           <p className="text-sm text-gray-500 mt-1">Requests fulfilled</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-amber-100">
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-yellow-100">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center">
-              <Calendar className="w-6 h-6 text-amber-600" />
+            <div className="w-12 h-12 rounded-2xl bg-yellow-100 flex items-center justify-center">
+              <Calendar className="w-6 h-6 text-yellow-600" />
             </div>
             <span className="text-xs font-semibold text-emerald-600">Today {stats.todayAppointments}</span>
           </div>
@@ -107,52 +110,81 @@ function BloodBankOverview() {
           )}
         </div>
 
-        <div className="bg-gradient-to-br from-red-600 to-amber-500 rounded-2xl p-6 text-white shadow-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-white/70">Appointments</p>
-              <h2 className="text-2xl font-bold">Today & upcoming</h2>
-            </div>
-            <Users className="w-6 h-6" />
-          </div>
-          <div className="space-y-3 mt-6">
-            {upcomingAppointments.length === 0 ? (
-              <div className="rounded-xl bg-white/15 p-4 text-sm text-white/80">
-                No upcoming appointments scheduled.
+        <div className="space-y-6">
+          <div className="bg-gradient-to-br from-red-600 to-yellow-500 rounded-2xl p-6 text-white shadow-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-white/70">Appointments</p>
+                <h2 className="text-2xl font-bold">Today & upcoming</h2>
               </div>
-            ) : (
-              upcomingAppointments.map((appt) => (
-                <div key={appt.id} className="rounded-xl bg-white/15 p-4">
-                  <p className="text-sm font-semibold">{appt.donorName || 'Donor'}</p>
-                  <p className="text-xs text-white/70 mt-1">
-                    {appt.scheduledDate.toLocaleDateString()} • {appt.bloodType}
-                  </p>
-                  <span className={`mt-2 inline-block rounded-full px-2 py-1 text-[10px] font-semibold ${getStatusColor(appt.status)} bg-white/20 text-white border border-white/20`}>
-                    {appt.status}
-                  </span>
+              <Users className="w-6 h-6" />
+            </div>
+            <div className="space-y-3 mt-6">
+              {upcomingAppointments.length === 0 ? (
+                <div className="rounded-xl bg-white/15 p-4 text-sm text-white/80">
+                  No upcoming appointments scheduled.
                 </div>
-              ))
-            )}
+              ) : (
+                upcomingAppointments.map((appt) => (
+                  <div key={appt.id} className="rounded-xl bg-white/15 p-4">
+                    <p className="text-sm font-semibold">{appt.donorName || 'Donor'}</p>
+                    <p className="text-xs text-white/70 mt-1">
+                      {appt.scheduledDate.toLocaleDateString()} • {appt.bloodType}
+                    </p>
+                    <span className={`mt-2 inline-block rounded-full px-2 py-1 text-[10px] font-semibold ${getStatusColor(appt.status)} bg-white/20 text-white border border-white/20`}>
+                      {appt.status}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+            <Link
+              to="/bloodbank/dashboard/appointments"
+              className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-white/90"
+            >
+              View appointments
+              <ChevronRight className="w-4 h-4" />
+            </Link>
           </div>
-          <Link
-            to="/bloodbank/dashboard/appointments"
-            className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-white/90"
-          >
-            View appointments
-            <ChevronRight className="w-4 h-4" />
-          </Link>
+
+          <div className="bg-white rounded-2xl shadow-xl p-6 border border-yellow-100">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-yellow-600">Referrals</p>
+                <h3 className="text-lg font-bold text-gray-900">Referral snapshot</h3>
+              </div>
+              <Users className="w-5 h-5 text-yellow-500" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-yellow-100 bg-yellow-50 px-3 py-3">
+                <p className="text-xs text-gray-500">Registered</p>
+                <p className="text-xl font-bold text-gray-900">{referralSummary?.registered || 0}</p>
+              </div>
+              <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-3">
+                <p className="text-xs text-gray-500">Eligible</p>
+                <p className="text-xl font-bold text-gray-900">{eligibleReferralCount}</p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+              <span>{referralCount} total referrals</span>
+              <Link to="/bloodbank/dashboard/referrals" className="inline-flex items-center gap-1 font-semibold text-yellow-600 hover:text-yellow-700">
+                View details
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-xl p-6">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-amber-600">Requests</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-yellow-600">Requests</p>
             <h2 className="text-2xl font-bold text-gray-900">Active blood requests</h2>
           </div>
           <Link
             to="/bloodbank/dashboard/requests"
-            className="text-sm font-semibold text-amber-600 hover:text-amber-700 flex items-center gap-2"
+            className="text-sm font-semibold text-yellow-600 hover:text-yellow-700 flex items-center gap-2"
           >
             View all
             <ChevronRight className="w-4 h-4" />
@@ -161,7 +193,7 @@ function BloodBankOverview() {
 
         {activeRequests.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
-            <Heart className="w-10 h-10 text-amber-200 mx-auto mb-2" />
+            <Heart className="w-10 h-10 text-yellow-200 mx-auto mb-2" />
             <p>No active requests right now.</p>
           </div>
         ) : (
