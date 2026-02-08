@@ -1,9 +1,20 @@
 import { Link, useOutletContext } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Calendar, ChevronRight, Heart, Package, Users } from 'lucide-react';
+import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { db } from '../../../firebase';
 import type { BloodBankDashboardContext } from '../BloodBankDashboard';
+
+type BloodBankBranch = {
+  id: string;
+  name: string;
+  city?: string;
+  state?: string;
+};
 
 function BloodBankOverview() {
   const {
+    user,
     stats,
     inventory,
     bloodRequests,
@@ -15,12 +26,79 @@ function BloodBankOverview() {
     referralSummary,
   } = useOutletContext<BloodBankDashboardContext>();
 
+  const baseHospitalId = user?.parentHospitalId || user?.uid || '';
+  const [branches, setBranches] = useState<BloodBankBranch[]>([]);
+
   const criticalInventory = inventory.filter((item) => item.status === 'critical' || item.status === 'low');
   const activeRequests = bloodRequests.filter((request) => request.status === 'active' || request.status === 'partially_fulfilled');
   const upcomingAppointments = appointments
     .filter((appt) => appt.status === 'scheduled' || appt.status === 'confirmed')
     .sort((a, b) => a.scheduledDate.getTime() - b.scheduledDate.getTime())
     .slice(0, 4);
+
+  useEffect(() => {
+    if (!baseHospitalId) return;
+    const q = query(
+      collection(db, 'bloodbankBranches'),
+      where('parentHospitalId', '==', baseHospitalId),
+      orderBy('createdAt', 'asc')
+    );
+    return onSnapshot(q, (snapshot) => {
+      const rows = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          name: data.name || 'Branch',
+          city: data.city,
+          state: data.state,
+        } as BloodBankBranch;
+      });
+      setBranches(rows);
+    });
+  }, [baseHospitalId]);
+
+  const branchSummary = useMemo(() => {
+    if (!baseHospitalId) return [];
+    const branchMap = new Map<string, {
+      id: string;
+      name: string;
+      totalUnits: number;
+      availableUnits: number;
+      reservedUnits: number;
+      criticalTypes: number;
+    }>();
+
+    const resolveBranchName = (branchId: string) => {
+      if (branchId === baseHospitalId) return 'Main branch';
+      return branches.find((branch) => branch.id === branchId)?.name || 'Branch';
+    };
+
+    inventory.forEach((item) => {
+      const branchId = item.branchId || item.hospitalId || baseHospitalId;
+      if (!branchMap.has(branchId)) {
+        branchMap.set(branchId, {
+          id: branchId,
+          name: resolveBranchName(branchId),
+          totalUnits: 0,
+          availableUnits: 0,
+          reservedUnits: 0,
+          criticalTypes: 0,
+        });
+      }
+      const entry = branchMap.get(branchId);
+      if (!entry) return;
+      entry.totalUnits += item.units || 0;
+      item.batches.forEach((batch) => {
+        if (batch.status === 'available') entry.availableUnits += batch.units;
+        if (batch.status === 'reserved') entry.reservedUnits += batch.units;
+      });
+      if (item.status === 'critical' || item.status === 'low') {
+        entry.criticalTypes += 1;
+      }
+    });
+
+    return Array.from(branchMap.values());
+  }, [inventory, branches, baseHospitalId]);
 
   return (
     <div className="space-y-6">
@@ -69,6 +147,40 @@ function BloodBankOverview() {
           <p className="text-sm text-gray-500 mt-1">Donations today</p>
         </div>
       </div>
+
+      {branchSummary.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-red-600">Branches</p>
+              <h2 className="text-2xl font-bold text-gray-900">Branch inventory snapshot</h2>
+            </div>
+            <Link
+              to="/bloodbank/dashboard/inventory"
+              className="text-sm font-semibold text-red-600 hover:text-red-700 flex items-center gap-2"
+            >
+              Manage inventory
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {branchSummary.map((branch) => (
+              <div key={branch.id} className="rounded-2xl border border-gray-100 p-4 bg-gray-50/40">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">{branch.name}</h3>
+                  <span className="text-xs font-semibold text-gray-500">{branch.criticalTypes} alerts</span>
+                </div>
+                <div className="mt-3 text-sm text-gray-600">
+                  Total units: <span className="font-semibold text-gray-900">{branch.totalUnits}</span>
+                </div>
+                <div className="mt-1 text-xs text-gray-500">
+                  Available {branch.availableUnits} • Reserved {branch.reservedUnits}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="bg-white rounded-2xl shadow-xl p-6">

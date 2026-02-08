@@ -340,6 +340,151 @@ app.post('/api/v1/blood-requests', async (req, res) => {
 const specs = swaggerJsdoc(swaggerOptions);
 app.use('/v1/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
+// ========================================================================
+// Scheduled Jobs: Inventory Expiry + Alerts
+// ========================================================================
+
+const calculateInventoryStatus = (units, lowLevel = 10, criticalLevel = 5) => {
+  if (units <= 0) return 'critical';
+  if (units <= criticalLevel) return 'critical';
+  if (units <= lowLevel) return 'low';
+  if (units > lowLevel * 3) return 'surplus';
+  return 'adequate';
+};
+
+export const inventoryExpiryJob = functions.pubsub
+  .schedule('every day 02:30')
+  .timeZone('Asia/Kolkata')
+  .onRun(async () => {
+    const db = admin.firestore();
+    const now = new Date();
+    const alertDays = [7, 3, 1];
+
+    const inventorySnapshot = await db.collection('bloodInventory').get();
+    const bulkWriter = db.bulkWriter();
+
+    for (const docSnap of inventorySnapshot.docs) {
+      const data = docSnap.data();
+      const batches = Array.isArray(data.batches) ? data.batches : [];
+      let expiredUnits = 0;
+      let updated = false;
+
+      const nowTimestamp = admin.firestore.Timestamp.now();
+      const nextBatches = batches.map((batch) => {
+        const expiryDate = batch.expiryDate?.toDate ? batch.expiryDate.toDate() : null;
+        const status = batch.status || 'available';
+        if (expiryDate && (status === 'available' || status === 'reserved') && expiryDate <= now) {
+          expiredUnits += batch.units || 0;
+          updated = true;
+          return {
+            ...batch,
+            status: 'expired',
+            updatedAt: nowTimestamp,
+          };
+        }
+        return batch;
+      });
+
+      if (updated) {
+        const currentUnits = data.units || 0;
+        const nextUnits = Math.max(0, currentUnits - expiredUnits);
+        const status = calculateInventoryStatus(nextUnits, data.lowLevel || 10, data.criticalLevel || 5);
+
+        bulkWriter.update(docSnap.ref, {
+          batches: nextBatches,
+          units: nextUnits,
+          status,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        if (expiredUnits > 0) {
+          bulkWriter.set(db.collection('inventoryTransactions').doc(), {
+            hospitalId: data.hospitalId,
+            inventoryId: docSnap.id,
+            bloodType: data.bloodType || '',
+            type: 'expire',
+            deltaUnits: -expiredUnits,
+            previousUnits: currentUnits,
+            newUnits: nextUnits,
+            reason: 'Scheduled expiry cleanup',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdBy: 'system',
+          });
+        }
+      }
+
+      for (const batch of batches) {
+        const expiryDate = batch.expiryDate?.toDate ? batch.expiryDate.toDate() : null;
+        const status = batch.status || 'available';
+        if (!expiryDate || !(status === 'available' || status === 'reserved')) continue;
+        const daysLeft = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        for (const threshold of alertDays) {
+          if (daysLeft > threshold || daysLeft < 0) continue;
+          const alertId = `${docSnap.id}_${batch.batchId}_${threshold}`;
+          const alertRef = db.collection('inventoryAlerts').doc(alertId);
+          const existing = await alertRef.get();
+          if (existing.exists && existing.data()?.status !== 'open') continue;
+          bulkWriter.set(alertRef, {
+            hospitalId: data.hospitalId,
+            inventoryId: docSnap.id,
+            bloodType: data.bloodType || '',
+            batchId: batch.batchId,
+            alertType: 'expiry',
+            daysToExpiry: daysLeft,
+            status: 'open',
+            message: `Batch expires in ${daysLeft} days`,
+            createdAt: existing.exists ? existing.data()?.createdAt : admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+        }
+      }
+    }
+
+    await bulkWriter.close();
+
+    // Release reservations for expired/cancelled requests
+    const reservationsSnapshot = await db.collection('inventoryReservations').where('status', '==', 'active').get();
+    for (const reservationDoc of reservationsSnapshot.docs) {
+      const reservation = reservationDoc.data();
+      if (!reservation?.requestId) continue;
+      const requestSnap = await db.collection('bloodRequests').doc(reservation.requestId).get();
+      const requestStatus = requestSnap.exists ? requestSnap.data()?.status : 'expired';
+      if (!['expired', 'cancelled'].includes(requestStatus)) continue;
+
+      const inventoryRef = db.collection('bloodInventory').doc(reservation.inventoryId);
+      const inventorySnap = await inventoryRef.get();
+      if (!inventorySnap.exists) continue;
+      const inventoryData = inventorySnap.data();
+      const batches = Array.isArray(inventoryData?.batches) ? inventoryData.batches : [];
+      const nowTimestamp = admin.firestore.Timestamp.now();
+      const nextBatches = batches.map((batch) => {
+        if (!reservation.reservedBatchIds?.includes(batch.batchId)) return batch;
+        return {
+          ...batch,
+          status: 'available',
+          reservationId: '',
+          reservedForRequestId: '',
+          reservedByUid: '',
+          updatedAt: nowTimestamp,
+        };
+      });
+
+      await inventoryRef.update({
+        batches: nextBatches,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await reservationDoc.ref.update({
+        status: requestStatus === 'expired' ? 'expired' : 'released',
+        requestStatus,
+        releasedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    return null;
+  });
+
 // 404 handling
 app.use((req, res) => {
   console.log('404 Not Found:', req.originalUrl);

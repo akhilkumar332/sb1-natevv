@@ -59,6 +59,44 @@ service cloud.firestore {
     }
 
     /**
+     * Check if user is staff of a bloodbank (parentHospitalId)
+     */
+    function isHospitalStaffFor(hospitalId) {
+      let userData = getUserData();
+      return isAuthenticated() && userData != null && userData.parentHospitalId == hospitalId;
+    }
+
+    /**
+     * Check if user can edit hospital resources
+     */
+    function hasHospitalEditAccess(hospitalId) {
+      let userData = getUserData();
+      return isAuthenticated() && (
+        request.auth.uid == hospitalId ||
+        (
+          userData != null &&
+          userData.parentHospitalId == hospitalId &&
+          userData.staffRole in ['editor', 'manager']
+        )
+      );
+    }
+
+    /**
+     * Check if user can manage hospital resources
+     */
+    function hasHospitalManagerAccess(hospitalId) {
+      let userData = getUserData();
+      return isAuthenticated() && (
+        request.auth.uid == hospitalId ||
+        (
+          userData != null &&
+          userData.parentHospitalId == hospitalId &&
+          userData.staffRole == 'manager'
+        )
+      );
+    }
+
+    /**
      * Check if user is NGO
      */
     function isNGO() {
@@ -207,11 +245,7 @@ service cloud.firestore {
       // Allow self-service soft delete (status = deleted) with limited fields
       allow update: if isAuthenticated() && (
         (isOwner(userId) && (
-          (
-            request.resource.data.role == resource.data.role &&
-            request.resource.data.verified == resource.data.verified &&
-            request.resource.data.status == resource.data.status
-          ) ||
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'verified', 'status']) ||
           (
             request.resource.data.status == 'deleted' &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deletedAt', 'updatedAt'])
@@ -381,12 +415,12 @@ service cloud.firestore {
 
       // Only the hospital or admin can create/update their inventory
       allow create: if isAuthenticated() && (
-        (isHospital() && isVerified() && request.resource.data.hospitalId == request.auth.uid) ||
+        (isHospital() && isVerified() && hasHospitalEditAccess(request.resource.data.hospitalId)) ||
         isAdmin()
       );
 
       allow update: if isAuthenticated() && (
-        (isHospital() && resource.data.hospitalId == request.auth.uid) ||
+        (isHospital() && hasHospitalEditAccess(resource.data.hospitalId)) ||
         isAdmin()
       );
 
@@ -562,6 +596,127 @@ service cloud.firestore {
 
       allow create, update: if isAuthenticated() && (
         isOwner(donorId) || isAdmin()
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: inventoryTransactions
+    // ========================================================================
+
+    match /inventoryTransactions/{transactionId} {
+      allow read: if isAuthenticated() && (
+        resource.data.hospitalId == request.auth.uid ||
+        isHospitalStaffFor(resource.data.hospitalId) ||
+        isAdmin()
+      );
+
+      allow create: if isAuthenticated() && (
+        (isHospital() && hasHospitalEditAccess(request.resource.data.hospitalId)) ||
+        isAdmin()
+      );
+
+      allow update, delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: inventoryTransfers
+    // ========================================================================
+
+    match /inventoryTransfers/{transferId} {
+      allow read: if isAuthenticated() && (
+        resource.data.fromHospitalId == request.auth.uid ||
+        resource.data.toHospitalId == request.auth.uid ||
+        isHospitalStaffFor(resource.data.fromHospitalId) ||
+        isHospitalStaffFor(resource.data.toHospitalId) ||
+        isAdmin()
+      );
+
+      allow create: if isAuthenticated() && (
+        (isHospital() && hasHospitalEditAccess(request.resource.data.fromHospitalId)) ||
+        isAdmin()
+      );
+
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        (
+          hasHospitalEditAccess(resource.data.fromHospitalId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        ) ||
+        (
+          hasHospitalEditAccess(resource.data.toHospitalId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: inventoryAlerts
+    // ========================================================================
+
+    match /inventoryAlerts/{alertId} {
+      allow read: if isAuthenticated() && (
+        hasHospitalEditAccess(resource.data.hospitalId) ||
+        isHospitalStaffFor(resource.data.hospitalId) ||
+        isAdmin()
+      );
+
+      allow create: if isAdmin();
+
+      allow update: if isAuthenticated() && (
+        hasHospitalEditAccess(resource.data.hospitalId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: inventoryReservations
+    // ========================================================================
+
+    match /inventoryReservations/{reservationId} {
+      allow read: if isAuthenticated() && (
+        hasHospitalEditAccess(resource.data.hospitalId) ||
+        isHospitalStaffFor(resource.data.hospitalId) ||
+        isAdmin()
+      );
+
+      allow create: if isAuthenticated() && (
+        hasHospitalEditAccess(request.resource.data.hospitalId) ||
+        isAdmin()
+      );
+
+      allow update: if isAuthenticated() && (
+        hasHospitalEditAccess(resource.data.hospitalId) ||
+        isAdmin()
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: bloodbankBranches
+    // ========================================================================
+
+    match /bloodbankBranches/{branchId} {
+      allow read: if isAuthenticated() && (
+        hasHospitalEditAccess(resource.data.parentHospitalId) ||
+        isHospitalStaffFor(resource.data.parentHospitalId) ||
+        isAdmin()
+      );
+
+      allow create: if isAuthenticated() && (
+        hasHospitalManagerAccess(request.resource.data.parentHospitalId) ||
+        isAdmin()
+      );
+
+      allow update: if isAuthenticated() && (
+        hasHospitalManagerAccess(resource.data.parentHospitalId) ||
+        isAdmin()
       );
 
       allow delete: if isAdmin();

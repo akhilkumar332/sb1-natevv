@@ -1,6 +1,7 @@
 // src/hooks/useLogin.ts
 import { useState } from 'react';
-import { PhoneAuthError, useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
+import { PhoneAuthError } from '../errors/PhoneAuthError';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { FirebaseError } from 'firebase/app';

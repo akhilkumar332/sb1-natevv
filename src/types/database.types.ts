@@ -17,6 +17,7 @@ export type Gender = 'Male' | 'Female' | 'Other';
 export type UserRole = 'donor' | 'bloodbank' | 'ngo' | 'admin' | 'hospital';
 export type UserStatus = 'active' | 'inactive' | 'suspended' | 'pending_verification';
 export type DonorLevel = 'New Donor' | 'Rookie' | 'Regular' | 'Super' | 'Hero' | 'Legend' | 'Champion';
+export type StaffRole = 'viewer' | 'editor' | 'manager';
 
 // ============================================================================
 // COLLECTION: users
@@ -42,6 +43,9 @@ export interface User {
   role: UserRole;
   status: UserStatus;
   verified: boolean;
+  staffRole?: StaffRole;
+  parentHospitalId?: string;
+  branchId?: string;
 
   // Common Fields
   createdAt: Timestamp;
@@ -226,6 +230,8 @@ export interface BloodRequest {
 
 export type InventoryStatus = 'adequate' | 'low' | 'critical' | 'surplus';
 export type BatchStatus = 'available' | 'reserved' | 'expired' | 'used';
+export type BatchSource = 'donation' | 'camp' | 'transfer' | 'other';
+export type BatchTestStatus = 'pending' | 'passed' | 'failed';
 
 /**
  * BloodInventory interface for tracking blood stock at hospitals
@@ -233,6 +239,7 @@ export type BatchStatus = 'available' | 'reserved' | 'expired' | 'used';
 export interface BloodInventory {
   id?: string;
   hospitalId: string;
+  branchId?: string;
 
   // Blood Details
   bloodType: string;
@@ -248,6 +255,15 @@ export interface BloodInventory {
     collectionDate: Timestamp;
     expiryDate: Timestamp;
     status: BatchStatus;
+    source?: BatchSource;
+    donorId?: string;
+    reservationId?: string;
+    reservedForRequestId?: string;
+    reservedByUid?: string;
+    testedStatus?: BatchTestStatus;
+    notes?: string;
+    createdAt?: Timestamp;
+    updatedAt?: Timestamp;
   }>;
 
   // Thresholds
@@ -259,6 +275,96 @@ export interface BloodInventory {
   lastRestocked: Timestamp;
 
   // Metadata
+  updatedAt: Timestamp;
+}
+
+export type InventoryTransactionType =
+  | 'add_batch'
+  | 'adjust'
+  | 'consume'
+  | 'expire'
+  | 'delete_batch'
+  | 'transfer_out'
+  | 'transfer_in'
+  | 'reserve'
+  | 'release';
+
+export interface InventoryTransaction {
+  id?: string;
+  hospitalId: string;
+  inventoryId: string;
+  bloodType: string;
+  type: InventoryTransactionType;
+  deltaUnits: number;
+  previousUnits: number;
+  newUnits: number;
+  batchId?: string;
+  reservationId?: string;
+  reason?: string;
+  notes?: string;
+  createdAt: Timestamp;
+  createdBy: string;
+}
+
+export interface InventoryTransfer {
+  id?: string;
+  fromHospitalId: string;
+  toHospitalId: string;
+  fromHospitalName?: string;
+  toHospitalName?: string;
+  fromBranchId?: string;
+  toBranchId?: string;
+  bloodType: string;
+  units: number;
+  status: 'pending' | 'sent' | 'received' | 'rejected' | 'cancelled';
+  notes?: string;
+  collectionDate?: Timestamp;
+  expiryDate?: Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface InventoryAlert {
+  id?: string;
+  hospitalId: string;
+  inventoryId: string;
+  bloodType: string;
+  batchId: string;
+  alertType: 'expiry';
+  daysToExpiry: number;
+  status: 'open' | 'dismissed' | 'resolved';
+  message?: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface InventoryReservation {
+  id?: string;
+  hospitalId: string;
+  branchId?: string;
+  inventoryId: string;
+  bloodType: string;
+  units: number;
+  requestId: string;
+  requestStatus?: string;
+  reservedBatchIds: string[];
+  status: 'active' | 'released' | 'fulfilled' | 'expired';
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  releasedAt?: Timestamp;
+  fulfilledAt?: Timestamp;
+}
+
+export interface BloodBankBranch {
+  id?: string;
+  parentHospitalId: string;
+  name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  phone?: string;
+  isPrimary?: boolean;
+  createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 

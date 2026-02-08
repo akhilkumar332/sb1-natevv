@@ -10,6 +10,7 @@ import { db } from '../firebase';
 export interface BloodInventoryItem {
   id: string;
   hospitalId: string;
+  branchId?: string;
   bloodType: string;
   units: number;
   status: 'critical' | 'low' | 'adequate' | 'surplus';
@@ -21,7 +22,16 @@ export interface BloodInventoryItem {
     units: number;
     collectionDate: Date;
     expiryDate: Date;
-    status: 'available' | 'used' | 'expired';
+    status: 'available' | 'reserved' | 'used' | 'expired';
+    source?: string;
+    donorId?: string;
+    reservationId?: string;
+    reservedForRequestId?: string;
+    reservedByUid?: string;
+    testedStatus?: string;
+    notes?: string;
+    createdAt?: Date;
+    updatedAt?: Date;
   }>;
   updatedAt: Date;
 }
@@ -97,6 +107,8 @@ export interface BloodBankStats {
   adequateTypes: number;
   expiringIn7Days: number;
   expiringIn30Days: number;
+  reservedUnits: number;
+  availableUnits: number;
   activeRequests: number;
   fulfilledRequests: number;
   todayAppointments: number;
@@ -128,6 +140,8 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
     adequateTypes: 0,
     expiringIn7Days: 0,
     expiringIn30Days: 0,
+    reservedUnits: 0,
+    availableUnits: 0,
     activeRequests: 0,
     fulfilledRequests: 0,
     todayAppointments: 0,
@@ -150,6 +164,8 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
         ...batch,
         collectionDate: batch.collectionDate?.toISOString(),
         expiryDate: batch.expiryDate?.toISOString(),
+        createdAt: batch.createdAt?.toISOString(),
+        updatedAt: batch.updatedAt?.toISOString(),
       })),
     }));
 
@@ -189,6 +205,8 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
         ...batch,
         collectionDate: batch.collectionDate ? new Date(batch.collectionDate) : new Date(),
         expiryDate: batch.expiryDate ? new Date(batch.expiryDate) : new Date(),
+        createdAt: batch.createdAt ? new Date(batch.createdAt) : undefined,
+        updatedAt: batch.updatedAt ? new Date(batch.updatedAt) : undefined,
       })),
     }));
 
@@ -229,6 +247,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
           return {
             id: doc.id,
             hospitalId: data.hospitalId || '',
+            branchId: data.branchId || data.hospitalId || '',
             bloodType: data.bloodType || '',
             units: data.units || 0,
             status: data.status || 'adequate',
@@ -241,6 +260,15 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
               collectionDate: batch.collectionDate?.toDate() || new Date(),
               expiryDate: batch.expiryDate?.toDate() || new Date(),
               status: batch.status || 'available',
+              source: batch.source,
+              donorId: batch.donorId,
+              reservationId: batch.reservationId,
+              reservedForRequestId: batch.reservedForRequestId,
+              reservedByUid: batch.reservedByUid,
+              testedStatus: batch.testedStatus,
+              notes: batch.notes,
+              createdAt: batch.createdAt?.toDate(),
+              updatedAt: batch.updatedAt?.toDate(),
             })),
             updatedAt: data.updatedAt?.toDate() || new Date(),
           };
@@ -388,6 +416,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
       return {
         id: doc.id,
         hospitalId: data.hospitalId || '',
+        branchId: data.branchId || data.hospitalId || '',
         bloodType: data.bloodType || '',
         units: data.units || 0,
         status: data.status || 'adequate',
@@ -465,10 +494,20 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
 
     let expiringIn7Days = 0;
     let expiringIn30Days = 0;
+    let reservedUnits = 0;
+    let availableUnits = 0;
 
     inventory.forEach(item => {
       item.batches.forEach(batch => {
         if (batch.status === 'available') {
+          availableUnits += batch.units;
+          if (batch.expiryDate <= sevenDaysFromNow) {
+            expiringIn7Days += batch.units;
+          } else if (batch.expiryDate <= thirtyDaysFromNow) {
+            expiringIn30Days += batch.units;
+          }
+        } else if (batch.status === 'reserved') {
+          reservedUnits += batch.units;
           if (batch.expiryDate <= sevenDaysFromNow) {
             expiringIn7Days += batch.units;
           } else if (batch.expiryDate <= thirtyDaysFromNow) {
@@ -513,6 +552,8 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
       adequateTypes,
       expiringIn7Days,
       expiringIn30Days,
+      reservedUnits,
+      availableUnits,
       activeRequests,
       fulfilledRequests,
       todayAppointments,
@@ -552,19 +593,27 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
         setLoading(true);
       }
 
+      const scheduleBackground = (task: () => void) => {
+        if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+          (window as any).requestIdleCallback(task);
+        } else {
+          setTimeout(task, 0);
+        }
+      };
+
       const runFetch = async () => {
         try {
           const unsubscribeInventory = await fetchInventory();
           const unsubscribeRequests = await fetchRequests();
 
-          await Promise.all([
-            fetchAppointments(),
-            fetchDonations(),
-          ]);
-
           if (!usedCache) {
             setLoading(false);
           }
+
+          scheduleBackground(() => {
+            void fetchAppointments();
+            void fetchDonations();
+          });
 
           return () => {
             unsubscribeInventory();
@@ -585,6 +634,18 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
     };
 
     loadData();
+  }, [bloodBankId]);
+
+  useEffect(() => {
+    if (!bloodBankId) return;
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
+      void fetchAppointments();
+      void fetchDonations();
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, [bloodBankId]);
 
   useEffect(() => {

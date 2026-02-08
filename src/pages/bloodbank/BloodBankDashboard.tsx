@@ -50,6 +50,7 @@ export type BloodBankDashboardContext = {
 function BloodBankDashboard() {
   const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const baseHospitalId = user?.parentHospitalId || user?.uid || '';
 
   const {
     inventory,
@@ -60,7 +61,7 @@ function BloodBankDashboard() {
     loading,
     error,
     refreshData,
-  } = useBloodBankData(user?.uid || '');
+  } = useBloodBankData(baseHospitalId);
 
   const {
     referralLoading,

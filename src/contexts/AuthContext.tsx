@@ -39,6 +39,7 @@ import { findUsersByPhone } from '../utils/userLookup';
 import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../services/referral.service';
 import { clearReferralTracking, getReferralReferrerUid, getReferralTracking } from '../utils/referralTracking';
 import { buildPublicDonorPayload } from '../utils/publicDonor';
+import { PhoneAuthError } from '../errors/PhoneAuthError';
 
 // Define window recaptcha type
 declare global {
@@ -95,6 +96,9 @@ interface User {
   contactPerson?: string;
   operatingHours?: string;
   facilities?: string[];
+  staffRole?: 'viewer' | 'editor' | 'manager';
+  parentHospitalId?: string;
+  branchId?: string;
   contactPersonName?: string;
   website?: string;
   yearEstablished?: string;
@@ -163,18 +167,6 @@ interface LoginResponse {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
-
-type PhoneAuthErrorCode = 'not_registered' | 'multiple_accounts' | 'role_mismatch' | 'link_required';
-
-export class PhoneAuthError extends Error {
-  code: PhoneAuthErrorCode;
-
-  constructor(message: string, code: PhoneAuthErrorCode) {
-    super(message);
-    this.name = 'PhoneAuthError';
-    this.code = code;
-  }
-}
 
 const pendingPhoneLinkKey = 'pendingPhoneLink';
 const userCacheKey = 'bh_user_cache';
