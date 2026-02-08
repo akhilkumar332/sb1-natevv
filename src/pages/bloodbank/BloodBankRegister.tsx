@@ -10,18 +10,8 @@ export function BloodBankRegister() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const {
-    formData,
-    otpResendTimer,
-    confirmationResult,
-    authLoading,
-    handleIdentifierChange,
-    handleChange,
-    handlePhoneNumberSubmit,
-    handleOTPSubmit,
-    handleResendOTP,
     handleGoogleRegister,
     googleLoading,
-    otpLoading,
   } = useBloodBankRegister();
 
   useEffect(() => {
@@ -139,68 +129,10 @@ export function BloodBankRegister() {
                       src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
                       alt="Google logo"
                     />
-                    Register with Google
+                    Sign up with Google
                   </>
                 )}
               </button>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white text-gray-500">or register with phone</span>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <input
-                  type="tel"
-                  name="identifier"
-                  value={formData.identifier}
-                  onChange={(e) => handleIdentifierChange(e.target.value)}
-                  placeholder="Phone number"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                />
-
-                {!confirmationResult ? (
-                  <button
-                    type="button"
-                    onClick={handlePhoneNumberSubmit}
-                    disabled={authLoading}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-red-600 to-yellow-500 text-white rounded-xl font-semibold hover:from-red-700 hover:to-yellow-600 transition-all"
-                  >
-                    Send OTP
-                  </button>
-                ) : (
-                  <div className="space-y-4">
-                    <input
-                      type="text"
-                      name="otp"
-                      value={formData.otp}
-                      onChange={handleChange}
-                      placeholder="Enter OTP"
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleOTPSubmit}
-                      disabled={otpLoading}
-                      className="w-full px-4 py-3 bg-gradient-to-r from-red-600 to-yellow-500 text-white rounded-xl font-semibold hover:from-red-700 hover:to-yellow-600 transition-all"
-                    >
-                      {otpLoading ? 'Verifying...' : 'Verify & Register'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleResendOTP}
-                      disabled={otpResendTimer > 0}
-                      className="w-full text-sm text-red-600 hover:text-red-700"
-                    >
-                      {otpResendTimer > 0 ? `Resend OTP in ${otpResendTimer}s` : 'Resend OTP'}
-                    </button>
-                  </div>
-                )}
-              </div>
 
               <div className="pt-4 border-t border-gray-100">
                 <p className="text-center text-sm text-gray-600">
