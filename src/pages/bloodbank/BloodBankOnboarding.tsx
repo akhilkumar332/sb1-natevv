@@ -404,30 +404,50 @@ export function BloodBankOnboarding() {
     e.preventDefault();
     if (!validateStep()) return;
 
+    const parsedDob = formData.dateOfBirth ? new Date(formData.dateOfBirth) : null;
+    if (parsedDob && Number.isNaN(parsedDob.getTime())) {
+      toast.error('Please enter a valid date of birth');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      await updateUserProfile({
+      const payload = {
         ...formData,
         bloodBankName: formData.hospitalName,
         bloodBankType: formData.hospitalType,
         hospitalName: formData.hospitalName,
         hospitalType: formData.hospitalType,
-        dateOfBirth: new Date(formData.dateOfBirth),
-        onboardingCompleted: true
-      });
+        dateOfBirth: parsedDob ?? formData.dateOfBirth,
+        onboardingCompleted: true,
+      };
+      await updateUserProfile(payload);
       if (user?.uid) {
-        await applyReferralTrackingForUser(user.uid);
-        await ensureReferralTrackingForExistingReferral({
-          ...user,
-          onboardingCompleted: true,
-          role: user.role || 'bloodbank',
-        });
+        try {
+          await applyReferralTrackingForUser(user.uid);
+        } catch (referralError) {
+          console.warn('Referral tracking failed:', referralError);
+        }
+        try {
+          await ensureReferralTrackingForExistingReferral({
+            ...user,
+            onboardingCompleted: true,
+            role: user.role || 'bloodbank',
+          });
+        } catch (referralError) {
+          console.warn('Referral sync failed:', referralError);
+        }
       }
       toast.success('BloodBank profile completed successfully!');
       navigate('/bloodbank/dashboard');
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast.error('Failed to complete onboarding. Please try again.');
+      const message = error instanceof Error ? error.message : '';
+      if (message.toLowerCase().includes('permission')) {
+        toast.error('Permission denied while saving your profile. Please sign in again.');
+      } else {
+        toast.error('Failed to complete onboarding. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

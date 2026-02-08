@@ -27,6 +27,9 @@ type ReferralStatusUpdate = {
   isEligible: boolean;
 };
 
+const stripUndefined = <T extends Record<string, any>>(payload: T): T =>
+  Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined)) as T;
+
 const buildReferralNotificationId = (
   referrerUid: string,
   referredUid: string,
@@ -149,16 +152,16 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
     }
 
     const [referralResult, userResult] = await Promise.allSettled([
-      setDoc(referralRef, {
+      setDoc(referralRef, stripUndefined({
         referrerUid,
         referredUid: newUserUid,
-        referrerBhId: referrerBhId,
+        referrerBhId,
         referrerRole,
         referredRole,
         referredAt: serverTimestamp(),
         status: 'registered',
         createdAt: serverTimestamp(),
-      }),
+      })),
       setDoc(
         userRef,
         {
@@ -296,7 +299,7 @@ export const ensureReferralTrackingForExistingReferral = async (user: any): Prom
   const referralSnap = await getDoc(referralRef);
 
   if (!referralSnap.exists()) {
-    await setDoc(referralRef, {
+    await setDoc(referralRef, stripUndefined({
       referrerUid,
       referredUid: user.uid,
       referrerBhId: user.referredByBhId,
@@ -305,7 +308,7 @@ export const ensureReferralTrackingForExistingReferral = async (user: any): Prom
       referredAt: serverTimestamp(),
       status: 'registered',
       createdAt: serverTimestamp(),
-    });
+    }));
     await sendReferralNotification(referrerUid, 'registered', user.uid, user, user.uid, referrerRole);
   }
 
