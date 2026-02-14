@@ -443,7 +443,13 @@ function NgoCampaigns() {
           </div>
         ) : (
           filteredCampaigns.map((campaign) => {
-            const progress = campaign.target > 0 ? Math.min((campaign.achieved / campaign.target) * 100, 100) : 0;
+            const registeredCount = Array.isArray(campaign.registeredDonors)
+              ? campaign.registeredDonors.length
+              : typeof campaign.registeredDonors === 'number'
+                ? campaign.registeredDonors
+                : 0;
+            const achievedValue = Math.max(campaign.achieved || 0, registeredCount);
+            const progress = campaign.target > 0 ? Math.min((achievedValue / campaign.target) * 100, 100) : 0;
             return (
               <div key={campaign.id} className="bg-white rounded-2xl shadow-xl p-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -474,7 +480,7 @@ function NgoCampaigns() {
                   <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
                     <span>Progress</span>
                     <span className="font-semibold text-gray-700">
-                      {campaign.achieved} / {campaign.target}
+                      {achievedValue} / {campaign.target}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">

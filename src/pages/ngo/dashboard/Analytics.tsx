@@ -45,7 +45,15 @@ function NgoAnalytics() {
       const nextMonth = new Date(month.getFullYear(), month.getMonth() + 1, 1);
       const value = campaigns
         .filter((campaign) => campaign.startDate >= month && campaign.startDate < nextMonth)
-        .reduce((sum, campaign) => sum + campaign.achieved, 0);
+        .reduce((sum, campaign) => {
+          const registeredCount = Array.isArray(campaign.registeredDonors)
+            ? campaign.registeredDonors.length
+            : typeof campaign.registeredDonors === 'number'
+              ? campaign.registeredDonors
+              : 0;
+          const achievedValue = Math.max(campaign.achieved || 0, registeredCount);
+          return sum + achievedValue;
+        }, 0);
       return {
         label: month.toLocaleString('default', { month: 'short' }),
         value,

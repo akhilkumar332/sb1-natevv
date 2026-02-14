@@ -20,6 +20,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  arrayUnion,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
@@ -220,26 +221,28 @@ export const registerDonorForCampaign = async (
       throw new ValidationError('Donor already registered for this campaign');
     }
 
-    const registeredDonors = [...(campaign.registeredDonors || []), donorId];
-
     await updateDoc(doc(db, 'campaigns', campaignId), {
-      registeredDonors,
+      registeredDonors: arrayUnion(donorId),
       updatedAt: getServerTimestamp(),
     });
 
-    // Create notification for donor
-    await addDoc(collection(db, 'notifications'), {
-      userId: donorId,
-      userRole: 'donor',
-      type: 'campaign_invite',
-      title: 'Campaign Registration Confirmed',
-      message: `You have successfully registered for ${campaign.title}`,
-      read: false,
-      priority: 'medium',
-      relatedId: campaignId,
-      relatedType: 'campaign',
-      createdAt: getServerTimestamp(),
-    });
+    // Create notification for donor (best-effort)
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        userId: donorId,
+        userRole: 'donor',
+        type: 'campaign_invite',
+        title: 'Campaign Registration Confirmed',
+        message: `You have successfully registered for ${campaign.title}`,
+        read: false,
+        priority: 'medium',
+        relatedId: campaignId,
+        relatedType: 'campaign',
+        createdAt: getServerTimestamp(),
+      });
+    } catch (notificationError) {
+      console.warn('Failed to create campaign notification for donor', notificationError);
+    }
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) {
       throw error;

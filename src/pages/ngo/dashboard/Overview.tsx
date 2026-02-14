@@ -100,7 +100,13 @@ function NgoOverview() {
           ) : (
             <div className="space-y-4">
               {spotlightCampaigns.map((campaign) => {
-                const progress = campaign.target > 0 ? Math.min((campaign.achieved / campaign.target) * 100, 100) : 0;
+                const registeredCount = Array.isArray(campaign.registeredDonors)
+                  ? campaign.registeredDonors.length
+                  : typeof campaign.registeredDonors === 'number'
+                    ? campaign.registeredDonors
+                    : 0;
+                const achievedValue = Math.max(campaign.achieved || 0, registeredCount);
+                const progress = campaign.target > 0 ? Math.min((achievedValue / campaign.target) * 100, 100) : 0;
                 return (
                   <div key={campaign.id} className="border border-gray-100 rounded-2xl p-4 bg-gray-50/40">
                     <div className="flex items-start justify-between gap-4">
@@ -122,7 +128,7 @@ function NgoOverview() {
                       <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
                         <span>Progress</span>
                         <span className="font-semibold text-gray-700">
-                          {campaign.achieved} / {campaign.target}
+                          {achievedValue} / {campaign.target}
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">

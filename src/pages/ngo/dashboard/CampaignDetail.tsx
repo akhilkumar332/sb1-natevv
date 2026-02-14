@@ -123,7 +123,13 @@ function NgoCampaignDetail() {
     );
   }
 
-  const progress = campaign.target > 0 ? Math.min((campaign.achieved / campaign.target) * 100, 100) : 0;
+  const registeredCount = Array.isArray(campaign.registeredDonors)
+    ? campaign.registeredDonors.length
+    : typeof campaign.registeredDonors === 'number'
+      ? campaign.registeredDonors
+      : 0;
+  const achievedValue = Math.max(campaign.achieved || 0, registeredCount);
+  const progress = campaign.target > 0 ? Math.min((achievedValue / campaign.target) * 100, 100) : 0;
   const latitude = campaign.locationDetails?.latitude;
   const longitude = campaign.locationDetails?.longitude;
   const hasCoordinates = typeof latitude === 'number' && typeof longitude === 'number';
@@ -399,7 +405,7 @@ function NgoCampaignDetail() {
           <div className="flex items-center justify-between text-sm text-gray-500">
             <span>Target</span>
             <span className="font-semibold text-gray-700">
-              {campaign.achieved} / {campaign.target} {campaign.targetType || 'units'}
+              {achievedValue} / {campaign.target} {campaign.targetType || 'units'}
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3">

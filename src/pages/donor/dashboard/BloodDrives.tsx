@@ -1,10 +1,12 @@
-import { Calendar, MapPin, MapPinned, Target } from 'lucide-react';
+import { Calendar, Check, MapPin, MapPinned, Target } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 import { useRealtimeCampaigns } from '../../../hooks/useRealtimeCampaigns';
 import { useMemo, useState } from 'react';
 import { MapContainer, Marker, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import toast from 'react-hot-toast';
+import { registerDonorForCampaign } from '../../../services/ngo.service';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -24,6 +26,7 @@ const DonorBloodDrives = () => {
   const [typeFilter, setTypeFilter] = useState<'all' | 'blood-drive' | 'awareness' | 'fundraising' | 'volunteer'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'upcoming' | 'completed' | 'cancelled' | 'draft'>('all');
   const [cityFilter, setCityFilter] = useState<'all' | 'my-city'>('all');
+  const [participatingId, setParticipatingId] = useState<string | null>(null);
 
   const getLocationLabel = (campaign: any) => {
     if (!campaign) return 'Location to be announced';
@@ -94,6 +97,39 @@ const DonorBloodDrives = () => {
         return 'bg-gray-100 text-gray-600 border-gray-200';
       default:
         return 'bg-red-50 text-red-700 border-red-200';
+    }
+  };
+
+  const isFundraisingDonate = (campaign: any) =>
+    campaign?.type === 'fundraising' && campaign?.targetType === 'funds';
+
+  const hasParticipated = (campaign: any) =>
+    Array.isArray(campaign?.registeredDonors) && user?.uid
+      ? campaign.registeredDonors.includes(user.uid)
+      : false;
+
+  const handleParticipate = async (campaign: any) => {
+    if (!user?.uid) {
+      toast.error('Please log in to participate.');
+      return;
+    }
+    if (hasParticipated(campaign)) {
+      toast.success('You already participated.');
+      return;
+    }
+    try {
+      setParticipatingId(campaign.id);
+      await registerDonorForCampaign(campaign.id, user.uid);
+      toast.success('Participation confirmed.');
+    } catch (error: any) {
+      const message = error?.message || '';
+      if (message.toLowerCase().includes('already registered')) {
+        toast.success('You already participated.');
+        return;
+      }
+      toast.error(message || 'Unable to participate. Please try again.');
+    } finally {
+      setParticipatingId(null);
     }
   };
 
@@ -210,6 +246,36 @@ const DonorBloodDrives = () => {
                             <span className="font-semibold text-gray-700">Ends:</span>
                             <span>{formatDateTime(campaign.endDate)}</span>
                           </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {isFundraisingDonate(campaign) ? (
+                            <button
+                              type="button"
+                              disabled
+                              className="rounded-full bg-red-100 px-4 py-2 text-xs font-semibold text-red-700"
+                            >
+                              Donate (Coming soon)
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleParticipate(campaign)}
+                              disabled={hasParticipated(campaign) || participatingId === campaign.id}
+                              className={`rounded-full px-4 py-2 text-xs font-semibold transition-all ${
+                                hasParticipated(campaign)
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-red-600 text-white hover:bg-red-700'
+                              } ${participatingId === campaign.id ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            >
+                              {hasParticipated(campaign) ? (
+                                <span className="inline-flex items-center gap-2">
+                                  <Check className="w-3 h-3" />
+                                  Participated
+                                </span>
+                              ) : participatingId === campaign.id ? 'Participating...' : 'Participate'}
+                            </button>
+                          )}
                         </div>
                       </div>
 
