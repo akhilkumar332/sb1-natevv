@@ -236,16 +236,24 @@ function BloodBankDonors() {
       const donorsQuery = query(donorsRef, where('role', '==', 'donor'));
       const allDonorsSnap = await getDocs(donorsQuery);
 
-      const totalDonors = allDonorsSnap.size;
-      const activeDonors = allDonorsSnap.docs.filter(doc =>
-        doc.data().isAvailable === true
-      ).length;
+      const eligibleDonors = allDonorsSnap.docs
+        .map((doc) => doc.data())
+        .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
+        .filter((data: any) => !data.status || data.status === 'active');
+
+      const totalDonors = eligibleDonors.length;
+
+      const publicSnap = await getDocs(collection(db, 'publicDonors'));
+      const activeDonors = publicSnap.docs
+        .map((doc) => doc.data())
+        .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
+        .filter((data: any) => data.isAvailable === true).length;
 
       const oneMonthAgo = new Date();
       oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
-      const newThisMonth = allDonorsSnap.docs.filter(doc => {
-        const createdAt = doc.data().createdAt?.toDate();
+      const newThisMonth = eligibleDonors.filter((data: any) => {
+        const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt ? new Date(data.createdAt) : null;
         return createdAt && createdAt >= oneMonthAgo;
       }).length;
 
