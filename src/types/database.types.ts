@@ -106,6 +106,7 @@ export interface User {
     donationType: DonationComponent;
     message?: string;
   };
+  findDonorsCompactMode?: boolean;
   notificationPreferences?: {
     email: boolean;
     sms: boolean;

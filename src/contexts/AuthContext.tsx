@@ -130,6 +130,7 @@ interface User {
     donationType: 'whole' | 'plasma' | 'platelets';
     message?: string;
   };
+  findDonorsCompactMode?: boolean;
 }
 
 const normalizeUserDate = (value?: any): Date | null => {

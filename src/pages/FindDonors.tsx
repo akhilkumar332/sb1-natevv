@@ -54,6 +54,12 @@ function FindDonors() {
   const [selectedGender, setSelectedGender] = useState<string>(urlParams.get('gender') || '');
   const [selectedDonationType, setSelectedDonationType] = useState<string>(urlParams.get('donationType') || '');
   const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [compactMode, setCompactMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('findDonorsCompact') === 'true';
+  });
+  const compactPrefRef = useRef<boolean | null>(null);
+  const compactPrefLoadedRef = useRef(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [donorError, setDonorError] = useState<string | null>(null);
   const [baseDonors, setBaseDonors] = useState<Donor[]>([]);
@@ -140,6 +146,30 @@ function FindDonors() {
   useEffect(() => {
     updateURL();
   }, [searchTerm, selectedBloodType, selectedDistance, selectedAvailability, selectedGender, selectedDonationType]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('findDonorsCompact', compactMode ? 'true' : 'false');
+  }, [compactMode]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const stored = user.findDonorsCompactMode;
+    if (typeof stored !== 'boolean') return;
+    compactPrefLoadedRef.current = true;
+    compactPrefRef.current = stored;
+    setCompactMode(stored);
+  }, [user?.uid, user?.findDonorsCompactMode]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (!compactPrefLoadedRef.current) return;
+    if (compactPrefRef.current === compactMode) return;
+    compactPrefRef.current = compactMode;
+    updateUserProfile({ findDonorsCompactMode: compactMode }).catch((error) => {
+      console.warn('Failed to sync compact mode preference', error);
+    });
+  }, [compactMode, user?.uid, updateUserProfile]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -885,6 +915,21 @@ function FindDonors() {
                 </button>
               </div>
 
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <span className="text-xs font-semibold text-gray-500">View:</span>
+                <button
+                  type="button"
+                  onClick={() => setCompactMode((prev) => !prev)}
+                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
+                    compactMode
+                      ? 'border-red-200 bg-red-50 text-red-700'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {compactMode ? 'Compact On' : 'Compact Off'}
+                </button>
+              </div>
+
               {/* Filter Options */}
               {showFilters && (
                 <div className="mt-6 pt-6 border-t border-gray-200">
@@ -1047,9 +1092,9 @@ function FindDonors() {
                 </button>
               </div>
             ) : loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className={`grid grid-cols-1 md:grid-cols-2 ${compactMode ? 'lg:grid-cols-5 gap-3' : 'lg:grid-cols-4 gap-4'}`}>
                 {[...Array(6)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-2xl p-4 animate-pulse border border-gray-100">
+                  <div key={i} className={`bg-white rounded-2xl border border-gray-100 animate-pulse ${compactMode ? 'p-3' : 'p-4'}`}>
                     <div className="h-6 bg-gray-200 rounded mb-4"></div>
                     <div className="h-4 bg-gray-200 rounded mb-2"></div>
                     <div className="h-4 bg-gray-200 rounded mb-4"></div>
@@ -1061,11 +1106,11 @@ function FindDonors() {
                 ))}
               </div>
             ) : filteredDonors.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className={`grid grid-cols-1 md:grid-cols-2 ${compactMode ? 'lg:grid-cols-5 gap-3' : 'lg:grid-cols-4 gap-4'}`}>
                 {pageDonors.map((donor) => (
                   <div
                     key={donor.id}
-                    className="group bg-white rounded-2xl p-4 shadow-md hover:shadow-lg transition-all duration-300 border border-gray-100 relative overflow-hidden"
+                    className={`group bg-white rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 border border-gray-100 relative overflow-hidden ${compactMode ? 'p-3' : 'p-4'}`}
                   >
                     {/* Background Gradient */}
                     <div className="absolute inset-0 bg-gradient-to-br from-red-50 to-pink-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -1073,10 +1118,10 @@ function FindDonors() {
                     {/* Content */}
                     <div className="relative z-10">
                       {/* Mobile list layout */}
-                      <div className="sm:hidden space-y-3">
-                        <div className="flex gap-3">
+                      <div className={`sm:hidden ${compactMode ? 'space-y-2' : 'space-y-3'}`}>
+                        <div className={`flex ${compactMode ? 'gap-2' : 'gap-3'}`}>
                           <div className="flex flex-col items-center gap-2">
-                            <div className="w-10 h-10 bg-gradient-to-r from-red-600 to-red-700 rounded-full flex items-center justify-center text-white font-bold shadow">
+                            <div className={`${compactMode ? 'w-9 h-9 text-xs' : 'w-10 h-10'} bg-gradient-to-r from-red-600 to-red-700 rounded-full flex items-center justify-center text-white font-bold shadow`}>
                               {(donor.name?.trim()?.[0] || '?')}
                             </div>
                             <span className="px-2.5 py-1 bg-gradient-to-r from-red-600 to-red-700 text-white text-[10px] font-bold rounded-full shadow">
@@ -1092,10 +1137,10 @@ function FindDonors() {
                               </span>
                             )}
                           </div>
-                          <div className="flex-1 space-y-2">
+                          <div className={`flex-1 ${compactMode ? 'space-y-1.5' : 'space-y-2'}`}>
                             <div className="flex items-start justify-between gap-2">
                               <div>
-                                <h3 className="font-bold text-gray-900 text-base">{donor.name}</h3>
+                                <h3 className={`font-bold text-gray-900 ${compactMode ? 'text-sm' : 'text-base'}`}>{donor.name}</h3>
                                 <p className="text-xs text-gray-500">{donor.gender}</p>
                               </div>
                               <button
@@ -1112,10 +1157,10 @@ function FindDonors() {
                                 <CheckCircle className={`w-4 h-4 ${trayIds.has(donor.id) ? 'text-red-600' : 'text-gray-400'}`} />
                               </button>
                             </div>
-                            <div className="space-y-2">
+                            <div className={compactMode ? 'space-y-1.5' : 'space-y-2'}>
                               <div className="flex items-start text-gray-600">
                                 <MapPin className="w-4 h-4 mr-2 text-red-600 mt-0.5" />
-                                <div className="text-xs leading-5">
+                                <div className={`text-xs ${compactMode ? 'leading-4' : 'leading-5'}`}>
                                   <p>{donor.location}</p>
                                   <p className="text-[10px] text-gray-500">
                                     {typeof donor.distance === 'number'
@@ -1134,7 +1179,9 @@ function FindDonors() {
                                 {donor.donationTypes.map((type) => (
                                   <span
                                     key={`mobile-${donor.id}-${type}`}
-                                    className="rounded-full bg-red-50 px-2.5 py-0.5 text-[10px] font-semibold text-red-600"
+                                    className={`rounded-full bg-red-50 text-[10px] font-semibold text-red-600 ${
+                                      compactMode ? 'px-2 py-0.5' : 'px-2.5 py-0.5'
+                                    }`}
                                   >
                                     {donationTypes.find((item) => item.value === type)?.label || type}
                                   </span>
@@ -1146,13 +1193,13 @@ function FindDonors() {
                         <button
                           onClick={() => toggleTray(donor)}
                           disabled={donor.availability === 'Unavailable'}
-                          className={`w-full flex items-center justify-center py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                          className={`w-full flex items-center justify-center rounded-xl text-sm font-semibold transition-all ${
                             donor.availability === 'Available'
                               ? trayIds.has(donor.id)
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
                                 : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:shadow-lg transform hover:scale-[1.02]'
                               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          }`}
+                          } ${compactMode ? 'py-2' : 'py-2.5'}`}
                         >
                           {trayIds.has(donor.id) ? 'In Tray' : 'Add to Tray'}
                         </button>
@@ -1161,13 +1208,13 @@ function FindDonors() {
                       {/* Desktop card layout */}
                       <div className="hidden sm:block">
                       {/* Header */}
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gradient-to-r from-red-600 to-red-700 rounded-full flex items-center justify-center text-white font-bold shadow">
+                      <div className={`flex items-start justify-between ${compactMode ? 'mb-2' : 'mb-3'}`}>
+                        <div className={`flex items-center ${compactMode ? 'space-x-2' : 'space-x-3'}`}>
+                          <div className={`${compactMode ? 'w-9 h-9 text-xs' : 'w-10 h-10'} bg-gradient-to-r from-red-600 to-red-700 rounded-full flex items-center justify-center text-white font-bold shadow`}>
                             {(donor.name?.trim()?.[0] || '?')}
                           </div>
                           <div>
-                            <h3 className="font-bold text-gray-900 text-base">{donor.name}</h3>
+                            <h3 className={`font-bold text-gray-900 ${compactMode ? 'text-sm' : 'text-base'}`}>{donor.name}</h3>
                             <p className="text-xs text-gray-500">{donor.gender}</p>
                           </div>
                         </div>
@@ -1185,15 +1232,15 @@ function FindDonors() {
                           >
                             <CheckCircle className={`w-4 h-4 ${trayIds.has(donor.id) ? 'text-red-600' : 'text-gray-400'}`} />
                           </button>
-                          <span className="px-2.5 py-1 bg-gradient-to-r from-red-600 to-red-700 text-white text-xs font-bold rounded-full shadow">
+                          <span className={`bg-gradient-to-r from-red-600 to-red-700 text-white text-xs font-bold rounded-full shadow ${compactMode ? 'px-2 py-0.5' : 'px-2.5 py-1'}`}>
                             {donor.bloodType}
                           </span>
                           {donor.availability === 'Available' ? (
-                            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-semibold rounded-full">
+                            <span className={`bg-green-100 text-green-700 text-[10px] font-semibold rounded-full ${compactMode ? 'px-1.5 py-0.5' : 'px-2 py-0.5'}`}>
                               Available
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-semibold rounded-full">
+                            <span className={`bg-gray-100 text-gray-600 text-[10px] font-semibold rounded-full ${compactMode ? 'px-1.5 py-0.5' : 'px-2 py-0.5'}`}>
                               Unavailable
                             </span>
                           )}
@@ -1201,10 +1248,10 @@ function FindDonors() {
                       </div>
 
                       {/* Details */}
-                      <div className="space-y-2 mb-3">
+                      <div className={`${compactMode ? 'space-y-1.5 mb-2' : 'space-y-2 mb-3'}`}>
                         <div className="flex items-start text-gray-600">
                           <MapPin className="w-4 h-4 mr-2 text-red-600 mt-0.5" />
-                          <div className="text-xs leading-5">
+                          <div className={`text-xs ${compactMode ? 'leading-4' : 'leading-5'}`}>
                             <p>{donor.location}</p>
                             <p className="text-[10px] text-gray-500">
                               {typeof donor.distance === 'number'
@@ -1223,7 +1270,9 @@ function FindDonors() {
                           {donor.donationTypes.map((type) => (
                             <span
                               key={`${donor.id}-${type}`}
-                              className="rounded-full bg-red-50 px-2.5 py-0.5 text-[10px] font-semibold text-red-600"
+                              className={`rounded-full bg-red-50 text-[10px] font-semibold text-red-600 ${
+                                compactMode ? 'px-2 py-0.5' : 'px-2.5 py-0.5'
+                              }`}
                             >
                               {donationTypes.find((item) => item.value === type)?.label || type}
                             </span>
@@ -1236,13 +1285,13 @@ function FindDonors() {
                         <button
                           onClick={() => toggleTray(donor)}
                           disabled={donor.availability === 'Unavailable'}
-                          className={`flex-1 flex items-center justify-center py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                          className={`flex-1 flex items-center justify-center rounded-xl text-sm font-semibold transition-all ${
                             donor.availability === 'Available'
                               ? trayIds.has(donor.id)
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
                                 : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:shadow-lg transform hover:scale-105'
                               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          }`}
+                          } ${compactMode ? 'py-2' : 'py-2.5'}`}
                         >
                           {trayIds.has(donor.id) ? 'In Tray' : 'Add to Tray'}
                         </button>
