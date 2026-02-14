@@ -273,9 +273,14 @@ const DonorRequests = () => {
                             Requested {formatTime(request.requestedAt)}
                           </p>
                         </div>
-                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white text-emerald-700 border border-emerald-200 w-fit">
-                          Accepted
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white text-emerald-700 border border-emerald-200 w-fit">
+                            Accepted
+                          </span>
+                          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                            Notification sent
+                          </span>
+                        </div>
                       </div>
                       {renderContactCapsule({
                         label: request.requesterName || 'Requester',
@@ -534,6 +539,11 @@ const DonorRequests = () => {
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(request.status)}`}>
                         {(request.status || 'pending').charAt(0).toUpperCase() + (request.status || 'pending').slice(1)}
                       </span>
+                      {request.status === 'accepted' && (
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                          Notification sent
+                        </span>
+                      )}
                       <span className="text-xs text-gray-500">
                         {formatDate(request.requestedAt)} • {formatTime(request.requestedAt)}
                       </span>

@@ -962,15 +962,16 @@ function DonorDashboard() {
     if (donorRequestActionId) {
       return;
     }
+    setDonorRequestActionId(requestId);
+    const requestRef = doc(db, 'donorRequests', requestId);
+    let requestData: any;
     try {
-      setDonorRequestActionId(requestId);
-      const requestRef = doc(db, 'donorRequests', requestId);
       const requestSnap = await getDoc(requestRef);
       if (!requestSnap.exists()) {
         toast.error('Request not found.');
         return;
       }
-      const requestData = requestSnap.data() as any;
+      requestData = requestSnap.data() as any;
       if (requestData.targetDonorUid !== user.uid) {
         toast.error('You are not allowed to update this request.');
         return;
@@ -992,40 +993,49 @@ function DonorDashboard() {
         }
       }
       await updateDoc(requestRef, updatePayload);
-
-      await addDoc(collection(db, 'notifications'), {
-        userId: requestData.requesterUid,
-        userRole: 'donor',
-        type: 'donor_request',
-        title: decision === 'accepted' ? 'Donor request accepted' : 'Donor request declined',
-        message: `${requestData.targetDonorName || 'A donor'} has ${decision} your donor request.`,
-        read: false,
-        priority: 'high',
-        relatedId: requestId,
-        relatedType: 'donor_request',
-        createdAt: serverTimestamp(),
-        createdBy: user.uid,
-      });
-
-      await addDoc(collection(db, 'notifications'), {
-        userId: user.uid,
-        userRole: 'donor',
-        type: 'donor_request',
-        title: decision === 'accepted' ? 'You accepted a donor request' : 'You declined a donor request',
-        message: `You ${decision} a request from ${requestData.requesterName || 'a donor'}.`,
-        read: false,
-        priority: 'low',
-        relatedId: requestId,
-        relatedType: 'donor_request',
-        createdAt: serverTimestamp(),
-        createdBy: user.uid,
-      });
     } catch (error) {
       console.error('Failed to update donor request:', error);
       toast.error('Unable to update request. Please try again.');
+      return;
     } finally {
       setDonorRequestActionId(null);
     }
+
+    const requesterNotification = addDoc(collection(db, 'notifications'), {
+      userId: requestData.requesterUid,
+      userRole: 'donor',
+      type: 'donor_request',
+      title: decision === 'accepted' ? 'Donor request accepted' : 'Donor request declined',
+      message: `${requestData.targetDonorName || 'A donor'} has ${decision} your donor request.`,
+      read: false,
+      priority: 'high',
+      relatedId: requestId,
+      relatedType: 'donor_request',
+      createdAt: serverTimestamp(),
+      createdBy: user.uid,
+    });
+
+    const selfNotification = addDoc(collection(db, 'notifications'), {
+      userId: user.uid,
+      userRole: 'donor',
+      type: 'donor_request',
+      title: decision === 'accepted' ? 'You accepted a donor request' : 'You declined a donor request',
+      message: `You ${decision} a request from ${requestData.requesterName || 'a donor'}.`,
+      read: false,
+      priority: 'low',
+      relatedId: requestId,
+      relatedType: 'donor_request',
+      createdAt: serverTimestamp(),
+      createdBy: user.uid,
+    });
+
+    const results = await Promise.allSettled([requesterNotification, selfNotification]);
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        const label = index === 0 ? 'requester' : 'self';
+        console.warn(`Failed to send ${label} notification for donor request`, result.reason);
+      }
+    });
   };
 
   const handleDeleteDonorRequest = async (requestId: string) => {
