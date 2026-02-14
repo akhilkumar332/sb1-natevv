@@ -24,7 +24,7 @@ import { useBloodRequest } from '../../hooks/useBloodRequest';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import BhIdBanner from '../../components/BhIdBanner';
-import { addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, runTransaction, serverTimestamp, Timestamp, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, runTransaction, serverTimestamp, Timestamp, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
 import { useReferrals } from '../../hooks/useReferrals';
