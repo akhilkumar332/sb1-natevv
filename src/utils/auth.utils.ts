@@ -398,8 +398,12 @@ export const needsProfileCompletion = (user: User | null): boolean => {
     return !hasBasicInfo || !user.bloodType || !user.gender || !user.dateOfBirth;
   }
 
-  if (user.role === 'bloodbank' || user.role === 'hospital') {
-    return !hasBasicInfo || !(user.bloodBankName || user.hospitalName) || !user.contactPerson;
+  if (user.role === 'bloodbank') {
+    return !hasBasicInfo || !user.bloodBankName || !user.contactPerson;
+  }
+
+  if (user.role === 'hospital') {
+    return !hasBasicInfo || !user.hospitalName || !user.contactPerson;
   }
 
   if (user.role === 'ngo') {

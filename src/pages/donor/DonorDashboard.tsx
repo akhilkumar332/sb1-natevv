@@ -24,7 +24,7 @@ import { useBloodRequest } from '../../hooks/useBloodRequest';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import BhIdBanner from '../../components/BhIdBanner';
-import { addDoc, collection, doc, getDoc, setDoc, updateDoc, serverTimestamp, Timestamp, query, where, onSnapshot } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, runTransaction, serverTimestamp, Timestamp, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
 import { useReferrals } from '../../hooks/useReferrals';
@@ -32,8 +32,14 @@ import {
   clearPendingDonorRequestDoc,
   decodePendingDonorRequest,
   loadPendingDonorRequestDoc,
+  loadPendingDonorRequestFromSession,
   savePendingDonorRequestDoc,
-  submitDonorRequest,
+  clearPendingDonorRequestFromSession,
+  submitDonorRequestBatch,
+  type DonationComponent,
+  type PendingDonorRequest,
+  type PendingDonorRequestBatch,
+  type PendingDonorRequestPayload,
 } from '../../services/donorRequest.service';
 import type { ConfirmationResult } from 'firebase/auth';
 
@@ -99,9 +105,12 @@ function DonorDashboard() {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [incomingDonorRequests, setIncomingDonorRequests] = useState<any[]>([]);
   const [outgoingDonorRequests, setOutgoingDonorRequests] = useState<any[]>([]);
+  const [donorRequestBatches, setDonorRequestBatches] = useState<any[]>([]);
   const [incomingRequestsLoading, setIncomingRequestsLoading] = useState(true);
   const [outgoingRequestsLoading, setOutgoingRequestsLoading] = useState(true);
+  const [donorRequestBatchesLoading, setDonorRequestBatchesLoading] = useState(true);
   const [donorRequestActionId, setDonorRequestActionId] = useState<string | null>(null);
+  const [donorRequestDeleteId, setDonorRequestDeleteId] = useState<string | null>(null);
   const [editingDonationId, setEditingDonationId] = useState<string | null>(null);
   const [editingDonationData, setEditingDonationData] = useState({
     location: '',
@@ -582,6 +591,8 @@ function DonorDashboard() {
       setOutgoingDonorRequests([]);
       setIncomingRequestsLoading(false);
       setOutgoingRequestsLoading(false);
+      setDonorRequestBatches([]);
+      setDonorRequestBatchesLoading(false);
       return;
     }
 
@@ -591,6 +602,10 @@ function DonorDashboard() {
     );
     const outgoingQuery = query(
       collection(db, 'donorRequests'),
+      where('requesterUid', '==', user.uid)
+    );
+    const batchesQuery = query(
+      collection(db, 'donorRequestBatches'),
       where('requesterUid', '==', user.uid)
     );
 
@@ -636,9 +651,33 @@ function DonorDashboard() {
       setOutgoingRequestsLoading(false);
     });
 
+    setDonorRequestBatchesLoading(true);
+    const unsubscribeBatches = onSnapshot(batchesQuery, (snapshot) => {
+      const items = snapshot.docs.map((docSnapshot) => {
+        const data = docSnapshot.data();
+        return {
+          id: docSnapshot.id,
+          ...data,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
+        };
+      })
+        .sort((a: any, b: any) => {
+          const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : 0;
+          const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : 0;
+          return bTime - aTime;
+        })
+        .slice(0, 10);
+      setDonorRequestBatches(items);
+      setDonorRequestBatchesLoading(false);
+    }, (error) => {
+      console.warn('Failed to load donor request batches:', error);
+      setDonorRequestBatchesLoading(false);
+    });
+
     return () => {
       unsubscribeIncoming();
       unsubscribeOutgoing();
+      unsubscribeBatches();
     };
   }, [user?.uid]);
 
@@ -646,16 +685,25 @@ function DonorDashboard() {
     if (!user?.uid || user.role !== 'donor' || !user.onboardingCompleted) return;
     const params = new URLSearchParams(location.search);
     const encoded = params.get('pendingRequest');
+    const pendingKey = params.get('pendingRequestKey');
+    const pendingFromSession = pendingKey ? loadPendingDonorRequestFromSession(pendingKey) : null;
     const pendingFromUrl = encoded ? decodePendingDonorRequest(encoded) : null;
-    const pendingKeyFromUrl = pendingFromUrl
-      ? `${pendingFromUrl.targetDonorId}:${pendingFromUrl.createdAt}`
+    const pendingFromSearch = pendingFromSession || pendingFromUrl;
+    const pendingKeyFromUrl = pendingFromSearch
+      ? Array.isArray((pendingFromSearch as PendingDonorRequestBatch).targets)
+        ? `batch:${pendingFromSearch.createdAt}`
+        : `single:${(pendingFromSearch as PendingDonorRequest).targetDonorId}:${pendingFromSearch.createdAt}`
       : null;
 
     const submitPending = async () => {
-      if (pendingFromUrl) {
-        const targetReturnTo = pendingFromUrl.returnTo || '/donor/dashboard/requests';
-        await savePendingDonorRequestDoc(user.uid, pendingFromUrl);
+      if (pendingFromSearch) {
+        const targetReturnTo = pendingFromSearch.returnTo || '/donor/dashboard/requests';
+        await savePendingDonorRequestDoc(user.uid, pendingFromSearch as PendingDonorRequestPayload);
+        if (pendingKey) {
+          clearPendingDonorRequestFromSession(pendingKey);
+        }
         params.delete('pendingRequest');
+        params.delete('pendingRequestKey');
         const nextSearch = params.toString();
         const fallbackPath = nextSearch ? `${location.pathname}?${nextSearch}` : location.pathname;
         navigate(nextSearch ? `${targetReturnTo}?${nextSearch}` : targetReturnTo || fallbackPath, { replace: true });
@@ -663,8 +711,30 @@ function DonorDashboard() {
 
       const pending = await loadPendingDonorRequestDoc(user.uid);
       if (!pending) return;
-      if (pending.targetDonorId === user.uid) {
-        const selfKey = `self:${pending.targetDonorId}:${pending.createdAt}`;
+
+      const payload = Array.isArray((pending as PendingDonorRequestBatch).targets)
+        ? (pending as PendingDonorRequestBatch)
+        : ({
+          targets: [{
+            id: (pending as PendingDonorRequest).targetDonorId,
+            bhId: (pending as PendingDonorRequest).targetDonorBhId,
+            name: (pending as PendingDonorRequest).targetDonorName,
+            bloodType: (pending as PendingDonorRequest).targetDonorBloodType,
+            location: (pending as PendingDonorRequest).targetLocation,
+          }],
+          donationType: ((pending as PendingDonorRequest).donationType || 'whole') as DonationComponent,
+          createdAt: (pending as PendingDonorRequest).createdAt,
+          returnTo: (pending as PendingDonorRequest).returnTo,
+        } as PendingDonorRequestBatch);
+
+      const pendingBatchKey = `batch:${payload.createdAt}:${payload.targets.length}`;
+      if (pendingRequestProcessedRef.current === pendingBatchKey || pendingRequestProcessedRef.current === pendingKeyFromUrl) {
+        return;
+      }
+
+      const filteredTargets = payload.targets.filter((target) => target.id !== user.uid);
+      if (filteredTargets.length === 0) {
+        const selfKey = `self:${payload.createdAt}`;
         if (pendingRequestProcessedRef.current !== selfKey) {
           pendingRequestProcessedRef.current = selfKey;
           toast.error('You cannot request yourself.', { id: 'self-request' });
@@ -672,12 +742,12 @@ function DonorDashboard() {
         await clearPendingDonorRequestDoc(user.uid);
         return;
       }
-      const pendingKey = `${pending.targetDonorId}:${pending.createdAt}`;
-      if (pendingRequestProcessedRef.current === pendingKey || pendingRequestProcessedRef.current === pendingKeyFromUrl) {
-        return;
-      }
-      pendingRequestProcessedRef.current = pendingKey;
-      await submitDonorRequest(user, pending);
+
+      pendingRequestProcessedRef.current = pendingBatchKey;
+      await submitDonorRequestBatch(user, {
+        ...payload,
+        targets: filteredTargets,
+      });
       await clearPendingDonorRequestDoc(user.uid);
       toast.success('Your donor request has been submitted.');
     };
@@ -948,6 +1018,57 @@ function DonorDashboard() {
       toast.error('Unable to update request. Please try again.');
     } finally {
       setDonorRequestActionId(null);
+    }
+  };
+
+  const handleDeleteDonorRequest = async (requestId: string) => {
+    if (!user?.uid) {
+      toast.error('Please log in to delete.');
+      return;
+    }
+    if (donorRequestActionId || donorRequestDeleteId) {
+      return;
+    }
+    try {
+      setDonorRequestDeleteId(requestId);
+      const requestRef = doc(db, 'donorRequests', requestId);
+      const requestSnap = await getDoc(requestRef);
+      if (!requestSnap.exists()) {
+        toast.error('Request not found.');
+        return;
+      }
+      const requestData = requestSnap.data() as any;
+      const isParticipant = requestData.requesterUid === user.uid || requestData.targetDonorUid === user.uid;
+      if (!isParticipant) {
+        toast.error('You are not allowed to delete this request.');
+        return;
+      }
+      const batchId = requestData.requestBatchId as string | undefined;
+      if (batchId) {
+        const batchRef = doc(db, 'donorRequestBatches', batchId);
+        await runTransaction(db, async (transaction) => {
+          const batchSnap = await transaction.get(batchRef);
+          if (!batchSnap.exists()) return;
+          const batchData = batchSnap.data() as any;
+          const sentCount = typeof batchData.sentCount === 'number' ? batchData.sentCount : 0;
+          const deletedCount = typeof batchData.deletedCount === 'number' ? batchData.deletedCount : 0;
+          const nextSent = Math.max(0, sentCount - 1);
+          const nextStatus = nextSent === 0 ? 'cancelled' : batchData.status;
+          transaction.update(batchRef, {
+            sentCount: nextSent,
+            deletedCount: deletedCount + 1,
+            status: nextStatus,
+            updatedAt: serverTimestamp(),
+          });
+        });
+      }
+      await deleteDoc(requestRef);
+      toast.success('Request deleted.');
+    } catch (error) {
+      console.error('Failed to delete donor request:', error);
+      toast.error('Unable to delete request. Please try again.');
+    } finally {
+      setDonorRequestDeleteId(null);
     }
   };
 
@@ -1869,9 +1990,12 @@ function DonorDashboard() {
     emergencyRequests,
     incomingDonorRequests,
     outgoingDonorRequests,
+    donorRequestBatches,
     incomingRequestsLoading,
     outgoingRequestsLoading,
+    donorRequestBatchesLoading,
     donorRequestActionId,
+    donorRequestDeleteId,
     bloodCamps,
     stats,
     badges: computedBadges,
@@ -1955,6 +2079,7 @@ function DonorDashboard() {
     handleViewAllRequests,
     handleRespondToRequest,
     handleDonorRequestDecision,
+    handleDeleteDonorRequest,
     handleViewAllBadges,
     handleViewAllCamps,
     handleBookDonation,

@@ -102,6 +102,10 @@ export interface User {
     showBhId: boolean;
     showQr: boolean;
   };
+  donorRequestTemplate?: {
+    donationType: DonationComponent;
+    message?: string;
+  };
   notificationPreferences?: {
     email: boolean;
     sms: boolean;
@@ -520,6 +524,30 @@ export interface DonorRequest {
     latitude?: number;
     longitude?: number;
   };
+}
+
+// ========================================================================
+// COLLECTION: donorRequestBatches
+// ========================================================================
+
+export interface DonorRequestBatch {
+  id?: string;
+  requesterUid: string;
+  requesterBhId?: string;
+  requesterName?: string;
+  requesterPhone?: string;
+  requesterBloodType?: BloodType;
+  donationType: DonationComponent;
+  message?: string;
+  targetCount: number;
+  sentCount: number;
+  skippedCount: number;
+  deletedCount?: number;
+  status: 'sending' | 'sent' | 'skipped' | 'failed' | 'cancelled';
+  targetDonorIds: string[];
+  skippedTargetIds?: string[];
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
 // ============================================================================

@@ -126,6 +126,10 @@ interface User {
   availableUntil?: Date | null;
   referredByUid?: string;
   referredByBhId?: string;
+  donorRequestTemplate?: {
+    donationType: 'whole' | 'plasma' | 'platelets';
+    message?: string;
+  };
 }
 
 const normalizeUserDate = (value?: any): Date | null => {

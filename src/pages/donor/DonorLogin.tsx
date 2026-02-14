@@ -39,7 +39,8 @@ export function DonorLogin() {
 
     hasNavigated.current = true;
     const pendingSearch = location.search || '';
-    const hasPendingRequest = new URLSearchParams(location.search).has('pendingRequest');
+    const params = new URLSearchParams(location.search);
+    const hasPendingRequest = params.has('pendingRequest') || params.has('pendingRequestKey');
     if (!user.onboardingCompleted) {
       navigate(`/donor/onboarding${pendingSearch}`);
     } else if (hasPendingRequest) {

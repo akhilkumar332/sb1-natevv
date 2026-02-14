@@ -176,7 +176,8 @@ export const useLogin = () => {
 
         // Navigate based on onboarding status - if not explicitly true, go to onboarding
         const pendingSearch = location.search || '';
-        const hasPendingRequest = new URLSearchParams(location.search).has('pendingRequest');
+        const pendingParams = new URLSearchParams(location.search);
+        const hasPendingRequest = pendingParams.has('pendingRequest') || pendingParams.has('pendingRequestKey');
         if (result.user.onboardingCompleted === true) {
           console.log('Navigating to dashboard');
           navigate(`/donor/${hasPendingRequest ? 'dashboard/requests' : 'dashboard'}${pendingSearch}`);

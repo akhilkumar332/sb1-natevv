@@ -379,7 +379,13 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isDonor() && (
         request.resource.data.requesterUid == request.auth.uid &&
         request.resource.data.targetDonorUid is string &&
-        request.resource.data.status == 'pending'
+        request.resource.data.targetDonorUid != request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.donationType in ['whole', 'plasma', 'platelets'] &&
+        (
+          request.resource.data.message == null ||
+          (request.resource.data.message is string && request.resource.data.message.size() <= 280)
+        )
       );
 
       // Requester can cancel; target donor can accept/reject
@@ -393,8 +399,12 @@ service cloud.firestore {
         isAdmin()
       );
 
-      // Only admin can delete
-      allow delete: if isAdmin();
+      // Requester or target donor can delete; admin can delete
+      allow delete: if isAuthenticated() && (
+        resource.data.requesterUid == request.auth.uid ||
+        resource.data.targetDonorUid == request.auth.uid ||
+        isAdmin()
+      );
     }
 
     // ========================================================================
@@ -403,6 +413,47 @@ service cloud.firestore {
 
     match /pendingDonorRequests/{userId} {
       allow read, write: if isAuthenticated() && isOwner(userId);
+    }
+
+    // ========================================================================
+    // COLLECTION: donorRequestBatches
+    // ========================================================================
+
+    match /donorRequestBatches/{batchId} {
+      allow read: if isAuthenticated() && (
+        resource.data.requesterUid == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow create: if isAuthenticated() && isDonor() && (
+        request.resource.data.requesterUid == request.auth.uid &&
+        request.resource.data.donationType in ['whole', 'plasma', 'platelets'] &&
+        request.resource.data.targetDonorIds is list &&
+        request.resource.data.targetDonorIds.size() > 0 &&
+        request.resource.data.targetDonorIds.size() <= 200 &&
+        request.resource.data.targetCount == request.resource.data.targetDonorIds.size() &&
+        request.resource.data.sentCount == 0 &&
+        request.resource.data.deletedCount == 0 &&
+        request.resource.data.status in ['sending', 'skipped'] &&
+        (
+          request.resource.data.message == null ||
+          (request.resource.data.message is string && request.resource.data.message.size() <= 280)
+        )
+      );
+
+      allow update: if isAuthenticated() && (
+        (resource.data.requesterUid == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['sentCount', 'skippedCount', 'deletedCount', 'status', 'updatedAt', 'skippedTargetIds']) &&
+          request.resource.data.status in ['sent', 'skipped', 'failed', 'cancelled']) ||
+        (request.auth.uid in resource.data.targetDonorIds &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['sentCount', 'deletedCount', 'status', 'updatedAt']) &&
+          request.resource.data.status in ['sent', 'skipped', 'failed', 'cancelled']) ||
+        isAdmin()
+      );
+
+      allow delete: if isAdmin();
     }
 
     // ========================================================================
