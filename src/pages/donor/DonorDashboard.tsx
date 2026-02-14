@@ -28,6 +28,8 @@ import { addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, runTrans
 import { auth, db } from '../../firebase';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
 import { useReferrals } from '../../hooks/useReferrals';
+import { NotificationCenter } from '../../components/shared/NotificationCenter';
+import { useUnreadNotificationCount } from '../../hooks/useRealtimeNotifications';
 import {
   clearPendingDonorRequestDoc,
   decodePendingDonorRequest,
@@ -71,6 +73,7 @@ function DonorDashboard() {
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const unreadNotificationCount = useUnreadNotificationCount(user?.uid || '');
 
   // State for modals and UI
   const [showNotifications, setShowNotifications] = useState(false);
@@ -1011,6 +1014,7 @@ function DonorDashboard() {
       priority: 'high',
       relatedId: requestId,
       relatedType: 'donor_request',
+      actionUrl: '/donor/dashboard/requests',
       createdAt: serverTimestamp(),
       createdBy: user.uid,
     });
@@ -1025,6 +1029,7 @@ function DonorDashboard() {
       priority: 'low',
       relatedId: requestId,
       relatedType: 'donor_request',
+      actionUrl: '/donor/dashboard/requests',
       createdAt: serverTimestamp(),
       createdBy: user.uid,
     });
@@ -2217,9 +2222,9 @@ function DonorDashboard() {
                 className="p-3 bg-white/20 hover:bg-white/30 rounded-full transition-all duration-300 relative"
               >
                 <Bell className="w-6 h-6" />
-                {emergencyRequests.length > 0 && (
+                {unreadNotificationCount > 0 && (
                   <span className="absolute top-0 right-0 w-5 h-5 bg-red-200 rounded-full text-xs flex items-center justify-center text-red-800 font-bold">
-                    {emergencyRequests.length}
+                    {unreadNotificationCount}
                   </span>
                 )}
               </button>
@@ -2260,14 +2265,29 @@ function DonorDashboard() {
             </div>
           </aside>
           <div className="lg:hidden mb-4 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm"
-            >
-              <Menu className="h-4 w-4 text-red-600" />
-              Menu
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm"
+              >
+                <Menu className="h-4 w-4 text-red-600" />
+                Menu
+              </button>
+              <button
+                type="button"
+                onClick={handleNotificationClick}
+                className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 bg-white text-red-600 shadow-sm"
+                aria-label="Open notifications"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadNotificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">
+                    {unreadNotificationCount}
+                  </span>
+                )}
+              </button>
+            </div>
             <span className="text-xs uppercase tracking-[0.2em] text-red-600">Dashboard</span>
           </div>
           <main className="min-w-0 flex-1">
@@ -2477,49 +2497,7 @@ function DonorDashboard() {
         </div>
       )}
 
-      {/* Notifications Panel */}
-      {showNotifications && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-                <Bell className="w-6 h-6 mr-2 text-red-600" />
-                Notifications
-              </h2>
-              <button
-                onClick={() => setShowNotifications(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6">
-              {emergencyRequests.length > 0 ? (
-                <div className="space-y-3">
-                  {emergencyRequests.slice(0, 5).map((request) => (
-                    <div key={request.id} className="p-4 bg-red-50 border-l-4 border-red-500 rounded-lg">
-                      <p className="font-semibold text-gray-800 text-sm">
-                        Emergency: {request.bloodType} needed
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        {request.hospitalName} - {request.units} units
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {formatTime(request.requestedAt)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <CheckCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-                  <p className="text-gray-600">No new notifications</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <NotificationCenter isOpen={showNotifications} onClose={() => setShowNotifications(false)} />
 
       {/* Share Options Drawer */}
       {shareOptionsOpen && (

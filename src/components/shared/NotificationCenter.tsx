@@ -5,11 +5,11 @@
  */
 
 import React, { useState } from 'react';
-import { Bell, Check, Trash2, X, ExternalLink } from 'lucide-react';
+import { Bell, Check, X, ExternalLink } from 'lucide-react';
 import { useRealtimeNotifications } from '../../hooks/useRealtimeNotifications';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatRelativeTime } from '../../utils/dataTransform';
-import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 interface NotificationCenterProps {
@@ -25,7 +25,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   onClose,
 }) => {
   const { user } = useAuth();
-  const { notifications, unreadCount, loading } = useRealtimeNotifications({
+  const { notifications, unreadCount, loading, error } = useRealtimeNotifications({
     userId: user?.uid || '',
     limitCount: 20,
   });
@@ -67,18 +67,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         return Promise.resolve();
       })
     );
-  };
-
-  // Delete notification
-  const handleDelete = async (notificationId: string) => {
-    if (!user) return;
-
-    try {
-      const notifRef = doc(db, 'notifications', notificationId);
-      await deleteDoc(notifRef);
-    } catch (error) {
-      console.error('Error deleting notification:', error);
-    }
   };
 
   // Get notification icon/color based on type
@@ -153,7 +141,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
         {/* Notifications List */}
         <div className="flex-1 overflow-y-auto">
-          {loading && notifications.length === 0 ? (
+          {error ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="text-sm text-red-600 text-center px-4">
+                {error}
+              </div>
+            </div>
+          ) : loading && notifications.length === 0 ? (
             <div className="flex items-center justify-center h-32">
               <div className="text-gray-500">Loading notifications...</div>
             </div>
@@ -163,7 +157,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
               <p>No notifications yet</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div className="space-y-2 px-4 pt-3 pb-4">
               {notifications.map((notification) => {
                 const style = getNotificationStyle(
                   notification.type,
@@ -173,13 +167,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                 return (
                   <div
                     key={notification.id}
-                    className={`p-4 hover:bg-gray-50 transition-colors ${
-                      !notification.read ? 'bg-blue-50' : ''
+                    className={`rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md ${
+                      !notification.read ? 'ring-1 ring-blue-100 bg-blue-50/40' : ''
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       {/* Icon */}
-                      <div className={`p-2 rounded ${style.bg}`}>
+                      <div className={`p-2 rounded-xl ${style.bg}`}>
                         <Bell className={`w-4 h-4 ${style.text}`} />
                       </div>
 
@@ -191,14 +185,31 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                         <p className="text-sm text-gray-600 mb-2">
                           {notification.message}
                         </p>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <span>
-                            {formatRelativeTime(
-                              notification.createdAt instanceof Date
-                                ? notification.createdAt
-                                : notification.createdAt.toDate()
-                            )}
-                          </span>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                          {(() => {
+                            const createdAtDate = notification.createdAt instanceof Date
+                              ? notification.createdAt
+                              : notification.createdAt?.toDate?.();
+                            const absoluteLabel = createdAtDate
+                              ? createdAtDate.toLocaleString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                })
+                              : 'Unknown time';
+                            const relativeLabel = createdAtDate
+                              ? formatRelativeTime(createdAtDate)
+                              : 'Unknown time';
+                            return (
+                              <>
+                                <span>{absoluteLabel}</span>
+                                <span className="text-gray-300">•</span>
+                                <span>{relativeLabel}</span>
+                              </>
+                            );
+                          })()}
                           {notification.actionUrl && (
                             <a
                               href={notification.actionUrl}
@@ -223,13 +234,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                             <Check className="w-4 h-4" />
                           </button>
                         )}
-                        <button
-                          onClick={() => notification.id && handleDelete(notification.id)}
-                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </div>
                     </div>
                   </div>
