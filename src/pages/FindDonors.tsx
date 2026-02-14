@@ -1072,6 +1072,94 @@ function FindDonors() {
 
                     {/* Content */}
                     <div className="relative z-10">
+                      {/* Mobile list layout */}
+                      <div className="sm:hidden space-y-3">
+                        <div className="flex gap-3">
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="w-10 h-10 bg-gradient-to-r from-red-600 to-red-700 rounded-full flex items-center justify-center text-white font-bold shadow">
+                              {(donor.name?.trim()?.[0] || '?')}
+                            </div>
+                            <span className="px-2.5 py-1 bg-gradient-to-r from-red-600 to-red-700 text-white text-[10px] font-bold rounded-full shadow">
+                              {donor.bloodType}
+                            </span>
+                            {donor.availability === 'Available' ? (
+                              <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-semibold rounded-full">
+                                Available
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-semibold rounded-full">
+                                Unavailable
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <h3 className="font-bold text-gray-900 text-base">{donor.name}</h3>
+                                <p className="text-xs text-gray-500">{donor.gender}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => toggleTray(donor)}
+                                disabled={donor.availability === 'Unavailable'}
+                                className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all ${
+                                  trayIds.has(donor.id)
+                                    ? 'border-red-200 bg-red-50 text-red-600'
+                                    : 'border-gray-200 text-gray-400'
+                                } ${donor.availability === 'Unavailable' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+                                aria-label="Select donor"
+                              >
+                                <CheckCircle className={`w-4 h-4 ${trayIds.has(donor.id) ? 'text-red-600' : 'text-gray-400'}`} />
+                              </button>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-start text-gray-600">
+                                <MapPin className="w-4 h-4 mr-2 text-red-600 mt-0.5" />
+                                <div className="text-xs leading-5">
+                                  <p>{donor.location}</p>
+                                  <p className="text-[10px] text-gray-500">
+                                    {typeof donor.distance === 'number'
+                                      ? `${donor.distance.toFixed(1)} km away`
+                                      : 'Distance unavailable'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center text-gray-600">
+                                <Clock className="w-4 h-4 mr-2 text-red-600" />
+                                <span className="text-xs">
+                                  Last donation: {donor.lastDonation ? donor.lastDonation.toLocaleDateString() : 'Not yet'}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {donor.donationTypes.map((type) => (
+                                  <span
+                                    key={`mobile-${donor.id}-${type}`}
+                                    className="rounded-full bg-red-50 px-2.5 py-0.5 text-[10px] font-semibold text-red-600"
+                                  >
+                                    {donationTypes.find((item) => item.value === type)?.label || type}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => toggleTray(donor)}
+                          disabled={donor.availability === 'Unavailable'}
+                          className={`w-full flex items-center justify-center py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                            donor.availability === 'Available'
+                              ? trayIds.has(donor.id)
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:shadow-lg transform hover:scale-[1.02]'
+                              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          }`}
+                        >
+                          {trayIds.has(donor.id) ? 'In Tray' : 'Add to Tray'}
+                        </button>
+                      </div>
+
+                      {/* Desktop card layout */}
+                      <div className="hidden sm:block">
                       {/* Header */}
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center space-x-3">
@@ -1158,6 +1246,7 @@ function FindDonors() {
                         >
                           {trayIds.has(donor.id) ? 'In Tray' : 'Add to Tray'}
                         </button>
+                      </div>
                       </div>
                     </div>
                   </div>
