@@ -1,6 +1,6 @@
 import { useOutletContext } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle, Droplet, Loader2, MapPin, MapPinned, MessageCircle, PhoneCall } from 'lucide-react';
+import { AlertCircle, CheckCircle, Droplet, Loader2, MapPin, MessageCircle, PhoneCall } from 'lucide-react';
 
 const DonorRequests = () => {
   const dashboard = useOutletContext<any>();
@@ -21,8 +21,6 @@ const DonorRequests = () => {
     handleDonorRequestDecision,
     handleDeleteDonorRequest,
     handleViewAllRequests,
-    bloodCamps,
-    handleViewAllCamps,
     formatDate,
     formatTime,
   } = dashboard;
@@ -164,8 +162,7 @@ const DonorRequests = () => {
 
   return (
     <>
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start">
-        <div className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-2">
           <div className="bg-white rounded-2xl shadow-xl p-6">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 pb-4">
               <div>
@@ -398,57 +395,9 @@ const DonorRequests = () => {
               </button>
             )}
           </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl shadow-xl p-6">
-            <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-4">
-              <h2 className="text-lg font-bold text-gray-800 flex items-center">
-                <MapPinned className="w-5 h-5 mr-2 text-red-600" />
-                Nearby Blood Camps
-              </h2>
-            </div>
-            {isLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <div key={`camp-skeleton-${index}`} className="h-16 rounded-xl bg-gray-100 animate-pulse" />
-                ))}
-              </div>
-            ) : (
-              <>
-                <div className="space-y-4">
-                  {bloodCamps.length > 0 ? (
-                    bloodCamps.map((camp: any) => (
-                      <div key={camp.id} className="p-4 bg-red-50 rounded-2xl border border-red-200 hover:bg-red-100 transition-all duration-300 cursor-pointer">
-                        <h3 className="font-semibold text-gray-800 text-sm mb-2">{camp.name}</h3>
-                        <p className="text-xs text-gray-600 flex items-center mb-2">
-                          <MapPin className="w-3 h-3 mr-1" />
-                          {camp.location}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {formatDate(camp.date)}, {camp.startTime} - {camp.endTime}
-                        </p>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-gray-500 text-center py-4">No upcoming blood camps in your area</p>
-                  )}
-                </div>
-                {bloodCamps.length > 0 && (
-                  <button
-                    onClick={handleViewAllCamps}
-                    className="w-full mt-4 py-2.5 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-xl transition-all duration-300"
-                  >
-                    View All Camps →
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        </div>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-4">
             <div>
@@ -500,9 +449,6 @@ const DonorRequests = () => {
             </div>
           )}
         </div>
-      </div>
-
-      <div className="mt-6">
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-4">
             <div>

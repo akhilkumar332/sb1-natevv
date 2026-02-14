@@ -2000,6 +2000,7 @@ function DonorDashboard() {
     { id: 'overview', label: 'Overview', to: 'overview', icon: Activity },
     { id: 'readiness', label: 'Readiness', to: 'readiness', icon: CheckCircle },
     { id: 'requests', label: 'Requests', to: 'requests', icon: AlertCircle },
+    { id: 'blood-drives', label: 'Blood Drives', to: 'blood-drives', icon: MapPinned },
     { id: 'journey', label: 'Journey', to: 'journey', icon: Trophy },
     { id: 'referrals', label: 'Referrals', to: 'referrals', icon: Users },
     { id: 'account', label: 'Account', to: 'account', icon: LucideUser },

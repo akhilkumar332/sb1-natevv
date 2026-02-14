@@ -20,6 +20,7 @@ const DonorDashboard = lazy(() => lazyLoad(import('./pages/donor/DonorDashboard'
 const DonorOverview = lazy(() => lazyLoad(import('./pages/donor/dashboard/Overview')));
 const DonorReadiness = lazy(() => lazyLoad(import('./pages/donor/dashboard/Readiness')));
 const DonorRequests = lazy(() => lazyLoad(import('./pages/donor/dashboard/Requests')));
+const DonorBloodDrives = lazy(() => lazyLoad(import('./pages/donor/dashboard/BloodDrives')));
 const DonorJourney = lazy(() => lazyLoad(import('./pages/donor/dashboard/Journey')));
 const DonorReferrals = lazy(() => lazyLoad(import('./pages/donor/dashboard/Referrals')));
 const DonorAccount = lazy(() => lazyLoad(import('./pages/donor/dashboard/Account')));
@@ -93,6 +94,7 @@ const AppRoutes = () => {
           <Route path="overview" element={<DonorOverview />} />
           <Route path="readiness" element={<DonorReadiness />} />
           <Route path="requests" element={<DonorRequests />} />
+          <Route path="blood-drives" element={<DonorBloodDrives />} />
           <Route path="journey" element={<DonorJourney />} />
           <Route path="referrals" element={<DonorReferrals />} />
           <Route path="account" element={<DonorAccount />} />
