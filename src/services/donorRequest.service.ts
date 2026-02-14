@@ -58,6 +58,7 @@ export type RequesterProfile = {
   bhId?: string;
   displayName?: string | null;
   phoneNumber?: string | null;
+  phoneNumberNormalized?: string | null;
   bloodType?: string | null;
   city?: string | null;
   latitude?: number | null;
@@ -200,7 +201,7 @@ export const submitDonorRequest = async (requester: RequesterProfile, payload: P
     requesterUid: requester.uid,
     requesterBhId: requester.bhId || '',
     requesterName: requester.displayName || 'Anonymous',
-    requesterPhone: requester.phoneNumber || '',
+    requesterPhone: requester.phoneNumber || requester.phoneNumberNormalized || '',
     requesterBloodType: requester.bloodType || '',
     targetDonorUid: payload.targetDonorId,
     targetDonorName: payload.targetDonorName,
@@ -283,7 +284,7 @@ export const submitDonorRequestBatch = async (
     requesterUid: requester.uid,
     requesterBhId: requester.bhId || '',
     requesterName: requester.displayName || 'Anonymous',
-    requesterPhone: requester.phoneNumber || '',
+    requesterPhone: requester.phoneNumber || requester.phoneNumberNormalized || '',
     requesterBloodType: requester.bloodType || '',
     donationType: payload.donationType,
     message: normalizedMessage,
@@ -305,7 +306,7 @@ export const submitDonorRequestBatch = async (
         requesterUid: requester.uid,
         requesterBhId: requester.bhId || '',
         requesterName: requester.displayName || 'Anonymous',
-        requesterPhone: requester.phoneNumber || '',
+        requesterPhone: requester.phoneNumber || requester.phoneNumberNormalized || '',
         requesterBloodType: requester.bloodType || '',
         targetDonorUid: target.id,
         targetDonorName: target.name,

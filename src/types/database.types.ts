@@ -507,6 +507,7 @@ export interface DonorRequest {
   targetDonorBhId?: string;
   targetDonorName?: string;
   targetDonorBloodType?: BloodType;
+  targetDonorPhone?: string;
 
   donationType: DonationComponent;
   message?: string;

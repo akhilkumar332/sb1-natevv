@@ -980,11 +980,18 @@ function DonorDashboard() {
         return;
       }
 
-      await updateDoc(requestRef, {
+      const updatePayload: Record<string, any> = {
         status: decision,
         respondedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      };
+      if (decision === 'accepted') {
+        const donorPhone = user.phoneNumber || user.phoneNumberNormalized;
+        if (donorPhone) {
+          updatePayload.targetDonorPhone = donorPhone;
+        }
+      }
+      await updateDoc(requestRef, updatePayload);
 
       await addDoc(collection(db, 'notifications'), {
         userId: requestData.requesterUid,

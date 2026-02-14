@@ -6,6 +6,7 @@ import {
   Clock,
   Droplet,
   Heart,
+  PhoneCall,
   Share2,
   SlidersHorizontal,
   Users,
@@ -37,6 +38,8 @@ const DonorOverview = () => {
     availableTodayHint,
     availabilityEnabled,
     normalizedLastDonation,
+    incomingDonorRequests,
+    outgoingDonorRequests,
     formatDate,
     shareOptions,
     qrCodeDataUrl,
@@ -59,6 +62,16 @@ const DonorOverview = () => {
   const eligibilityDetail = eligibleToDonate
     ? (nextEligibleDate ? `Eligible since ${nextEligibleLabel}` : 'Eligible anytime')
     : `Next eligible on ${nextEligibleLabel}`;
+
+  const contactWindowMs = 24 * 60 * 60 * 1000;
+  const isContactActive = (respondedAt?: any) => {
+    if (!respondedAt) return false;
+    const respondedDate = respondedAt instanceof Date ? respondedAt : new Date(respondedAt);
+    if (Number.isNaN(respondedDate.getTime())) return false;
+    return respondedDate.getTime() + contactWindowMs > Date.now();
+  };
+  const activeConnectionsCount = [...(incomingDonorRequests || []), ...(outgoingDonorRequests || [])]
+    .filter((request: any) => request.status === 'accepted' && isContactActive(request.respondedAt)).length;
 
   const donationEntries = Array.isArray(donationHistory) ? donationHistory : [];
   const resolvedDonationDates = donationEntries
@@ -166,7 +179,7 @@ const DonorOverview = () => {
         <h2 className="text-xl font-bold text-gray-900">Your Snapshot</h2>
       </div>
       <div className="mb-6">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-5">
           <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md">
             <div className="flex items-center justify-between">
               <div>
@@ -224,6 +237,24 @@ const DonorOverview = () => {
             <p className="mt-2 text-xs text-gray-500">
               {stats?.rank ? `Rank #${stats.rank}` : isLoading ? 'Updating...' : 'Keep donating!'}
             </p>
+          </div>
+          <div className="bg-white rounded-xl border border-emerald-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-gray-500">Active Connections</p>
+                <p className="text-2xl font-bold text-gray-900">{activeConnectionsCount}</p>
+              </div>
+              <div className="p-2 rounded-lg bg-emerald-50">
+                <PhoneCall className="w-5 h-5 text-emerald-600" />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/donor/dashboard/requests')}
+              className="mt-2 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+            >
+              View connections →
+            </button>
           </div>
         </div>
       </div>

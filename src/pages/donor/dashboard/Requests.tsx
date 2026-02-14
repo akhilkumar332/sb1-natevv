@@ -1,6 +1,6 @@
 import { useOutletContext } from 'react-router-dom';
-import { useState } from 'react';
-import { AlertCircle, CheckCircle, Droplet, Loader2, MapPin, MapPinned } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertCircle, CheckCircle, Droplet, Loader2, MapPin, MapPinned, MessageCircle, PhoneCall } from 'lucide-react';
 
 const DonorRequests = () => {
   const dashboard = useOutletContext<any>();
@@ -27,9 +27,15 @@ const DonorRequests = () => {
     formatTime,
   } = dashboard;
 
-  const pendingDonorRequests = (incomingDonorRequests || []).filter((request: any) => request.status === 'pending');
+  const [now, setNow] = useState(() => Date.now());
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string; detail?: string } | null>(null);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 60 * 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   const getDonationLabel = (type?: string) => {
     if (!type) return 'Donation';
     if (type === 'whole') return 'Whole Blood';
@@ -50,6 +56,95 @@ const DonorRequests = () => {
     if (status === 'failed') return 'bg-rose-100 text-rose-700';
     return 'bg-gray-100 text-gray-600';
   };
+  const contactWindowMs = 24 * 60 * 60 * 1000;
+  const getContactWindow = (respondedAt?: any) => {
+    if (!respondedAt) return null;
+    const respondedDate = respondedAt instanceof Date ? respondedAt : new Date(respondedAt);
+    if (Number.isNaN(respondedDate.getTime())) return null;
+    const expiresAt = new Date(respondedDate.getTime() + contactWindowMs);
+    const remainingMs = expiresAt.getTime() - now;
+    return {
+      expiresAt,
+      remainingMs,
+      active: remainingMs > 0,
+    };
+  };
+  const formatContactCountdown = (remainingMs: number) => {
+    if (remainingMs <= 0) return 'Expired';
+    const minutes = Math.ceil(remainingMs / (60 * 1000));
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.ceil(minutes / 60);
+    return `${hours}h`;
+  };
+  const getTelHref = (phone?: string) => {
+    if (!phone) return null;
+    const trimmed = phone.trim();
+    if (!trimmed) return null;
+    return `tel:${trimmed.replace(/\s+/g, '')}`;
+  };
+  const getWhatsAppHref = (phone?: string) => {
+    if (!phone) return null;
+    const digits = phone.replace(/\D/g, '');
+    if (!digits) return null;
+    return `https://wa.me/${digits}`;
+  };
+
+  const renderContactCapsule = (options: { label: string; phone?: string; respondedAt?: any; accent?: 'emerald' | 'red' }) => {
+    const { label, phone, respondedAt, accent = 'emerald' } = options;
+    const contactWindow = getContactWindow(respondedAt);
+    if (!contactWindow?.active) return null;
+    const telHref = getTelHref(phone);
+    const whatsappHref = getWhatsAppHref(phone);
+    const accentBg = accent === 'red' ? 'bg-red-50/80 border-red-200' : 'bg-emerald-50/80 border-emerald-200';
+    const accentText = accent === 'red' ? 'text-red-600' : 'text-emerald-600';
+    const countdown = formatContactCountdown(contactWindow.remainingMs);
+
+    return (
+      <div className={`mt-3 rounded-xl border ${accentBg} p-3`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className={`text-xs uppercase tracking-[0.2em] ${accentText}`}>Contact window</p>
+            <p className="text-sm font-semibold text-gray-800">{label}</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {phone ? phone : 'Phone not available'} · Expires in {countdown}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href={telHref || '#'}
+              onClick={(event) => {
+                if (!telHref) event.preventDefault();
+              }}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold border ${
+                telHref ? 'border-gray-200 text-gray-700 hover:bg-white' : 'border-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              <PhoneCall className="w-3.5 h-3.5" />
+              Call
+            </a>
+            <a
+              href={whatsappHref || '#'}
+              target={whatsappHref ? '_blank' : undefined}
+              rel={whatsappHref ? 'noreferrer' : undefined}
+              onClick={(event) => {
+                if (!whatsappHref) event.preventDefault();
+              }}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold border ${
+                whatsappHref ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' : 'border-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              WhatsApp
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const pendingDonorRequests = (incomingDonorRequests || []).filter((request: any) => request.status === 'pending');
+  const acceptedIncomingRequests = (incomingDonorRequests || []).filter((request: any) => request.status === 'accepted');
+  const activeIncomingConnections = acceptedIncomingRequests.filter((request: any) => getContactWindow(request.respondedAt)?.active);
 
   const openDeleteModal = (request: any, fallbackLabel: string) => {
     setDeleteTarget({
@@ -152,6 +247,47 @@ const DonorRequests = () => {
                 </div>
               )}
             </div>
+
+            {activeIncomingConnections.length > 0 && (
+              <div className="mt-8 border-t border-gray-100 pt-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-emerald-600">Accepted connections</p>
+                    <h3 className="text-lg font-bold text-gray-900">Connect with requesters</h3>
+                    <p className="text-sm text-gray-500 mt-1">Contact details stay visible for 24 hours after acceptance.</p>
+                  </div>
+                  <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-semibold">
+                    {activeIncomingConnections.length} Active
+                  </span>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {activeIncomingConnections.map((request: any) => (
+                    <div key={request.id} className="p-5 border border-emerald-100 rounded-2xl bg-emerald-50/40">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="font-semibold text-gray-800">{request.requesterName || 'Donor requester'}</p>
+                          <p className="text-xs text-gray-500">
+                            {request.requesterBhId ? `BH ID: ${request.requesterBhId}` : 'BH ID unavailable'}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Requested {formatTime(request.requestedAt)}
+                          </p>
+                        </div>
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white text-emerald-700 border border-emerald-200 w-fit">
+                          Accepted
+                        </span>
+                      </div>
+                      {renderContactCapsule({
+                        label: request.requesterName || 'Requester',
+                        phone: request.requesterPhone,
+                        respondedAt: request.respondedAt,
+                        accent: 'emerald',
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl shadow-xl p-6">
@@ -410,6 +546,12 @@ const DonorRequests = () => {
                       </button>
                     </div>
                   </div>
+                  {request.status === 'accepted' && renderContactCapsule({
+                    label: request.targetDonorName || 'Accepting donor',
+                    phone: request.targetDonorPhone,
+                    respondedAt: request.respondedAt,
+                    accent: 'red',
+                  })}
                 </div>
               ))}
             </div>
