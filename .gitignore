@@ -28,8 +28,12 @@ dist-ssr
 #.firebaserc
 #firebase-debug.log
 
-#env ignore
-#.env
+# env files
+.env
+.env.*
+!.env.example
 #vite-env.d.ts
 
-#secrets/firebase-admin-sdk.json
+# secrets
+secrets/
+**/firebase-admin-sdk.json
