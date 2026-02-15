@@ -52,6 +52,8 @@ const DUPLICATE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const SESSION_KEY_PREFIX = 'pendingDonorRequest:';
 export const MAX_DONOR_REQUEST_BATCH_TARGETS = 200;
 export const MAX_DONOR_REQUEST_MESSAGE_LENGTH = 280;
+const RECENT_CACHE_PREFIX = 'recentDonorRequests:';
+const RECENT_CACHE_TTL_MS = 3 * 60 * 1000;
 
 export type RequesterProfile = {
   uid: string;
@@ -193,6 +195,54 @@ export const clearPendingDonorRequestDoc = async (uid: string) => {
   await deleteDoc(doc(db, 'pendingDonorRequests', uid));
 };
 
+const loadRecentRequestCache = (uid: string) => {
+  if (typeof window === 'undefined' || !window.sessionStorage) return null;
+  const raw = window.sessionStorage.getItem(`${RECENT_CACHE_PREFIX}${uid}`);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { savedAt: number; items: Array<{ targetDonorUid: string; requestedAt?: number; status?: string }> };
+    if (!parsed?.savedAt || Date.now() - parsed.savedAt > RECENT_CACHE_TTL_MS) return null;
+    return parsed.items || [];
+  } catch {
+    return null;
+  }
+};
+
+const saveRecentRequestCache = (uid: string, items: Array<{ targetDonorUid: string; requestedAt?: number; status?: string }>) => {
+  if (typeof window === 'undefined' || !window.sessionStorage) return;
+  try {
+    window.sessionStorage.setItem(`${RECENT_CACHE_PREFIX}${uid}`, JSON.stringify({ savedAt: Date.now(), items }));
+  } catch {
+    // ignore
+  }
+};
+
+export const primeRecentDonorRequestCache = async (uid: string) => {
+  const cached = loadRecentRequestCache(uid);
+  if (cached) return;
+  try {
+    const recentQuery = query(
+      collection(db, 'donorRequests'),
+      where('requesterUid', '==', uid),
+      orderBy('requestedAt', 'desc'),
+      limit(60)
+    );
+    const recentSnapshot = await getDocs(recentQuery);
+    const items = recentSnapshot.docs.map((docSnap) => {
+      const data = docSnap.data() as any;
+      const requestedAt = data.requestedAt?.toDate ? data.requestedAt.toDate().getTime() : undefined;
+      return {
+        targetDonorUid: data.targetDonorUid,
+        requestedAt,
+        status: data.status,
+      };
+    }).filter((item) => item.targetDonorUid);
+    saveRecentRequestCache(uid, items);
+  } catch (error) {
+    console.warn('Failed to prime recent donor requests cache', error);
+  }
+};
+
 export const submitDonorRequest = async (requester: RequesterProfile, payload: PendingDonorRequest) => {
   if (requester.uid === payload.targetDonorId) {
     throw new Error('self_request');
@@ -236,24 +286,43 @@ export const submitDonorRequestBatch = async (
   const batchRef = doc(collection(db, 'donorRequestBatches'));
   const batchId = batchRef.id;
 
-  const recentQuery = query(
-    collection(db, 'donorRequests'),
-    where('requesterUid', '==', requester.uid),
-    orderBy('requestedAt', 'desc'),
-    limit(60)
-  );
   const recentMap = new Map<string, { requestedAt?: Date; status?: string }>();
-  try {
-    const recentSnapshot = await getDocs(recentQuery);
-    recentSnapshot.docs.forEach((docSnap) => {
-      const data = docSnap.data() as any;
-      const requestedAt = data.requestedAt?.toDate ? data.requestedAt.toDate() : undefined;
-      if (data.targetDonorUid) {
-        recentMap.set(data.targetDonorUid, { requestedAt, status: data.status });
-      }
+  const cachedRecent = loadRecentRequestCache(requester.uid);
+  if (cachedRecent) {
+    cachedRecent.forEach((item) => {
+      if (!item?.targetDonorUid) return;
+      recentMap.set(item.targetDonorUid, {
+        requestedAt: item.requestedAt ? new Date(item.requestedAt) : undefined,
+        status: item.status,
+      });
     });
-  } catch (error) {
-    console.warn('Failed to load recent donor requests for dedupe. Continuing without dedupe.', error);
+    void primeRecentDonorRequestCache(requester.uid);
+  } else {
+    try {
+      const recentQuery = query(
+        collection(db, 'donorRequests'),
+        where('requesterUid', '==', requester.uid),
+        orderBy('requestedAt', 'desc'),
+        limit(60)
+      );
+      const recentSnapshot = await getDocs(recentQuery);
+      const items: Array<{ targetDonorUid: string; requestedAt?: number; status?: string }> = [];
+      recentSnapshot.docs.forEach((docSnap) => {
+        const data = docSnap.data() as any;
+        const requestedAt = data.requestedAt?.toDate ? data.requestedAt.toDate() : undefined;
+        if (data.targetDonorUid) {
+          recentMap.set(data.targetDonorUid, { requestedAt, status: data.status });
+          items.push({
+            targetDonorUid: data.targetDonorUid,
+            requestedAt: requestedAt ? requestedAt.getTime() : undefined,
+            status: data.status,
+          });
+        }
+      });
+      saveRecentRequestCache(requester.uid, items);
+    } catch (error) {
+      console.warn('Failed to load recent donor requests for dedupe. Continuing without dedupe.', error);
+    }
   }
 
   const now = Date.now();
@@ -330,6 +399,19 @@ export const submitDonorRequestBatch = async (
     });
     try {
       await batch.commit();
+
+      if (sendTargets.length > 0) {
+        const cache = loadRecentRequestCache(requester.uid) || [];
+        const updated = [
+          ...sendTargets.map((target) => ({
+            targetDonorUid: target.id,
+            requestedAt: Date.now(),
+            status: 'pending',
+          })),
+          ...cache,
+        ];
+        saveRecentRequestCache(requester.uid, updated.slice(0, 80));
+      }
     } catch (error) {
       await setDoc(
         batchRef,

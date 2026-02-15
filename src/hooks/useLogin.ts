@@ -175,15 +175,25 @@ export const useLogin = () => {
         toast.success('Successfully logged in with Google!');
 
         // Navigate based on onboarding status - if not explicitly true, go to onboarding
-        const pendingSearch = location.search || '';
         const pendingParams = new URLSearchParams(location.search);
+        const rawReturnTo = pendingParams.get('returnTo') || '';
+        const returnTo = rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//') ? rawReturnTo : '';
+        pendingParams.delete('returnTo');
+        const pendingSearch = pendingParams.toString();
         const hasPendingRequest = pendingParams.has('pendingRequest') || pendingParams.has('pendingRequestKey');
         if (result.user.onboardingCompleted === true) {
           console.log('Navigating to dashboard');
-          navigate(`/donor/${hasPendingRequest ? 'dashboard/requests' : 'dashboard'}${pendingSearch}`);
+          const destination = returnTo || (hasPendingRequest ? '/donor/dashboard/requests' : '/donor/dashboard');
+          const target = pendingSearch
+            ? `${destination}${destination.includes('?') ? '&' : '?'}${pendingSearch}`
+            : destination;
+          navigate(target);
         } else {
           console.log('Navigating to onboarding');
-          navigate(`/donor/onboarding${pendingSearch}`);
+          const onboardingTarget = pendingSearch
+            ? `/donor/onboarding?${pendingSearch}`
+            : '/donor/onboarding';
+          navigate(onboardingTarget);
         }
       } else {
         throw new Error('No token received');

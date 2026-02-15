@@ -15,6 +15,7 @@ import {
   savePendingDonorRequestToSession,
   loadPendingDonorRequestFromSession,
   clearPendingDonorRequestFromSession,
+  primeRecentDonorRequestCache,
   submitDonorRequestBatch,
   MAX_DONOR_REQUEST_BATCH_TARGETS,
   MAX_DONOR_REQUEST_MESSAGE_LENGTH,
@@ -170,6 +171,25 @@ function FindDonors() {
       console.warn('Failed to sync compact mode preference', error);
     });
   }, [compactMode, user?.uid, updateUserProfile]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const task = () => {
+      void primeRecentDonorRequestCache(user.uid);
+    };
+    const idle = typeof globalThis !== 'undefined' ? (globalThis as any).requestIdleCallback : null;
+    if (typeof idle === 'function') {
+      const id = idle(task);
+      return () => {
+        const cancel = (globalThis as any).cancelIdleCallback;
+        if (typeof cancel === 'function') {
+          cancel(id);
+        }
+      };
+    }
+    const timer = setTimeout(task, 800);
+    return () => clearTimeout(timer);
+  }, [user?.uid]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -475,6 +495,17 @@ function FindDonors() {
 
     const submitPending = async () => {
       if (pendingFromSearch) {
+        if (pendingFromSearch.returnTo === '/donor/dashboard/requests') {
+          const nextParams = new URLSearchParams(location.search);
+          if (pendingKey) {
+            nextParams.set('pendingRequestKey', pendingKey);
+          } else if (encoded) {
+            nextParams.set('pendingRequest', encoded);
+          }
+          nextParams.delete('returnTo');
+          navigate({ pathname: '/donor/dashboard/requests', search: nextParams.toString() }, { replace: true });
+          return;
+        }
         await savePendingDonorRequestDoc(user.uid, pendingFromSearch);
         if (pendingKey) {
           clearPendingDonorRequestFromSession(pendingKey);
@@ -700,17 +731,17 @@ function FindDonors() {
       donationType: requestDonationType,
       message: safeMessage,
       createdAt: Date.now(),
-      returnTo: '/donors',
+      returnTo: '/donor/dashboard/requests',
     };
 
     if (!user || user.role !== 'donor') {
       toast.error('Please login as a donor to send a request.');
       const pendingKey = savePendingDonorRequestToSession(payload as PendingDonorRequestPayload);
       if (pendingKey) {
-        navigate(`/donor/login?pendingRequestKey=${encodeURIComponent(pendingKey)}`);
+        navigate(`/donor/login?returnTo=${encodeURIComponent('/donor/dashboard/requests')}&pendingRequestKey=${encodeURIComponent(pendingKey)}`);
       } else {
         const encoded = encodePendingDonorRequest(payload as PendingDonorRequestPayload);
-        navigate(`/donor/login?pendingRequest=${encodeURIComponent(encoded)}`);
+        navigate(`/donor/login?returnTo=${encodeURIComponent('/donor/dashboard/requests')}&pendingRequest=${encodeURIComponent(encoded)}`);
       }
       return;
     }
@@ -718,10 +749,10 @@ function FindDonors() {
     if (!user.onboardingCompleted) {
       const pendingKey = savePendingDonorRequestToSession(payload as PendingDonorRequestPayload);
       if (pendingKey) {
-        navigate(`/donor/onboarding?pendingRequestKey=${encodeURIComponent(pendingKey)}`);
+        navigate(`/donor/onboarding?returnTo=${encodeURIComponent('/donor/dashboard/requests')}&pendingRequestKey=${encodeURIComponent(pendingKey)}`);
       } else {
         const encoded = encodePendingDonorRequest(payload as PendingDonorRequestPayload);
-        navigate(`/donor/onboarding?pendingRequest=${encodeURIComponent(encoded)}`);
+        navigate(`/donor/onboarding?returnTo=${encodeURIComponent('/donor/dashboard/requests')}&pendingRequest=${encodeURIComponent(encoded)}`);
       }
       return;
     }

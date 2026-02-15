@@ -108,9 +108,16 @@ const DonorBloodDrives = () => {
       ? campaign.registeredDonors.includes(user.uid)
       : false;
 
+  const isParticipationClosed = (campaign: any) =>
+    campaign?.status === 'cancelled' || campaign?.status === 'completed';
+
   const handleParticipate = async (campaign: any) => {
     if (!user?.uid) {
       toast.error('Please log in to participate.');
+      return;
+    }
+    if (isParticipationClosed(campaign)) {
+      toast.error('Participation is closed for this campaign.');
       return;
     }
     if (hasParticipated(campaign)) {
@@ -261,11 +268,14 @@ const DonorBloodDrives = () => {
                             <button
                               type="button"
                               onClick={() => handleParticipate(campaign)}
-                              disabled={hasParticipated(campaign) || participatingId === campaign.id}
+                              disabled={hasParticipated(campaign) || participatingId === campaign.id || isParticipationClosed(campaign)}
+                              title={isParticipationClosed(campaign) ? 'Participation closed for this campaign.' : undefined}
                               className={`rounded-full px-4 py-2 text-xs font-semibold transition-all ${
                                 hasParticipated(campaign)
                                   ? 'bg-emerald-100 text-emerald-700'
-                                  : 'bg-red-600 text-white hover:bg-red-700'
+                                  : isParticipationClosed(campaign)
+                                    ? 'bg-gray-100 text-gray-500'
+                                    : 'bg-red-600 text-white hover:bg-red-700'
                               } ${participatingId === campaign.id ? 'opacity-70 cursor-not-allowed' : ''}`}
                             >
                               {hasParticipated(campaign) ? (
@@ -273,7 +283,11 @@ const DonorBloodDrives = () => {
                                   <Check className="w-3 h-3" />
                                   Participated
                                 </span>
-                              ) : participatingId === campaign.id ? 'Participating...' : 'Participate'}
+                              ) : isParticipationClosed(campaign)
+                                ? 'Closed'
+                                : participatingId === campaign.id
+                                  ? 'Participating...'
+                                  : 'Participate'}
                             </button>
                           )}
                         </div>

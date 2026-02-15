@@ -37,6 +37,7 @@ import {
   loadPendingDonorRequestFromSession,
   savePendingDonorRequestDoc,
   clearPendingDonorRequestFromSession,
+  primeRecentDonorRequestCache,
   submitDonorRequestBatch,
   type DonationComponent,
   type PendingDonorRequest,
@@ -685,6 +686,25 @@ function DonorDashboard() {
   }, [user?.uid]);
 
   useEffect(() => {
+    if (!user?.uid) return;
+    const task = () => {
+      void primeRecentDonorRequestCache(user.uid);
+    };
+    const idle = typeof globalThis !== 'undefined' ? (globalThis as any).requestIdleCallback : null;
+    if (typeof idle === 'function') {
+      const id = idle(task);
+      return () => {
+        const cancel = (globalThis as any).cancelIdleCallback;
+        if (typeof cancel === 'function') {
+          cancel(id);
+        }
+      };
+    }
+    const timer = setTimeout(task, 1200);
+    return () => clearTimeout(timer);
+  }, [user?.uid]);
+
+  useEffect(() => {
     if (!user?.uid || user.role !== 'donor' || !user.onboardingCompleted) return;
     const params = new URLSearchParams(location.search);
     const encoded = params.get('pendingRequest');
@@ -694,13 +714,16 @@ function DonorDashboard() {
     const pendingFromSearch = pendingFromSession || pendingFromUrl;
     const pendingKeyFromUrl = pendingFromSearch
       ? Array.isArray((pendingFromSearch as PendingDonorRequestBatch).targets)
-        ? `batch:${pendingFromSearch.createdAt}`
+        ? `batch:${pendingFromSearch.createdAt}:${(pendingFromSearch as PendingDonorRequestBatch).targets.length}`
         : `single:${(pendingFromSearch as PendingDonorRequest).targetDonorId}:${pendingFromSearch.createdAt}`
       : null;
 
     const submitPending = async () => {
       if (pendingFromSearch) {
-        const targetReturnTo = pendingFromSearch.returnTo || '/donor/dashboard/requests';
+        const rawReturnTo = pendingFromSearch.returnTo || '';
+        const targetReturnTo = rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//')
+          ? rawReturnTo
+          : '/donor/dashboard/requests';
         await savePendingDonorRequestDoc(user.uid, pendingFromSearch as PendingDonorRequestPayload);
         if (pendingKey) {
           clearPendingDonorRequestFromSession(pendingKey);
@@ -709,7 +732,10 @@ function DonorDashboard() {
         params.delete('pendingRequestKey');
         const nextSearch = params.toString();
         const fallbackPath = nextSearch ? `${location.pathname}?${nextSearch}` : location.pathname;
-        navigate(nextSearch ? `${targetReturnTo}?${nextSearch}` : targetReturnTo || fallbackPath, { replace: true });
+        const destination = nextSearch
+          ? `${targetReturnTo}${targetReturnTo.includes('?') ? '&' : '?'}${nextSearch}`
+          : targetReturnTo || fallbackPath;
+        navigate(destination, { replace: true });
       }
 
       const pending = await loadPendingDonorRequestDoc(user.uid);

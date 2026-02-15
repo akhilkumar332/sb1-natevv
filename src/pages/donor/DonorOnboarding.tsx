@@ -516,7 +516,16 @@ export function DonorOnboarding() {
         toast.success('Welcome to the BloodHub family! 🎉');
 
         setTimeout(() => {
-          navigate(`/donor/dashboard${location.search || ''}`);
+          const params = new URLSearchParams(location.search);
+          const rawReturnTo = params.get('returnTo') || '';
+          const returnTo = rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//') ? rawReturnTo : '';
+          params.delete('returnTo');
+          const nextSearch = params.toString();
+          const destination = returnTo || '/donor/dashboard';
+          const target = nextSearch
+            ? `${destination}${destination.includes('?') ? '&' : '?'}${nextSearch}`
+            : destination;
+          navigate(target);
         }, 2000);
       } catch (error: any) {
         console.error('Onboarding submission error:', error);
