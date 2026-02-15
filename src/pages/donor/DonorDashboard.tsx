@@ -721,10 +721,14 @@ function DonorDashboard() {
     const submitPending = async () => {
       if (pendingFromSearch) {
         const rawReturnTo = pendingFromSearch.returnTo || '';
-        const targetReturnTo = rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//')
-          ? rawReturnTo
-          : '/donor/dashboard/requests';
-        await savePendingDonorRequestDoc(user.uid, pendingFromSearch as PendingDonorRequestPayload);
+        const isSafePath = rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//');
+        const isDashboardPath = isSafePath && rawReturnTo.startsWith('/donor/dashboard');
+        const targetReturnTo = isDashboardPath ? rawReturnTo : '/donor/dashboard/requests';
+        try {
+          await savePendingDonorRequestDoc(user.uid, pendingFromSearch as PendingDonorRequestPayload);
+        } catch (error) {
+          console.warn('Failed to persist pending donor request. Clearing payload.', error);
+        }
         if (pendingKey) {
           clearPendingDonorRequestFromSession(pendingKey);
         }
@@ -773,12 +777,19 @@ function DonorDashboard() {
       }
 
       pendingRequestProcessedRef.current = pendingBatchKey;
-      await submitDonorRequestBatch(user, {
-        ...payload,
-        targets: filteredTargets,
-      });
-      await clearPendingDonorRequestDoc(user.uid);
-      toast.success('Your donor request has been submitted.');
+      try {
+        await submitDonorRequestBatch(user, {
+          ...payload,
+          targets: filteredTargets,
+        });
+        await clearPendingDonorRequestDoc(user.uid);
+        toast.success('Your donor request has been submitted.');
+      } catch (error) {
+        console.error('Pending donor request submission failed:', error);
+        await clearPendingDonorRequestDoc(user.uid).catch(() => null);
+        pendingRequestProcessedRef.current = pendingBatchKey;
+        toast.error('Failed to submit your donor request.');
+      }
     };
 
     submitPending()

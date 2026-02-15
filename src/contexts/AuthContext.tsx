@@ -320,10 +320,15 @@ const normalizeEligibilityChecklist = (checklist: any) => {
 };
 
 // Helper function to update user in Firestore
+type UserFetchResult = {
+  user: User | null;
+  missing: boolean;
+};
+
 const updateUserInFirestore = async (
   firebaseUser: FirebaseUser,
   additionalData?: Partial<User>
-): Promise<User | null> => {
+): Promise<UserFetchResult> => {
   try {
     const userRef: DocumentReference = doc(db, 'users', firebaseUser.uid);
     const userDoc: DocumentSnapshot = await getDoc(userRef);
@@ -331,7 +336,7 @@ const updateUserInFirestore = async (
     // If user document doesn't exist, return null
     if (!userDoc.exists()) {
       console.warn('User document does not exist for:', firebaseUser.uid);
-      return null;
+      return { user: null, missing: true };
     }
 
     const existingUserData = userDoc.data() as User;
@@ -407,7 +412,7 @@ const updateUserInFirestore = async (
       }
     }
 
-    return resolvedUser;
+    return { user: resolvedUser, missing: false };
   } catch (error) {
     console.error('Error in updateUserInFirestore:', error);
     throw error;
@@ -454,10 +459,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const recentLoginRef = useRef<{ uid: string; at: number; user?: User } | null>(null);
   const userRef = useRef<User | null>(initialCachedUser);
   const publicDonorSyncRef = useRef<string | null>(null);
+  const profileRetryTimeoutRef = useRef<number | null>(null);
+
+  const logProfileIssue = (label: string, error: unknown, context?: Record<string, unknown>) => {
+    const err = error as any;
+    console.warn(`[auth] ${label}`, {
+      code: err?.code,
+      name: err?.name,
+      message: err?.message,
+      online: typeof navigator !== 'undefined' ? navigator.onLine : undefined,
+      ...context,
+    });
+  };
 
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+
+  useEffect(() => {
+    return () => {
+      if (profileRetryTimeoutRef.current !== null) {
+        window.clearTimeout(profileRetryTimeoutRef.current);
+        profileRetryTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!user?.uid || user.role !== 'donor') return;
@@ -544,19 +570,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(cachedUser);
             setLoading(false);
             void updateSessionMetadata(firebaseUser, cachedUser);
-            void updateUserInFirestore(firebaseUser).then((userData) => {
-              const isRegistrationRoute =
-                typeof window !== 'undefined' &&
-                (window.location.pathname.includes('/register') ||
-                  window.location.pathname.includes('/onboarding'));
-              if (userData) {
-                setUser(userData);
-              } else if (!isRegistrationRoute) {
-                console.warn('User document not found, signing out');
-                auth.signOut().catch(() => null);
-                setUser(null);
-              }
-            });
+            void updateUserInFirestore(firebaseUser)
+              .then((result) => {
+                const isRegistrationRoute =
+                  typeof window !== 'undefined' &&
+                  (window.location.pathname.includes('/register') ||
+                    window.location.pathname.includes('/onboarding'));
+                if (result.user) {
+                  setUser(result.user);
+                  return;
+                }
+                if (result.missing) {
+                  console.warn('User document missing. Keeping cached session active.');
+                  if (isRegistrationRoute) {
+                    setUser({
+                      uid: firebaseUser.uid,
+                      email: firebaseUser.email,
+                      displayName: firebaseUser.displayName,
+                      photoURL: firebaseUser.photoURL,
+                      phoneNumber: firebaseUser.phoneNumber,
+                    } as User);
+                  }
+                }
+              })
+              .catch((error) => {
+                logProfileIssue('cached-profile-refresh-failed', error, { uid: firebaseUser.uid });
+                if (profileRetryTimeoutRef.current !== null) {
+                  window.clearTimeout(profileRetryTimeoutRef.current);
+                }
+                profileRetryTimeoutRef.current = window.setTimeout(() => {
+                  updateUserInFirestore(firebaseUser)
+                    .then((retryResult) => {
+                      if (retryResult.user) {
+                        setUser(retryResult.user);
+                      }
+                    })
+                    .catch((retryError) => {
+                      logProfileIssue('cached-profile-retry-failed', retryError, { uid: firebaseUser.uid });
+                    });
+                }, 7000);
+              });
             return;
           }
 
@@ -566,14 +619,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const isNewUser = (currentTime - creationTime) < 30000; // 30 seconds grace period
 
           // Add retry logic with delay for new users
-          let userData = null;
+          let userData: User | null = null;
+          let missingUserDoc = false;
+          let lastError: unknown = null;
           let retries = isNewUser ? 5 : 3; // More retries for new users
           let delay = isNewUser ? 1000 : 500; // Longer delay for new users
 
-          while (retries > 0 && !userData) {
+          while (retries > 0 && !userData && !missingUserDoc) {
             try {
-              userData = await updateUserInFirestore(firebaseUser);
-              if (userData) break;
+              const result = await updateUserInFirestore(firebaseUser);
+              if (result.user) {
+                userData = result.user;
+                break;
+              }
+              if (result.missing) {
+                missingUserDoc = true;
+                break;
+              }
 
               // If document doesn't exist and user is NEW, wait for registration to complete
               if (isNewUser && !userData) {
@@ -587,6 +649,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 break;
               }
             } catch (error) {
+              lastError = error;
               console.warn(`Attempt ${(isNewUser ? 5 : 3) - retries + 1} failed, retrying...`, error);
               retries--;
               if (retries > 0) {
@@ -595,22 +658,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
-          const isRegistrationRoute =
-            typeof window !== 'undefined' &&
-            (window.location.pathname.includes('/register') ||
-              window.location.pathname.includes('/onboarding'));
-
           if (userData) {
             setUser(userData);
           } else {
-            // Only keep new users signed in during registration/onboarding flows
-            if (!isNewUser || !isRegistrationRoute) {
-              console.warn('User document not found, signing out');
-              await signOut(auth);
-              setUser(null);
+            if (missingUserDoc) {
+              console.warn('User document missing. Keeping session active.');
+            } else if (lastError) {
+              logProfileIssue('profile-load-failed', lastError, { uid: firebaseUser.uid });
+              if (profileRetryTimeoutRef.current !== null) {
+                window.clearTimeout(profileRetryTimeoutRef.current);
+              }
+              profileRetryTimeoutRef.current = window.setTimeout(() => {
+                updateUserInFirestore(firebaseUser)
+                  .then((retryResult) => {
+                    if (retryResult.user) {
+                      setUser(retryResult.user);
+                    }
+                  })
+                  .catch((retryError) => {
+                    logProfileIssue('profile-retry-failed', retryError, { uid: firebaseUser.uid });
+                  });
+              }, 7000);
+            }
+            const fallbackUser = currentUser || cachedUser;
+            if (fallbackUser) {
+              setUser(fallbackUser);
             } else {
-              console.log('⏳ New user registration in progress, keeping user signed in...');
-              // Set a temporary user object so UI doesn't flicker
+              console.log('⏳ Profile unavailable; keeping minimal session until retry.');
               setUser({
                 uid: firebaseUser.uid,
                 email: firebaseUser.email,

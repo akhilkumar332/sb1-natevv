@@ -171,13 +171,22 @@ export const loadPendingDonorRequestDoc = async (uid: string): Promise<PendingDo
     return null;
   }
   if (Array.isArray(data.targets)) {
+    const cleanTargets = data.targets.filter((target: any) => target && typeof target.id === 'string' && target.id.length > 0);
+    if (cleanTargets.length === 0) {
+      await deleteDoc(doc(db, 'pendingDonorRequests', uid));
+      return null;
+    }
     return {
-      targets: data.targets || [],
+      targets: cleanTargets,
       donationType: (data.donationType || 'whole') as DonationComponent,
       message: data.message,
       createdAt: createdAt ? createdAt.getTime() : Date.now(),
       returnTo: data.returnTo,
     } as PendingDonorRequestBatch;
+  }
+  if (!data?.targetDonorId) {
+    await deleteDoc(doc(db, 'pendingDonorRequests', uid));
+    return null;
   }
   return {
     targetDonorId: data.targetDonorId,
