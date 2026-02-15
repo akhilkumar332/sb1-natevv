@@ -533,6 +533,58 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
     });
   };
 
+  const buildCacheStats = () => {
+    const totalInventory = inventory.reduce((sum, item) => sum + item.units, 0);
+    const criticalTypes = inventory.filter(item => item.status === 'critical').length;
+    const lowTypes = inventory.filter(item => item.status === 'low').length;
+    const adequateTypes = inventory.filter(item => item.status === 'adequate' || item.status === 'surplus').length;
+
+    const now = new Date();
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    let expiringIn7Days = 0;
+    let expiringIn30Days = 0;
+    let reservedUnits = 0;
+    let availableUnits = 0;
+
+    inventory.forEach(item => {
+      item.batches.forEach(batch => {
+        if (batch.status === 'available') {
+          availableUnits += batch.units;
+          if (batch.expiryDate <= sevenDaysFromNow) {
+            expiringIn7Days += batch.units;
+          } else if (batch.expiryDate <= thirtyDaysFromNow) {
+            expiringIn30Days += batch.units;
+          }
+        } else if (batch.status === 'reserved') {
+          reservedUnits += batch.units;
+          if (batch.expiryDate <= sevenDaysFromNow) {
+            expiringIn7Days += batch.units;
+          } else if (batch.expiryDate <= thirtyDaysFromNow) {
+            expiringIn30Days += batch.units;
+          }
+        }
+      });
+    });
+
+    const activeRequests = bloodRequests.filter(r => r.status === 'active' || r.status === 'partially_fulfilled').length;
+    const fulfilledRequests = bloodRequests.filter(r => r.status === 'fulfilled').length;
+
+    return {
+      totalInventory,
+      criticalTypes,
+      lowTypes,
+      adequateTypes,
+      expiringIn7Days,
+      expiringIn30Days,
+      reservedUnits,
+      availableUnits,
+      activeRequests,
+      fulfilledRequests,
+    };
+  };
+
   useEffect(() => {
     if (!bloodBankId) return;
 
@@ -558,7 +610,22 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
               setInventory(hydrateInventory(cached.inventory));
               setBloodRequests(hydrateRequests(cached.bloodRequests));
               // Do not hydrate appointments/donations from localStorage (sensitive data)
-              setStats(cached.stats || stats);
+              if (cached.stats) {
+                const safeStats = { ...cached.stats };
+                delete safeStats.todayAppointments;
+                delete safeStats.todayDonations;
+                delete safeStats.totalDonationsThisMonth;
+                delete safeStats.totalUnitsThisMonth;
+                if (cached.stats !== safeStats) {
+                  cached.stats = safeStats;
+                  try {
+                    window.localStorage.setItem(cacheKey, JSON.stringify(cached));
+                  } catch (err) {
+                    console.warn('Failed to sanitize BloodBank stats cache', err);
+                  }
+                }
+                setStats(prev => ({ ...prev, ...safeStats }));
+              }
               setLoading(false);
               usedCache = true;
             }
@@ -639,14 +706,14 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
       timestamp: Date.now(),
       inventory: serializeInventory(inventory),
       bloodRequests: serializeRequests(bloodRequests),
-      stats,
+      stats: buildCacheStats(),
     };
     try {
       window.localStorage.setItem(cacheKey, JSON.stringify(payload));
     } catch (err) {
       console.warn('Failed to write BloodBank dashboard cache', err);
     }
-  }, [cacheKey, loading, inventory, bloodRequests, stats]);
+  }, [cacheKey, loading, inventory, bloodRequests]);
 
   const refreshData = async () => {
     await Promise.all([
