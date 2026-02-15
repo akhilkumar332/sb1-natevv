@@ -181,21 +181,6 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
       })),
     }));
 
-  const serializeAppointments = (items: Appointment[]) =>
-    items.map((item) => ({
-      ...item,
-      scheduledDate: item.scheduledDate?.toISOString(),
-      completedAt: item.completedAt ? item.completedAt.toISOString() : null,
-      createdAt: item.createdAt?.toISOString(),
-    }));
-
-  const serializeDonations = (items: Donation[]) =>
-    items.map((item) => ({
-      ...item,
-      donationDate: item.donationDate?.toISOString(),
-      createdAt: item.createdAt?.toISOString(),
-    }));
-
   const hydrateInventory = (items: any[] = []): BloodInventoryItem[] =>
     items.map((item) => ({
       ...item,
@@ -220,21 +205,6 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
         ...donor,
         respondedAt: donor.respondedAt ? new Date(donor.respondedAt) : new Date(),
       })),
-    }));
-
-  const hydrateAppointments = (items: any[] = []): Appointment[] =>
-    items.map((item) => ({
-      ...item,
-      scheduledDate: item.scheduledDate ? new Date(item.scheduledDate) : new Date(),
-      completedAt: item.completedAt ? new Date(item.completedAt) : undefined,
-      createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
-    }));
-
-  const hydrateDonations = (items: any[] = []): Donation[] =>
-    items.map((item) => ({
-      ...item,
-      donationDate: item.donationDate ? new Date(item.donationDate) : new Date(),
-      createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
     }));
 
   const fetchInventory = async () => {
@@ -575,11 +545,19 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
         if (cachedRaw) {
           try {
             const cached = JSON.parse(cachedRaw);
+            if (cached.appointments || cached.donations) {
+              delete cached.appointments;
+              delete cached.donations;
+              try {
+                window.localStorage.setItem(cacheKey, JSON.stringify(cached));
+              } catch (err) {
+                console.warn('Failed to sanitize BloodBank dashboard cache', err);
+              }
+            }
             if (cached.timestamp && Date.now() - cached.timestamp < cacheTTL) {
               setInventory(hydrateInventory(cached.inventory));
               setBloodRequests(hydrateRequests(cached.bloodRequests));
-              setAppointments(hydrateAppointments(cached.appointments));
-              setDonations(hydrateDonations(cached.donations));
+              // Do not hydrate appointments/donations from localStorage (sensitive data)
               setStats(cached.stats || stats);
               setLoading(false);
               usedCache = true;
@@ -661,8 +639,6 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
       timestamp: Date.now(),
       inventory: serializeInventory(inventory),
       bloodRequests: serializeRequests(bloodRequests),
-      appointments: serializeAppointments(appointments),
-      donations: serializeDonations(donations),
       stats,
     };
     try {
@@ -670,7 +646,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
     } catch (err) {
       console.warn('Failed to write BloodBank dashboard cache', err);
     }
-  }, [cacheKey, loading, inventory, bloodRequests, appointments, donations, stats]);
+  }, [cacheKey, loading, inventory, bloodRequests, stats]);
 
   const refreshData = async () => {
     await Promise.all([

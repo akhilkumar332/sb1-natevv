@@ -86,7 +86,35 @@ if (!admin.apps.length) {
 const app = express();
 
 // Middleware
-app.use(cors({ origin: true }));
+const allowedOrigins = (() => {
+  const raw = process.env.CORS_ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS || '';
+  const envOrigins = raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const defaults = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:4173',
+  ];
+  const combined = envOrigins.length > 0 ? envOrigins : defaults;
+  return new Set(combined);
+})();
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true; // allow non-browser or same-origin requests
+  return allowedOrigins.has(origin);
+};
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (isAllowedOrigin(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -204,15 +232,19 @@ app.post('/api/v1/auth/login', async (req, res) => {
 /**
  * @swagger
  * /api/v1/donors:
- *   get:
+ *   post:
  *     summary: Get a list of donors
  *     tags: [Donors]
- *     parameters:
- *       - in: query
- *         name: bloodType
- *         schema:
- *           type: string
- *         description: Filter by blood type
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               bloodType:
+ *                 type: string
+ *                 description: Filter by blood type
  *     responses:
  *       200:
  *         description: List of donors
@@ -232,7 +264,9 @@ app.post('/api/v1/auth/login', async (req, res) => {
  */
 const listDonorsHandler = async (req, res) => {
   try {
-    const { bloodType } = req.query || {};
+    const bloodType = req.method === 'GET'
+      ? null
+      : (typeof req.body?.bloodType === 'string' ? req.body.bloodType.trim() : null);
     const usersRef = admin.firestore().collection('users').where('role', '==', 'donor');
     let snapshot;
     try {
@@ -290,6 +324,7 @@ const listDonorsHandler = async (req, res) => {
 };
 
 app.get('/api/v1/donors', listDonorsHandler);
+app.post('/api/v1/donors', listDonorsHandler);
 app.get('/v1/donors', listDonorsHandler);
 
 /**

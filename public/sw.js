@@ -58,9 +58,11 @@ self.addEventListener('fetch', (event) => {
             // Only cache successful responses
             if (response && response.status === 200) {
               // Don't cache API calls or Firebase requests
-              if (!event.request.url.includes('/api/') &&
-                  !event.request.url.includes('firestore.googleapis.com') &&
-                  !event.request.url.endsWith('/version.json')) {
+              const requestUrl = new URL(event.request.url);
+              const isFirestoreHost = requestUrl.hostname === 'firestore.googleapis.com';
+              if (!requestUrl.pathname.startsWith('/api/') &&
+                  !isFirestoreHost &&
+                  !requestUrl.pathname.endsWith('/version.json')) {
                 cache.put(event.request, response.clone());
               }
             }

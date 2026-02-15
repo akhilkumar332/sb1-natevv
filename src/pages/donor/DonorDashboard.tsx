@@ -831,8 +831,10 @@ function DonorDashboard() {
   }, [shareOptions, user?.uid, updateUserProfile]);
 
   const providerIds = auth.currentUser?.providerData?.map(provider => provider.providerId) || [];
-  const isPhoneLinked = providerIds.includes('phone');
-  const isGoogleLinked = providerIds.includes('google.com');
+  const PHONE_PROVIDER_ID = 'phone';
+  const GOOGLE_PROVIDER_ID = 'google.com';
+  const isPhoneLinked = providerIds.some((id) => id === PHONE_PROVIDER_ID);
+  const isGoogleLinked = providerIds.some((id) => id === GOOGLE_PROVIDER_ID);
   const canUnlinkPhone = isPhoneLinked && isGoogleLinked;
   const canUnlinkGoogle = isGoogleLinked && isPhoneLinked;
 
