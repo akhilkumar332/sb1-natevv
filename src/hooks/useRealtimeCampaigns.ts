@@ -4,7 +4,7 @@
  * Real-time campaign monitoring using Firebase onSnapshot
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   collection,
   query,
@@ -45,10 +45,49 @@ export const useRealtimeCampaigns = ({
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const cacheKey = useMemo(() => {
+    const key = [ngoId || 'all', status || 'all', city || 'all', limitCount].join('|');
+    return `campaigns_cache_${encodeURIComponent(key)}`;
+  }, [ngoId, status, city, limitCount]);
+  const cacheTTL = 5 * 60 * 1000;
+
+  const serializeCampaigns = (items: Campaign[]) =>
+    items.map((item) => ({
+      ...item,
+      startDate: item.startDate instanceof Date ? item.startDate.toISOString() : item.startDate,
+      endDate: item.endDate instanceof Date ? item.endDate.toISOString() : item.endDate,
+      createdAt: item.createdAt instanceof Date ? item.createdAt.toISOString() : item.createdAt,
+      updatedAt: item.updatedAt instanceof Date ? item.updatedAt.toISOString() : item.updatedAt,
+    }));
+
+  const hydrateCampaigns = (items: any[] = []): Campaign[] =>
+    items.map((item) => ({
+      ...item,
+      startDate: item.startDate ? new Date(item.startDate) : item.startDate,
+      endDate: item.endDate ? new Date(item.endDate) : item.endDate,
+      createdAt: item.createdAt ? new Date(item.createdAt) : item.createdAt,
+      updatedAt: item.updatedAt ? new Date(item.updatedAt) : item.updatedAt,
+    }));
 
   useEffect(() => {
     setLoading(true);
     setError(null);
+    let usedCache = false;
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const cachedRaw = window.sessionStorage.getItem(cacheKey);
+      if (cachedRaw) {
+        try {
+          const cached = JSON.parse(cachedRaw);
+          if (cached.timestamp && Date.now() - cached.timestamp < cacheTTL) {
+            setCampaigns(hydrateCampaigns(cached.campaigns || []));
+            setLoading(false);
+            usedCache = true;
+          }
+        } catch (err) {
+          console.warn('Failed to hydrate campaigns cache', err);
+        }
+      }
+    }
 
     // Build query constraints
     const constraints: any[] = [];
@@ -93,7 +132,22 @@ export const useRealtimeCampaigns = ({
           }
 
           setCampaigns(campaignData);
-          setLoading(false);
+          if (!usedCache) {
+            setLoading(false);
+          }
+          if (typeof window !== 'undefined' && window.sessionStorage) {
+            try {
+              window.sessionStorage.setItem(
+                cacheKey,
+                JSON.stringify({
+                  timestamp: Date.now(),
+                  campaigns: serializeCampaigns(campaignData),
+                })
+              );
+            } catch (err) {
+              console.warn('Failed to write campaigns cache', err);
+            }
+          }
         } catch (err) {
           console.error('Error processing campaigns:', err);
           setError('Failed to load campaigns');

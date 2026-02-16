@@ -3,7 +3,7 @@
  * Fetches all donor-related data from Firestore
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   collection,
   query,
@@ -101,7 +101,7 @@ interface UseDonorDataReturn {
   badges: Badge[];
   loading: boolean;
   error: string | null;
-  refreshData: () => Promise<void>;
+  refreshData: (options?: { silent?: boolean }) => Promise<void>;
 }
 
 export const useDonorData = (userId: string, bloodType?: string, city?: string): UseDonorDataReturn => {
@@ -114,6 +114,78 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const legacySyncRef = useRef(false);
+  const cacheKey = useMemo(() => (userId ? `donor_dashboard_cache_${userId}` : ''), [userId]);
+  const cacheTTL = 5 * 60 * 1000;
+
+  const serializeDonationHistory = (items: DonationHistory[]) =>
+    items.map((entry) => ({
+      ...entry,
+      date: entry.date?.toISOString(),
+      certificateUrl: undefined,
+      notes: undefined,
+    }));
+
+  const serializeEmergencyRequests = (items: EmergencyRequest[]) =>
+    items.map((item) => ({
+      ...item,
+      requestedAt: item.requestedAt?.toISOString(),
+      contactPhone: undefined,
+      patientInfo: undefined,
+    }));
+
+  const serializeBloodCamps = (items: BloodCamp[]) =>
+    items.map((item) => ({
+      ...item,
+      date: item.date?.toISOString(),
+    }));
+
+  const serializeBadges = (items: Badge[]) =>
+    items.map((badge) => ({
+      ...badge,
+      earnedDate: badge.earnedDate?.toISOString(),
+    }));
+
+  const serializeStats = (value: DonorStats | null) => {
+    if (!value) return null;
+    return {
+      ...value,
+      nextEligibleDate: value.nextEligibleDate?.toISOString() ?? null,
+      badges: serializeBadges(value.badges || []),
+    };
+  };
+
+  const hydrateDonationHistory = (items: any[] = []): DonationHistory[] =>
+    items.map((entry) => ({
+      ...entry,
+      date: entry.date ? new Date(entry.date) : new Date(),
+    }));
+
+  const hydrateEmergencyRequests = (items: any[] = []): EmergencyRequest[] =>
+    items.map((item) => ({
+      ...item,
+      requestedAt: item.requestedAt ? new Date(item.requestedAt) : new Date(),
+    }));
+
+  const hydrateBloodCamps = (items: any[] = []): BloodCamp[] =>
+    items.map((item) => ({
+      ...item,
+      date: item.date ? new Date(item.date) : new Date(),
+    }));
+
+  const hydrateBadges = (items: any[] = []): Badge[] =>
+    items.map((badge) => ({
+      ...badge,
+      earnedDate: badge.earnedDate ? new Date(badge.earnedDate) : undefined,
+    }));
+
+  const hydrateStats = (value: any | null): DonorStats | null => {
+    if (!value) return null;
+    return {
+      ...value,
+      nextEligibleDate: value.nextEligibleDate ? new Date(value.nextEligibleDate) : null,
+      badges: hydrateBadges(value.badges || []),
+    };
+  };
 
   const parseDonationDate = (value: any): Date | null => {
     if (!value) return null;
@@ -318,6 +390,39 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     }
   };
 
+  const fetchDonationHistoryOnce = async () => {
+    if (!userId) return;
+    try {
+      const historyRef = doc(db, 'DonationHistory', userId);
+      const snapshot = await getDoc(historyRef);
+      if (!snapshot.exists()) {
+        setDonationHistory([]);
+        setFirstDonationDate(null);
+        return;
+      }
+      const data = snapshot.data();
+      const rawDonations = Array.isArray(data.donations) ? data.donations : [];
+      const mapped = rawDonations.map((entry: any, index: number) => (
+        mapDonationEntry(entry, `donation-${index}`)
+      ));
+      if (mapped.length === 0) {
+        setDonationHistory([]);
+        setFirstDonationDate(null);
+        return;
+      }
+      const sortedDonations = [...mapped]
+        .sort((a, b) => b.date.getTime() - a.date.getTime())
+        .slice(0, 20);
+      const oldestDonation = mapped.reduce((oldest, donation) => (
+        donation.date < oldest ? donation.date : oldest
+      ), mapped[0].date);
+      setDonationHistory(sortedDonations);
+      setFirstDonationDate(oldestDonation);
+    } catch (err) {
+      console.error('Error fetching donation history (once):', err);
+    }
+  };
+
   // Fetch emergency blood requests matching donor's blood type and city
   const fetchEmergencyRequests = async () => {
     if (!bloodType) return () => {};
@@ -374,6 +479,47 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     }
   };
 
+  const fetchEmergencyRequestsOnce = async () => {
+    if (!bloodType) return;
+    try {
+      const requestsRef = collection(db, 'bloodRequests');
+      const q = query(
+        requestsRef,
+        where('bloodType', '==', bloodType),
+        limit(20)
+      );
+      const snapshot = await getDocs(q);
+      const allRequests: EmergencyRequest[] = snapshot.docs.map(docSnapshot => {
+        const data = docSnapshot.data();
+        return {
+          id: docSnapshot.id,
+          bloodType: data.bloodType,
+          units: data.units || data.unitsNeeded || 1,
+          urgency: data.urgency || 'medium',
+          hospitalName: data.hospitalName || data.hospital || 'BloodBank',
+          hospitalId: data.hospitalId || '',
+          location: data.location || data.city || '',
+          city: data.city || '',
+          requestedAt: data.createdAt?.toDate() || data.requestedAt?.toDate() || new Date(),
+          patientInfo: data.patientInfo,
+          contactPhone: data.contactPhone,
+          status: data.status || 'active',
+        };
+      });
+      const urgencyOrder = { critical: 3, high: 2, medium: 1 };
+      const activeRequests = allRequests
+        .filter(r => r.status === 'active')
+        .sort((a, b) => {
+          const urgencyDiff = (urgencyOrder[b.urgency] || 0) - (urgencyOrder[a.urgency] || 0);
+          if (urgencyDiff !== 0) return urgencyDiff;
+          return b.requestedAt.getTime() - a.requestedAt.getTime();
+        })
+        .slice(0, 5);
+      setEmergencyRequests(activeRequests);
+    } catch (err) {
+      console.error('Error fetching emergency requests (once):', err);
+    }
+  };
   // Fetch nearby blood camps
   const fetchBloodCamps = async () => {
     if (!city) return;
@@ -481,7 +627,49 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     if (!userId) return;
 
     const loadData = async () => {
-      setLoading(true);
+      setError(null);
+      let usedCache = false;
+      if (cacheKey && typeof window !== 'undefined' && window.sessionStorage) {
+        const cachedRaw = window.sessionStorage.getItem(cacheKey);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw);
+            if (cached.timestamp && Date.now() - cached.timestamp < cacheTTL) {
+              if (cached.donationHistory) {
+                const hydrated = hydrateDonationHistory(cached.donationHistory);
+                setDonationHistory(hydrated);
+                if (cached.firstDonationDate) {
+                  setFirstDonationDate(new Date(cached.firstDonationDate));
+                } else if (hydrated.length > 0) {
+                  const oldestDonation = hydrated.reduce((oldest, donation) => (
+                    donation.date < oldest ? donation.date : oldest
+                  ), hydrated[0].date);
+                  setFirstDonationDate(oldestDonation);
+                }
+              }
+              if (cached.emergencyRequests) {
+                setEmergencyRequests(hydrateEmergencyRequests(cached.emergencyRequests));
+              }
+              if (cached.bloodCamps) {
+                setBloodCamps(hydrateBloodCamps(cached.bloodCamps));
+              }
+              if (cached.stats) {
+                setStats(hydrateStats(cached.stats));
+              }
+              if (cached.badges) {
+                setBadges(hydrateBadges(cached.badges));
+              }
+              setLoading(false);
+              usedCache = true;
+            }
+          } catch (err) {
+            console.warn('Failed to hydrate donor dashboard cache', err);
+          }
+        }
+      }
+      if (!usedCache) {
+        setLoading(true);
+      }
       setError(null);
 
       try {
@@ -489,11 +677,23 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
         const unsubscribeDonations = await fetchDonationHistory();
         const unsubscribeRequests = await fetchEmergencyRequests();
 
-        setLoading(false);
+        if (!usedCache) {
+          setLoading(false);
+        }
 
         // Fetch camps and stats in background
-        void fetchBloodCamps();
-        void fetchStatsAndBadges();
+        const scheduleBackground = (task: () => void) => {
+          if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+            (window as any).requestIdleCallback(task);
+          } else {
+            setTimeout(task, 0);
+          }
+        };
+
+        scheduleBackground(() => {
+          void fetchBloodCamps();
+          void fetchStatsAndBadges();
+        });
 
         // Cleanup listeners on unmount
         return () => {
@@ -517,15 +717,38 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     }
   }, [donationHistory.length]);
 
-  const refreshData = async () => {
-    setLoading(true);
+  const refreshData = async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoading(true);
+    }
     await syncDonationHistoryFromLegacy();
-    await fetchDonationHistory();
-    await fetchEmergencyRequests();
+    await fetchDonationHistoryOnce();
+    await fetchEmergencyRequestsOnce();
     await fetchBloodCamps();
     await fetchStatsAndBadges();
-    setLoading(false);
+    if (!options?.silent) {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    if (!cacheKey || loading) return;
+    if (typeof window === 'undefined' || !window.sessionStorage) return;
+    const payload = {
+      timestamp: Date.now(),
+      donationHistory: serializeDonationHistory(donationHistory),
+      firstDonationDate: firstDonationDate?.toISOString() ?? null,
+      emergencyRequests: serializeEmergencyRequests(emergencyRequests),
+      bloodCamps: serializeBloodCamps(bloodCamps),
+      stats: serializeStats(stats),
+      badges: serializeBadges(badges),
+    };
+    try {
+      window.sessionStorage.setItem(cacheKey, JSON.stringify(payload));
+    } catch (err) {
+      console.warn('Failed to write donor dashboard cache', err);
+    }
+  }, [cacheKey, loading, donationHistory, firstDonationDate, emergencyRequests, bloodCamps, stats, badges]);
 
   return {
     donationHistory,

@@ -1,5 +1,5 @@
 // src/pages/donor/DonorDashboard.tsx
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   User as LucideUser,
   MapPin,
@@ -145,6 +145,11 @@ function DonorDashboard() {
     certificateUrl: '',
   });
   const [donationFeedbackMap, setDonationFeedbackMap] = useState<Record<string, DonationFeedback>>({});
+  const requestCacheKey = useMemo(() => (user?.uid ? `donor_requests_cache_${user.uid}` : ''), [user?.uid]);
+  const requestCacheTTL = 5 * 60 * 1000;
+  const incomingRequestsRef = useRef<any[]>([]);
+  const outgoingRequestsRef = useRef<any[]>([]);
+  const requestBatchesRef = useRef<any[]>([]);
 
   // Use custom hook to fetch all donor data
   const {
@@ -600,6 +605,144 @@ function DonorDashboard() {
       return;
     }
 
+    if (requestCacheKey && typeof window !== 'undefined') {
+      const sanitizeRequestCache = (cached: any) => {
+        let hadPII = false;
+        const stripRequestPII = (item: any) => {
+          if (!item || typeof item !== 'object') return item;
+          const {
+            requesterPhone,
+            requesterEmail,
+            targetDonorPhone,
+            targetDonorEmail,
+            contactPhone,
+            contactEmail,
+            ...rest
+          } = item;
+          if (
+            requesterPhone
+            || requesterEmail
+            || targetDonorPhone
+            || targetDonorEmail
+            || contactPhone
+            || contactEmail
+          ) {
+            hadPII = true;
+          }
+          return rest;
+        };
+        const stripBatchPII = (item: any) => {
+          if (!item || typeof item !== 'object') return item;
+          const {
+            requesterPhone,
+            requesterEmail,
+            contactPhone,
+            contactEmail,
+            ...rest
+          } = item;
+          if (requesterPhone || requesterEmail || contactPhone || contactEmail) {
+            hadPII = true;
+          }
+          return rest;
+        };
+        const sanitizedIncoming = Array.isArray(cached?.incoming)
+          ? cached.incoming.map(stripRequestPII)
+          : [];
+        const sanitizedOutgoing = Array.isArray(cached?.outgoing)
+          ? cached.outgoing.map(stripRequestPII)
+          : [];
+        const sanitizedBatches = Array.isArray(cached?.batches)
+          ? cached.batches.map(stripBatchPII)
+          : [];
+        return {
+          hadPII,
+          sanitized: {
+            timestamp: cached?.timestamp || Date.now(),
+            incoming: sanitizedIncoming,
+            outgoing: sanitizedOutgoing,
+            batches: sanitizedBatches,
+          },
+        };
+      };
+
+      if (window.localStorage && window.sessionStorage) {
+        const legacyRaw = window.localStorage.getItem(requestCacheKey);
+        if (legacyRaw) {
+          try {
+            const legacyCache = JSON.parse(legacyRaw);
+            const { sanitized } = sanitizeRequestCache(legacyCache);
+            let shouldWrite = true;
+            const existingRaw = window.sessionStorage.getItem(requestCacheKey);
+            if (existingRaw) {
+              try {
+                const existing = JSON.parse(existingRaw);
+                if (existing?.timestamp && existing.timestamp > sanitized.timestamp) {
+                  shouldWrite = false;
+                }
+              } catch {
+                // ignore
+              }
+            }
+            if (shouldWrite) {
+              window.sessionStorage.setItem(requestCacheKey, JSON.stringify(sanitized));
+            }
+          } catch (error) {
+            console.warn('Failed to sanitize legacy donor request cache', error);
+          }
+          window.localStorage.removeItem(requestCacheKey);
+        }
+      }
+
+      if (window.sessionStorage) {
+        const cachedRaw = window.sessionStorage.getItem(requestCacheKey);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw);
+            const { hadPII, sanitized } = sanitizeRequestCache(cached);
+            const cacheIsFresh = sanitized.timestamp && Date.now() - sanitized.timestamp < requestCacheTTL;
+            if (cacheIsFresh) {
+              const hydrateRequest = (item: any) => ({
+                ...item,
+                requestedAt: item.requestedAt ? new Date(item.requestedAt) : undefined,
+                respondedAt: item.respondedAt ? new Date(item.respondedAt) : undefined,
+              });
+              const hydrateBatch = (item: any) => ({
+                ...item,
+                createdAt: item.createdAt ? new Date(item.createdAt) : item.createdAt,
+              });
+              const incomingItems = sanitized.incoming.map(hydrateRequest);
+              const outgoingItems = sanitized.outgoing.map(hydrateRequest);
+              const batchItems = sanitized.batches.map(hydrateBatch);
+              if (incomingItems.length > 0) {
+                incomingRequestsRef.current = incomingItems;
+                setIncomingDonorRequests(incomingItems);
+                setIncomingRequestsLoading(false);
+              }
+              if (outgoingItems.length > 0) {
+                outgoingRequestsRef.current = outgoingItems;
+                setOutgoingDonorRequests(outgoingItems);
+                setOutgoingRequestsLoading(false);
+              }
+              if (batchItems.length > 0) {
+                requestBatchesRef.current = batchItems;
+                setDonorRequestBatches(batchItems);
+                setDonorRequestBatchesLoading(false);
+              }
+            }
+            if (hadPII) {
+              try {
+                window.sessionStorage.setItem(requestCacheKey, JSON.stringify(sanitized));
+              } catch (error) {
+                console.warn('Failed to purge donor request cache PII', error);
+              }
+            }
+          } catch (error) {
+            console.warn('Failed to hydrate donor request cache', error);
+          }
+        }
+      }
+    }
+
     const incomingQuery = query(
       collection(db, 'donorRequests'),
       where('targetDonorUid', '==', user.uid)
@@ -625,6 +768,60 @@ function DonorDashboard() {
       };
     };
 
+    const persistCache = (incoming: any[], outgoing: any[], batches: any[]) => {
+      if (!requestCacheKey || typeof window === 'undefined' || !window.sessionStorage) return;
+      const stripRequestPII = (item: any) => {
+        if (!item || typeof item !== 'object') return item;
+        const {
+          requesterPhone,
+          requesterEmail,
+          targetDonorPhone,
+          targetDonorEmail,
+          contactPhone,
+          contactEmail,
+          ...rest
+        } = item;
+        return rest;
+      };
+      const stripBatchPII = (item: any) => {
+        if (!item || typeof item !== 'object') return item;
+        const {
+          requesterPhone,
+          requesterEmail,
+          contactPhone,
+          contactEmail,
+          ...rest
+        } = item;
+        return rest;
+      };
+      const serializeRequest = (item: any) => {
+        const sanitized = stripRequestPII(item);
+        return {
+          ...sanitized,
+          requestedAt: item.requestedAt instanceof Date ? item.requestedAt.toISOString() : item.requestedAt,
+          respondedAt: item.respondedAt instanceof Date ? item.respondedAt.toISOString() : item.respondedAt,
+        };
+      };
+      const serializeBatch = (item: any) => {
+        const sanitized = stripBatchPII(item);
+        return {
+          ...sanitized,
+          createdAt: item.createdAt instanceof Date ? item.createdAt.toISOString() : item.createdAt,
+        };
+      };
+      const payload = {
+        timestamp: Date.now(),
+        incoming: incoming.slice(0, 10).map(serializeRequest),
+        outgoing: outgoing.slice(0, 10).map(serializeRequest),
+        batches: batches.slice(0, 10).map(serializeBatch),
+      };
+      try {
+        window.sessionStorage.setItem(requestCacheKey, JSON.stringify(payload));
+      } catch (error) {
+        console.warn('Failed to write donor request cache', error);
+      }
+    };
+
     setIncomingRequestsLoading(true);
     const unsubscribeIncoming = onSnapshot(incomingQuery, (snapshot) => {
       const items = snapshot.docs.map(mapRequest)
@@ -633,8 +830,14 @@ function DonorDashboard() {
           const bTime = b.requestedAt ? new Date(b.requestedAt).getTime() : 0;
           return bTime - aTime;
         });
+      incomingRequestsRef.current = items;
       setIncomingDonorRequests(items);
       setIncomingRequestsLoading(false);
+      persistCache(
+        incomingRequestsRef.current,
+        outgoingRequestsRef.current,
+        requestBatchesRef.current
+      );
     }, (error) => {
       console.warn('Failed to load incoming donor requests:', error);
       setIncomingRequestsLoading(false);
@@ -648,8 +851,14 @@ function DonorDashboard() {
           const bTime = b.requestedAt ? new Date(b.requestedAt).getTime() : 0;
           return bTime - aTime;
         });
+      outgoingRequestsRef.current = items;
       setOutgoingDonorRequests(items);
       setOutgoingRequestsLoading(false);
+      persistCache(
+        incomingRequestsRef.current,
+        outgoingRequestsRef.current,
+        requestBatchesRef.current
+      );
     }, (error) => {
       console.warn('Failed to load outgoing donor requests:', error);
       setOutgoingRequestsLoading(false);
@@ -671,8 +880,14 @@ function DonorDashboard() {
           return bTime - aTime;
         })
         .slice(0, 10);
+      requestBatchesRef.current = items;
       setDonorRequestBatches(items);
       setDonorRequestBatchesLoading(false);
+      persistCache(
+        incomingRequestsRef.current,
+        outgoingRequestsRef.current,
+        requestBatchesRef.current
+      );
     }, (error) => {
       console.warn('Failed to load donor request batches:', error);
       setDonorRequestBatchesLoading(false);
@@ -703,6 +918,37 @@ function DonorDashboard() {
     const timer = setTimeout(task, 1200);
     return () => clearTimeout(timer);
   }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (typeof window === 'undefined' || !window.sessionStorage) return;
+    const prefetchKey = `donor_dashboard_prefetch_${user.uid}`;
+    const lastPrefetch = window.sessionStorage.getItem(prefetchKey);
+    if (lastPrefetch && Date.now() - Number(lastPrefetch) < 5 * 60 * 1000) {
+      return;
+    }
+    const task = () => {
+      refreshData({ silent: true })
+        .catch((error) => {
+          console.warn('Donor dashboard prefetch failed', error);
+        })
+        .finally(() => {
+          window.sessionStorage.setItem(prefetchKey, Date.now().toString());
+        });
+    };
+    const idle = typeof globalThis !== 'undefined' ? (globalThis as any).requestIdleCallback : null;
+    if (typeof idle === 'function') {
+      const id = idle(task);
+      return () => {
+        const cancel = (globalThis as any).cancelIdleCallback;
+        if (typeof cancel === 'function') {
+          cancel(id);
+        }
+      };
+    }
+    const timer = setTimeout(task, 1200);
+    return () => clearTimeout(timer);
+  }, [user?.uid, refreshData]);
 
   useEffect(() => {
     if (!user?.uid || user.role !== 'donor' || !user.onboardingCompleted) return;
@@ -2182,7 +2428,7 @@ function DonorDashboard() {
           <p className="text-gray-800 text-lg font-semibold mb-2">Error Loading Dashboard</p>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
-            onClick={refreshData}
+            onClick={() => refreshData()}
             className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all duration-300 flex items-center space-x-2 mx-auto"
           >
             <RefreshCw className="w-5 h-5" />
@@ -2254,7 +2500,7 @@ function DonorDashboard() {
             </div>
             <div className="hidden md:flex items-center space-x-4">
               <button
-                onClick={refreshData}
+                onClick={() => refreshData()}
                 className="p-3 bg-white/20 hover:bg-white/30 rounded-full transition-all duration-300"
                 title="Refresh data"
               >
