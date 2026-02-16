@@ -4,12 +4,33 @@ import {
   ChevronRight,
   Handshake,
   Heart,
+  MapPin,
   Plus,
   Target,
   TrendingUp,
   Users,
 } from 'lucide-react';
 import type { NgoDashboardContext } from '../NgoDashboard';
+
+const typeLabels: Record<string, string> = {
+  'blood-drive': 'Blood Drive',
+  awareness: 'Awareness',
+  fundraising: 'Fundraising',
+  volunteer: 'Volunteer Drive',
+};
+
+const targetLabels: Record<string, string> = {
+  units: 'Units',
+  donors: 'Donors',
+  funds: 'Funds',
+  volunteers: 'Volunteers',
+};
+
+const formatDateRange = (start: Date, end: Date) => {
+  const startText = start.toLocaleDateString();
+  const endText = end.toLocaleDateString();
+  return `${startText} • ${endText}`;
+};
 
 function NgoOverview() {
   const {
@@ -19,6 +40,7 @@ function NgoOverview() {
     volunteers,
     donorCommunity,
     getStatusColor,
+    getCampaignTypeIcon,
     referralCount,
     eligibleReferralCount,
     referralSummary,
@@ -107,35 +129,73 @@ function NgoOverview() {
                     : 0;
                 const achievedValue = Math.max(campaign.achieved || 0, registeredCount);
                 const progress = campaign.target > 0 ? Math.min((achievedValue / campaign.target) * 100, 100) : 0;
+                const typeLabel = typeLabels[campaign.type] || 'Campaign';
+                const targetLabel = targetLabels[campaign.targetType || 'units'] || 'Units';
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const daysUntilStart = Math.ceil((campaign.startDate.getTime() - today.getTime()) / 86400000);
+                const daysToEnd = Math.ceil((campaign.endDate.getTime() - today.getTime()) / 86400000);
+                const scheduleLabel = daysUntilStart > 0
+                  ? `Starts in ${daysUntilStart}d`
+                  : daysToEnd > 0
+                    ? `${daysToEnd}d left`
+                    : 'Ended';
                 return (
-                  <div key={campaign.id} className="border border-gray-100 rounded-2xl p-4 bg-gray-50/40">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{campaign.title}</h3>
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mt-2">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
-                            {campaign.startDate.toLocaleDateString()}
-                          </span>
-                          <span>{campaign.location}</span>
+                  <div key={campaign.id} className="rounded-2xl border border-red-100/60 bg-white shadow-sm p-5">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center text-red-600">
+                          {getCampaignTypeIcon(campaign.type)}
+                        </div>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600">
+                              {typeLabel}
+                            </span>
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(campaign.status)}`}>
+                              {campaign.status}
+                            </span>
+                            <span className="px-3 py-1 rounded-full text-xs font-semibold border border-gray-200 text-gray-500">
+                              {scheduleLabel}
+                            </span>
+                          </div>
+                          <h3 className="text-base font-semibold text-gray-900 mt-2">{campaign.title}</h3>
+                          <p className="text-xs text-gray-500 mt-2 flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-amber-500" />
+                            {campaign.location}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-red-400" />
+                            {formatDateRange(campaign.startDate, campaign.endDate)}
+                          </p>
                         </div>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(campaign.status)}`}>
-                        {campaign.status}
-                      </span>
+                      <div className="flex flex-col items-start sm:items-end gap-1">
+                        <div className="text-xs text-gray-500">Target</div>
+                        <div className="text-base font-semibold text-gray-900">
+                          {campaign.target} {targetLabel}
+                        </div>
+                      </div>
                     </div>
                     <div className="mt-4">
-                      <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                      <div className="flex items-center justify-between text-xs text-gray-500">
                         <span>Progress</span>
                         <span className="font-semibold text-gray-700">
-                          {achievedValue} / {campaign.target}
+                          {achievedValue} / {campaign.target} {targetLabel}
                         </span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="w-full bg-gray-100 rounded-full h-2 mt-2">
                         <div
                           className="h-2 rounded-full bg-gradient-to-r from-red-600 to-amber-500"
                           style={{ width: `${progress}%` }}
                         />
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                        <span>{progress.toFixed(1)}% completed</span>
+                        <span>
+                          {campaign.city || 'City'}
+                          {campaign.state ? `, ${campaign.state}` : ''}
+                        </span>
                       </div>
                     </div>
                   </div>

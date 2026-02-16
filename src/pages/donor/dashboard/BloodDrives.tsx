@@ -56,6 +56,16 @@ const DonorBloodDrives = () => {
     return null;
   };
 
+  const getEffectiveStatus = (campaign: any) => {
+    const endDate = toDateValue(campaign?.endDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (endDate && endDate < today) {
+      return 'completed';
+    }
+    return campaign?.status || 'active';
+  };
+
   const sortedCampaigns = useMemo(() => {
     const list = [...(campaigns || [])]
       .filter((campaign) => Boolean(campaign?.ngoId))
@@ -67,7 +77,8 @@ const DonorBloodDrives = () => {
 
     return list.filter((campaign) => {
       if (typeFilter !== 'all' && campaign.type !== typeFilter) return false;
-      if (statusFilter !== 'all' && campaign.status !== statusFilter) return false;
+      const effectiveStatus = getEffectiveStatus(campaign);
+      if (statusFilter !== 'all' && effectiveStatus !== statusFilter) return false;
       if (cityFilter === 'my-city') {
         const campaignCity = campaign.location?.city || (campaign as any).city || (campaign as any).locationDetails?.city;
         if (!campaignCity || !user?.city) return false;
@@ -108,8 +119,10 @@ const DonorBloodDrives = () => {
       ? campaign.registeredDonors.includes(user.uid)
       : false;
 
-  const isParticipationClosed = (campaign: any) =>
-    campaign?.status === 'cancelled' || campaign?.status === 'completed';
+  const isParticipationClosed = (campaign: any) => {
+    const effectiveStatus = getEffectiveStatus(campaign);
+    return effectiveStatus === 'cancelled' || effectiveStatus === 'completed';
+  };
 
   const handleParticipate = async (campaign: any) => {
     if (!user?.uid) {
@@ -224,9 +237,9 @@ const DonorBloodDrives = () => {
                               {campaign.ngoName ? `By ${campaign.ngoName}` : 'By NGO'}
                             </p>
                           </div>
-                          {campaign.status && (
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusClasses(campaign.status)} w-fit`}>
-                              {campaign.status}
+                          {getEffectiveStatus(campaign) && (
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusClasses(getEffectiveStatus(campaign))} w-fit`}>
+                              {getEffectiveStatus(campaign)}
                             </span>
                           )}
                         </div>

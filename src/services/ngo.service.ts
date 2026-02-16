@@ -56,6 +56,15 @@ export const createCampaign = async (
     const endDate = campaign.endDate instanceof Date
       ? campaign.endDate
       : campaign.endDate.toDate();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (startDate < today) {
+      throw new ValidationError('Start date cannot be in the past');
+    }
+    if (endDate < today) {
+      throw new ValidationError('End date cannot be in the past');
+    }
 
     if (endDate <= startDate) {
       throw new ValidationError('End date must be after start date');
@@ -162,12 +171,45 @@ export const updateCampaign = async (
   try {
     // Remove fields that shouldn't be updated directly
     const { id, createdAt, createdBy, ...allowedUpdates } = updates;
+    const hasStart = allowedUpdates.startDate !== undefined;
+    const hasEnd = allowedUpdates.endDate !== undefined;
+    if (hasStart || hasEnd) {
+      const campaignDoc = await getDoc(doc(db, 'campaigns', campaignId));
+      if (!campaignDoc.exists()) {
+        throw new NotFoundError('Campaign not found');
+      }
+      const current = campaignDoc.data() as any;
+      const normalizeDate = (value: any): Date | null => {
+        if (!value) return null;
+        if (value instanceof Date) return value;
+        if (typeof value?.toDate === 'function') return value.toDate();
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+      };
+      const startDate = hasStart ? normalizeDate(allowedUpdates.startDate) : normalizeDate(current.startDate);
+      const endDate = hasEnd ? normalizeDate(allowedUpdates.endDate) : normalizeDate(current.endDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (startDate && startDate < today) {
+        throw new ValidationError('Start date cannot be in the past');
+      }
+      if (endDate && endDate < today) {
+        throw new ValidationError('End date cannot be in the past');
+      }
+      if (startDate && endDate && endDate <= startDate) {
+        throw new ValidationError('End date must be after start date');
+      }
+    }
 
     await updateDoc(doc(db, 'campaigns', campaignId), {
       ...allowedUpdates,
       updatedAt: getServerTimestamp(),
     });
   } catch (error) {
+    if (error instanceof ValidationError || error instanceof NotFoundError) {
+      throw error;
+    }
     throw new DatabaseError('Failed to update campaign');
   }
 };

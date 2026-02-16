@@ -3,9 +3,10 @@
  * Fetches all NGO-related data from Firestore
  */
 
-import { useMemo, useState, useEffect } from 'react';
-import { collection, query, where, limit, onSnapshot, getDocs, documentId } from 'firebase/firestore';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import { collection, query, where, limit, onSnapshot, getDocs, documentId, writeBatch, doc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { getServerTimestamp } from '../utils/firestore.utils';
 
 export interface Campaign {
   id: string;
@@ -127,6 +128,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const autoCompleteRef = useRef<{ lastRun: number; inFlight: boolean }>({ lastRun: 0, inFlight: false });
 
   const cacheKey = useMemo(() => (ngoId ? `ngo_dashboard_cache_${ngoId}` : ''), [ngoId]);
   const cacheTTL = 5 * 60 * 1000;
@@ -553,6 +555,46 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
 
     loadData();
   }, [ngoId]);
+
+  useEffect(() => {
+    if (!ngoId || campaigns.length === 0) return;
+    if (autoCompleteRef.current.inFlight) return;
+    const now = Date.now();
+    if (now - autoCompleteRef.current.lastRun < 5 * 60 * 1000) {
+      return;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const toComplete = campaigns.filter((campaign) => {
+      if (!campaign?.endDate) return false;
+      const endDate = campaign.endDate instanceof Date ? campaign.endDate : new Date(campaign.endDate);
+      if (Number.isNaN(endDate.getTime())) return false;
+      const isPast = endDate < today;
+      const isActiveLike = campaign.status === 'active' || campaign.status === 'upcoming';
+      return isPast && isActiveLike;
+    });
+    if (toComplete.length === 0) {
+      autoCompleteRef.current.lastRun = now;
+      return;
+    }
+    autoCompleteRef.current.inFlight = true;
+    const batch = writeBatch(db);
+    toComplete.forEach((campaign) => {
+      batch.update(doc(db, 'campaigns', campaign.id), {
+        status: 'completed',
+        completedAt: getServerTimestamp(),
+        updatedAt: getServerTimestamp(),
+      });
+    });
+    batch.commit()
+      .catch((error) => {
+        console.warn('Failed to auto-complete past campaigns', error);
+      })
+      .finally(() => {
+        autoCompleteRef.current.lastRun = Date.now();
+        autoCompleteRef.current.inFlight = false;
+      });
+  }, [campaigns, ngoId]);
 
   useEffect(() => {
     if (!loading && campaigns.length >= 0) {

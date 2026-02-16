@@ -8,6 +8,7 @@ import {
   Trash2,
   Edit3,
   Target,
+  Calendar,
   Locate,
   X,
 } from 'lucide-react';
@@ -33,6 +34,33 @@ const emptyForm = {
   venue: '',
   latitude: '',
   longitude: '',
+};
+
+const parseLocalDate = (value: string) => {
+  if (!value) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+const typeLabels: Record<string, string> = {
+  'blood-drive': 'Blood Drive',
+  awareness: 'Awareness',
+  fundraising: 'Fundraising',
+  volunteer: 'Volunteer Drive',
+};
+
+const targetLabels: Record<string, string> = {
+  units: 'Units',
+  donors: 'Donors',
+  funds: 'Funds',
+  volunteers: 'Volunteers',
+};
+
+const formatDateRange = (start: Date, end: Date) => {
+  const startText = start.toLocaleDateString();
+  const endText = end.toLocaleDateString();
+  return `${startText} • ${endText}`;
 };
 
 function toInputDate(date: Date) {
@@ -182,6 +210,17 @@ function NgoCampaignDetail() {
       : 0;
   const achievedValue = Math.max(campaign.achieved || 0, registeredCount);
   const progress = campaign.target > 0 ? Math.min((achievedValue / campaign.target) * 100, 100) : 0;
+  const typeLabel = typeLabels[campaign.type] || 'Campaign';
+  const targetLabel = targetLabels[campaign.targetType || 'units'] || 'Units';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysUntilStart = Math.ceil((campaign.startDate.getTime() - today.getTime()) / 86400000);
+  const daysToEnd = Math.ceil((campaign.endDate.getTime() - today.getTime()) / 86400000);
+  const scheduleLabel = daysUntilStart > 0
+    ? `Starts in ${daysUntilStart}d`
+    : daysToEnd > 0
+      ? `${daysToEnd}d left`
+      : 'Ended';
   const latitude = campaign.locationDetails?.latitude;
   const longitude = campaign.locationDetails?.longitude;
   const hasCoordinates = typeof latitude === 'number' && typeof longitude === 'number';
@@ -356,7 +395,25 @@ function NgoCampaignDetail() {
       return;
     }
 
-    if (new Date(form.endDate) < new Date(form.startDate)) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = parseLocalDate(form.startDate);
+    const endDate = parseLocalDate(form.endDate);
+
+    if (!startDate || !endDate) {
+      toast.error('Please enter valid dates.');
+      return;
+    }
+
+    if (startDate < today) {
+      toast.error('Start date cannot be in the past.');
+      return;
+    }
+    if (endDate < today) {
+      toast.error('End date cannot be in the past.');
+      return;
+    }
+    if (endDate <= startDate) {
       toast.error('End date must be after start date.');
       return;
     }
@@ -372,8 +429,8 @@ function NgoCampaignDetail() {
         status: form.status as any,
         target: Number(form.target || 0),
         targetType: form.targetType as any,
-        startDate: Timestamp.fromDate(new Date(form.startDate)),
-        endDate: Timestamp.fromDate(new Date(form.endDate)),
+        startDate: Timestamp.fromDate(startDate),
+        endDate: Timestamp.fromDate(endDate),
         location: {
           address: form.address,
           city: form.city,
@@ -397,7 +454,7 @@ function NgoCampaignDetail() {
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-2xl shadow-xl p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <Link
               to="/ngo/dashboard/campaigns"
@@ -406,13 +463,35 @@ function NgoCampaignDetail() {
               <ArrowLeft className="w-4 h-4" />
               Back to campaigns
             </Link>
-            <h2 className="text-2xl font-bold text-gray-900 mt-2">{campaign.title}</h2>
-            <p className="text-sm text-gray-500 mt-1">{campaign.description || 'No description provided.'}</p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600">
+                {typeLabel}
+              </span>
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(campaign.status)}`}>
+                {campaign.status}
+              </span>
+              <span className="px-3 py-1 rounded-full text-xs font-semibold border border-gray-200 text-gray-500">
+                {scheduleLabel}
+              </span>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mt-3">{campaign.title}</h2>
+            <p className="text-sm text-gray-500 mt-2">{campaign.description || 'No description provided.'}</p>
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+              <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1">
+                <MapPin className="w-4 h-4 text-amber-500" />
+                {campaign.location}
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1">
+                <Calendar className="w-4 h-4 text-red-400" />
+                {formatDateRange(campaign.startDate, campaign.endDate)}
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1">
+                <Target className="w-4 h-4 text-red-500" />
+                {campaign.target} {targetLabel}
+              </span>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(campaign.status)}`}>
-              {campaign.status}
-            </span>
             {campaign.status === 'cancelled' ? (
               <span className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-400">
                 <Archive className="w-4 h-4" />
@@ -430,16 +509,32 @@ function NgoCampaignDetail() {
             )}
             <button
               type="button"
-              onClick={() => setDeleteOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
+              onClick={() => {
+                if (campaign.status === 'completed') return;
+                setDeleteOpen(true);
+              }}
+              disabled={campaign.status === 'completed'}
+              className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold ${
+                campaign.status === 'completed'
+                  ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                  : 'border-red-200 text-red-600 hover:bg-red-50'
+              }`}
             >
               <Trash2 className="w-4 h-4" />
               Delete
             </button>
             <button
               type="button"
-              onClick={openEdit}
-              className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+              onClick={() => {
+                if (campaign.status === 'completed') return;
+                openEdit();
+              }}
+              disabled={campaign.status === 'completed'}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold ${
+                campaign.status === 'completed'
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
             >
               <Edit3 className="w-4 h-4" />
               Edit Campaign
@@ -457,7 +552,7 @@ function NgoCampaignDetail() {
           <div className="flex items-center justify-between text-sm text-gray-500">
             <span>Target</span>
             <span className="font-semibold text-gray-700">
-              {achievedValue} / {campaign.target} {campaign.targetType || 'units'}
+              {achievedValue} / {campaign.target} {targetLabel}
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3">

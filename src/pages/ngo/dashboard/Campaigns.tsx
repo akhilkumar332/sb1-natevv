@@ -42,6 +42,33 @@ const emptyForm = {
   longitude: '',
 };
 
+const parseLocalDate = (value: string) => {
+  if (!value) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+const typeLabels: Record<string, string> = {
+  'blood-drive': 'Blood Drive',
+  awareness: 'Awareness',
+  fundraising: 'Fundraising',
+  volunteer: 'Volunteer Drive',
+};
+
+const targetLabels: Record<string, string> = {
+  units: 'Units',
+  donors: 'Donors',
+  funds: 'Funds',
+  volunteers: 'Volunteers',
+};
+
+const formatDateRange = (start: Date, end: Date) => {
+  const startText = start.toLocaleDateString();
+  const endText = end.toLocaleDateString();
+  return `${startText} • ${endText}`;
+};
+
 function toInputDate(date: Date) {
   return date.toISOString().split('T')[0];
 }
@@ -326,7 +353,25 @@ function NgoCampaigns() {
       return;
     }
 
-    if (new Date(form.endDate) < new Date(form.startDate)) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = parseLocalDate(form.startDate);
+    const endDate = parseLocalDate(form.endDate);
+
+    if (!startDate || !endDate) {
+      toast.error('Please enter valid dates.');
+      return;
+    }
+
+    if (startDate < today) {
+      toast.error('Start date cannot be in the past.');
+      return;
+    }
+    if (endDate < today) {
+      toast.error('End date cannot be in the past.');
+      return;
+    }
+    if (endDate <= startDate) {
       toast.error('End date must be after start date.');
       return;
     }
@@ -343,8 +388,8 @@ function NgoCampaigns() {
         target: Number(form.target || 0),
         achieved: 0,
         targetType: form.targetType as any,
-        startDate: Timestamp.fromDate(new Date(form.startDate)),
-        endDate: Timestamp.fromDate(new Date(form.endDate)),
+        startDate: Timestamp.fromDate(startDate),
+        endDate: Timestamp.fromDate(endDate),
         location: {
           address: form.address,
           city: form.city,
@@ -443,6 +488,7 @@ function NgoCampaigns() {
           </div>
         ) : (
           filteredCampaigns.map((campaign) => {
+            const isCompleted = campaign.status === 'completed';
             const registeredCount = Array.isArray(campaign.registeredDonors)
               ? campaign.registeredDonors.length
               : typeof campaign.registeredDonors === 'number'
@@ -450,49 +496,75 @@ function NgoCampaigns() {
                 : 0;
             const achievedValue = Math.max(campaign.achieved || 0, registeredCount);
             const progress = campaign.target > 0 ? Math.min((achievedValue / campaign.target) * 100, 100) : 0;
+            const typeLabel = typeLabels[campaign.type] || 'Campaign';
+            const targetLabel = targetLabels[campaign.targetType || 'units'] || 'Units';
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const daysUntilStart = Math.ceil((campaign.startDate.getTime() - today.getTime()) / 86400000);
+            const daysToEnd = Math.ceil((campaign.endDate.getTime() - today.getTime()) / 86400000);
+            const scheduleLabel = daysUntilStart > 0
+              ? `Starts in ${daysUntilStart}d`
+              : daysToEnd > 0
+                ? `${daysToEnd}d left`
+                : 'Ended';
             return (
-              <div key={campaign.id} className="bg-white rounded-2xl shadow-xl p-6">
+              <div key={campaign.id} className="bg-white rounded-2xl border border-red-100/60 shadow-xl p-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-red-600">
+                    <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600">
                       {getCampaignTypeIcon(campaign.type)}
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{campaign.title}</h3>
-                      <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 mt-2">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-4 h-4" />
-                          {campaign.location}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600">
+                          {typeLabel}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          {campaign.startDate.toLocaleDateString()} - {campaign.endDate.toLocaleDateString()}
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(campaign.status)}`}>
+                          {campaign.status}
+                        </span>
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold border border-gray-200 text-gray-500">
+                          {scheduleLabel}
                         </span>
                       </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mt-3">{campaign.title}</h3>
+                      <p className="text-sm text-gray-500 mt-2 flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-amber-500" />
+                        {campaign.location}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-red-400" />
+                        {formatDateRange(campaign.startDate, campaign.endDate)}
+                      </p>
                     </div>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(campaign.status)}`}>
-                    {campaign.status}
-                  </span>
+                  <div className="flex flex-col items-start lg:items-end gap-2">
+                    <div className="text-xs text-gray-500">Target</div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      {campaign.target} {targetLabel}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-6">
-                  <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
+                  <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>Progress</span>
                     <span className="font-semibold text-gray-700">
-                      {achievedValue} / {campaign.target}
+                      {achievedValue} / {campaign.target} {targetLabel}
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div className="w-full bg-gray-100 rounded-full h-2 mt-2">
                     <div
-                      className="h-3 rounded-full bg-gradient-to-r from-red-600 to-amber-500"
+                      className="h-2 rounded-full bg-gradient-to-r from-red-600 to-amber-500"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">{progress.toFixed(1)}% completed</p>
+                  <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                    <span>{progress.toFixed(1)}% completed</span>
+                    <span>{campaign.city || 'City'}{campaign.state ? `, ${campaign.state}` : ''}</span>
+                  </div>
                 </div>
 
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="mt-6 flex flex-wrap gap-2">
                   <Link
                     to={`/ngo/dashboard/campaigns/${campaign.id}`}
                     className="flex-1 rounded-xl bg-red-600 text-white px-4 py-2 text-sm font-semibold hover:bg-red-700 text-center"
@@ -500,10 +572,18 @@ function NgoCampaigns() {
                     View Details
                   </Link>
                   <button
-                    className="flex-1 rounded-xl border border-amber-300 text-amber-700 px-4 py-2 text-sm font-semibold hover:bg-amber-50"
-                    onClick={() => openEdit(campaign.id)}
+                    className={`flex-1 rounded-xl border px-4 py-2 text-sm font-semibold ${
+                      isCompleted
+                        ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                        : 'border-amber-300 text-amber-700 hover:bg-amber-50'
+                    }`}
+                    onClick={() => {
+                      if (isCompleted) return;
+                      openEdit(campaign.id);
+                    }}
+                    disabled={isCompleted}
                   >
-                    Edit Campaign
+                    Edit
                   </button>
                   {campaign.status === 'cancelled' ? (
                     <span className="flex-1 rounded-xl border border-gray-200 text-gray-400 px-4 py-2 text-sm font-semibold text-center">
@@ -518,8 +598,16 @@ function NgoCampaigns() {
                     </button>
                   )}
                   <button
-                    className="flex-1 rounded-xl border border-red-200 text-red-600 px-4 py-2 text-sm font-semibold hover:bg-red-50"
-                    onClick={() => setDeleteCandidate(campaign.id)}
+                    className={`flex-1 rounded-xl border px-4 py-2 text-sm font-semibold ${
+                      isCompleted
+                        ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                        : 'border-red-200 text-red-600 hover:bg-red-50'
+                    }`}
+                    onClick={() => {
+                      if (isCompleted) return;
+                      setDeleteCandidate(campaign.id);
+                    }}
+                    disabled={isCompleted}
                   >
                     Delete
                   </button>

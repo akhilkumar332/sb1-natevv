@@ -9,7 +9,6 @@ import { Campaign } from '../../types/database.types';
 import { formatDate } from '../../utils/dataTransform';
 import { ProgressBar } from './ProgressBar';
 import {
-  Calendar,
   MapPin,
   Users,
   Target,
@@ -100,11 +99,32 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
     userRole === 'donor' &&
     onRegister;
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const toDateValue = (value: any) => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === 'function') return value.toDate();
+    if (typeof value === 'string' || typeof value === 'number') {
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    return null;
+  };
+  const startDate = toDateValue(campaign.startDate) || new Date();
+  const endDate = toDateValue(campaign.endDate) || new Date();
+  const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / 86400000);
+  const daysToEnd = Math.ceil((endDate.getTime() - today.getTime()) / 86400000);
+  const scheduleLabel = daysUntilStart > 0
+    ? `Starts in ${daysUntilStart}d`
+    : daysToEnd > 0
+      ? `${daysToEnd}d left`
+      : 'Ended';
+
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-      {/* Banner Image */}
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-lg hover:shadow-xl transition-shadow">
       {campaign.bannerImage && (
-        <div className="h-48 overflow-hidden bg-gray-200">
+        <div className="h-44 overflow-hidden bg-gray-100 rounded-t-2xl">
           <img
             src={campaign.bannerImage}
             alt={campaign.title}
@@ -114,61 +134,49 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
       )}
 
       <div className="p-6">
-        {/* Header */}
-        <div className="flex justify-between items-start mb-3">
-          <div className="flex items-center gap-2">
-            {getTypeIcon(campaign.type)}
-            <span className="text-sm font-medium text-gray-600">
-              {getTypeLabel(campaign.type)}
-            </span>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-red-50 flex items-center justify-center">
+              {getTypeIcon(campaign.type)}
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600">
+                  {getTypeLabel(campaign.type)}
+                </span>
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(campaign.status)}`}>
+                  {getStatusLabel(campaign.status)}
+                </span>
+                <span className="px-3 py-1 rounded-full text-xs font-semibold border border-gray-200 text-gray-500">
+                  {scheduleLabel}
+                </span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mt-3">{campaign.title}</h3>
+              <p className="text-sm text-gray-500 mt-1 line-clamp-2">{campaign.description}</p>
+            </div>
           </div>
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
-              campaign.status
-            )}`}
-          >
-            {getStatusLabel(campaign.status)}
-          </span>
-        </div>
-
-        <h3 className="text-xl font-semibold text-gray-900 mb-2">
-          {campaign.title}
-        </h3>
-
-        <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-          {campaign.description}
-        </p>
-
-        {/* Organization */}
-        <div className="flex items-center gap-2 mb-4">
-          <Users className="w-4 h-4 text-gray-600" />
-          <span className="text-sm text-gray-700">{campaign.ngoName}</span>
-        </div>
-
-        {/* Location */}
-        <div className="flex items-start gap-2 mb-4">
-          <MapPin className="w-4 h-4 text-gray-600 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm text-gray-700">
-              {campaign.location.venue && `${campaign.location.venue}, `}
-              {campaign.location.city}, {campaign.location.state}
-            </p>
-            {campaign.location.address && (
-              <p className="text-xs text-gray-500">{campaign.location.address}</p>
-            )}
+          <div className="text-right text-xs text-gray-500">
+            <div className="font-semibold text-gray-700">
+              {formatDate(campaign.startDate)} • {formatDate(campaign.endDate)}
+            </div>
+            <div className="mt-1">
+              {campaign.location?.city}, {campaign.location?.state}
+            </div>
           </div>
         </div>
 
-        {/* Dates */}
-        <div className="flex items-center gap-2 mb-4">
-          <Calendar className="w-4 h-4 text-gray-600" />
-          <span className="text-sm text-gray-700">
-            {formatDate(campaign.startDate)} - {formatDate(campaign.endDate)}
+        <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+          <Users className="w-4 h-4" />
+          <span>{campaign.ngoName}</span>
+          <span className="text-gray-300">•</span>
+          <MapPin className="w-4 h-4" />
+          <span>
+            {campaign.location?.venue && `${campaign.location.venue}, `}
+            {campaign.location?.city}
           </span>
         </div>
 
-        {/* Progress */}
-        <div className="mb-4">
+        <div className="mt-5">
           <ProgressBar
             current={campaign.achieved}
             target={campaign.target}
@@ -179,41 +187,33 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
           />
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-4 pb-4 border-b">
+        <div className="mt-4 grid grid-cols-3 gap-4 border-t border-gray-100 pt-4 text-center">
           <div>
-            <p className="text-xs text-gray-600">Registered</p>
-            <p className="text-lg font-semibold text-gray-900">
-              {campaign.registeredDonors?.length || 0}
-            </p>
+            <p className="text-xs text-gray-500">Registered</p>
+            <p className="text-lg font-semibold text-gray-900">{campaign.registeredDonors?.length || 0}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-600">Confirmed</p>
-            <p className="text-lg font-semibold text-gray-900">
-              {campaign.confirmedDonors?.length || 0}
-            </p>
+            <p className="text-xs text-gray-500">Confirmed</p>
+            <p className="text-lg font-semibold text-gray-900">{campaign.confirmedDonors?.length || 0}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-600">Volunteers</p>
-            <p className="text-lg font-semibold text-gray-900">
-              {campaign.volunteers?.length || 0}
-            </p>
+            <p className="text-xs text-gray-500">Volunteers</p>
+            <p className="text-lg font-semibold text-gray-900">{campaign.volunteers?.length || 0}</p>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-2">
+        <div className="mt-5 flex flex-wrap gap-2">
           {canRegister && campaign.id && (
             <button
               onClick={() => onRegister(campaign.id!)}
-              className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors font-medium"
+              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-semibold"
             >
               Register
             </button>
           )}
 
           {isRegistered && (
-            <div className="flex-1 px-4 py-2 bg-green-100 text-green-800 rounded font-medium text-center">
+            <div className="flex-1 px-4 py-2 bg-emerald-100 text-emerald-800 rounded-xl font-semibold text-center">
               Registered ✓
             </div>
           )}
@@ -223,7 +223,7 @@ export const CampaignCard: React.FC<CampaignCardProps> = ({
               onClick={() => onViewDetails(campaign.id!)}
               className={`${
                 canRegister || isRegistered ? 'flex-shrink-0' : 'flex-1'
-              } px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors font-medium`}
+              } px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold`}
             >
               View Details
             </button>
