@@ -35,6 +35,7 @@ export type NgoDashboardContext = {
   partnerships: Partnership[];
   donorCommunity: DonorCommunity;
   stats: NgoStats;
+  getParticipantDonors: (donorIds: string[]) => Promise<any[]>;
   loading: boolean;
   error: string | null;
   refreshData: (options?: { silent?: boolean }) => Promise<void>;
@@ -66,6 +67,7 @@ function NgoDashboard() {
     partnerships,
     donorCommunity,
     stats,
+    getParticipantDonors,
     loading,
     error,
     refreshData,
@@ -186,6 +188,7 @@ function NgoDashboard() {
     partnerships,
     donorCommunity,
     stats,
+    getParticipantDonors,
     loading,
     error,
     refreshData,

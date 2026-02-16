@@ -4,7 +4,7 @@
  */
 
 import { useMemo, useState, useEffect } from 'react';
-import { collection, query, where, limit, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, limit, onSnapshot, getDocs, documentId } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export interface Campaign {
@@ -21,7 +21,7 @@ export interface Campaign {
   city?: string;
   state?: string;
   description?: string;
-  registeredDonors?: number;
+  registeredDonors?: string[] | number;
   confirmedDonors?: number;
   locationDetails?: {
     address?: string;
@@ -99,6 +99,7 @@ interface UseNgoDataReturn {
   partnerships: Partnership[];
   donorCommunity: DonorCommunity;
   stats: NgoStats;
+  getParticipantDonors: (donorIds: string[]) => Promise<DonorSummary[]>;
   loading: boolean;
   error: string | null;
   refreshData: (options?: { silent?: boolean }) => Promise<void>;
@@ -129,6 +130,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
 
   const cacheKey = useMemo(() => (ngoId ? `ngo_dashboard_cache_${ngoId}` : ''), [ngoId]);
   const cacheTTL = 5 * 60 * 1000;
+  const participantsCacheTTL = 5 * 60 * 1000;
 
   const serializeCampaigns = (items: Campaign[]) =>
     items.map((campaign) => ({
@@ -195,6 +197,11 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
         const campaignList: Campaign[] = snapshot.docs.map(doc => {
           const data = doc.data();
           const locationData = data.location;
+          const registeredCount = Array.isArray(data.registeredDonors)
+            ? data.registeredDonors.length
+            : typeof data.registeredDonors === 'number'
+              ? data.registeredDonors
+              : 0;
           return {
             id: doc.id,
             title: data.title || data.name || '',
@@ -203,13 +210,17 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
             startDate: data.startDate?.toDate() || new Date(),
             endDate: data.endDate?.toDate() || new Date(),
             target: data.target || data.targetDonors || 0,
-            achieved: data.achieved || data.registeredDonors?.length || 0,
+            achieved: data.achieved || registeredCount || 0,
             targetType: data.targetType,
             location: buildLocationLabel(locationData) || (typeof data.location === 'string' ? data.location : ''),
             city: data.city || locationData?.city,
             state: data.state || locationData?.state,
             description: data.description,
-            registeredDonors: data.registeredDonors?.length || 0,
+            registeredDonors: Array.isArray(data.registeredDonors)
+              ? data.registeredDonors
+              : typeof data.registeredDonors === 'number'
+                ? data.registeredDonors
+                : [],
             confirmedDonors: data.confirmedDonors?.length || 0,
             locationDetails: typeof locationData === 'object'
               ? {
@@ -247,6 +258,11 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       const campaignList: Campaign[] = snapshot.docs.map(doc => {
         const data = doc.data();
         const locationData = data.location;
+        const registeredCount = Array.isArray(data.registeredDonors)
+          ? data.registeredDonors.length
+          : typeof data.registeredDonors === 'number'
+            ? data.registeredDonors
+            : 0;
         return {
           id: doc.id,
           title: data.title || data.name || '',
@@ -255,13 +271,17 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
           startDate: data.startDate?.toDate() || new Date(),
           endDate: data.endDate?.toDate() || new Date(),
           target: data.target || data.targetDonors || 0,
-          achieved: data.achieved || data.registeredDonors?.length || 0,
+          achieved: data.achieved || registeredCount || 0,
           targetType: data.targetType,
           location: buildLocationLabel(locationData) || (typeof data.location === 'string' ? data.location : ''),
           city: data.city || locationData?.city,
           state: data.state || locationData?.state,
           description: data.description,
-          registeredDonors: data.registeredDonors?.length || 0,
+          registeredDonors: Array.isArray(data.registeredDonors)
+            ? data.registeredDonors
+            : typeof data.registeredDonors === 'number'
+              ? data.registeredDonors
+              : [],
           confirmedDonors: data.confirmedDonors?.length || 0,
           locationDetails: typeof locationData === 'object'
             ? {
@@ -570,12 +590,108 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
     ]);
   };
 
+  const getParticipantDonors = async (donorIds: string[]): Promise<DonorSummary[]> => {
+    if (!Array.isArray(donorIds) || donorIds.length === 0) return [];
+    const normalized = Array.from(new Set(donorIds.filter(Boolean)));
+    if (normalized.length === 0) return [];
+    const cacheKey = `ngo_campaign_participants_${normalized.slice().sort().join('_')}`;
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const cachedRaw = window.sessionStorage.getItem(cacheKey);
+      if (cachedRaw) {
+        try {
+          const cached = JSON.parse(cachedRaw);
+          if (cached?.timestamp && Date.now() - cached.timestamp < participantsCacheTTL) {
+            return Array.isArray(cached.donors)
+              ? cached.donors.map((donor: any) => ({
+                  ...donor,
+                  lastDonation: donor.lastDonation ? new Date(donor.lastDonation) : undefined,
+                  createdAt: donor.createdAt ? new Date(donor.createdAt) : undefined,
+                }))
+              : [];
+          }
+        } catch (error) {
+          console.warn('Failed to parse campaign participants cache', error);
+        }
+      }
+    }
+
+    const donors: DonorSummary[] = [];
+    const chunks: string[][] = [];
+    for (let index = 0; index < normalized.length; index += 10) {
+      chunks.push(normalized.slice(index, index + 10));
+    }
+    try {
+      const queries = chunks.map((chunk) =>
+        getDocs(query(collection(db, 'users'), where(documentId(), 'in', chunk)))
+      );
+      const snapshots = await Promise.all(queries);
+      snapshots.forEach((snapshot) => {
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data();
+          donors.push({
+            id: docSnap.id,
+            name: data.displayName || data.name || 'Donor',
+            email: data.email,
+            phone: data.phoneNumber,
+            bloodType: data.bloodType,
+            city: data.city,
+            state: data.state,
+            latitude: typeof data.latitude === 'number'
+              ? data.latitude
+              : typeof data.location?.latitude === 'number'
+                ? data.location.latitude
+                : undefined,
+            longitude: typeof data.longitude === 'number'
+              ? data.longitude
+              : typeof data.location?.longitude === 'number'
+                ? data.location.longitude
+                : undefined,
+            isAvailable: data.isAvailable,
+            lastDonation: data.lastDonation?.toDate ? data.lastDonation.toDate() : data.lastDonation ? new Date(data.lastDonation) : undefined,
+            totalDonations: data.totalDonations,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt ? new Date(data.createdAt) : undefined,
+          });
+        });
+      });
+    } catch (error) {
+      console.error('Failed to load participant donors', error);
+    }
+
+    const ordered = normalized
+      .map((id) => donors.find((donor) => donor.id === id))
+      .filter(Boolean) as DonorSummary[];
+
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        const sanitized = ordered.map((donor) => ({
+          ...donor,
+          email: undefined,
+          phone: undefined,
+          lastDonation: donor.lastDonation ? donor.lastDonation.toISOString() : undefined,
+          createdAt: donor.createdAt ? donor.createdAt.toISOString() : undefined,
+        }));
+        window.sessionStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            timestamp: Date.now(),
+            donors: sanitized,
+          })
+        );
+      } catch (error) {
+        console.warn('Failed to write participant donors cache', error);
+      }
+    }
+
+    return ordered;
+  };
+
   return {
     campaigns,
     volunteers,
     partnerships,
     donorCommunity,
     stats,
+    getParticipantDonors,
     loading,
     error,
     refreshData,

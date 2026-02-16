@@ -73,7 +73,7 @@ L.Icon.Default.mergeOptions({
 
 function NgoCampaignDetail() {
   const { campaignId } = useParams();
-  const { campaigns, getStatusColor, user } = useOutletContext<NgoDashboardContext>();
+  const { campaigns, getStatusColor, user, getParticipantDonors } = useOutletContext<NgoDashboardContext>();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -85,11 +85,63 @@ function NgoCampaignDetail() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [noResults, setNoResults] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [participantDonors, setParticipantDonors] = useState<any[]>([]);
+  const [participantsLoading, setParticipantsLoading] = useState(false);
+  const [participantSearch, setParticipantSearch] = useState('');
 
   const campaign = useMemo(
     () => campaigns.find((item) => item.id === campaignId),
     [campaigns, campaignId]
   );
+
+  const participantIds = useMemo(() => {
+    if (!campaign) return [];
+    return Array.isArray(campaign.registeredDonors) ? campaign.registeredDonors : [];
+  }, [campaign]);
+
+  const participantCount = useMemo(() => {
+    if (!campaign) return 0;
+    if (Array.isArray(campaign.registeredDonors)) return campaign.registeredDonors.length;
+    if (typeof campaign.registeredDonors === 'number') return campaign.registeredDonors;
+    return 0;
+  }, [campaign]);
+
+  useEffect(() => {
+    let isActive = true;
+    if (!campaign || participantIds.length === 0) {
+      setParticipantDonors([]);
+      return () => {
+        isActive = false;
+      };
+    }
+    setParticipantsLoading(true);
+    getParticipantDonors(participantIds)
+      .then((donors) => {
+        if (!isActive) return;
+        setParticipantDonors(donors);
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setParticipantDonors([]);
+      })
+      .finally(() => {
+        if (!isActive) return;
+        setParticipantsLoading(false);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [campaign?.id, participantIds.join('|')]);
+
+  const filteredParticipants = useMemo(() => {
+    if (!participantSearch.trim()) return participantDonors;
+    const term = participantSearch.toLowerCase();
+    return participantDonors.filter((donor) =>
+      donor.name?.toLowerCase().includes(term)
+      || donor.city?.toLowerCase().includes(term)
+      || donor.bloodType?.toLowerCase().includes(term)
+    );
+  }, [participantDonors, participantSearch]);
 
   useEffect(() => {
     const lat = parseFloat(form.latitude);
@@ -459,6 +511,58 @@ function NgoCampaignDetail() {
           </div>
           {!hasCoordinates && (
             <p className="text-xs text-gray-500 mt-3">No map coordinates saved for this campaign.</p>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-xl p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-red-600">Participated donors</p>
+            <h3 className="text-lg font-bold text-gray-900">Donor list</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              {participantCount} donors participated in this campaign.
+            </p>
+          </div>
+          <div className="relative w-full sm:max-w-xs">
+            <input
+              value={participantSearch}
+              onChange={(event) => setParticipantSearch(event.target.value)}
+              placeholder="Search donors..."
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        <div className="mt-4">
+          {participantsLoading ? (
+            <div className="text-sm text-gray-500 py-6">Loading participants...</div>
+          ) : filteredParticipants.length === 0 ? (
+            <div className="text-sm text-gray-500 py-6">
+              {participantCount === 0
+                ? 'No donors have participated yet.'
+                : participantIds.length === 0
+                  ? 'Participants recorded, but donor list is unavailable.'
+                  : 'No matching donors found.'}
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {filteredParticipants.map((donor) => (
+                <div key={donor.id} className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-r from-red-600 to-amber-500 text-white flex items-center justify-center font-semibold">
+                      {donor.name?.charAt(0) || 'D'}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{donor.name || 'Donor'}</p>
+                      <p className="text-xs text-gray-500">
+                        {donor.bloodType || 'Blood type'} • {donor.city || 'City'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
