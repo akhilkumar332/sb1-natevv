@@ -49,6 +49,7 @@ export type PendingDonorRequestPayload = PendingDonorRequest | PendingDonorReque
 
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const DUPLICATE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const CONNECTION_WINDOW_MS = 24 * 60 * 60 * 1000;
 const SESSION_KEY_PREFIX = 'pendingDonorRequest:';
 export const MAX_DONOR_REQUEST_BATCH_TARGETS = 200;
 export const MAX_DONOR_REQUEST_MESSAGE_LENGTH = 280;
@@ -65,6 +66,57 @@ export type RequesterProfile = {
   city?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+};
+
+const buildConnectionKey = (uidA: string, uidB: string) => {
+  const [first, second] = [uidA, uidB].sort();
+  return `${first}_${second}`;
+};
+
+const resolveConnectionExpiry = (data: any) => {
+  const expiresAt = data?.connectionExpiresAt?.toDate ? data.connectionExpiresAt.toDate() : data?.connectionExpiresAt;
+  if (expiresAt instanceof Date) return expiresAt;
+  const respondedAt = data?.respondedAt?.toDate ? data.respondedAt.toDate() : data?.respondedAt;
+  if (respondedAt instanceof Date) return new Date(respondedAt.getTime() + CONNECTION_WINDOW_MS);
+  return null;
+};
+
+const chunkArray = <T,>(items: T[], size: number) => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+};
+
+const fetchActiveConnections = async (requesterUid: string, targetIds: string[]) => {
+  if (!targetIds.length) return new Set<string>();
+  const uniqueTargets = Array.from(new Set(targetIds.filter(Boolean)));
+  if (!uniqueTargets.length) return new Set<string>();
+  const now = Date.now();
+  const activeTargets = new Set<string>();
+  const connectionKeys = uniqueTargets.map((targetId) => buildConnectionKey(requesterUid, targetId));
+  const chunks = chunkArray(connectionKeys, 10);
+
+  await Promise.all(chunks.map(async (chunk) => {
+    const connectionsQuery = query(
+      collection(db, 'donorRequests'),
+      where('connectionKey', 'in', chunk)
+    );
+    const snapshot = await getDocs(connectionsQuery);
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as any;
+      if (data.status !== 'accepted') return;
+      const expiresAt = resolveConnectionExpiry(data);
+      if (expiresAt && expiresAt.getTime() <= now) return;
+      const otherId = data.requesterUid === requesterUid ? data.targetDonorUid : data.requesterUid;
+      if (otherId) {
+        activeTargets.add(otherId);
+      }
+    });
+  }));
+
+  return activeTargets;
 };
 
 export const encodePendingDonorRequest = (payload: PendingDonorRequestPayload) => {
@@ -256,6 +308,10 @@ export const submitDonorRequest = async (requester: RequesterProfile, payload: P
   if (requester.uid === payload.targetDonorId) {
     throw new Error('self_request');
   }
+  const activeTargets = await fetchActiveConnections(requester.uid, [payload.targetDonorId]);
+  if (activeTargets.has(payload.targetDonorId)) {
+    throw new Error('active_connection');
+  }
   return await addDoc(collection(db, 'donorRequests'), {
     requesterUid: requester.uid,
     requesterBhId: requester.bhId || '',
@@ -268,6 +324,7 @@ export const submitDonorRequest = async (requester: RequesterProfile, payload: P
     targetDonorBloodType: payload.targetDonorBloodType,
     donationType: payload.donationType,
     status: 'pending',
+    connectionKey: buildConnectionKey(requester.uid, payload.targetDonorId),
     requestedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     requesterLocation: {
@@ -337,12 +394,25 @@ export const submitDonorRequestBatch = async (
   const now = Date.now();
   const sendTargets: PendingDonorRequestTarget[] = [];
   const skippedTargets: PendingDonorRequestTarget[] = [];
+  let activeConnectionTargets: Set<string> = new Set();
+  try {
+    activeConnectionTargets = await fetchActiveConnections(
+      requester.uid,
+      payload.targets.map((target) => target.id)
+    );
+  } catch (error) {
+    console.warn('Failed to check active donor connections. Continuing without connection guard.', error);
+  }
   const normalizedMessage = typeof payload.message === 'string'
     ? payload.message.trim().slice(0, MAX_DONOR_REQUEST_MESSAGE_LENGTH)
     : '';
 
   payload.targets.forEach((target) => {
     if (target.id === requester.uid) {
+      skippedTargets.push(target);
+      return;
+    }
+    if (activeConnectionTargets.has(target.id)) {
       skippedTargets.push(target);
       return;
     }
@@ -394,6 +464,7 @@ export const submitDonorRequestBatch = async (
         message: normalizedMessage,
         status: 'pending',
         requestBatchId: batchId,
+        connectionKey: buildConnectionKey(requester.uid, target.id),
         requestedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         requesterLocation: {

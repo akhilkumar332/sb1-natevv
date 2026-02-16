@@ -394,7 +394,7 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
           request.resource.data.status in ['cancelled']) ||
         (resource.data.targetDonorUid == request.auth.uid &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt', 'updatedAt', 'targetDonorPhone']) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt', 'updatedAt', 'targetDonorPhone', 'connectionExpiresAt', 'connectionKey']) &&
           request.resource.data.status in ['accepted', 'rejected']) ||
         isAdmin()
       );

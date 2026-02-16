@@ -1029,10 +1029,13 @@ function DonorDashboard() {
         updatedAt: serverTimestamp(),
       };
       if (decision === 'accepted') {
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
         const donorPhone = user.phoneNumber || user.phoneNumberNormalized;
         if (donorPhone) {
           updatePayload.targetDonorPhone = donorPhone;
         }
+        updatePayload.connectionExpiresAt = Timestamp.fromDate(expiresAt);
+        updatePayload.connectionKey = [requestData.requesterUid, requestData.targetDonorUid].sort().join('_');
       }
       await updateDoc(requestRef, updatePayload);
     } catch (error) {

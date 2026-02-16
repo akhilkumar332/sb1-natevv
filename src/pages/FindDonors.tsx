@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, MapPin, Filter, AlertCircle, CheckCircle, Clock, Heart, X, Users, ChevronRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { collection, doc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp, startAfter, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, startAfter, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { calculateDistance } from '../utils/geolocation';
 import type { Coordinates } from '../types/database.types';
 import { db } from '../firebase';
@@ -74,6 +74,8 @@ function FindDonors() {
   const [requestDonationType, setRequestDonationType] = useState<DonationComponent>('whole');
   const [requestMessage, setRequestMessage] = useState('');
   const [requestResult, setRequestResult] = useState<{ sent: number; skipped: number } | null>(null);
+  const [connectedDonorIds, setConnectedDonorIds] = useState<Set<string>>(new Set());
+  const [connectionExpiryMap, setConnectionExpiryMap] = useState<Record<string, number>>({});
   const [templateSaving, setTemplateSaving] = useState(false);
   const [sendSliderValue, setSendSliderValue] = useState(0);
   const [sliderDragging, setSliderDragging] = useState(false);
@@ -91,6 +93,8 @@ function FindDonors() {
   const prefetchInFlightRef = useRef(false);
   const selfRequestToastRef = useRef<string | null>(null);
   const pendingRequestProcessedRef = useRef<string | null>(null);
+  const requesterConnectionsRef = useRef<any[]>([]);
+  const targetConnectionsRef = useRef<any[]>([]);
   const sliderTrackRef = useRef<HTMLDivElement | null>(null);
   const sliderValueRef = useRef(0);
 
@@ -189,6 +193,92 @@ function FindDonors() {
     }
     const timer = setTimeout(task, 800);
     return () => clearTimeout(timer);
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setConnectedDonorIds(new Set());
+      return;
+    }
+
+    const buildExpiry = (data: any) => {
+      const toDate = (value: any) => (value?.toDate ? value.toDate() : value instanceof Date ? value : null);
+      const expires = toDate(data?.connectionExpiresAt);
+      if (expires) return expires;
+      const respondedAt = toDate(data?.respondedAt);
+      if (respondedAt) return new Date(respondedAt.getTime() + 24 * 60 * 60 * 1000);
+      const requestedAt = toDate(data?.requestedAt);
+      if (requestedAt) return new Date(requestedAt.getTime() + 24 * 60 * 60 * 1000);
+      return null;
+    };
+
+    const computeConnections = () => {
+      const now = Date.now();
+      const active = new Set<string>();
+      const expiryMap: Record<string, number> = {};
+      const allDocs = [...requesterConnectionsRef.current, ...targetConnectionsRef.current];
+      allDocs.forEach((docSnap) => {
+        const data = docSnap.data() as any;
+        if (data.status !== 'accepted') return;
+        const expiresAt = buildExpiry(data);
+        if (expiresAt && expiresAt.getTime() <= now) return;
+        const otherId = data.requesterUid === user.uid ? data.targetDonorUid : data.requesterUid;
+        if (otherId) {
+          active.add(otherId);
+          if (expiresAt) {
+            const timestamp = expiresAt.getTime();
+            if (!expiryMap[otherId] || timestamp > expiryMap[otherId]) {
+              expiryMap[otherId] = timestamp;
+            }
+          }
+        }
+        const needsKey = !data.connectionKey && data.requesterUid && data.targetDonorUid;
+        const needsExpiry = !data.connectionExpiresAt && expiresAt;
+        if (needsKey || needsExpiry) {
+          const updatePayload: Record<string, any> = { updatedAt: serverTimestamp() };
+          if (needsKey) {
+            updatePayload.connectionKey = [data.requesterUid, data.targetDonorUid].sort().join('_');
+          }
+          if (needsExpiry && expiresAt) {
+            updatePayload.connectionExpiresAt = Timestamp.fromDate(expiresAt);
+          }
+          updateDoc(docSnap.ref, updatePayload).catch((error) => {
+            console.warn('Failed to backfill donor connection fields', error);
+          });
+        }
+      });
+      setConnectedDonorIds(active);
+      setConnectionExpiryMap(expiryMap);
+    };
+
+    const requesterQuery = query(
+      collection(db, 'donorRequests'),
+      where('requesterUid', '==', user.uid),
+      limit(200)
+    );
+    const targetQuery = query(
+      collection(db, 'donorRequests'),
+      where('targetDonorUid', '==', user.uid),
+      limit(200)
+    );
+
+    const unsubscribeRequester = onSnapshot(requesterQuery, (snapshot) => {
+      requesterConnectionsRef.current = snapshot.docs;
+      computeConnections();
+    }, (error) => {
+      console.warn('Failed to load requester donor connections', error);
+    });
+    const unsubscribeTarget = onSnapshot(targetQuery, (snapshot) => {
+      targetConnectionsRef.current = snapshot.docs;
+      computeConnections();
+    }, (error) => {
+      console.warn('Failed to load target donor connections', error);
+    });
+
+    return () => {
+      unsubscribeRequester();
+      unsubscribeTarget();
+    };
   }, [user?.uid]);
 
   useEffect(() => {
@@ -615,12 +705,26 @@ function FindDonors() {
     if (trayIds.has(donor.id)) {
       removeFromTray(donor.id);
     } else {
+      if (connectedDonorIds.has(donor.id)) {
+        toast.error('You already have an active connection with this donor.');
+        return;
+      }
       addToTray(donor);
     }
   };
 
   const clearTray = () => {
     setTrayDonors([]);
+  };
+
+  const formatConnectionExpiry = (donorId: string) => {
+    const expiresAt = connectionExpiryMap[donorId];
+    if (!expiresAt) return 'Connected';
+    const diffMs = expiresAt - Date.now();
+    if (diffMs <= 0) return 'Connection expiring';
+    const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+    if (diffHours <= 1) return 'Expires in < 1h';
+    return `Expires in ${diffHours}h`;
   };
 
   const openRequestStudio = () => {
@@ -1223,16 +1327,17 @@ function FindDonors() {
                         </div>
                         <button
                           onClick={() => toggleTray(donor)}
-                          disabled={donor.availability === 'Unavailable'}
+                          disabled={donor.availability === 'Unavailable' || connectedDonorIds.has(donor.id)}
+                          title={connectedDonorIds.has(donor.id) ? formatConnectionExpiry(donor.id) : undefined}
                           className={`w-full flex items-center justify-center rounded-xl text-sm font-semibold transition-all ${
-                            donor.availability === 'Available'
+                            donor.availability === 'Available' && !connectedDonorIds.has(donor.id)
                               ? trayIds.has(donor.id)
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
                                 : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:shadow-lg transform hover:scale-[1.02]'
                               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           } ${compactMode ? 'py-2' : 'py-2.5'}`}
                         >
-                          {trayIds.has(donor.id) ? 'In Tray' : 'Add to Tray'}
+                          {connectedDonorIds.has(donor.id) ? 'Connected' : trayIds.has(donor.id) ? 'In Tray' : 'Add to Tray'}
                         </button>
                       </div>
 
@@ -1266,7 +1371,14 @@ function FindDonors() {
                           <span className={`bg-gradient-to-r from-red-600 to-red-700 text-white text-xs font-bold rounded-full shadow ${compactMode ? 'px-2 py-0.5' : 'px-2.5 py-1'}`}>
                             {donor.bloodType}
                           </span>
-                          {donor.availability === 'Available' ? (
+                          {connectedDonorIds.has(donor.id) ? (
+                            <span
+                              title={formatConnectionExpiry(donor.id)}
+                              className={`bg-emerald-100 text-emerald-700 text-[10px] font-semibold rounded-full ${compactMode ? 'px-1.5 py-0.5' : 'px-2 py-0.5'}`}
+                            >
+                              Connected
+                            </span>
+                          ) : donor.availability === 'Available' ? (
                             <span className={`bg-green-100 text-green-700 text-[10px] font-semibold rounded-full ${compactMode ? 'px-1.5 py-0.5' : 'px-2 py-0.5'}`}>
                               Available
                             </span>
@@ -1315,16 +1427,17 @@ function FindDonors() {
                       <div className="flex gap-3">
                         <button
                           onClick={() => toggleTray(donor)}
-                          disabled={donor.availability === 'Unavailable'}
+                          disabled={donor.availability === 'Unavailable' || connectedDonorIds.has(donor.id)}
+                          title={connectedDonorIds.has(donor.id) ? formatConnectionExpiry(donor.id) : undefined}
                           className={`flex-1 flex items-center justify-center rounded-xl text-sm font-semibold transition-all ${
-                            donor.availability === 'Available'
+                            donor.availability === 'Available' && !connectedDonorIds.has(donor.id)
                               ? trayIds.has(donor.id)
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
                                 : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:shadow-lg transform hover:scale-105'
                               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           } ${compactMode ? 'py-2' : 'py-2.5'}`}
                         >
-                          {trayIds.has(donor.id) ? 'In Tray' : 'Add to Tray'}
+                          {connectedDonorIds.has(donor.id) ? 'Connected' : trayIds.has(donor.id) ? 'In Tray' : 'Add to Tray'}
                         </button>
                       </div>
                       </div>

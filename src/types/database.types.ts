@@ -515,6 +515,8 @@ export interface DonorRequest {
   status: DonorRequestStatus;
   requestedAt: Timestamp;
   respondedAt?: Timestamp;
+  connectionExpiresAt?: Timestamp;
+  connectionKey?: string;
 
   requesterLocation?: {
     city?: string;
