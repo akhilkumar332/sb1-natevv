@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import { Heart, Users, TrendingUp, ChevronRight, Search, MapPin } from 'lucide-react';
 import { MapContainer, TileLayer, Popup, useMap, useMapEvents, CircleMarker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import type { NgoDashboardContext } from '../NgoDashboard';
-import { collection, documentId, endBefore, getDocs, limit, limitToLast, orderBy, query, startAfter, where, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, documentId, endBefore, getDocs, limit, limitToLast, orderBy, query, startAfter, where } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import type { DonorSummary } from '../../../hooks/useNgoData';
 
@@ -151,10 +151,19 @@ function NgoDonors() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingDonors, setLoadingDonors] = useState(false);
   const [hasNextPage, setHasNextPage] = useState(false);
-  const [firstDoc, setFirstDoc] = useState<QueryDocumentSnapshot | null>(null);
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [firstDocId, setFirstDocId] = useState<string | null>(null);
+  const [lastDocId, setLastDocId] = useState<string | null>(null);
   const [mapDonors, setMapDonors] = useState<DonorSummary[]>([]);
   const pageSize = 10;
+  const donorsCacheTTL = 5 * 60 * 1000;
+  const donorsCacheKey = useMemo(
+    () => `ngo_donors_cache_${bloodTypeFilter}_${availabilityFilter}_${cityFilter}`,
+    [bloodTypeFilter, availabilityFilter, cityFilter]
+  );
+  const mapCacheKey = 'ngo_donors_map_cache';
+  const mapCacheTTL = 5 * 60 * 1000;
+  const isMountedRef = useRef(true);
+  const donorFetchIdRef = useRef(0);
 
   const activeRate = donorCommunity.totalDonors > 0
     ? Math.round((donorCommunity.activeDonors / donorCommunity.totalDonors) * 100)
@@ -205,14 +214,95 @@ function NgoDonors() {
   }, [mapDonors, searchTerm, bloodTypeFilter, availabilityFilter, cityFilter]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     setCurrentPage(1);
-    setFirstDoc(null);
-    setLastDoc(null);
+    setFirstDocId(null);
+    setLastDocId(null);
     setHasNextPage(false);
   }, [bloodTypeFilter, availabilityFilter, cityFilter]);
 
-  const fetchDonorPage = async (direction: 'initial' | 'next' | 'prev' = 'initial') => {
-    setLoadingDonors(true);
+  const sanitizeDonor = (donor: DonorSummary) => ({
+    ...donor,
+    email: undefined,
+    phone: undefined,
+  });
+
+  const hydrateDonor = (donor: any): DonorSummary => ({
+    ...donor,
+    lastDonation: donor.lastDonation ? new Date(donor.lastDonation) : undefined,
+    createdAt: donor.createdAt ? new Date(donor.createdAt) : undefined,
+  });
+
+  const loadDonorCache = () => {
+    if (typeof window === 'undefined' || !window.sessionStorage) return null;
+    const raw = window.sessionStorage.getItem(donorsCacheKey);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed?.timestamp || Date.now() - parsed.timestamp > donorsCacheTTL) return null;
+      return {
+        donors: Array.isArray(parsed.donors) ? parsed.donors.map(hydrateDonor) : [],
+        firstDocId: parsed.firstDocId || null,
+        lastDocId: parsed.lastDocId || null,
+        hasNextPage: Boolean(parsed.hasNextPage),
+      };
+    } catch (error) {
+      console.warn('Failed to parse NGO donors cache', error);
+      return null;
+    }
+  };
+
+  const persistDonorCache = (payload: {
+    donors: DonorSummary[];
+    firstDocId: string | null;
+    lastDocId: string | null;
+    hasNextPage: boolean;
+  }) => {
+    if (typeof window === 'undefined' || !window.sessionStorage) return;
+    try {
+      window.sessionStorage.setItem(
+        donorsCacheKey,
+        JSON.stringify({
+          timestamp: Date.now(),
+          donors: payload.donors.map(sanitizeDonor),
+          firstDocId: payload.firstDocId,
+          lastDocId: payload.lastDocId,
+          hasNextPage: payload.hasNextPage,
+        })
+      );
+    } catch (error) {
+      console.warn('Failed to write NGO donors cache', error);
+    }
+  };
+
+  const fetchDonorPage = async (
+    direction: 'initial' | 'next' | 'prev' = 'initial',
+    options?: { silent?: boolean; bypassCache?: boolean }
+  ) => {
+    const fetchId = ++donorFetchIdRef.current;
+    if (!options?.silent) {
+      setLoadingDonors(true);
+    }
+    const shouldUseCache = direction === 'initial' && !options?.bypassCache;
+    if (shouldUseCache) {
+      const cached = loadDonorCache();
+      if (cached) {
+        if (isMountedRef.current) {
+          setDonors(cached.donors);
+          setFirstDocId(cached.firstDocId);
+          setLastDocId(cached.lastDocId);
+          setHasNextPage(cached.hasNextPage);
+          setLoadingDonors(false);
+        }
+        return;
+      }
+    }
     try {
       const constraints: any[] = [
         where('role', '==', 'donor'),
@@ -228,11 +318,11 @@ function NgoDonors() {
       }
       constraints.push(orderBy(documentId()));
 
-      if (direction === 'next' && lastDoc) {
-        constraints.push(startAfter(lastDoc));
+      if (direction === 'next' && lastDocId) {
+        constraints.push(startAfter(lastDocId));
         constraints.push(limit(pageSize + 1));
-      } else if (direction === 'prev' && firstDoc) {
-        constraints.push(endBefore(firstDoc));
+      } else if (direction === 'prev' && firstDocId) {
+        constraints.push(endBefore(firstDocId));
         constraints.push(limitToLast(pageSize + 1));
       } else {
         constraints.push(limit(pageSize + 1));
@@ -273,26 +363,66 @@ function NgoDonors() {
           createdAt: data.createdAt?.toDate(),
         };
       });
+      if (!isMountedRef.current || fetchId !== donorFetchIdRef.current) return;
       setDonors(donorList);
-      setFirstDoc(docs[0] || null);
-      setLastDoc(docs[docs.length - 1] || null);
-      if (direction === 'prev') {
-        setHasNextPage(true);
-      } else {
-        setHasNextPage(hasExtra);
+      setFirstDocId(docs[0]?.id || null);
+      setLastDocId(docs[docs.length - 1]?.id || null);
+      const effectiveHasNext = direction === 'prev' ? true : hasExtra;
+      setHasNextPage(effectiveHasNext);
+      if (direction === 'initial') {
+        persistDonorCache({
+          donors: donorList,
+          firstDocId: docs[0]?.id || null,
+          lastDocId: docs[docs.length - 1]?.id || null,
+          hasNextPage: effectiveHasNext,
+        });
       }
     } catch (error) {
       console.error('Error loading donors:', error);
-      setDonors([]);
-      setHasNextPage(false);
+      if (isMountedRef.current && fetchId === donorFetchIdRef.current) {
+        setDonors([]);
+        setHasNextPage(false);
+      }
     } finally {
-      setLoadingDonors(false);
+      if (!options?.silent && isMountedRef.current && fetchId === donorFetchIdRef.current) {
+        setLoadingDonors(false);
+      }
     }
   };
 
   useEffect(() => {
     fetchDonorPage('initial');
-  }, [bloodTypeFilter, availabilityFilter, cityFilter]);
+  }, [bloodTypeFilter, availabilityFilter, cityFilter, donorsCacheKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.sessionStorage) return;
+    const prefetchKey = `ngo_donors_prefetch_${donorsCacheKey}`;
+    const lastPrefetch = window.sessionStorage.getItem(prefetchKey);
+    if (lastPrefetch && Date.now() - Number(lastPrefetch) < donorsCacheTTL) {
+      return;
+    }
+    const task = () => {
+      fetchDonorPage('initial', { silent: true, bypassCache: true })
+        .catch((error) => {
+          console.warn('NGO donors prefetch failed', error);
+        })
+        .finally(() => {
+          window.sessionStorage.setItem(prefetchKey, Date.now().toString());
+        });
+    };
+    const idle = typeof globalThis !== 'undefined' ? (globalThis as any).requestIdleCallback : null;
+    if (typeof idle === 'function') {
+      const id = idle(task);
+      return () => {
+        const cancel = (globalThis as any).cancelIdleCallback;
+        if (typeof cancel === 'function') {
+          cancel(id);
+        }
+      };
+    }
+    const timer = setTimeout(task, 1200);
+    return () => clearTimeout(timer);
+  }, [donorsCacheKey]);
 
   useEffect(() => {
     let isActive = true;
@@ -332,7 +462,57 @@ function NgoDonors() {
       };
     };
 
-    const fetchMapDonors = async () => {
+    const hydrateMapDonor = (donor: any): DonorSummary => ({
+      ...donor,
+      lastDonation: donor.lastDonation ? new Date(donor.lastDonation) : undefined,
+      createdAt: donor.createdAt ? new Date(donor.createdAt) : undefined,
+    });
+
+    const sanitizeMapDonor = (donor: DonorSummary) => ({
+      ...donor,
+      email: undefined,
+      phone: undefined,
+    });
+
+    const loadMapCache = () => {
+      if (typeof window === 'undefined' || !window.sessionStorage) return null;
+      const raw = window.sessionStorage.getItem(mapCacheKey);
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw);
+        if (!parsed?.timestamp || Date.now() - parsed.timestamp > mapCacheTTL) return null;
+        return Array.isArray(parsed.donors) ? parsed.donors.map(hydrateMapDonor) : [];
+      } catch (error) {
+        console.warn('Failed to parse NGO donor map cache', error);
+        return null;
+      }
+    };
+
+    const persistMapCache = (payload: DonorSummary[]) => {
+      if (typeof window === 'undefined' || !window.sessionStorage) return;
+      try {
+        window.sessionStorage.setItem(
+          mapCacheKey,
+          JSON.stringify({
+            timestamp: Date.now(),
+            donors: payload.map(sanitizeMapDonor),
+          })
+        );
+      } catch (error) {
+        console.warn('Failed to write NGO donor map cache', error);
+      }
+    };
+
+    const fetchMapDonors = async (options?: { silent?: boolean; bypassCache?: boolean }) => {
+      if (!options?.bypassCache) {
+        const cached = loadMapCache();
+        if (cached && isActive) {
+          setMapDonors(cached);
+          if (options?.silent) {
+            return;
+          }
+        }
+      }
       try {
         const publicSnap = await getDocs(
           query(collection(db, 'publicDonors'), orderBy(documentId()), limit(200))
@@ -343,6 +523,7 @@ function NgoDonors() {
         if (isActive) {
           setMapDonors(publicRows);
         }
+        persistMapCache(publicRows);
       } catch (error) {
         console.warn('Failed to load public donors for map', error);
         if (isActive) {
@@ -354,6 +535,27 @@ function NgoDonors() {
     };
 
     fetchMapDonors();
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const prefetchKey = 'ngo_donors_map_prefetch';
+      const lastPrefetch = window.sessionStorage.getItem(prefetchKey);
+      if (!lastPrefetch || Date.now() - Number(lastPrefetch) >= mapCacheTTL) {
+        const task = () => {
+          fetchMapDonors({ silent: true, bypassCache: true })
+            .catch((error) => {
+              console.warn('NGO donor map prefetch failed', error);
+            })
+            .finally(() => {
+              window.sessionStorage.setItem(prefetchKey, Date.now().toString());
+            });
+        };
+        const idle = typeof globalThis !== 'undefined' ? (globalThis as any).requestIdleCallback : null;
+        if (typeof idle === 'function') {
+          idle(task);
+        } else {
+          setTimeout(task, 1200);
+        }
+      }
+    }
     return () => {
       isActive = false;
     };

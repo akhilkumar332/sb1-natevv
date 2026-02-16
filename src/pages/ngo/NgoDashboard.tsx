@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -37,7 +37,7 @@ export type NgoDashboardContext = {
   stats: NgoStats;
   loading: boolean;
   error: string | null;
-  refreshData: () => Promise<void>;
+  refreshData: (options?: { silent?: boolean }) => Promise<void>;
   getStatusColor: (status: string) => string;
   getCampaignTypeIcon: (type: string) => JSX.Element;
   getPartnershipIcon: (type: string) => JSX.Element;
@@ -86,6 +86,37 @@ function NgoDashboard() {
     shareInviteLink,
     openWhatsAppInvite,
   } = useReferrals(user);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (typeof window === 'undefined' || !window.sessionStorage) return;
+    const prefetchKey = `ngo_dashboard_prefetch_${user.uid}`;
+    const lastPrefetch = window.sessionStorage.getItem(prefetchKey);
+    if (lastPrefetch && Date.now() - Number(lastPrefetch) < 5 * 60 * 1000) {
+      return;
+    }
+    const task = () => {
+      refreshData({ silent: true })
+        .catch((error) => {
+          console.warn('NGO dashboard prefetch failed', error);
+        })
+        .finally(() => {
+          window.sessionStorage.setItem(prefetchKey, Date.now().toString());
+        });
+    };
+    const idle = typeof globalThis !== 'undefined' ? (globalThis as any).requestIdleCallback : null;
+    if (typeof idle === 'function') {
+      const id = idle(task);
+      return () => {
+        const cancel = (globalThis as any).cancelIdleCallback;
+        if (typeof cancel === 'function') {
+          cancel(id);
+        }
+      };
+    }
+    const timer = setTimeout(task, 1200);
+    return () => clearTimeout(timer);
+  }, [user?.uid, refreshData]);
 
   const menuItems = [
     { id: 'overview', label: 'Overview', to: 'overview', icon: Activity },
@@ -195,7 +226,7 @@ function NgoDashboard() {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Data</h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
-            onClick={refreshData}
+            onClick={() => refreshData()}
             className="bg-gradient-to-r from-red-600 to-amber-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-red-700 hover:to-amber-700 transition-all shadow-lg flex items-center gap-2 mx-auto"
           >
             <RefreshCw className="w-5 h-5" />
@@ -239,7 +270,7 @@ function NgoDashboard() {
             </div>
             <div className="hidden md:flex items-center space-x-3">
               <button
-                onClick={refreshData}
+                onClick={() => refreshData()}
                 className="p-3 bg-white/15 hover:bg-white/25 rounded-full transition-all duration-300"
                 title="Refresh data"
               >

@@ -101,7 +101,7 @@ interface UseNgoDataReturn {
   stats: NgoStats;
   loading: boolean;
   error: string | null;
-  refreshData: () => Promise<void>;
+  refreshData: (options?: { silent?: boolean }) => Promise<void>;
 }
 
 export const useNgoData = (ngoId: string): UseNgoDataReturn => {
@@ -141,12 +141,16 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
     items.map((volunteer) => ({
       ...volunteer,
       joinDate: volunteer.joinDate?.toISOString(),
+      email: undefined,
+      phone: undefined,
     }));
 
   const serializePartnerships = (items: Partnership[]) =>
     items.map((partner) => ({
       ...partner,
       since: partner.since?.toISOString(),
+      contactEmail: undefined,
+      contactPhone: undefined,
     }));
 
   const hydrateCampaigns = (items: any[] = []): Campaign[] =>
@@ -420,21 +424,77 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       setError(null);
 
       if (typeof window !== 'undefined' && cacheKey) {
-        const cachedRaw = window.localStorage.getItem(cacheKey);
-        if (cachedRaw) {
-          try {
-            const cached = JSON.parse(cachedRaw);
-            if (cached?.timestamp && Date.now() - cached.timestamp < cacheTTL) {
-              setCampaigns(hydrateCampaigns(cached.campaigns));
-              setVolunteers(hydrateVolunteers(cached.volunteers));
-              setPartnerships(hydratePartnerships(cached.partnerships));
-              setDonorCommunity(cached.donorCommunity || donorCommunity);
-              setStats(cached.stats || stats);
-              setLoading(false);
-              usedCache = true;
+        const sanitizeCache = (payload: any) => {
+          const safeCampaigns = Array.isArray(payload?.campaigns) ? payload.campaigns : [];
+          const safeVolunteers = Array.isArray(payload?.volunteers)
+            ? payload.volunteers.map((volunteer: any) => ({
+                ...volunteer,
+                email: undefined,
+                phone: undefined,
+              }))
+            : [];
+          const safePartnerships = Array.isArray(payload?.partnerships)
+            ? payload.partnerships.map((partner: any) => ({
+                ...partner,
+                contactEmail: undefined,
+                contactPhone: undefined,
+              }))
+            : [];
+          return {
+            timestamp: payload?.timestamp || Date.now(),
+            campaigns: safeCampaigns,
+            volunteers: safeVolunteers,
+            partnerships: safePartnerships,
+            donorCommunity: payload?.donorCommunity || donorCommunity,
+            stats: payload?.stats || stats,
+          };
+        };
+
+        if (window.localStorage && window.sessionStorage) {
+          const legacyRaw = window.localStorage.getItem(cacheKey);
+          if (legacyRaw) {
+            try {
+              const legacy = JSON.parse(legacyRaw);
+              const sanitized = sanitizeCache(legacy);
+              let shouldWrite = true;
+              const existingRaw = window.sessionStorage.getItem(cacheKey);
+              if (existingRaw) {
+                try {
+                  const existing = JSON.parse(existingRaw);
+                  if (existing?.timestamp && existing.timestamp > sanitized.timestamp) {
+                    shouldWrite = false;
+                  }
+                } catch {
+                  // ignore
+                }
+              }
+              if (shouldWrite) {
+                window.sessionStorage.setItem(cacheKey, JSON.stringify(sanitized));
+              }
+            } catch (err) {
+              console.warn('Failed to migrate NGO dashboard cache', err);
             }
-          } catch (err) {
-            console.warn('Failed to hydrate NGO dashboard cache', err);
+            window.localStorage.removeItem(cacheKey);
+          }
+        }
+
+        if (window.sessionStorage) {
+          const cachedRaw = window.sessionStorage.getItem(cacheKey);
+          if (cachedRaw) {
+            try {
+              const cached = sanitizeCache(JSON.parse(cachedRaw));
+              if (cached?.timestamp && Date.now() - cached.timestamp < cacheTTL) {
+                setCampaigns(hydrateCampaigns(cached.campaigns));
+                setVolunteers(hydrateVolunteers(cached.volunteers));
+                setPartnerships(hydratePartnerships(cached.partnerships));
+                setDonorCommunity(cached.donorCommunity || donorCommunity);
+                setStats(cached.stats || stats);
+                setLoading(false);
+                usedCache = true;
+              }
+            } catch (err) {
+              console.warn('Failed to hydrate NGO dashboard cache', err);
+            }
           }
         }
       }
@@ -482,7 +542,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
 
   useEffect(() => {
     if (!cacheKey || loading) return;
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !window.sessionStorage) return;
     const payload = {
       timestamp: Date.now(),
       campaigns: serializeCampaigns(campaigns),
@@ -492,13 +552,16 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       stats,
     };
     try {
-      window.localStorage.setItem(cacheKey, JSON.stringify(payload));
+      window.sessionStorage.setItem(cacheKey, JSON.stringify(payload));
     } catch (err) {
       console.warn('Failed to write NGO dashboard cache', err);
     }
   }, [cacheKey, loading, campaigns, volunteers, partnerships, donorCommunity, stats]);
 
-  const refreshData = async () => {
+  const refreshData = async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setError(null);
+    }
     await Promise.all([
       fetchCampaignsOnce(),
       fetchVolunteers(),
