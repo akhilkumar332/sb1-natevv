@@ -293,12 +293,6 @@ const DonorRequests = () => {
                         </div>
                       )}
                     </div>
-                    {request.status === 'accepted' && incomingFilter === 'accepted' && renderContactCapsule({
-                      label: request.requesterName || 'Requester',
-                      phone: request.requesterPhone,
-                      respondedAt: request.respondedAt,
-                      accent: 'emerald',
-                    })}
                   </div>
                 ))
               ) : (
