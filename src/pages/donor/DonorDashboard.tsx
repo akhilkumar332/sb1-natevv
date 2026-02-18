@@ -152,6 +152,7 @@ function DonorDashboard() {
   const outgoingRequestsRef = useRef<any[]>([]);
   const requestBatchesRef = useRef<any[]>([]);
   const outgoingExpiryRef = useRef<Set<string>>(new Set());
+  const incomingExpiryRef = useRef<Set<string>>(new Set());
 
   // Use custom hook to fetch all donor data
   const {
@@ -770,21 +771,21 @@ function DonorDashboard() {
       };
     };
 
-    const expireStaleOutgoing = (items: any[]) => {
+    const expireStaleRequests = (items: any[], refGuard: React.MutableRefObject<Set<string>>) => {
       const now = Date.now();
       items.forEach((item) => {
         if (!item || item.status !== 'pending' || !item.requestedAt) return;
         const requestedAt = item.requestedAt instanceof Date ? item.requestedAt : new Date(item.requestedAt);
         if (Number.isNaN(requestedAt.getTime())) return;
         if (now - requestedAt.getTime() < requestCooldownMs) return;
-        if (outgoingExpiryRef.current.has(item.id)) return;
-        outgoingExpiryRef.current.add(item.id);
+        if (refGuard.current.has(item.id)) return;
+        refGuard.current.add(item.id);
         updateDoc(doc(db, 'donorRequests', item.id), {
           status: 'expired',
           expiredAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         }).catch((error) => {
-          outgoingExpiryRef.current.delete(item.id);
+          refGuard.current.delete(item.id);
           console.warn('Failed to expire donor request', error);
         });
       });
@@ -852,6 +853,7 @@ function DonorDashboard() {
           const bTime = b.requestedAt ? new Date(b.requestedAt).getTime() : 0;
           return bTime - aTime;
         });
+      expireStaleRequests(items, incomingExpiryRef);
       incomingRequestsRef.current = items;
       setIncomingDonorRequests(items);
       setIncomingRequestsLoading(false);
@@ -873,7 +875,7 @@ function DonorDashboard() {
           const bTime = b.requestedAt ? new Date(b.requestedAt).getTime() : 0;
           return bTime - aTime;
         });
-      expireStaleOutgoing(items);
+      expireStaleRequests(items, outgoingExpiryRef);
       outgoingRequestsRef.current = items;
       setOutgoingDonorRequests(items);
       setOutgoingRequestsLoading(false);

@@ -24,7 +24,8 @@ const DonorRequests = () => {
   } = dashboard;
 
   const [now, setNow] = useState(() => Date.now());
-  const [outreachFilter, setOutreachFilter] = useState<'all' | 'pending' | 'accepted' | 'expired'>('all');
+  const [outreachFilter, setOutreachFilter] = useState<'all' | 'pending' | 'accepted' | 'expired' | 'rejected'>('pending');
+  const [incomingFilter, setIncomingFilter] = useState<'all' | 'pending' | 'accepted' | 'expired' | 'rejected'>('pending');
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 60 * 1000);
@@ -139,15 +140,34 @@ const DonorRequests = () => {
   };
 
   const pendingDonorRequests = (incomingDonorRequests || []).filter((request: any) => request.status === 'pending');
+  const expiredIncomingRequests = (incomingDonorRequests || []).filter((request: any) => request.status === 'expired');
+  const rejectedIncomingRequests = (incomingDonorRequests || []).filter((request: any) => request.status === 'rejected');
   const acceptedIncomingRequests = (incomingDonorRequests || []).filter((request: any) => request.status === 'accepted');
+  const incomingTotals = {
+    all: incomingDonorRequests?.length || 0,
+    pending: pendingDonorRequests.length,
+    accepted: acceptedIncomingRequests.length,
+    expired: expiredIncomingRequests.length,
+    rejected: rejectedIncomingRequests.length,
+  };
+  const filteredIncomingRequests = incomingFilter === 'expired'
+    ? expiredIncomingRequests
+    : incomingFilter === 'rejected'
+      ? rejectedIncomingRequests
+      : incomingFilter === 'accepted'
+        ? acceptedIncomingRequests
+        : incomingFilter === 'pending'
+          ? pendingDonorRequests
+          : (incomingDonorRequests || []);
   const activeIncomingConnections = acceptedIncomingRequests.filter((request: any) => getContactWindow(request.respondedAt)?.active);
 
   const outreachTotals = useMemo(() => {
-    const counts = { all: 0, pending: 0, accepted: 0, expired: 0 };
+    const counts = { all: 0, pending: 0, accepted: 0, expired: 0, rejected: 0 };
     (outgoingDonorRequests || []).forEach((request: any) => {
       const status = request?.status || 'pending';
       counts.all += 1;
       if (status === 'accepted') counts.accepted += 1;
+      else if (status === 'rejected') counts.rejected += 1;
       else if (status === 'expired') counts.expired += 1;
       else counts.pending += 1;
     });
@@ -157,6 +177,7 @@ const DonorRequests = () => {
     const status = request?.status || 'pending';
     if (outreachFilter === 'all') return true;
     if (outreachFilter === 'accepted') return status === 'accepted';
+    if (outreachFilter === 'rejected') return status === 'rejected';
     if (outreachFilter === 'expired') return status === 'expired';
     return status === 'pending';
   });
@@ -172,8 +193,36 @@ const DonorRequests = () => {
                 <p className="text-sm text-gray-500 mt-1">Respond to donors who requested you directly.</p>
               </div>
               <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-semibold">
-                {pendingDonorRequests.length} Pending
+                {incomingFilter === 'expired'
+                  ? `${incomingTotals.expired} Expired`
+                  : incomingFilter === 'rejected'
+                    ? `${incomingTotals.rejected} Rejected`
+                    : incomingFilter === 'accepted'
+                      ? `${incomingTotals.accepted} Accepted`
+                    : incomingFilter === 'pending'
+                      ? `${incomingTotals.pending} Pending`
+                      : `${incomingTotals.all} Total`}
               </span>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {(['all', 'pending', 'accepted', 'expired', 'rejected'] as const).map((filter) => {
+                const isActive = incomingFilter === filter;
+                const label = filter.charAt(0).toUpperCase() + filter.slice(1);
+                return (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setIncomingFilter(filter)}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold border transition-all ${
+                      isActive
+                        ? 'bg-amber-600 text-white border-amber-600'
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    {label} ({incomingTotals[filter]})
+                  </button>
+                );
+              })}
             </div>
 
             <div className="mt-6 space-y-4">
@@ -183,8 +232,8 @@ const DonorRequests = () => {
                     <div key={`incoming-skeleton-${index}`} className="p-5 border border-gray-100 rounded-2xl bg-gray-50 animate-pulse h-24" />
                   ))}
                 </div>
-              ) : pendingDonorRequests.length > 0 ? (
-                pendingDonorRequests.map((request: any) => (
+              ) : filteredIncomingRequests.length > 0 ? (
+                filteredIncomingRequests.map((request: any) => (
                   <div key={request.id} className="p-5 border border-amber-100 rounded-2xl bg-amber-50/40">
                     <div className="flex flex-col gap-4">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -213,23 +262,43 @@ const DonorRequests = () => {
                           Requested {formatTime(request.requestedAt)}
                         </p>
                       </div>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-                        <button
-                          onClick={() => handleDonorRequestDecision(request.id, 'accepted')}
-                          disabled={donorRequestActionId === request.id}
-                          className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          {donorRequestActionId === request.id ? 'Working...' : 'Accept'}
-                        </button>
-                        <button
-                          onClick={() => handleDonorRequestDecision(request.id, 'rejected')}
-                          disabled={donorRequestActionId === request.id}
-                          className="w-full sm:w-auto px-4 py-2 rounded-xl border border-rose-200 text-rose-600 text-sm font-semibold hover:bg-rose-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          {donorRequestActionId === request.id ? 'Working...' : 'Reject'}
-                        </button>
-                      </div>
+                      {request.status === 'pending' && incomingFilter === 'pending' ? (
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                          <button
+                            onClick={() => handleDonorRequestDecision(request.id, 'accepted')}
+                            disabled={donorRequestActionId === request.id}
+                            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {donorRequestActionId === request.id ? 'Working...' : 'Accept'}
+                          </button>
+                          <button
+                            onClick={() => handleDonorRequestDecision(request.id, 'rejected')}
+                            disabled={donorRequestActionId === request.id}
+                            className="w-full sm:w-auto px-4 py-2 rounded-xl border border-rose-200 text-rose-600 text-sm font-semibold hover:bg-rose-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {donorRequestActionId === request.id ? 'Working...' : 'Reject'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end">
+                          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                            {request.status === 'expired'
+                              ? 'Expired'
+                              : request.status === 'accepted'
+                                ? 'Accepted'
+                              : request.status === 'rejected'
+                                ? 'Rejected'
+                                : 'Closed'}
+                          </span>
+                        </div>
+                      )}
                     </div>
+                    {request.status === 'accepted' && incomingFilter === 'accepted' && renderContactCapsule({
+                      label: request.requesterName || 'Requester',
+                      phone: request.requesterPhone,
+                      respondedAt: request.respondedAt,
+                      accent: 'emerald',
+                    })}
                   </div>
                 ))
               ) : (
@@ -454,7 +523,7 @@ const DonorRequests = () => {
             </span>
           </div>
           <div className="flex flex-wrap gap-2 mb-4">
-            {(['all', 'pending', 'accepted', 'expired'] as const).map((filter) => {
+            {(['all', 'pending', 'accepted', 'rejected', 'expired'] as const).map((filter) => {
               const isActive = outreachFilter === filter;
               const label = filter.charAt(0).toUpperCase() + filter.slice(1);
               const count = outreachTotals[filter];
