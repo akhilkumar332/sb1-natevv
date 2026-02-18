@@ -11,6 +11,7 @@ import {
   serverTimestamp,
   setDoc,
   Timestamp,
+  updateDoc,
   where,
   writeBatch,
 } from 'firebase/firestore';
@@ -73,6 +74,12 @@ const buildConnectionKey = (uidA: string, uidB: string) => {
   return `${first}_${second}`;
 };
 
+const resolveRequestedAt = (data: any) => {
+  const requestedAt = data?.requestedAt?.toDate ? data.requestedAt.toDate() : data?.requestedAt;
+  if (requestedAt instanceof Date) return requestedAt;
+  return null;
+};
+
 const resolveConnectionExpiry = (data: any) => {
   const expiresAt = data?.connectionExpiresAt?.toDate ? data.connectionExpiresAt.toDate() : data?.connectionExpiresAt;
   if (expiresAt instanceof Date) return expiresAt;
@@ -117,6 +124,23 @@ const fetchActiveConnections = async (requesterUid: string, targetIds: string[])
   }));
 
   return activeTargets;
+};
+
+const shouldExpirePending = (requestedAt?: Date | null) => {
+  if (!requestedAt) return false;
+  return Date.now() - requestedAt.getTime() >= DUPLICATE_WINDOW_MS;
+};
+
+const markRequestExpired = async (docRef: any) => {
+  try {
+    await updateDoc(docRef, {
+      status: 'expired',
+      expiredAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.warn('Failed to expire donor request', error);
+  }
 };
 
 export const encodePendingDonorRequest = (payload: PendingDonorRequestPayload) => {
@@ -312,6 +336,48 @@ export const submitDonorRequest = async (requester: RequesterProfile, payload: P
   if (activeTargets.has(payload.targetDonorId)) {
     throw new Error('active_connection');
   }
+  try {
+    const connectionKey = buildConnectionKey(requester.uid, payload.targetDonorId);
+    const existingQuery = query(
+      collection(db, 'donorRequests'),
+      where('connectionKey', '==', connectionKey)
+    );
+    const existingSnapshot = await getDocs(existingQuery);
+    const matches = existingSnapshot.docs
+      .map((docSnap) => ({ ref: docSnap.ref, ...docSnap.data() }))
+      .filter((item: any) => item.requesterUid === requester.uid && item.targetDonorUid === payload.targetDonorId);
+    if (matches.length > 0) {
+      const latest = matches.reduce((acc: any, item: any) => {
+        const requestedAt = resolveRequestedAt(item);
+        if (!acc) return { item, requestedAt };
+        if (!requestedAt) return acc;
+        if (!acc.requestedAt || requestedAt.getTime() > acc.requestedAt.getTime()) {
+          return { item, requestedAt };
+        }
+        return acc;
+      }, null as any);
+      if (latest?.item) {
+        if (latest.item.status === 'pending') {
+          if (shouldExpirePending(latest.requestedAt)) {
+            await markRequestExpired(latest.item.ref);
+          } else {
+            throw new Error('already_requested');
+          }
+        }
+      }
+    } else {
+      const cached = loadRecentRequestCache(requester.uid);
+      const cachedMatch = cached?.find((item) => item.targetDonorUid === payload.targetDonorId);
+      if (cachedMatch?.requestedAt && Date.now() - cachedMatch.requestedAt < DUPLICATE_WINDOW_MS) {
+        throw new Error('already_requested');
+      }
+    }
+  } catch (error: any) {
+    if (error?.message === 'already_requested') {
+      throw error;
+    }
+    console.warn('Failed to verify existing donor request. Continuing.', error);
+  }
   return await addDoc(collection(db, 'donorRequests'), {
     requesterUid: requester.uid,
     requesterBhId: requester.bhId || '',
@@ -395,6 +461,7 @@ export const submitDonorRequestBatch = async (
   const sendTargets: PendingDonorRequestTarget[] = [];
   const skippedTargets: PendingDonorRequestTarget[] = [];
   let activeConnectionTargets: Set<string> = new Set();
+  let existingRequestMap = new Map<string, { status?: string; requestedAt?: Date | null; ref?: any }>();
   try {
     activeConnectionTargets = await fetchActiveConnections(
       requester.uid,
@@ -402,6 +469,41 @@ export const submitDonorRequestBatch = async (
     );
   } catch (error) {
     console.warn('Failed to check active donor connections. Continuing without connection guard.', error);
+  }
+  try {
+    const uniqueTargets = Array.from(new Set(payload.targets.map((target) => target.id).filter(Boolean)));
+    const connectionKeys = uniqueTargets.map((targetId) => buildConnectionKey(requester.uid, targetId));
+    const chunks = chunkArray(connectionKeys, 10);
+    for (const chunk of chunks) {
+      const existingQuery = query(
+        collection(db, 'donorRequests'),
+        where('connectionKey', 'in', chunk)
+      );
+      const snapshot = await getDocs(existingQuery);
+      snapshot.docs.forEach((docSnap) => {
+        const data = docSnap.data() as any;
+        if (!data?.requesterUid || !data?.targetDonorUid) return;
+        if (data.requesterUid !== requester.uid) return;
+        const requestedAt = resolveRequestedAt(data);
+        const current = existingRequestMap.get(data.targetDonorUid);
+        if (!current || (requestedAt && (!current.requestedAt || requestedAt.getTime() > current.requestedAt.getTime()))) {
+          existingRequestMap.set(data.targetDonorUid, {
+            status: data.status,
+            requestedAt,
+            ref: docSnap.ref,
+          });
+        }
+        if (!data.connectionKey) {
+          updateDoc(docSnap.ref, {
+            connectionKey: buildConnectionKey(data.requesterUid, data.targetDonorUid),
+            updatedAt: serverTimestamp(),
+          }).catch(() => null);
+        }
+      });
+    }
+  } catch (error) {
+    console.warn('Failed to load existing donor requests for dedupe. Falling back to recent cache.', error);
+    existingRequestMap = new Map();
   }
   const normalizedMessage = typeof payload.message === 'string'
     ? payload.message.trim().slice(0, MAX_DONOR_REQUEST_MESSAGE_LENGTH)
@@ -416,12 +518,25 @@ export const submitDonorRequestBatch = async (
       skippedTargets.push(target);
       return;
     }
+    const existing = existingRequestMap.get(target.id);
+    if (existing?.status === 'pending') {
+      if (shouldExpirePending(existing.requestedAt)) {
+        if (existing.ref) {
+          void markRequestExpired(existing.ref);
+        }
+      } else {
+        skippedTargets.push(target);
+        return;
+      }
+    }
+    if (existing?.requestedAt && existing.requestedAt.getTime) {
+      if (now - existing.requestedAt.getTime() < DUPLICATE_WINDOW_MS) {
+        skippedTargets.push(target);
+        return;
+      }
+    }
     const recent = recentMap.get(target.id);
     if (recent?.requestedAt && now - recent.requestedAt.getTime() < DUPLICATE_WINDOW_MS) {
-      skippedTargets.push(target);
-      return;
-    }
-    if (recent?.status && recent.status === 'pending') {
       skippedTargets.push(target);
       return;
     }

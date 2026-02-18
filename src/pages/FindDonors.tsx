@@ -76,6 +76,8 @@ function FindDonors() {
   const [requestResult, setRequestResult] = useState<{ sent: number; skipped: number } | null>(null);
   const [connectedDonorIds, setConnectedDonorIds] = useState<Set<string>>(new Set());
   const [connectionExpiryMap, setConnectionExpiryMap] = useState<Record<string, number>>({});
+  const [pendingRequestTargets, setPendingRequestTargets] = useState<Set<string>>(new Set());
+  const [pendingRequestExpiryMap, setPendingRequestExpiryMap] = useState<Record<string, number>>({});
   const [templateSaving, setTemplateSaving] = useState(false);
   const [sendSliderValue, setSendSliderValue] = useState(0);
   const [sliderDragging, setSliderDragging] = useState(false);
@@ -95,8 +97,10 @@ function FindDonors() {
   const pendingRequestProcessedRef = useRef<string | null>(null);
   const requesterConnectionsRef = useRef<any[]>([]);
   const targetConnectionsRef = useRef<any[]>([]);
+  const pendingExpiryRef = useRef<Set<string>>(new Set());
   const sliderTrackRef = useRef<HTMLDivElement | null>(null);
   const sliderValueRef = useRef(0);
+  const REQUEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
   const requestLocation = () => {
     if (!navigator?.geolocation) {
@@ -198,6 +202,8 @@ function FindDonors() {
   useEffect(() => {
     if (!user?.uid) {
       setConnectedDonorIds(new Set());
+      setPendingRequestTargets(new Set());
+      setPendingRequestExpiryMap({});
       return;
     }
 
@@ -211,14 +217,47 @@ function FindDonors() {
       if (requestedAt) return new Date(requestedAt.getTime() + 24 * 60 * 60 * 1000);
       return null;
     };
+    const buildRequestedAt = (data: any) => {
+      const toDate = (value: any) => (value?.toDate ? value.toDate() : value instanceof Date ? value : null);
+      return toDate(data?.requestedAt);
+    };
 
     const computeConnections = () => {
       const now = Date.now();
       const active = new Set<string>();
       const expiryMap: Record<string, number> = {};
+      const pendingTargets = new Set<string>();
+      const pendingExpiry: Record<string, number> = {};
       const allDocs = [...requesterConnectionsRef.current, ...targetConnectionsRef.current];
       allDocs.forEach((docSnap) => {
         const data = docSnap.data() as any;
+        if (data.requesterUid === user.uid && data.status === 'pending') {
+          const requestedAt = buildRequestedAt(data);
+          if (!requestedAt) {
+            if (data.targetDonorUid) {
+              pendingTargets.add(data.targetDonorUid);
+              pendingExpiry[data.targetDonorUid] = now + REQUEST_COOLDOWN_MS;
+            }
+          } else {
+            const elapsed = now - requestedAt.getTime();
+            if (elapsed >= REQUEST_COOLDOWN_MS) {
+              if (!pendingExpiryRef.current.has(docSnap.id)) {
+                pendingExpiryRef.current.add(docSnap.id);
+                updateDoc(docSnap.ref, {
+                  status: 'expired',
+                  expiredAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                }).catch((error) => {
+                  pendingExpiryRef.current.delete(docSnap.id);
+                  console.warn('Failed to expire donor request', error);
+                });
+              }
+            } else if (data.targetDonorUid) {
+              pendingTargets.add(data.targetDonorUid);
+              pendingExpiry[data.targetDonorUid] = requestedAt.getTime() + REQUEST_COOLDOWN_MS;
+            }
+          }
+        }
         if (data.status !== 'accepted') return;
         const expiresAt = buildExpiry(data);
         if (expiresAt && expiresAt.getTime() <= now) return;
@@ -249,6 +288,8 @@ function FindDonors() {
       });
       setConnectedDonorIds(active);
       setConnectionExpiryMap(expiryMap);
+      setPendingRequestTargets(pendingTargets);
+      setPendingRequestExpiryMap(pendingExpiry);
     };
 
     const requesterQuery = query(
@@ -707,6 +748,13 @@ function FindDonors() {
     } else {
       if (connectedDonorIds.has(donor.id)) {
         toast.error('You already have an active connection with this donor.');
+        return;
+      }
+      if (pendingRequestTargets.has(donor.id)) {
+        const expiresAt = pendingRequestExpiryMap[donor.id];
+        const diffMs = expiresAt ? expiresAt - Date.now() : 0;
+        const diffHours = diffMs > 0 ? Math.ceil(diffMs / (1000 * 60 * 60)) : 24;
+        toast.error(`Already requested. Try again in ${diffHours}h.`);
         return;
       }
       addToTray(donor);
@@ -1242,11 +1290,13 @@ function FindDonors() {
               </div>
             ) : filteredDonors.length > 0 ? (
               <div className={`grid grid-cols-1 md:grid-cols-2 ${compactMode ? 'lg:grid-cols-5 gap-3' : 'lg:grid-cols-4 gap-4'}`}>
-                {pageDonors.map((donor) => (
-                  <div
-                    key={donor.id}
-                    className={`group bg-white rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 border border-gray-100 relative overflow-hidden ${compactMode ? 'p-3' : 'p-4'}`}
-                  >
+                {pageDonors.map((donor) => {
+                  const isRequested = pendingRequestTargets.has(donor.id);
+                  return (
+                    <div
+                      key={donor.id}
+                      className={`group bg-white rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 border border-gray-100 relative overflow-hidden ${compactMode ? 'p-3' : 'p-4'}`}
+                    >
                     {/* Background Gradient */}
                     <div className="absolute inset-0 bg-gradient-to-br from-red-50 to-pink-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
@@ -1285,7 +1335,9 @@ function FindDonors() {
                                 className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all ${
                                   trayIds.has(donor.id)
                                     ? 'border-red-200 bg-red-50 text-red-600'
-                                    : 'border-gray-200 text-gray-400'
+                                    : isRequested
+                                      ? 'border-amber-200 bg-amber-50 text-amber-600'
+                                      : 'border-gray-200 text-gray-400'
                                 } ${donor.availability === 'Unavailable' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}
                                 aria-label="Select donor"
                               >
@@ -1327,17 +1379,25 @@ function FindDonors() {
                         </div>
                         <button
                           onClick={() => toggleTray(donor)}
-                          disabled={donor.availability === 'Unavailable' || connectedDonorIds.has(donor.id)}
+                          aria-disabled={isRequested}
                           title={connectedDonorIds.has(donor.id) ? formatConnectionExpiry(donor.id) : undefined}
                           className={`w-full flex items-center justify-center rounded-xl text-sm font-semibold transition-all ${
-                            donor.availability === 'Available' && !connectedDonorIds.has(donor.id)
+                            donor.availability === 'Available' && !connectedDonorIds.has(donor.id) && !isRequested
                               ? trayIds.has(donor.id)
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
                                 : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:shadow-lg transform hover:scale-[1.02]'
-                              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : isRequested
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200 cursor-not-allowed'
+                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           } ${compactMode ? 'py-2' : 'py-2.5'}`}
                         >
-                          {connectedDonorIds.has(donor.id) ? 'Connected' : trayIds.has(donor.id) ? 'In Tray' : 'Add to Tray'}
+                          {connectedDonorIds.has(donor.id)
+                            ? 'Connected'
+                            : isRequested
+                              ? 'Requested'
+                              : trayIds.has(donor.id)
+                                ? 'In Tray'
+                                : 'Add to Tray'}
                         </button>
                       </div>
 
@@ -1362,7 +1422,9 @@ function FindDonors() {
                             className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all ${
                               trayIds.has(donor.id)
                                 ? 'border-red-200 bg-red-50 text-red-600'
-                                : 'border-gray-200 text-gray-400'
+                                : isRequested
+                                  ? 'border-amber-200 bg-amber-50 text-amber-600'
+                                  : 'border-gray-200 text-gray-400'
                             } ${donor.availability === 'Unavailable' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}
                             aria-label="Select donor"
                           >
@@ -1377,6 +1439,10 @@ function FindDonors() {
                               className={`bg-emerald-100 text-emerald-700 text-[10px] font-semibold rounded-full ${compactMode ? 'px-1.5 py-0.5' : 'px-2 py-0.5'}`}
                             >
                               Connected
+                            </span>
+                          ) : isRequested ? (
+                            <span className={`bg-amber-100 text-amber-700 text-[10px] font-semibold rounded-full ${compactMode ? 'px-1.5 py-0.5' : 'px-2 py-0.5'}`}>
+                              Requested
                             </span>
                           ) : donor.availability === 'Available' ? (
                             <span className={`bg-green-100 text-green-700 text-[10px] font-semibold rounded-full ${compactMode ? 'px-1.5 py-0.5' : 'px-2 py-0.5'}`}>
@@ -1427,23 +1493,32 @@ function FindDonors() {
                       <div className="flex gap-3">
                         <button
                           onClick={() => toggleTray(donor)}
-                          disabled={donor.availability === 'Unavailable' || connectedDonorIds.has(donor.id)}
+                          aria-disabled={isRequested}
                           title={connectedDonorIds.has(donor.id) ? formatConnectionExpiry(donor.id) : undefined}
                           className={`flex-1 flex items-center justify-center rounded-xl text-sm font-semibold transition-all ${
-                            donor.availability === 'Available' && !connectedDonorIds.has(donor.id)
+                            donor.availability === 'Available' && !connectedDonorIds.has(donor.id) && !isRequested
                               ? trayIds.has(donor.id)
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
                                 : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:shadow-lg transform hover:scale-105'
-                              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : isRequested
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200 cursor-not-allowed'
+                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           } ${compactMode ? 'py-2' : 'py-2.5'}`}
                         >
-                          {connectedDonorIds.has(donor.id) ? 'Connected' : trayIds.has(donor.id) ? 'In Tray' : 'Add to Tray'}
+                          {connectedDonorIds.has(donor.id)
+                            ? 'Connected'
+                            : isRequested
+                              ? 'Requested'
+                              : trayIds.has(donor.id)
+                                ? 'In Tray'
+                                : 'Add to Tray'}
                         </button>
                       </div>
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+                })}
               </div>
             ) : (
               <div className="text-center py-16">
@@ -1632,14 +1707,14 @@ function FindDonors() {
 
               {requestResult && (
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                  Sent to {requestResult.sent} donors. Skipped {requestResult.skipped} (recent requests).
+                  Sent to {requestResult.sent} donors. Skipped {requestResult.skipped} (already requested within 24h).
                 </div>
               )}
 
               <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
                 <p className="text-sm font-semibold text-gray-900">Ready to send</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Will attempt to send to {studioCount} donors. Some may be skipped if they were recently requested.
+                  Will attempt to send to {studioCount} donors. Some may be skipped if they were requested within 24h.
                 </p>
                 <div className="mt-4">
                   <div

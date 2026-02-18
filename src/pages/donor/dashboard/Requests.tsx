@@ -1,5 +1,5 @@
 import { useOutletContext } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle, Droplet, Loader2, MapPin, MessageCircle, PhoneCall } from 'lucide-react';
 
 const DonorRequests = () => {
@@ -16,18 +16,15 @@ const DonorRequests = () => {
     donorRequestBatches,
     donorRequestBatchesLoading,
     donorRequestActionId,
-    donorRequestDeleteId,
     handleRespondToRequest,
     handleDonorRequestDecision,
-    handleDeleteDonorRequest,
     handleViewAllRequests,
     formatDate,
     formatTime,
   } = dashboard;
 
   const [now, setNow] = useState(() => Date.now());
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string; detail?: string } | null>(null);
+  const [outreachFilter, setOutreachFilter] = useState<'all' | 'pending' | 'accepted' | 'expired'>('all');
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 60 * 1000);
@@ -44,6 +41,7 @@ const DonorRequests = () => {
   const getStatusBadge = (status?: string) => {
     if (status === 'accepted') return 'bg-emerald-100 text-emerald-700';
     if (status === 'rejected') return 'bg-rose-100 text-rose-700';
+    if (status === 'expired') return 'bg-gray-100 text-gray-600';
     if (status === 'cancelled') return 'bg-gray-100 text-gray-600';
     return 'bg-amber-100 text-amber-700';
   };
@@ -144,21 +142,24 @@ const DonorRequests = () => {
   const acceptedIncomingRequests = (incomingDonorRequests || []).filter((request: any) => request.status === 'accepted');
   const activeIncomingConnections = acceptedIncomingRequests.filter((request: any) => getContactWindow(request.respondedAt)?.active);
 
-  const openDeleteModal = (request: any, fallbackLabel: string) => {
-    setDeleteTarget({
-      id: request.id,
-      label: request.targetDonorName || request.requesterName || fallbackLabel,
-      detail: request.targetDonorBhId || request.requesterBhId || undefined,
+  const outreachTotals = useMemo(() => {
+    const counts = { all: 0, pending: 0, accepted: 0, expired: 0 };
+    (outgoingDonorRequests || []).forEach((request: any) => {
+      const status = request?.status || 'pending';
+      counts.all += 1;
+      if (status === 'accepted') counts.accepted += 1;
+      else if (status === 'expired') counts.expired += 1;
+      else counts.pending += 1;
     });
-    setDeleteModalOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteTarget) return;
-    await handleDeleteDonorRequest(deleteTarget.id);
-    setDeleteModalOpen(false);
-    setDeleteTarget(null);
-  };
+    return counts;
+  }, [outgoingDonorRequests]);
+  const filteredOutgoing = (outgoingDonorRequests || []).filter((request: any) => {
+    const status = request?.status || 'pending';
+    if (outreachFilter === 'all') return true;
+    if (outreachFilter === 'accepted') return status === 'accepted';
+    if (outreachFilter === 'expired') return status === 'expired';
+    return status === 'pending';
+  });
 
   return (
     <>
@@ -226,13 +227,6 @@ const DonorRequests = () => {
                           className="w-full sm:w-auto px-4 py-2 rounded-xl border border-rose-200 text-rose-600 text-sm font-semibold hover:bg-rose-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           {donorRequestActionId === request.id ? 'Working...' : 'Reject'}
-                        </button>
-                        <button
-                          onClick={() => openDeleteModal(request, 'Donor request')}
-                          disabled={donorRequestDeleteId === request.id || donorRequestActionId === request.id}
-                          className="w-full sm:w-auto px-4 py-2 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          {donorRequestDeleteId === request.id ? 'Deleting...' : 'Delete'}
                         </button>
                       </div>
                     </div>
@@ -459,15 +453,36 @@ const DonorRequests = () => {
               {outgoingDonorRequests?.length || 0} Total
             </span>
           </div>
+          <div className="flex flex-wrap gap-2 mb-4">
+            {(['all', 'pending', 'accepted', 'expired'] as const).map((filter) => {
+              const isActive = outreachFilter === filter;
+              const label = filter.charAt(0).toUpperCase() + filter.slice(1);
+              const count = outreachTotals[filter];
+              return (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setOutreachFilter(filter)}
+                  className={`rounded-full px-4 py-1.5 text-xs font-semibold border transition-all ${
+                    isActive
+                      ? 'bg-red-600 text-white border-red-600'
+                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  {label} {typeof count === 'number' ? `(${count})` : ''}
+                </button>
+              );
+            })}
+          </div>
           {outgoingRequestsLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, index) => (
                 <div key={`outgoing-skeleton-${index}`} className="h-16 rounded-xl bg-gray-100 animate-pulse" />
               ))}
             </div>
-          ) : outgoingDonorRequests?.length ? (
+          ) : filteredOutgoing?.length ? (
             <div className="space-y-4">
-              {outgoingDonorRequests.map((request: any) => (
+              {filteredOutgoing.map((request: any) => (
                 <div key={request.id} className="p-5 rounded-2xl border border-gray-100 bg-gray-50/40">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
@@ -493,13 +508,6 @@ const DonorRequests = () => {
                       <span className="text-xs text-gray-500">
                         {formatDate(request.requestedAt)} • {formatTime(request.requestedAt)}
                       </span>
-                      <button
-                        onClick={() => openDeleteModal(request, 'Donor request')}
-                        disabled={donorRequestDeleteId === request.id}
-                        className="px-3 py-1 rounded-full border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {donorRequestDeleteId === request.id ? 'Deleting...' : 'Delete'}
-                      </button>
                     </div>
                   </div>
                   {request.status === 'accepted' && renderContactCapsule({
@@ -513,52 +521,11 @@ const DonorRequests = () => {
             </div>
           ) : (
             <div className="text-sm text-gray-500 text-center py-6">
-              You haven't sent any donor requests yet.
+              No requests in this filter yet.
             </div>
           )}
         </div>
       </div>
-      {deleteModalOpen && deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-red-600">Delete request</p>
-                <h3 className="mt-2 text-lg font-bold text-gray-900">Confirm deletion</h3>
-                <p className="mt-2 text-sm text-gray-600">
-                  This will remove the request for both donors.
-                </p>
-                <p className="mt-3 text-sm font-semibold text-gray-800">
-                  {deleteTarget.label}
-                </p>
-                {deleteTarget.detail && (
-                  <p className="text-xs text-gray-500">{deleteTarget.detail}</p>
-                )}
-              </div>
-            </div>
-            <div className="mt-6 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setDeleteModalOpen(false);
-                  setDeleteTarget(null);
-                }}
-                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmDelete}
-                disabled={donorRequestDeleteId === deleteTarget.id}
-                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-              >
-                {donorRequestDeleteId === deleteTarget.id ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };
