@@ -161,6 +161,19 @@ const DonorRequests = () => {
           : (incomingDonorRequests || []);
   const activeIncomingConnections = acceptedIncomingRequests.filter((request: any) => getContactWindow(request.respondedAt)?.active);
 
+  useEffect(() => {
+    if (acceptedIncomingRequests.length > 0 && incomingFilter !== 'accepted') {
+      setIncomingFilter('accepted');
+    }
+  }, [acceptedIncomingRequests.length, incomingFilter]);
+
+  useEffect(() => {
+    const hasAccepted = (outgoingDonorRequests || []).some((request: any) => request?.status === 'accepted');
+    if (hasAccepted && outreachFilter !== 'accepted') {
+      setOutreachFilter('accepted');
+    }
+  }, [outgoingDonorRequests, outreachFilter]);
+
   const outreachTotals = useMemo(() => {
     const counts = { all: 0, pending: 0, accepted: 0, expired: 0, rejected: 0 };
     (outgoingDonorRequests || []).forEach((request: any) => {
@@ -522,10 +535,10 @@ const DonorRequests = () => {
               const label = filter.charAt(0).toUpperCase() + filter.slice(1);
               const count = outreachTotals[filter];
               return (
-                <button
-                  key={filter}
-                  type="button"
-                  onClick={() => setOutreachFilter(filter)}
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setOutreachFilter(filter)}
                   className={`rounded-full px-4 py-1.5 text-xs font-semibold border transition-all ${
                     isActive
                       ? 'bg-red-600 text-white border-red-600'
