@@ -45,6 +45,9 @@ function registerValidSW(swUrl: string, config?: Config) {
   navigator.serviceWorker
     .register(swUrl)
     .then((registration) => {
+      registration.update().catch(() => {
+        // Ignore update errors; we'll retry on next load.
+      });
       registration.onupdatefound = () => {
         const installingWorker = registration.installing;
         if (installingWorker == null) {
