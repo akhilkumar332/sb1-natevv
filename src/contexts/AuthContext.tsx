@@ -30,9 +30,13 @@ import {
   updateDoc, 
   serverTimestamp, 
   DocumentReference,
-  DocumentSnapshot
+  DocumentSnapshot,
+  disableNetwork,
+  enableNetwork
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
+import { getMessaging } from 'firebase/messaging';
+import { deleteFCMToken, removeFCMToken, initializeFCM } from '../services/notification.service';
 import { generateBhId } from '../utils/bhId';
 import { normalizePhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
@@ -115,6 +119,9 @@ interface User {
     showQr: boolean;
   };
   notificationPreferences?: {
+    push?: boolean;
+    email?: boolean;
+    sms?: boolean;
     emergencyAlerts?: boolean;
   };
   eligibilityChecklist?: {
@@ -462,6 +469,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const userRef = useRef<User | null>(initialCachedUser);
   const publicDonorSyncRef = useRef<string | null>(null);
   const profileRetryTimeoutRef = useRef<number | null>(null);
+  const pushInitRef = useRef<string | null>(null);
+  const firestoreNetworkDisabledRef = useRef(false);
 
   const logProfileIssue = (label: string, error: unknown, context?: Record<string, unknown>) => {
     const err = error as any;
@@ -479,6 +488,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   useEffect(() => {
+    if (!user?.uid) return;
+    if (!firestoreNetworkDisabledRef.current) return;
+    enableNetwork(db)
+      .then(() => {
+        firestoreNetworkDisabledRef.current = false;
+      })
+      .catch((error) => {
+        console.warn('Failed to re-enable Firestore network:', error);
+      });
+  }, [user?.uid]);
+
+  useEffect(() => {
     return () => {
       if (profileRetryTimeoutRef.current !== null) {
         window.clearTimeout(profileRetryTimeoutRef.current);
@@ -486,6 +507,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      pushInitRef.current = null;
+      return;
+    }
+    if (!['donor', 'ngo', 'bloodbank'].includes(user.role || '')) {
+      return;
+    }
+    if (pushInitRef.current === user.uid) return;
+    pushInitRef.current = user.uid;
+
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+
+    const enablePushOnLogin = async () => {
+      try {
+        if (!user.notificationPreferences || user.notificationPreferences.push !== true) {
+          await updateDoc(doc(db, 'users', user.uid), {
+            notificationPreferences: {
+              ...(user.notificationPreferences || {}),
+              push: true,
+            },
+            updatedAt: serverTimestamp(),
+          });
+        }
+        if (Notification.permission === 'granted') {
+          const messaging = getMessaging();
+          const token = await initializeFCM(user.uid, messaging);
+          if (token) {
+            try {
+              localStorage.setItem('fcmToken', token);
+            } catch {
+              // ignore
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to enable push on login:', error);
+      }
+    };
+
+    enablePushOnLogin();
+  }, [user?.role, user?.uid]);
 
   useEffect(() => {
     if (!user?.uid || user.role !== 'donor') return;
@@ -548,6 +612,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       try {
         if (firebaseUser) {
+          if (firestoreNetworkDisabledRef.current) {
+            try {
+              await enableNetwork(db);
+              firestoreNetworkDisabledRef.current = false;
+            } catch (error) {
+              console.warn('Failed to re-enable Firestore network on login:', error);
+            }
+          }
           const now = Date.now();
           const recentLogin = recentLoginRef.current;
           const currentUser = userRef.current;
@@ -1162,17 +1234,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!normalizedEmail) {
       throw new Error('Email is required');
     }
-    try {
-      await updateEmail(auth.currentUser, normalizedEmail);
-      await sendEmailVerification(auth.currentUser);
-      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        email: normalizedEmail,
-        updatedAt: serverTimestamp(),
-      });
-      setUser(prev => prev ? { ...prev, email: normalizedEmail, emailVerified: false } : prev);
-    } catch (error) {
-      throw error;
-    }
+    await updateEmail(auth.currentUser, normalizedEmail);
+    await sendEmailVerification(auth.currentUser);
+    await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+      email: normalizedEmail,
+      updatedAt: serverTimestamp(),
+    });
+    setUser(prev => prev ? { ...prev, email: normalizedEmail, emailVerified: false } : prev);
   };
 
   const ensureAnotherProvider = () => {
@@ -1481,6 +1549,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleLogout = async () => {
     let signOutFailed = false;
     try {
+      const storedToken = (() => {
+        try {
+          return localStorage.getItem('fcmToken');
+        } catch {
+          return null;
+        }
+      })();
+      if (storedToken && user?.uid) {
+        try {
+          await removeFCMToken(user.uid, storedToken);
+        } catch (error) {
+          console.warn('Failed to remove FCM token from user profile:', error);
+        }
+        try {
+          const messaging = getMessaging();
+          await deleteFCMToken(messaging);
+        } catch (error) {
+          console.warn('Failed to delete FCM token locally:', error);
+        }
+        try {
+          localStorage.removeItem('fcmToken');
+        } catch {
+          // ignore
+        }
+      }
+    } catch (error) {
+      console.warn('FCM logout cleanup failed:', error);
+    }
+
+    try {
+      // Clear user state early so dashboards unmount listeners before sign-out.
+      setUser(null);
+      await new Promise(resolve => setTimeout(resolve, 0));
+    } catch {
+      // ignore
+    }
+
+    try {
+      if (!firestoreNetworkDisabledRef.current) {
+        await disableNetwork(db);
+        firestoreNetworkDisabledRef.current = true;
+      }
+    } catch (error) {
+      console.warn('Failed to disable Firestore network during logout:', error);
+    }
+
+    try {
       await auth.signOut();
     } catch (error) {
       signOutFailed = true;
@@ -1488,7 +1603,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      setUser(null);
       localStorage.removeItem('authToken');
       sessionStorage.clear();
       // Clear any other auth-related storage

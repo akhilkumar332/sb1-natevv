@@ -30,22 +30,81 @@ import { DatabaseError } from '../utils/errorHandler';
 /**
  * Request notification permission and get FCM token
  */
+const waitForServiceWorkerActivation = async (registration: ServiceWorkerRegistration) => {
+  if (registration.active) return registration;
+  const worker = registration.installing || registration.waiting;
+  if (!worker) return registration;
+  await new Promise<void>((resolve) => {
+    const handleState = () => {
+      if (worker.state === 'activated') {
+        worker.removeEventListener('statechange', handleState);
+        resolve();
+      }
+    };
+    worker.addEventListener('statechange', handleState);
+  });
+  return registration;
+};
+
+const ensureMessagingServiceWorker = async () => {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+    return null;
+  }
+  const scope = '/firebase-cloud-messaging-push-scope';
+  try {
+    let registration = await navigator.serviceWorker.getRegistration(scope);
+    if (!registration) {
+      registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope });
+    }
+    if (registration) {
+      await waitForServiceWorkerActivation(registration);
+    }
+    return registration || null;
+  } catch (error) {
+    console.warn('Failed to register FCM service worker:', error);
+    return null;
+  }
+};
+
 export const requestNotificationPermission = async (
   messaging: Messaging
 ): Promise<string | null> => {
   try {
-    const permission = await Notification.requestPermission();
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return null;
+    }
+
+    const permission = Notification.permission === 'granted'
+      ? 'granted'
+      : await Notification.requestPermission();
 
     if (permission === 'granted') {
-      const token = await getToken(messaging, {
-        vapidKey: FCM_CONFIG.vapidKey,
-      });
-
-      return token;
+      const registration = await ensureMessagingServiceWorker();
+      if (!registration) return null;
+      try {
+        const token = await getToken(messaging, {
+          vapidKey: FCM_CONFIG.vapidKey,
+          serviceWorkerRegistration: registration,
+        });
+        return token;
+      } catch (error: any) {
+        const message = error?.message || '';
+        if (error?.name === 'AbortError' || message.includes('no active Service Worker')) {
+          console.warn('FCM subscription not ready yet. Retry after service worker activates.');
+          return null;
+        }
+        throw error;
+      }
     }
 
     return null;
   } catch (error) {
+    const err = error as any;
+    const message = err?.message || '';
+    if (err?.name === 'AbortError' || message.includes('no active Service Worker')) {
+      console.warn('FCM subscription not ready yet. Retry after service worker activates.');
+      return null;
+    }
     console.error('Error requesting notification permission:', error);
     throw new DatabaseError('Failed to request notification permission');
   }

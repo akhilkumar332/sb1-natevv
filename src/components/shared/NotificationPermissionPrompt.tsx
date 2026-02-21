@@ -23,6 +23,7 @@ export const NotificationPermissionPrompt: React.FC<NotificationPermissionPrompt
   const { isGranted, isDenied } = useNotificationPermission();
   const { requestPermission, loading } = usePushNotifications();
   const [dismissed, setDismissed] = useState(false);
+  const [attemptedEnable, setAttemptedEnable] = useState(false);
 
   // Don't show if already granted or user dismissed
   if (isGranted || dismissed) {
@@ -30,6 +31,7 @@ export const NotificationPermissionPrompt: React.FC<NotificationPermissionPrompt
   }
 
   const handleRequestPermission = async () => {
+    setAttemptedEnable(true);
     await requestPermission();
   };
 
@@ -62,17 +64,24 @@ export const NotificationPermissionPrompt: React.FC<NotificationPermissionPrompt
               : 'Get real-time alerts for emergency blood requests, appointment reminders, and important updates.'}
           </p>
 
+          {isDenied && (
+            <div className="text-xs text-gray-600 space-y-2">
+              <p className="font-medium text-gray-700">How to enable notifications:</p>
+              <p>Chrome/Edge: Settings → Privacy &amp; security → Site settings → Notifications → Allow BloodHub.</p>
+              <p>Safari (macOS): Safari → Settings → Websites → Notifications → Allow BloodHub.</p>
+              <p>iOS (installed app): Settings → Notifications → BloodHub → Allow Notifications.</p>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex gap-2">
-            {!isDenied && (
-              <button
-                onClick={handleRequestPermission}
-                disabled={loading}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 transition-colors font-medium text-sm"
-              >
-                {loading ? 'Requesting...' : 'Enable Notifications'}
-              </button>
-            )}
+            <button
+              onClick={handleRequestPermission}
+              disabled={loading}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 transition-colors font-medium text-sm"
+            >
+              {loading ? 'Requesting...' : 'Enable Notifications'}
+            </button>
 
             {showCloseButton && (
               <button
@@ -83,6 +92,12 @@ export const NotificationPermissionPrompt: React.FC<NotificationPermissionPrompt
               </button>
             )}
           </div>
+
+          {isDenied && attemptedEnable && (
+            <p className="mt-2 text-xs text-red-600">
+              Still blocked. Please enable notifications in your browser settings above, then try again.
+            </p>
+          )}
         </div>
 
         {/* Close Button */}

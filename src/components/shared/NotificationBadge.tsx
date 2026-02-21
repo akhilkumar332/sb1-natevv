@@ -4,11 +4,12 @@
  * Badge component for showing unread notification count
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { useRealtimeNotifications } from '../../hooks/useRealtimeNotifications';
 import { useAuth } from '../../contexts/AuthContext';
 import { NotificationCenter } from './NotificationCenter';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface NotificationBadgeProps {
   showLabel?: boolean;
@@ -23,12 +24,24 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
   className = '',
 }) => {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { unreadCount } = useRealtimeNotifications({
     userId: user?.uid || '',
     limitCount: 50,
   });
 
   const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('panel') !== 'notifications') return;
+    setIsOpen(true);
+    params.delete('panel');
+    const nextSearch = params.toString();
+    const nextUrl = `${location.pathname}${nextSearch ? `?${nextSearch}` : ''}${location.hash || ''}`;
+    navigate(nextUrl, { replace: true });
+  }, [location.hash, location.pathname, location.search, navigate]);
 
   const handleToggle = () => {
     setIsOpen(!isOpen);

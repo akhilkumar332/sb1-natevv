@@ -1,9 +1,71 @@
+import { useEffect, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import { CheckCircle, MapPin, User, Building2, FileText } from 'lucide-react';
 import type { NgoDashboardContext } from '../NgoDashboard';
+import { usePushNotifications } from '../../../hooks/usePushNotifications';
+import { db } from '../../../firebase';
+import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 function NgoAccount() {
   const { user } = useOutletContext<NgoDashboardContext>();
+  const {
+    permission: pushPermission,
+    loading: pushLoading,
+    requestPermission,
+    unsubscribe,
+  } = usePushNotifications();
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [pushMessage, setPushMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    setPushEnabled(user.notificationPreferences?.push !== false);
+  }, [user?.notificationPreferences?.push, user]);
+
+  const handlePushToggle = async () => {
+    if (!user?.uid) return;
+    const wantsEnable = !pushEnabled;
+    setPushMessage(null);
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setPushMessage('Push notifications are not supported in this browser.');
+      return;
+    }
+
+    if (wantsEnable) {
+      await requestPermission();
+      if (Notification.permission === 'granted') {
+        setPushEnabled(true);
+        await updateDoc(doc(db, 'users', user.uid), {
+          notificationPreferences: {
+            ...(user.notificationPreferences || {}),
+            push: true,
+          },
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        setPushEnabled(false);
+        await updateDoc(doc(db, 'users', user.uid), {
+          notificationPreferences: {
+            ...(user.notificationPreferences || {}),
+            push: false,
+          },
+          updatedAt: serverTimestamp(),
+        });
+        setPushMessage('Notifications are blocked. Enable them in your browser settings.');
+      }
+    } else {
+      await unsubscribe();
+      setPushEnabled(false);
+      await updateDoc(doc(db, 'users', user.uid), {
+        notificationPreferences: {
+          ...(user.notificationPreferences || {}),
+          push: false,
+        },
+        fcmTokens: [],
+        updatedAt: serverTimestamp(),
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -171,6 +233,47 @@ function NgoAccount() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-xl p-5">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-red-600">Notifications</p>
+            <h3 className="text-lg font-semibold text-gray-900">Push Notifications</h3>
+            <p className="text-xs text-gray-500 mt-1">Get alerts in your browser.</p>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Enable Push</p>
+            <p className="text-xs text-gray-500">Receive NGO updates and requests.</p>
+            {pushPermission === 'denied' && !pushMessage && (
+              <p className="text-xs text-red-600 mt-1">
+                Notifications are blocked. Enable them in your browser settings.
+              </p>
+            )}
+            {pushMessage && (
+              <p className="text-xs text-red-600 mt-1">{pushMessage}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handlePushToggle}
+            disabled={pushLoading}
+            role="switch"
+            aria-checked={pushEnabled}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 ${
+              pushEnabled ? 'bg-red-600' : 'bg-gray-300'
+            } ${pushLoading ? 'opacity-60' : ''}`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                pushEnabled ? 'translate-x-5' : 'translate-x-1'
+              }`}
+            />
+          </button>
         </div>
       </div>
     </div>

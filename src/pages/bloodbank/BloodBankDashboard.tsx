@@ -3,7 +3,9 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBloodBankData, BloodInventoryItem, BloodRequest, Appointment, Donation, BloodBankStats } from '../../hooks/useBloodBankData';
 import { useReferrals } from '../../hooks/useReferrals';
+import { useFcmNotificationBridge } from '../../hooks/useFcmNotificationBridge';
 import BhIdBanner from '../../components/BhIdBanner';
+import NotificationPermissionPrompt from '../../components/shared/NotificationPermissionPrompt';
 import {
   Activity,
   AlertCircle,
@@ -51,6 +53,8 @@ function BloodBankDashboard() {
   const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const baseHospitalId = user?.parentHospitalId || user?.uid || '';
+
+  useFcmNotificationBridge();
 
   const {
     inventory,
@@ -277,6 +281,11 @@ function BloodBankDashboard() {
           </div>
 
           <main className="min-w-0 flex-1">
+            {user?.notificationPreferences?.push !== false && (
+              <div className="mb-4">
+                <NotificationPermissionPrompt />
+              </div>
+            )}
             <Outlet context={dashboardContext} />
           </main>
         </div>

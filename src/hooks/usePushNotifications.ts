@@ -36,6 +36,14 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [messaging, setMessaging] = useState<Messaging | null>(null);
+  const tokenStorageKey = 'fcmToken';
+  const readStoredToken = () => {
+    try {
+      return localStorage.getItem(tokenStorageKey);
+    } catch {
+      return null;
+    }
+  };
 
   // Initialize messaging
   useEffect(() => {
@@ -44,6 +52,13 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
       setMessaging(msg);
     } catch (err) {
       console.error('Failed to initialize messaging:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    const storedToken = readStoredToken();
+    if (storedToken) {
+      setToken(storedToken);
     }
   }, []);
 
@@ -69,13 +84,22 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
 
       if (fcmToken) {
         setToken(fcmToken);
-        setPermission('granted');
-      } else {
-        setPermission('denied');
+        try {
+          localStorage.setItem(tokenStorageKey, fcmToken);
+        } catch {
+          // ignore
+        }
+      }
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        setPermission(Notification.permission);
       }
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to request permission'));
-      setPermission('denied');
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        setPermission(Notification.permission);
+      } else {
+        setPermission('default');
+      }
     } finally {
       setLoading(false);
     }
@@ -83,7 +107,8 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
 
   // Unsubscribe from notifications
   const unsubscribe = useCallback(async () => {
-    if (!user || !messaging || !token) {
+    const tokenToRemove = token || readStoredToken();
+    if (!user || !messaging || !tokenToRemove) {
       return;
     }
 
@@ -91,9 +116,14 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
     setError(null);
 
     try {
-      await removeFCMToken(user.uid, token);
+      await removeFCMToken(user.uid, tokenToRemove);
       await deleteFCMToken(messaging);
       setToken(null);
+      try {
+        localStorage.removeItem(tokenStorageKey);
+      } catch {
+        // ignore
+      }
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to unsubscribe'));
     } finally {
@@ -117,6 +147,7 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
 
 interface UseForegroundMessagesOptions {
   onMessage?: (payload: any) => void;
+  enabled?: boolean;
 }
 
 /**
@@ -125,9 +156,12 @@ interface UseForegroundMessagesOptions {
 export const useForegroundMessages = (
   options: UseForegroundMessagesOptions = {}
 ): void => {
-  const { onMessage: onMessageCallback } = options;
+  const { onMessage: onMessageCallback, enabled = true } = options;
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
     let unsubscribe: (() => void) | undefined;
 
     try {
@@ -135,18 +169,28 @@ export const useForegroundMessages = (
 
       // Listen for foreground messages
       unsubscribe = onMessage(messaging, (payload) => {
-        console.log('Foreground message received:', payload);
 
         // Show browser notification
         if ('Notification' in window && Notification.permission === 'granted') {
           const { title, body, icon } = payload.notification || {};
-
-          new Notification(title || 'BloodHub India', {
+          const notificationTitle = title || 'BloodHub India';
+          const notificationOptions: NotificationOptions = {
             body: body || '',
-            icon: icon || '/notification-icon.png',
-            badge: '/notification-badge.png',
+            icon: icon || '/notification-icon.svg',
+            badge: '/notification-badge.svg',
             data: payload.data,
-          });
+            tag: payload.data?.type || 'default',
+          };
+
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready
+              .then((registration) => registration.showNotification(notificationTitle, notificationOptions))
+              .catch(() => {
+                new Notification(notificationTitle, notificationOptions);
+              });
+          } else {
+            new Notification(notificationTitle, notificationOptions);
+          }
         }
 
         // Call custom callback
@@ -163,7 +207,7 @@ export const useForegroundMessages = (
         unsubscribe();
       }
     };
-  }, [onMessageCallback]);
+  }, [enabled, onMessageCallback]);
 };
 
 // ============================================================================

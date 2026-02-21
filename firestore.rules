@@ -155,12 +155,20 @@ service cloud.firestore {
      */
     function isDonorRequestExpiryUpdate() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'expiredAt', 'updatedAt'])
-        && resource.data.status == 'accepted'
         && request.resource.data.status == 'expired'
         && (
-          (resource.data.connectionExpiresAt != null && request.time >= resource.data.connectionExpiresAt)
-          || (resource.data.connectionExpiresAt == null && resource.data.respondedAt != null
-            && request.time >= resource.data.respondedAt + duration.value(24, 'h'))
+          // Accepted request: expire after contact window.
+          (resource.data.status == 'accepted' &&
+            (
+              (resource.data.connectionExpiresAt != null && request.time >= resource.data.connectionExpiresAt)
+              || (resource.data.connectionExpiresAt == null && resource.data.respondedAt != null
+                && request.time >= resource.data.respondedAt + duration.value(24, 'h'))
+            )
+          )
+          // Pending request: expire after 24 hours from requestedAt.
+          || (resource.data.status == 'pending'
+            && resource.data.requestedAt != null
+            && request.time >= resource.data.requestedAt + duration.value(24, 'h'))
         );
     }
 
@@ -188,6 +196,29 @@ service cloud.firestore {
           == request.auth.uid
         && get(/databases/$(database)/documents/ReferralTracking/$(request.resource.data.referralId)).data.referrerUid
           == request.resource.data.userId;
+    }
+
+    /**
+     * Allow users to create their own general notifications (client-side FCM bridge).
+     */
+    function isSelfNotificationCreate() {
+      return request.resource.data.userId == request.auth.uid
+        && request.resource.data.type in [
+          'emergency_request',
+          'donor_request',
+          'appointment_reminder',
+          'campaign_invite',
+          'donation_confirmation',
+          'verification_status',
+          'achievement',
+          'referral',
+          'general'
+        ]
+        && request.resource.data.title is string
+        && request.resource.data.message is string
+        && request.resource.data.read == false
+        && request.resource.data.priority in ['low', 'medium', 'high']
+        && request.resource.data.createdAt is timestamp;
     }
 
     /**
@@ -638,7 +669,8 @@ service cloud.firestore {
           isAppointmentNotificationForHospital() ||
           isBloodRequestNotificationForRequester() ||
           isDonorRequestNotificationForRequester()
-        ))
+        )) ||
+        isSelfNotificationCreate()
       );
 
       // Recipient can update (mark as read), admin can update any
@@ -811,7 +843,13 @@ service cloud.firestore {
 
       // Only system/admin can create badges for users
       // In practice, this should be done via Cloud Functions
-      allow create: if isAdmin();
+      allow create: if isAdmin() || (
+        isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.badgeId is string &&
+        request.resource.data.earnedAt is timestamp &&
+        request.resource.data.keys().hasOnly(['userId', 'badgeId', 'earnedAt'])
+      );
 
       // User can update display preferences, admin can update any
       allow update: if isAuthenticated() && (

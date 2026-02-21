@@ -25,6 +25,8 @@ import { addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, runTrans
 import { auth, db } from '../../firebase';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
 import { useReferrals } from '../../hooks/useReferrals';
+import { useFcmNotificationBridge } from '../../hooks/useFcmNotificationBridge';
+import NotificationPermissionPrompt from '../../components/shared/NotificationPermissionPrompt';
 import {
   clearPendingDonorRequestDoc,
   decodePendingDonorRequest,
@@ -183,6 +185,8 @@ function DonorDashboard() {
   } = useReferrals(user);
 
   const { respondToRequest, responding } = useBloodRequest();
+
+  useFcmNotificationBridge();
 
   const formatDate = (date?: Date | string) => {
     if (!date) return 'N/A';
@@ -2524,6 +2528,11 @@ function DonorDashboard() {
             <span className="text-xs uppercase tracking-[0.2em] text-red-600">Dashboard</span>
           </div>
           <main className="min-w-0 flex-1">
+            {user?.notificationPreferences?.push !== false && (
+              <div className="mb-4">
+                <NotificationPermissionPrompt />
+              </div>
+            )}
             <Outlet context={dashboardContext} />
           </main>
         </div>

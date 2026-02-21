@@ -10,7 +10,9 @@ import {
   NgoStats,
 } from '../../hooks/useNgoData';
 import { useReferrals } from '../../hooks/useReferrals';
+import { useFcmNotificationBridge } from '../../hooks/useFcmNotificationBridge';
 import BhIdBanner from '../../components/BhIdBanner';
+import NotificationPermissionPrompt from '../../components/shared/NotificationPermissionPrompt';
 import {
   Activity,
   AlertCircle,
@@ -60,6 +62,8 @@ export type NgoDashboardContext = {
 function NgoDashboard() {
   const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useFcmNotificationBridge();
 
   const {
     campaigns,
@@ -334,6 +338,11 @@ function NgoDashboard() {
           </div>
 
           <main className="min-w-0 flex-1">
+            {user?.notificationPreferences?.push !== false && (
+              <div className="mb-4">
+                <NotificationPermissionPrompt />
+              </div>
+            )}
             <Outlet context={dashboardContext} />
           </main>
         </div>

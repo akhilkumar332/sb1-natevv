@@ -1,6 +1,7 @@
 import { spawn, execSync } from 'child_process';
 import { writeFile } from 'fs/promises';
 import path from 'path';
+import { writeFirebaseConfig } from './prepare-firebase-config.mjs';
 
 const writeVersionFile = async () => {
   let commit = 'unknown';
@@ -76,6 +77,7 @@ const suppressBaselineWarnings = (text) => {
 };
 
 try {
+  await writeFirebaseConfig();
   await writeVersionFile();
   await run(getBinPath('tsc'), []);
   process.env.BROWSERSLIST_IGNORE_OLD_DATA = '1';

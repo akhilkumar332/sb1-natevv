@@ -170,8 +170,6 @@ export const useLogin = () => {
       }
       if (result?.token && result?.user) {
         handleLoginSuccess(result.token);
-        console.log('Google login user data:', result.user);
-        console.log('Onboarding completed:', result.user.onboardingCompleted);
         toast.success('Successfully logged in with Google!');
 
         // Navigate based on onboarding status - if not explicitly true, go to onboarding

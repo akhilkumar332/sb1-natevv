@@ -191,7 +191,6 @@ function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: 
     }
   };
 
-  console.log('User object:', user); // Log user object for debugging
 
   return (
     <div className="relative">
@@ -327,7 +326,6 @@ function MobileUserMenu({ onClose, achievementLabel, hideDashboardLink }: { onCl
     }
   };
 
-  console.log('User object:', user); // Log user object for debugging
 
   return (
     <div className="space-y-3 border-t border-gray-200 pt-4 mt-4">
@@ -381,8 +379,11 @@ const Navbar: React.FC = () => {
   const { user, authLoading } = useAuth();
   const location = useLocation();
   const isDonorDashboard = user?.role === 'donor' && location.pathname.startsWith('/donor/dashboard');
+  const isNgoDashboard = user?.role === 'ngo' && location.pathname.startsWith('/ngo/dashboard');
+  const isBloodbankDashboard = user?.role === 'bloodbank' && location.pathname.startsWith('/bloodbank/dashboard');
   const hideDonorNav = isDonorDashboard;
   const hideDashboardLink = hideDonorNav;
+  const showNotificationBadge = isDonorDashboard || isNgoDashboard || isBloodbankDashboard;
   const topBadge = useTopDonorBadge(user);
   const achievementLabel = topBadge.name
     ? `${topBadge.icon ? `${topBadge.icon} ` : ''}${topBadge.name}`
@@ -438,7 +439,7 @@ const Navbar: React.FC = () => {
                 ) : (
                   <Suspense fallback={<LoadingFallback />}>
                     <div className="flex items-center gap-3">
-                      {isDonorDashboard && (
+                      {showNotificationBadge && (
                         <NotificationBadge className="rounded-full border border-red-100 bg-red-50 hover:bg-red-100" />
                       )}
                       <UserMenu achievementLabel={achievementLabel} hideDashboardLink={hideDashboardLink} />
@@ -450,7 +451,7 @@ const Navbar: React.FC = () => {
 
              {/* Mobile Menu Button */}
             <div className="md:hidden flex items-center">
-              {isDonorDashboard && (
+              {showNotificationBadge && (
                 <NotificationBadge className="mr-2 rounded-xl border border-red-100 bg-red-50 hover:bg-red-100" />
               )}
               <button

@@ -7,13 +7,13 @@
 // FCM configuration
 export const FCM_CONFIG = {
   // Vapid key for web push (to be added from Firebase Console)
-  vapidKey: process.env.VITE_FCM_VAPID_KEY || '',
+  vapidKey: import.meta.env.VITE_FCM_VAPID_KEY || '',
 
   // Notification options
   defaultNotificationOptions: {
     requireInteraction: false,
-    badge: '/notification-badge.png',
-    icon: '/notification-icon.png',
+    badge: '/notification-badge.svg',
+    icon: '/notification-icon.svg',
     vibrate: [200, 100, 200],
   },
 

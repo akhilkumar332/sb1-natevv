@@ -9,6 +9,7 @@ import { Bell, Mail, Smartphone, AlertCircle, Save } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { usePushNotifications } from '../../hooks/usePushNotifications';
 
 interface NotificationPreferencesProps {
   onSave?: () => void;
@@ -26,6 +27,12 @@ interface Preferences {
  */
 export const NotificationPreferences: React.FC<NotificationPreferencesProps> = ({ onSave }) => {
   const { user } = useAuth();
+  const {
+    permission,
+    loading: pushLoading,
+    requestPermission,
+    unsubscribe,
+  } = usePushNotifications();
 
   const [preferences, setPreferences] = useState<Preferences>({
     email: true,
@@ -36,17 +43,42 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [pushMessage, setPushMessage] = useState<string | null>(null);
 
   // Load preferences from user data
   useEffect(() => {
     const userPrefs = (user as any)?.notificationPreferences;
     if (userPrefs) {
-      setPreferences(userPrefs);
+      setPreferences((prev) => ({ ...prev, ...userPrefs }));
     }
   }, [user]);
 
   // Handle preference change
-  const handleToggle = (key: keyof Preferences) => {
+  const handleToggle = async (key: keyof Preferences) => {
+    if (key === 'push') {
+      const wantsEnable = !preferences.push;
+      setSaved(false);
+      setPushMessage(null);
+
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        setPushMessage('Push notifications are not supported in this browser.');
+        return;
+      }
+
+      if (wantsEnable) {
+        await requestPermission();
+        const granted = Notification.permission === 'granted';
+        setPreferences((prev) => ({ ...prev, push: granted }));
+        if (!granted) {
+          setPushMessage('Notifications are blocked. Enable them in your browser settings.');
+        }
+      } else {
+        await unsubscribe();
+        setPreferences((prev) => ({ ...prev, push: false }));
+      }
+      return;
+    }
+
     setPreferences((prev) => ({
       ...prev,
       [key]: !prev[key],
@@ -148,12 +180,28 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
             <p className="text-sm text-gray-600 mt-1">
               Receive push notifications in your browser
             </p>
+            {permission === 'denied' && !pushMessage && (
+              <p className="text-xs text-red-600 mt-2">
+                Notifications are blocked. Enable them in your browser settings.
+              </p>
+            )}
+            {pushMessage && (
+              <p className="text-xs text-red-600 mt-2">
+                {pushMessage}
+              </p>
+            )}
+            {pushLoading && (
+              <p className="text-xs text-gray-500 mt-2">
+                Updating push preference...
+              </p>
+            )}
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
               checked={preferences.push}
               onChange={() => handleToggle('push')}
+              disabled={pushLoading}
               className="sr-only peer"
             />
             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
@@ -190,7 +238,7 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
       <div className="flex items-center gap-3">
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || pushLoading}
           className="flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 transition-colors font-medium"
         >
           <Save className="w-4 h-4" />

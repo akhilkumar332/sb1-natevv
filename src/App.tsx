@@ -13,6 +13,7 @@ import { useInactivityCheck } from './hooks/useInactivityCheck';
 import { useLocation } from 'react-router-dom';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { setReferralTracking, setReferralReferrerUid } from './utils/referralTracking';
+import { applyPwaBranding } from './utils/pwaManifest';
 
 function App() {
   useAuthSync();
@@ -65,6 +66,10 @@ function App() {
       setReferralReferrerUid(referrerUid.trim());
     }
   }, [location.search]);
+
+  useEffect(() => {
+    applyPwaBranding(location.pathname);
+  }, [location.pathname]);
 
   return (
     <LoadingProvider>
