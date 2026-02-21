@@ -520,6 +520,50 @@ export const inventoryExpiryJob = functions.pubsub
     return null;
   });
 
+export const donorRequestExpiryJob = functions.pubsub
+  .schedule('every 15 minutes')
+  .onRun(async () => {
+    const db = admin.firestore();
+    const now = admin.firestore.Timestamp.now();
+    const batchSize = 500;
+    let expiredCount = 0;
+    let lastDoc = null;
+
+    while (true) {
+      let query = db
+        .collection('donorRequests')
+        .where('status', '==', 'accepted')
+        .where('connectionExpiresAt', '<=', now)
+        .orderBy('connectionExpiresAt')
+        .limit(batchSize);
+
+      if (lastDoc) {
+        query = query.startAfter(lastDoc);
+      }
+
+      const snapshot = await query.get();
+      if (snapshot.empty) {
+        break;
+      }
+
+      const bulkWriter = db.bulkWriter();
+      snapshot.docs.forEach((docSnap) => {
+        bulkWriter.update(docSnap.ref, {
+          status: 'expired',
+          expiredAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+      await bulkWriter.close();
+
+      expiredCount += snapshot.size;
+      lastDoc = snapshot.docs[snapshot.docs.length - 1];
+    }
+
+    console.log(`Expired ${expiredCount} donor requests with lapsed contact window.`);
+    return null;
+  });
+
 // 404 handling
 app.use((req, res) => {
   console.log('404 Not Found:', req.originalUrl);

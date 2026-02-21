@@ -1,5 +1,5 @@
 import { useOutletContext } from 'react-router-dom';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle, Droplet, Loader2, MapPin, MessageCircle, PhoneCall } from 'lucide-react';
 
 const DonorRequests = () => {
@@ -26,6 +26,8 @@ const DonorRequests = () => {
   const [now, setNow] = useState(() => Date.now());
   const [outreachFilter, setOutreachFilter] = useState<'all' | 'pending' | 'accepted' | 'expired' | 'rejected'>('pending');
   const [incomingFilter, setIncomingFilter] = useState<'all' | 'pending' | 'accepted' | 'expired' | 'rejected'>('pending');
+  const incomingFilterTouchedRef = useRef(false);
+  const outreachFilterTouchedRef = useRef(false);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 60 * 1000);
@@ -162,12 +164,18 @@ const DonorRequests = () => {
   const activeIncomingConnections = acceptedIncomingRequests.filter((request: any) => getContactWindow(request.respondedAt)?.active);
 
   useEffect(() => {
+    if (incomingFilterTouchedRef.current) {
+      return;
+    }
     if (acceptedIncomingRequests.length > 0 && incomingFilter !== 'accepted') {
       setIncomingFilter('accepted');
     }
   }, [acceptedIncomingRequests.length, incomingFilter]);
 
   useEffect(() => {
+    if (outreachFilterTouchedRef.current) {
+      return;
+    }
     const hasAccepted = (outgoingDonorRequests || []).some((request: any) => request?.status === 'accepted');
     if (hasAccepted && outreachFilter !== 'accepted') {
       setOutreachFilter('accepted');
@@ -225,7 +233,10 @@ const DonorRequests = () => {
                   <button
                     key={filter}
                     type="button"
-                    onClick={() => setIncomingFilter(filter)}
+                    onClick={() => {
+                      incomingFilterTouchedRef.current = true;
+                      setIncomingFilter(filter);
+                    }}
                     className={`rounded-full px-4 py-1.5 text-xs font-semibold border transition-all ${
                       isActive
                         ? 'bg-amber-600 text-white border-amber-600'
@@ -538,7 +549,10 @@ const DonorRequests = () => {
                   <button
                     key={filter}
                     type="button"
-                    onClick={() => setOutreachFilter(filter)}
+                    onClick={() => {
+                      outreachFilterTouchedRef.current = true;
+                      setOutreachFilter(filter);
+                    }}
                   className={`rounded-full px-4 py-1.5 text-xs font-semibold border transition-all ${
                     isActive
                       ? 'bg-red-600 text-white border-red-600'

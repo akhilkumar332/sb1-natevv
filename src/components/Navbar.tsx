@@ -166,7 +166,7 @@ function SigninDropdown() {
   );
 }
 
-function UserMenu({ achievementLabel }: { achievementLabel?: string }) {
+function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: string; hideDashboardLink?: boolean }) {
   const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
@@ -232,17 +232,21 @@ function UserMenu({ achievementLabel }: { achievementLabel?: string }) {
           <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-3xl opacity-10 pointer-events-none"></div>
 
           <div className="relative z-10">
-            <Link
-              to={getDashboardPath()}
-              className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 transition-all duration-300 group"
-              onClick={() => setIsOpen(false)}
-            >
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-r from-red-600 to-red-700 mr-3 shadow-md transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
-                <LayoutDashboard className="w-4 h-4 text-white" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
-              </div>
-              <span className="font-semibold">Dashboard</span>
-            </Link>
-            <div className="h-px bg-gradient-to-r from-transparent via-red-200 to-transparent my-1"></div>
+            {!hideDashboardLink && (
+              <>
+                <Link
+                  to={getDashboardPath()}
+                  className="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 transition-all duration-300 group"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-r from-red-600 to-red-700 mr-3 shadow-md transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                    <LayoutDashboard className="w-4 h-4 text-white" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+                  </div>
+                  <span className="font-semibold">Dashboard</span>
+                </Link>
+                <div className="h-px bg-gradient-to-r from-transparent via-red-200 to-transparent my-1"></div>
+              </>
+            )}
             <button
               onClick={handleLogout}
               className="flex items-center w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 transition-all duration-300 group"
@@ -298,7 +302,7 @@ function MobileAuthMenu({ onClose }: { onClose?: () => void }) {
   );
 }
 
-function MobileUserMenu({ onClose, achievementLabel }: { onClose?: () => void; achievementLabel?: string }) {
+function MobileUserMenu({ onClose, achievementLabel, hideDashboardLink }: { onClose?: () => void; achievementLabel?: string; hideDashboardLink?: boolean }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -351,14 +355,16 @@ function MobileUserMenu({ onClose, achievementLabel }: { onClose?: () => void; a
           )}
         </div>
       </div>
-      <Link
-        to={getDashboardPath()}
-        onClick={onClose}
-        className="flex items-center px-4 py-3 text-gray-700 hover:bg-red-50 rounded-xl transition-all group"
-      >
-        <LayoutDashboard className="w-5 h-5 mr-3 text-red-600 group-hover:scale-110 transition-transform" />
-        <span className="font-medium">Dashboard</span>
-      </Link>
+      {!hideDashboardLink && (
+        <Link
+          to={getDashboardPath()}
+          onClick={onClose}
+          className="flex items-center px-4 py-3 text-gray-700 hover:bg-red-50 rounded-xl transition-all group"
+        >
+          <LayoutDashboard className="w-5 h-5 mr-3 text-red-600 group-hover:scale-110 transition-transform" />
+          <span className="font-medium">Dashboard</span>
+        </Link>
+      )}
       <button
         onClick={handleLogout}
         className="flex items-center w-full px-4 py-3 text-gray-700 hover:bg-red-50 rounded-xl transition-all group"
@@ -375,6 +381,7 @@ const Navbar: React.FC = () => {
   const { user, authLoading } = useAuth();
   const location = useLocation();
   const hideDonorNav = user?.role === 'donor' && location.pathname.startsWith('/donor/dashboard');
+  const hideDashboardLink = hideDonorNav;
   const topBadge = useTopDonorBadge(user);
   const achievementLabel = topBadge.name
     ? `${topBadge.icon ? `${topBadge.icon} ` : ''}${topBadge.name}`
@@ -433,7 +440,7 @@ const Navbar: React.FC = () => {
                       {user?.role === 'donor' && (
                         <NotificationBadge className="rounded-full border border-red-100 bg-red-50 hover:bg-red-100" />
                       )}
-                      <UserMenu achievementLabel={achievementLabel} />
+                      <UserMenu achievementLabel={achievementLabel} hideDashboardLink={hideDashboardLink} />
                     </div>
                   </Suspense>
                 )}
@@ -524,7 +531,7 @@ const Navbar: React.FC = () => {
                 ) : (
                   <div className="animate-slideInRight" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
                     <Suspense fallback={<LoadingFallback />}>
-                      <MobileUserMenu onClose={() => setIsOpen(false)} achievementLabel={achievementLabel} />
+                      <MobileUserMenu onClose={() => setIsOpen(false)} achievementLabel={achievementLabel} hideDashboardLink={hideDashboardLink} />
                     </Suspense>
                   </div>
                 )}

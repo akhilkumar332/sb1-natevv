@@ -151,6 +151,20 @@ service cloud.firestore {
     }
 
     /**
+     * Allow donors to expire accepted donor requests after the contact window ends.
+     */
+    function isDonorRequestExpiryUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'expiredAt', 'updatedAt'])
+        && resource.data.status == 'accepted'
+        && request.resource.data.status == 'expired'
+        && (
+          (resource.data.connectionExpiresAt != null && request.time >= resource.data.connectionExpiresAt)
+          || (resource.data.connectionExpiresAt == null && resource.data.respondedAt != null
+            && request.time >= resource.data.respondedAt + duration.value(24, 'h'))
+        );
+    }
+
+    /**
      * Allow referral notifications only if the auth user is the referred donor
      */
     function isReferralNotificationCreate() {
@@ -396,6 +410,8 @@ service cloud.firestore {
         (resource.data.targetDonorUid == request.auth.uid &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt', 'updatedAt', 'targetDonorPhone', 'connectionExpiresAt', 'connectionKey']) &&
           request.resource.data.status in ['accepted', 'rejected']) ||
+        ((resource.data.requesterUid == request.auth.uid || resource.data.targetDonorUid == request.auth.uid) &&
+          isDonorRequestExpiryUpdate()) ||
         isAdmin()
       );
 

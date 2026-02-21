@@ -399,6 +399,20 @@
       ]
     },
     {
+      "collectionGroup": "donorRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "connectionExpiresAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "inventoryAlerts",
       "queryScope": "COLLECTION",
       "fields": [

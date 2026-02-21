@@ -146,6 +146,8 @@ function DonorDashboard() {
   const requestBatchesRef = useRef<any[]>([]);
   const outgoingExpiryRef = useRef<Set<string>>(new Set());
   const incomingExpiryRef = useRef<Set<string>>(new Set());
+  const outgoingAcceptedExpiryRef = useRef<Set<string>>(new Set());
+  const incomingAcceptedExpiryRef = useRef<Set<string>>(new Set());
 
   // Use custom hook to fetch all donor data
   const {
@@ -701,6 +703,7 @@ function DonorDashboard() {
                 ...item,
                 requestedAt: item.requestedAt ? new Date(item.requestedAt) : undefined,
                 respondedAt: item.respondedAt ? new Date(item.respondedAt) : undefined,
+                connectionExpiresAt: item.connectionExpiresAt ? new Date(item.connectionExpiresAt) : undefined,
               });
               const hydrateBatch = (item: any) => ({
                 ...item,
@@ -756,12 +759,29 @@ function DonorDashboard() {
       const data = docSnapshot.data();
       const requestedAt = data.requestedAt?.toDate ? data.requestedAt.toDate() : undefined;
       const respondedAt = data.respondedAt?.toDate ? data.respondedAt.toDate() : undefined;
+      const connectionExpiresAt = data.connectionExpiresAt?.toDate ? data.connectionExpiresAt.toDate() : data.connectionExpiresAt;
       return {
         id: docSnapshot.id,
         ...data,
         requestedAt,
         respondedAt,
+        connectionExpiresAt,
       };
+    };
+
+    const resolveConnectionExpiry = (item: any) => {
+      if (!item) return null;
+      const rawExpiry = item.connectionExpiresAt;
+      if (rawExpiry instanceof Date) return rawExpiry;
+      if (rawExpiry) {
+        const parsed = new Date(rawExpiry);
+        if (!Number.isNaN(parsed.getTime())) return parsed;
+      }
+      const respondedAt = item.respondedAt instanceof Date ? item.respondedAt : (item.respondedAt ? new Date(item.respondedAt) : null);
+      if (respondedAt && !Number.isNaN(respondedAt.getTime())) {
+        return new Date(respondedAt.getTime() + requestCooldownMs);
+      }
+      return null;
     };
 
     const expireStaleRequests = (items: any[], refGuard: React.MutableRefObject<Set<string>>) => {
@@ -780,6 +800,26 @@ function DonorDashboard() {
         }).catch((error) => {
           refGuard.current.delete(item.id);
           console.warn('Failed to expire donor request', error);
+        });
+      });
+    };
+
+    const expireLapsedConnections = (items: any[], refGuard: React.MutableRefObject<Set<string>>) => {
+      const now = Date.now();
+      items.forEach((item) => {
+        if (!item || item.status !== 'accepted') return;
+        const expiresAt = resolveConnectionExpiry(item);
+        if (!expiresAt || Number.isNaN(expiresAt.getTime())) return;
+        if (now < expiresAt.getTime()) return;
+        if (refGuard.current.has(item.id)) return;
+        refGuard.current.add(item.id);
+        updateDoc(doc(db, 'donorRequests', item.id), {
+          status: 'expired',
+          expiredAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }).catch((error) => {
+          refGuard.current.delete(item.id);
+          console.warn('Failed to expire accepted donor request', error);
         });
       });
     };
@@ -816,6 +856,7 @@ function DonorDashboard() {
           ...sanitized,
           requestedAt: item.requestedAt instanceof Date ? item.requestedAt.toISOString() : item.requestedAt,
           respondedAt: item.respondedAt instanceof Date ? item.respondedAt.toISOString() : item.respondedAt,
+          connectionExpiresAt: item.connectionExpiresAt instanceof Date ? item.connectionExpiresAt.toISOString() : item.connectionExpiresAt,
         };
       };
       const serializeBatch = (item: any) => {
@@ -847,6 +888,7 @@ function DonorDashboard() {
           return bTime - aTime;
         });
       expireStaleRequests(items, incomingExpiryRef);
+      expireLapsedConnections(items, incomingAcceptedExpiryRef);
       incomingRequestsRef.current = items;
       setIncomingDonorRequests(items);
       setIncomingRequestsLoading(false);
@@ -869,6 +911,7 @@ function DonorDashboard() {
           return bTime - aTime;
         });
       expireStaleRequests(items, outgoingExpiryRef);
+      expireLapsedConnections(items, outgoingAcceptedExpiryRef);
       outgoingRequestsRef.current = items;
       setOutgoingDonorRequests(items);
       setOutgoingRequestsLoading(false);
