@@ -1,11 +1,86 @@
 // src/components/Navbar.tsx
-import React, { useState, Suspense } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, LogOut, LayoutDashboard, Heart, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import LogoMark from './LogoMark';
+import NotificationBadge from './shared/NotificationBadge';
+import { gamificationService } from '../services/gamification.service';
 
+const TOP_BADGE_TTL_MS = 10 * 60 * 1000;
+
+const getTopBadge = (badges: Array<{ name: string; earned: boolean; requirement?: number; icon?: string }> = []) => {
+  const earned = badges.filter((badge) => badge.earned);
+  if (earned.length === 0) return { name: '', icon: '' };
+  const sorted = [...earned].sort((a, b) => (b.requirement || 0) - (a.requirement || 0));
+  const top = sorted[0];
+  return {
+    name: top?.name || '',
+    icon: top?.icon || '',
+  };
+};
+
+const useTopDonorBadge = (user: any) => {
+  const [badge, setBadge] = useState<{ name: string; icon?: string }>({ name: '', icon: '' });
+
+  useEffect(() => {
+    if (!user?.uid || user.role !== 'donor') {
+      setBadge({ name: '', icon: '' });
+      return;
+    }
+    const cacheKey = `donor_top_badge_${user.uid}`;
+    const dashboardCacheKey = `donor_dashboard_cache_${user.uid}`;
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        const cachedRaw = window.sessionStorage.getItem(cacheKey);
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          if (cached?.name && cached?.savedAt && Date.now() - cached.savedAt < TOP_BADGE_TTL_MS) {
+            setBadge({ name: cached.name, icon: cached.icon || '' });
+            return;
+          }
+        }
+        const dashboardRaw = window.sessionStorage.getItem(dashboardCacheKey);
+        if (dashboardRaw) {
+          const dashboardCached = JSON.parse(dashboardRaw);
+          const cachedBadges = dashboardCached?.badges || dashboardCached?.stats?.badges || [];
+          const topFromCache = getTopBadge(cachedBadges);
+          if (topFromCache.name) {
+            setBadge(topFromCache);
+            window.sessionStorage.setItem(cacheKey, JSON.stringify({ name: topFromCache.name, icon: topFromCache.icon, savedAt: Date.now() }));
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to read badge cache', error);
+      }
+    }
+    let active = true;
+    gamificationService.getUserBadges(user.uid)
+      .then((badges) => {
+        if (!active) return;
+        const topBadge = getTopBadge(badges as any);
+        setBadge(topBadge);
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          try {
+            window.sessionStorage.setItem(cacheKey, JSON.stringify({ name: topBadge.name, icon: topBadge.icon, savedAt: Date.now() }));
+          } catch (error) {
+            console.warn('Failed to cache badge name', error);
+          }
+        }
+      })
+      .catch((error) => {
+        console.warn('Failed to load badge name', error);
+        if (active) setBadge({ name: '', icon: '' });
+      });
+    return () => {
+      active = false;
+    };
+  }, [user?.uid, user?.role]);
+
+  return badge;
+};
 
 interface NavLinkProps {
   to: string;
@@ -91,7 +166,7 @@ function SigninDropdown() {
   );
 }
 
-function UserMenu() {
+function UserMenu({ achievementLabel }: { achievementLabel?: string }) {
   const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
@@ -139,9 +214,16 @@ function UserMenu() {
             {(user?.displayName || user?.email || 'U')[0].toUpperCase()}
           </div>
         )}
-        <span className="hidden md:inline text-gray-800 font-semibold">
-          {user?.displayName || user?.email?.split('@')[0] || 'User'}
-        </span>
+        <div className="hidden md:flex flex-col items-start">
+          <span className="text-gray-800 font-semibold">
+            {user?.displayName || user?.email?.split('@')[0] || 'User'}
+          </span>
+          {achievementLabel && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-600">
+              {achievementLabel}
+            </span>
+          )}
+        </div>
       </button>
 
       {isOpen && (
@@ -216,7 +298,7 @@ function MobileAuthMenu({ onClose }: { onClose?: () => void }) {
   );
 }
 
-function MobileUserMenu({ onClose }: { onClose?: () => void }) {
+function MobileUserMenu({ onClose, achievementLabel }: { onClose?: () => void; achievementLabel?: string }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -264,6 +346,9 @@ function MobileUserMenu({ onClose }: { onClose?: () => void }) {
         <div>
           <p className="text-gray-800 font-semibold">{user?.displayName || user?.email?.split('@')[0] || 'User'}</p>
           <p className="text-xs text-gray-500">{user?.email}</p>
+          {achievementLabel && (
+            <p className="text-[10px] font-semibold text-red-600 mt-1">{achievementLabel}</p>
+          )}
         </div>
       </div>
       <Link
@@ -290,6 +375,10 @@ const Navbar: React.FC = () => {
   const { user, authLoading } = useAuth();
   const location = useLocation();
   const hideDonorNav = user?.role === 'donor' && location.pathname.startsWith('/donor/dashboard');
+  const topBadge = useTopDonorBadge(user);
+  const achievementLabel = topBadge.name
+    ? `${topBadge.icon ? `${topBadge.icon} ` : ''}${topBadge.name}`
+    : (user?.role === 'donor' ? 'New Donor' : '');
 
   const LoadingFallback = () => (
     <div className="flex items-center space-x-2">
@@ -340,7 +429,12 @@ const Navbar: React.FC = () => {
                   </div>
                 ) : (
                   <Suspense fallback={<LoadingFallback />}>
-                    <UserMenu />
+                    <div className="flex items-center gap-3">
+                      {user?.role === 'donor' && (
+                        <NotificationBadge className="rounded-full border border-red-100 bg-red-50 hover:bg-red-100" />
+                      )}
+                      <UserMenu achievementLabel={achievementLabel} />
+                    </div>
                   </Suspense>
                 )}
               </div>
@@ -348,6 +442,9 @@ const Navbar: React.FC = () => {
 
              {/* Mobile Menu Button */}
             <div className="md:hidden flex items-center">
+              {user?.role === 'donor' && (
+                <NotificationBadge className="mr-2 rounded-xl border border-red-100 bg-red-50 hover:bg-red-100" />
+              )}
               <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all border border-red-200"
@@ -427,7 +524,7 @@ const Navbar: React.FC = () => {
                 ) : (
                   <div className="animate-slideInRight" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
                     <Suspense fallback={<LoadingFallback />}>
-                      <MobileUserMenu onClose={() => setIsOpen(false)} />
+                      <MobileUserMenu onClose={() => setIsOpen(false)} achievementLabel={achievementLabel} />
                     </Suspense>
                   </div>
                 )}

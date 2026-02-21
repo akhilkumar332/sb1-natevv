@@ -82,6 +82,8 @@ interface User {
   totalDonations?: number;
   medicalConditions?: string;
   occupation?: string;
+  donorLevel?: string;
+  badges?: string[];
   preferredLanguage?: string;
   howHeardAboutUs?: string;
   interestedInVolunteering?: boolean;

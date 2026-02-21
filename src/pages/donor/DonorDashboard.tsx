@@ -7,8 +7,6 @@ import {
   Droplet,
   Clock,
   Users,
-  Bell,
-  Share2,
   Activity,
   AlertCircle,
   CheckCircle,
@@ -23,13 +21,10 @@ import { useDonorData } from '../../hooks/useDonorData';
 import { useBloodRequest } from '../../hooks/useBloodRequest';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import BhIdBanner from '../../components/BhIdBanner';
 import { addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, runTransaction, serverTimestamp, Timestamp, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
 import { useReferrals } from '../../hooks/useReferrals';
-import { NotificationCenter } from '../../components/shared/NotificationCenter';
-import { useUnreadNotificationCount } from '../../hooks/useRealtimeNotifications';
 import {
   clearPendingDonorRequestDoc,
   decodePendingDonorRequest,
@@ -74,10 +69,8 @@ function DonorDashboard() {
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const unreadNotificationCount = useUnreadNotificationCount(user?.uid || '');
 
   // State for modals and UI
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showAllRequests, setShowAllRequests] = useState(false);
   const [showAllBadges, setShowAllBadges] = useState(false);
   const [showAllCamps, setShowAllCamps] = useState(false);
@@ -1866,10 +1859,6 @@ function DonorDashboard() {
     setShowAllCamps(true);
   };
 
-  const handleNotificationClick = () => {
-    setShowNotifications(!showNotifications);
-  };
-
   const handleViewAllRequests = () => {
     setShowAllRequests(true);
   };
@@ -2300,15 +2289,6 @@ function DonorDashboard() {
     }
     return badge;
   });
-  const bestBadgeByCategory = (category: string) => {
-    const earned = computedBadges.filter((badge: any) => badge.category === category && badge.earned);
-    if (earned.length === 0) return null;
-    return earned.sort((a: any, b: any) => (a.requirement || 0) - (b.requirement || 0)).pop() || null;
-  };
-  const bestDonationBadge = bestBadgeByCategory('donation');
-  const bestStreakBadge = bestBadgeByCategory('streak');
-  const bestEmergencyBadge = bestBadgeByCategory('emergency');
-  const rareHeroBadge = computedBadges.find((badge: any) => badge.id === 'rare_hero' && badge.earned) || null;
   const menuItems = [
     { id: 'overview', label: 'Overview', to: 'overview', icon: Activity },
     { id: 'readiness', label: 'Readiness', to: 'readiness', icon: CheckCircle },
@@ -2466,97 +2446,6 @@ function DonorDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-red-600 to-red-700 text-white shadow-xl">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              {user?.photoURL ? (
-                <img
-                  src={user.photoURL}
-                  alt="Profile"
-                  className="w-16 h-16 rounded-full border-4 border-white shadow-lg object-cover"
-                  onError={(e) => {
-                    e.currentTarget.src = `https://ui-avatars.com/api/?background=fff&color=dc2626&name=${encodeURIComponent(user?.displayName || 'Donor')}`;
-                  }}
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm border-4 border-white flex items-center justify-center">
-                  <LucideUser className="w-8 h-8" />
-                </div>
-              )}
-              <div>
-                <h1 className="text-2xl font-bold">Welcome back, {user?.displayName?.split(' ')[0] || 'Donor'}!</h1>
-                {(bestDonationBadge || bestStreakBadge || bestEmergencyBadge || rareHeroBadge) && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {bestDonationBadge && (
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
-                        <span className="text-base">{bestDonationBadge.icon}</span>
-                        <span>{bestDonationBadge.name}</span>
-                      </span>
-                    )}
-                    {bestStreakBadge && (
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
-                        <span className="text-base">{bestStreakBadge.icon}</span>
-                        <span>{bestStreakBadge.name}</span>
-                      </span>
-                    )}
-                    {bestEmergencyBadge && (
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
-                        <span className="text-base">{bestEmergencyBadge.icon}</span>
-                        <span>{bestEmergencyBadge.name}</span>
-                      </span>
-                    )}
-                    {rareHeroBadge && (
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
-                        <span className="text-base">{rareHeroBadge.icon}</span>
-                        <span>{rareHeroBadge.name}</span>
-                      </span>
-                    )}
-                  </div>
-                )}
-                {donationCount === 0 && (
-                  <p className="text-white/80 flex items-center">
-                    <span className="text-2xl mr-2">{donorLevel.icon}</span>
-                    {donorLevel.level}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="hidden md:flex items-center space-x-4">
-              <button
-                onClick={() => refreshData()}
-                className="p-3 bg-white/20 hover:bg-white/30 rounded-full transition-all duration-300"
-                title="Refresh data"
-              >
-                <RefreshCw className="w-6 h-6" />
-              </button>
-              <button
-                onClick={handleNotificationClick}
-                className="p-3 bg-white/20 hover:bg-white/30 rounded-full transition-all duration-300 relative"
-              >
-                <Bell className="w-6 h-6" />
-                {unreadNotificationCount > 0 && (
-                  <span className="absolute top-0 right-0 w-5 h-5 bg-red-200 rounded-full text-xs flex items-center justify-center text-red-800 font-bold">
-                    {unreadNotificationCount}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={handleInviteFriends}
-                className="p-3 bg-white/20 hover:bg-white/30 rounded-full transition-all duration-300"
-              >
-                <Share2 className="w-6 h-6" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 pt-6">
-        <BhIdBanner />
-      </div>
-
       <div className="container mx-auto px-4 py-8">
         <div className="lg:flex lg:gap-6">
           <aside className="hidden lg:block lg:w-64">
@@ -2587,19 +2476,6 @@ function DonorDashboard() {
               >
                 <Menu className="h-4 w-4 text-red-600" />
                 Menu
-              </button>
-              <button
-                type="button"
-                onClick={handleNotificationClick}
-                className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 bg-white text-red-600 shadow-sm"
-                aria-label="Open notifications"
-              >
-                <Bell className="h-5 w-5" />
-                {unreadNotificationCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">
-                    {unreadNotificationCount}
-                  </span>
-                )}
               </button>
             </div>
             <span className="text-xs uppercase tracking-[0.2em] text-red-600">Dashboard</span>
@@ -2811,7 +2687,6 @@ function DonorDashboard() {
         </div>
       )}
 
-      <NotificationCenter isOpen={showNotifications} onClose={() => setShowNotifications(false)} />
 
       {/* Share Options Drawer */}
       {shareOptionsOpen && (

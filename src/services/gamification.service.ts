@@ -16,7 +16,8 @@ import {
   orderBy,
   limit,
   increment,
-  serverTimestamp
+  serverTimestamp,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { User } from '../types/database.types';
@@ -230,6 +231,118 @@ class GamificationService {
     });
   }
 
+  private parseDonationDate(value: any): Date | null {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === 'function') {
+      try {
+        return value.toDate();
+      } catch (error) {
+        return null;
+      }
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      const parsed = new Date(value);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+    return null;
+  }
+
+  private calculateStreaksFromDates(dates: Date[]): { currentStreak: number; longestStreak: number } {
+    if (dates.length === 0) return { currentStreak: 0, longestStreak: 0 };
+
+    const sorted = [...dates].sort((a, b) => b.getTime() - a.getTime());
+    let currentStreak = 1;
+    let longestStreak = 1;
+    let tempStreak = 1;
+
+    for (let i = 1; i < sorted.length; i++) {
+      const prevDate = sorted[i - 1];
+      const currDate = sorted[i];
+      const daysDiff = Math.abs((prevDate.getTime() - currDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (daysDiff <= 120) {
+        tempStreak++;
+        if (i === sorted.length - 1 || i === 0) {
+          currentStreak = tempStreak;
+        }
+      } else {
+        longestStreak = Math.max(longestStreak, tempStreak);
+        tempStreak = 1;
+      }
+    }
+
+    longestStreak = Math.max(longestStreak, tempStreak);
+
+    return { currentStreak, longestStreak };
+  }
+
+  private buildDonationKey(date: Date | null, entry: any): string {
+    if (!date) return '';
+    const hospital = entry?.hospitalId || entry?.hospitalName || entry?.bloodBank || '';
+    const location = entry?.location || entry?.city || '';
+    return `${date.getTime()}::${hospital}::${location}`;
+  }
+
+  private async buildStatsFromDonations(userId: string, fallback: UserStats, userData?: User | null): Promise<UserStats> {
+    try {
+      const [donationsSnap, historySnap] = await Promise.all([
+        getDocs(query(
+          collection(db, 'donations'),
+          where('donorId', '==', userId)
+        )),
+        getDoc(doc(db, 'DonationHistory', userId))
+      ]);
+
+      const seenKeys = new Set<string>();
+      const dates: Date[] = [];
+
+      donationsSnap.docs.forEach((snapshot) => {
+        const data = snapshot.data();
+        if (data?.status && data.status !== 'completed') return;
+        const date = this.parseDonationDate(data?.donationDate);
+        const idKey = snapshot.id;
+        const fallbackKey = this.buildDonationKey(date, data);
+        if (idKey && seenKeys.has(idKey)) return;
+        if (!idKey && fallbackKey && seenKeys.has(fallbackKey)) return;
+        if (idKey) seenKeys.add(idKey);
+        if (fallbackKey) seenKeys.add(fallbackKey);
+        if (date) dates.push(date);
+      });
+
+      if (historySnap.exists()) {
+        const historyData = historySnap.data();
+        const rawDonations = Array.isArray(historyData?.donations) ? historyData.donations : [];
+        rawDonations.forEach((entry: any) => {
+          if (entry?.status && entry.status === 'cancelled') return;
+          const date = this.parseDonationDate(entry?.date ?? entry?.donationDate ?? entry?.createdAt);
+          const idKey = entry?.legacyId || entry?.id || entry?.donationId;
+          const fallbackKey = this.buildDonationKey(date, entry);
+          if (idKey && seenKeys.has(idKey)) return;
+          if (!idKey && fallbackKey && seenKeys.has(fallbackKey)) return;
+          if (idKey) seenKeys.add(idKey);
+          if (fallbackKey) seenKeys.add(fallbackKey);
+          if (date) dates.push(date);
+        });
+      }
+
+      const totalDonations = dates.length;
+      const { currentStreak, longestStreak } = this.calculateStreaksFromDates(dates);
+      const points = fallback.points || userData?.impactScore || totalDonations * 100;
+
+      return {
+        ...fallback,
+        totalDonations: Math.max(fallback.totalDonations, totalDonations),
+        currentStreak: Math.max(fallback.currentStreak, currentStreak),
+        longestStreak: Math.max(fallback.longestStreak, longestStreak),
+        points,
+      };
+    } catch (error) {
+      console.warn('Failed to derive stats from donations', error);
+      return fallback;
+    }
+  }
+
   /**
    * Get or create user stats
    */
@@ -286,7 +399,51 @@ class GamificationService {
         userBadgesSnap.docs.map(doc => doc.data().badgeId)
       );
 
-      return this.buildBadgeList(stats, userData, earnedBadgeIds);
+      const derivedStats = userBadgesSnap.empty || stats.totalDonations === 0
+        ? await this.buildStatsFromDonations(userId, stats, userData)
+        : stats;
+
+      const computed = this.buildBadgeList(derivedStats, userData);
+      const badges = computed;
+
+      const missingEarned = computed.filter((badge) => badge.earned && !earnedBadgeIds.has(badge.id));
+      if (missingEarned.length > 0) {
+        const batch = writeBatch(db);
+        missingEarned.forEach((badge) => {
+          const userBadgeRef = doc(collection(db, 'userBadges'));
+          batch.set(userBadgeRef, {
+            userId,
+            badgeId: badge.id,
+            earnedAt: serverTimestamp(),
+          });
+        });
+        try {
+          await batch.commit();
+        } catch (error) {
+          console.warn('Failed to backfill user badges', error);
+        }
+      }
+
+      if (derivedStats !== stats && derivedStats) {
+        try {
+          const userStatsRef = doc(db, 'userStats', userId);
+          await setDoc(
+            userStatsRef,
+            {
+              totalDonations: derivedStats.totalDonations,
+              currentStreak: derivedStats.currentStreak,
+              longestStreak: derivedStats.longestStreak,
+              points: derivedStats.points,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        } catch (error) {
+          console.warn('Failed to backfill user stats from donations', error);
+        }
+      }
+
+      return badges;
     } catch (error) {
       console.error('Error fetching user badges, using calculated progress instead:', error);
       return this.buildBadgeList(stats, userData);
