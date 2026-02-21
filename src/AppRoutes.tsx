@@ -3,12 +3,44 @@ import { lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 
-// Helper function for lazy loading with delay
+const LAZY_RELOAD_KEY = 'bh_lazy_reload_attempted';
+
+const isChunkLoadError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes('Loading chunk') ||
+    message.includes('ChunkLoadError') ||
+    message.includes('Failed to fetch dynamically imported module') ||
+    message.includes('Importing a module script failed') ||
+    message.includes('Cannot find module')
+  );
+};
+
+const tryAutoReload = (error: unknown) => {
+  if (!import.meta.env.PROD) return false;
+  if (!isChunkLoadError(error)) return false;
+  try {
+    if (window.sessionStorage.getItem(LAZY_RELOAD_KEY)) {
+      return false;
+    }
+    window.sessionStorage.setItem(LAZY_RELOAD_KEY, String(Date.now()));
+  } catch {
+    // If storage is unavailable, still attempt a one-time reload.
+  }
+  window.location.reload();
+  return true;
+};
+
+// Helper function for lazy loading with retry
 const lazyLoad = (importPromise: Promise<any>) => {
-    return importPromise.catch(error => {
-      console.error("Error loading component:", error);
-      return { default: () => <div>Error loading, please reload.</div> };
-    });
+  return importPromise.catch(error => {
+    console.error("Error loading component:", error);
+    const reloading = tryAutoReload(error);
+    if (reloading) {
+      return { default: () => <div>Reloading...</div> };
+    }
+    return { default: () => <div>Error loading, please reload.</div> };
+  });
 };
 
 // Lazy load components
