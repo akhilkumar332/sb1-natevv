@@ -7,6 +7,7 @@ import PhoneInput from 'react-phone-number-input';
 import { useLogin } from '../../hooks/useLogin';
 import 'react-phone-number-input/style.css';
 import LogoMark from '../../components/LogoMark';
+import PwaInstallCta from '../../components/PwaInstallCta';
 
 export function DonorLogin() {
   const navigate = useNavigate();
@@ -280,6 +281,11 @@ export function DonorLogin() {
                   </>
                 )}
               </button>
+
+              <PwaInstallCta
+                label="Install Donor App"
+                buttonClassName="bg-red-600 text-white hover:bg-red-700 focus:ring-red-500"
+              />
 
               <div className="pt-4 border-t border-gray-100">
                 <p className="text-center text-sm text-gray-600">

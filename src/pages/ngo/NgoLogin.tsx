@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { Heart, Users, Calendar, TrendingUp, Shield } from 'lucide-react';
 import LogoMark from '../../components/LogoMark';
+import PwaInstallCta from '../../components/PwaInstallCta';
 import { authStorage } from '../../utils/authStorage';
 import { auth } from '../../firebase';
 
@@ -193,6 +194,11 @@ export function NgoLogin() {
                   </>
                 )}
               </button>
+
+              <PwaInstallCta
+                label="Install NGO App"
+                buttonClassName="bg-amber-600 text-white hover:bg-amber-700 focus:ring-amber-500"
+              />
 
               <div className="pt-4 border-t border-gray-100">
                 <p className="text-center text-sm text-gray-600">

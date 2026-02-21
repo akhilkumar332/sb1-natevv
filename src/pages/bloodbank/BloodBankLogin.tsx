@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { Building2, Users, Activity, Shield } from 'lucide-react';
 import LogoMark from '../../components/LogoMark';
+import PwaInstallCta from '../../components/PwaInstallCta';
 
 export function BloodBankLogin() {
   const navigate = useNavigate();
@@ -174,6 +175,11 @@ export function BloodBankLogin() {
                   </>
                 )}
               </button>
+
+              <PwaInstallCta
+                label="Install Bloodbank App"
+                buttonClassName="bg-red-600 text-white hover:bg-red-700 focus:ring-red-500"
+              />
 
               <div className="pt-4 border-t border-gray-100">
                 <p className="text-center text-sm text-gray-600">
