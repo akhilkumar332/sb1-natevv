@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "start": "node src/functions/index.js",
     "dev:server": "nodemon src/functions/index.js",
+    "send:fcm": "node scripts/send-fcm-data.mjs",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
