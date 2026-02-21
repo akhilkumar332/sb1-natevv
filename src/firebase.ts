@@ -23,7 +23,6 @@ googleProvider.setCustomParameters({
 // Force long polling to avoid "Fetch failed" issues on some networks/proxies.
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
-  useFetchStreams: false,
 });
 
 export default app;
