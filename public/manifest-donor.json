@@ -1,6 +1,7 @@
 {
   "name": "BloodHub Donor",
   "short_name": "BloodHub Donor",
+  "id": "/donor",
   "start_url": "/donor/login",
   "scope": "/donor/",
   "display": "standalone",

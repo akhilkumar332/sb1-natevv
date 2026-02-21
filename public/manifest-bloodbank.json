@@ -1,6 +1,7 @@
 {
   "name": "BloodHub Bloodbank",
   "short_name": "BloodHub Bank",
+  "id": "/bloodbank",
   "start_url": "/bloodbank/login",
   "scope": "/bloodbank/",
   "display": "standalone",

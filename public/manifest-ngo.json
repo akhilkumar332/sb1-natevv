@@ -1,6 +1,7 @@
 {
   "name": "BloodHub NGO",
   "short_name": "BloodHub NGO",
+  "id": "/ngo",
   "start_url": "/ngo/login",
   "scope": "/ngo/",
   "display": "standalone",
