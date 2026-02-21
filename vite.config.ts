@@ -43,7 +43,7 @@ export default defineConfig(({ command, mode }) => {
         ],
         injectManifest: {
           globPatterns: ['**/*.{js,css,html,svg,ico,png,webp,json,txt,woff,woff2}'],
-          globIgnores: ['**/firebase-messaging-sw.js'],
+          globIgnores: ['**/firebase-messaging-sw.js', '**/firebase-config.js'],
         },
       }),
       {
