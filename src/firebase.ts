@@ -1,7 +1,7 @@
 // src/firebase.ts
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -20,6 +20,10 @@ googleProvider.setCustomParameters({
   // Add this to handle the COOP policy
   auth_type: 'popup',
 });
-export const db = getFirestore(app);
+// Force long polling to avoid "Fetch failed" issues on some networks/proxies.
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  useFetchStreams: false,
+});
 
 export default app;
