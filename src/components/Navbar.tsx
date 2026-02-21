@@ -380,7 +380,8 @@ const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const { user, authLoading } = useAuth();
   const location = useLocation();
-  const hideDonorNav = user?.role === 'donor' && location.pathname.startsWith('/donor/dashboard');
+  const isDonorDashboard = user?.role === 'donor' && location.pathname.startsWith('/donor/dashboard');
+  const hideDonorNav = isDonorDashboard;
   const hideDashboardLink = hideDonorNav;
   const topBadge = useTopDonorBadge(user);
   const achievementLabel = topBadge.name
@@ -437,7 +438,7 @@ const Navbar: React.FC = () => {
                 ) : (
                   <Suspense fallback={<LoadingFallback />}>
                     <div className="flex items-center gap-3">
-                      {user?.role === 'donor' && (
+                      {isDonorDashboard && (
                         <NotificationBadge className="rounded-full border border-red-100 bg-red-50 hover:bg-red-100" />
                       )}
                       <UserMenu achievementLabel={achievementLabel} hideDashboardLink={hideDashboardLink} />
@@ -449,7 +450,7 @@ const Navbar: React.FC = () => {
 
              {/* Mobile Menu Button */}
             <div className="md:hidden flex items-center">
-              {user?.role === 'donor' && (
+              {isDonorDashboard && (
                 <NotificationBadge className="mr-2 rounded-xl border border-red-100 bg-red-50 hover:bg-red-100" />
               )}
               <button
