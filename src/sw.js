@@ -9,7 +9,11 @@ clientsClaim();
 self.skipWaiting();
 
 cleanupOutdatedCaches();
-precacheAndRoute(self.__WB_MANIFEST || []);
+const precacheManifest = (self.__WB_MANIFEST || []).filter((entry) => {
+  const url = typeof entry === 'string' ? entry : entry.url;
+  return url !== '/firebase-messaging-sw.js' && url !== '/firebase-config.js';
+});
+precacheAndRoute(precacheManifest);
 
 const OFFLINE_URL = '/offline.html';
 
@@ -35,6 +39,12 @@ registerRoute(
       new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 }),
     ],
   })
+);
+
+// Always fetch the latest Firebase messaging and config scripts.
+registerRoute(
+  ({ url }) => url.pathname === '/firebase-messaging-sw.js' || url.pathname === '/firebase-config.js',
+  new NetworkOnly()
 );
 
 // Images and fonts: cache-first.
