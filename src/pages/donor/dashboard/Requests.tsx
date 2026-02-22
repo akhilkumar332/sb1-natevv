@@ -13,8 +13,6 @@ const DonorRequests = () => {
     outgoingDonorRequests,
     incomingRequestsLoading,
     outgoingRequestsLoading,
-    donorRequestBatches,
-    donorRequestBatchesLoading,
     donorRequestActionId,
     handleRespondToRequest,
     handleDonorRequestDecision,
@@ -47,13 +45,6 @@ const DonorRequests = () => {
     if (status === 'expired') return 'bg-gray-100 text-gray-600';
     if (status === 'cancelled') return 'bg-gray-100 text-gray-600';
     return 'bg-amber-100 text-amber-700';
-  };
-  const getBatchStatusBadge = (status?: string) => {
-    if (status === 'sent') return 'bg-emerald-100 text-emerald-700';
-    if (status === 'sending') return 'bg-amber-100 text-amber-700';
-    if (status === 'cancelled') return 'bg-rose-100 text-rose-700';
-    if (status === 'failed') return 'bg-rose-100 text-rose-700';
-    return 'bg-gray-100 text-gray-600';
   };
   const contactWindowMs = 24 * 60 * 60 * 1000;
   const getContactWindow = (respondedAt?: any) => {
@@ -478,58 +469,7 @@ const DonorRequests = () => {
           </div>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <div className="bg-white rounded-2xl shadow-xl p-6">
-          <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-red-600">Batch Outreach</p>
-              <h3 className="text-xl font-bold text-gray-900">Bulk requests</h3>
-            </div>
-            <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-semibold">
-              {donorRequestBatches?.length || 0} Total
-            </span>
-          </div>
-          {donorRequestBatchesLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 2 }).map((_, index) => (
-                <div key={`batch-skeleton-${index}`} className="h-16 rounded-xl bg-gray-100 animate-pulse" />
-              ))}
-            </div>
-          ) : donorRequestBatches?.length ? (
-            <div className="space-y-4">
-              {donorRequestBatches.map((batch: any) => (
-                <div key={batch.id} className="p-5 rounded-2xl border border-gray-100 bg-gray-50/40">
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="font-semibold text-gray-800">
-                        {getDonationLabel(batch.donationType)} · {batch.targetCount} donors
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Sent {batch.sentCount || 0} • Skipped {batch.skippedCount || 0}
-                        {batch.deletedCount ? ` • Deleted ${batch.deletedCount}` : ''}
-                      </p>
-                      {batch.message ? (
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{batch.message}</p>
-                      ) : null}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getBatchStatusBadge(batch.status)}`}>
-                        {(batch.status || 'sent').charAt(0).toUpperCase() + (batch.status || 'sent').slice(1)}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {formatDate(batch.createdAt)} • {formatTime(batch.createdAt)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-sm text-gray-500 text-center py-6">
-              No batch requests sent yet.
-            </div>
-          )}
-        </div>
+      <div className="mt-6 grid gap-6">
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-4">
             <div>
