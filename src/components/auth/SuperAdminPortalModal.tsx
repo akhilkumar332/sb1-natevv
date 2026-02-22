@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Search, Shield } from 'lucide-react';
-import { searchUsersForImpersonation } from '../../services/admin.service';
+import { searchUsersForImpersonation, searchUsersForImpersonationFast } from '../../services/admin.service';
 import type { ImpersonationUser } from '../../services/admin.service';
 
 type PortalRole = 'donor' | 'ngo' | 'bloodbank' | 'admin';
@@ -40,7 +40,52 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [pendingImpersonation, setPendingImpersonation] = useState<ImpersonationUser | null>(null);
+  const [recentImpersonations, setRecentImpersonations] = useState<ImpersonationUser[]>([]);
   const otherPortals = portalOrder.filter((role) => role !== currentPortal);
+  const cacheRef = React.useRef(new Map<string, { results: ImpersonationUser[]; at: number }>());
+  const fastCacheRef = React.useRef(new Map<string, { results: ImpersonationUser[]; at: number }>());
+  const inflightRef = React.useRef(new Map<string, Promise<ImpersonationUser[]>>());
+  const inflightFastRef = React.useRef(new Map<string, Promise<ImpersonationUser[]>>());
+  const recentStorageKey = 'bh_impersonation_recent';
+  const hasFastResultsRef = React.useRef(false);
+
+  const matchesQuery = React.useCallback((user: ImpersonationUser, query: string) => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return true;
+    const name = user.displayName?.toLowerCase() ?? '';
+    const email = user.email?.toLowerCase() ?? '';
+    const bhId = user.bhId?.toLowerCase() ?? '';
+    return name.includes(normalized) || email.includes(normalized) || bhId.includes(normalized);
+  }, []);
+
+  const readRecent = React.useCallback(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(recentStorageKey);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as ImpersonationUser[];
+      return Array.isArray(parsed) ? parsed.slice(0, 10) : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const writeRecent = React.useCallback((next: ImpersonationUser[]) => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(recentStorageKey, JSON.stringify(next.slice(0, 10)));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const pushRecent = React.useCallback((user: ImpersonationUser) => {
+    setRecentImpersonations((prev) => {
+      const next = [user, ...prev.filter((item) => item.uid !== user.uid)].slice(0, 10);
+      writeRecent(next);
+      return next;
+    });
+  }, [writeRecent]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -51,25 +96,85 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
       setPendingImpersonation(null);
       return;
     }
+    setRecentImpersonations(readRecent());
 
     const trimmed = searchTerm.trim();
     if (!trimmed || trimmed.length < 2) {
       setSearchResults([]);
       setSearchLoading(false);
       setSearchError(null);
+      hasFastResultsRef.current = false;
       return;
     }
 
     let isActive = true;
+    hasFastResultsRef.current = false;
+    const normalized = trimmed.toLowerCase();
+    const now = Date.now();
+    const cache = cacheRef.current;
+    const cached = cache.get(normalized);
+    if (cached && now - cached.at < 60_000) {
+      setSearchResults(cached.results);
+    } else {
+      let bestPrefix: { key: string; entry: { results: ImpersonationUser[]; at: number } } | null = null;
+      for (const [key, entry] of cache.entries()) {
+        if (normalized.startsWith(key) && now - entry.at < 60_000) {
+          if (!bestPrefix || key.length > bestPrefix.key.length) {
+            bestPrefix = { key, entry };
+          }
+        }
+      }
+      if (bestPrefix) {
+        setSearchResults(bestPrefix.entry.results.filter((user) => matchesQuery(user, normalized)));
+      }
+    }
     const handle = window.setTimeout(async () => {
       setSearchLoading(true);
       setSearchError(null);
+      const isExact = trimmed.includes('@') || trimmed.toUpperCase().startsWith('BH');
       try {
-        const results = await searchUsersForImpersonation(trimmed);
+        if (!isExact) {
+          const fastCache = fastCacheRef.current.get(normalized);
+          if (fastCache && now - fastCache.at < 60_000) {
+            if (isActive) {
+              setSearchResults(fastCache.results);
+            }
+          } else {
+            const fastInflight = inflightFastRef.current.get(normalized);
+            const fastPromise = fastInflight ?? searchUsersForImpersonationFast(trimmed);
+            if (!fastInflight) {
+              inflightFastRef.current.set(normalized, fastPromise);
+            }
+            fastPromise
+              .then((fastResults) => {
+                inflightFastRef.current.delete(normalized);
+                fastCacheRef.current.set(normalized, { results: fastResults, at: Date.now() });
+                if (isActive && fastResults.length > 0) {
+                  hasFastResultsRef.current = true;
+                  setSearchResults(fastResults);
+                }
+              })
+              .catch(() => {
+                inflightFastRef.current.delete(normalized);
+              });
+          }
+        }
+
+        const inflight = inflightRef.current.get(normalized);
+        const promise = inflight ?? searchUsersForImpersonation(trimmed);
+        if (!inflight) {
+          inflightRef.current.set(normalized, promise);
+        }
+        const results = await promise;
+        inflightRef.current.delete(normalized);
         if (isActive) {
-          setSearchResults(results);
+          if (results.length > 0 || !hasFastResultsRef.current) {
+            setSearchResults(results);
+          }
+          cacheRef.current.set(normalized, { results, at: Date.now() });
         }
       } catch (error) {
+        inflightRef.current.delete(normalized);
         if (isActive) {
           setSearchError('Search failed. Please try again.');
           setSearchResults([]);
@@ -85,7 +190,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
       isActive = false;
       window.clearTimeout(handle);
     };
-  }, [isOpen, searchTerm]);
+  }, [isOpen, searchTerm, matchesQuery, readRecent]);
 
   const handleImpersonateClick = (user: ImpersonationUser) => {
     if (!onImpersonate) return;
@@ -94,6 +199,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
 
   const confirmImpersonation = () => {
     if (!pendingImpersonation || !onImpersonate || impersonationLoading) return;
+    pushRecent(pendingImpersonation);
     onImpersonate(pendingImpersonation);
     setPendingImpersonation(null);
   };
@@ -181,6 +287,35 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                     <span className="h-3 w-3 animate-spin rounded-full border border-amber-400 border-t-transparent" />
                     Switching user…
                   </div>
+                )}
+                {!impersonationLoading && searchTerm.trim().length < 2 && recentImpersonations.length > 0 && (
+                  <>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                      Recent impersonations
+                    </p>
+                    {recentImpersonations.map((user) => (
+                      <button
+                        key={`recent-${user.uid}`}
+                        onClick={() => handleImpersonateClick(user)}
+                        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {user.displayName || user.email || 'User'}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {user.email || 'No email'}
+                              {user.bhId ? ` · ${user.bhId}` : ''}
+                            </p>
+                          </div>
+                          <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+                            {user.role}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </>
                 )}
                 {searchLoading && (
                   <p className="text-xs text-gray-500">Searching…</p>

@@ -47,6 +47,89 @@ export type ImpersonationUser = {
   status?: User['status'];
 };
 
+const buildVariants = (value: string) => {
+  const variants = new Set<string>();
+  variants.add(value);
+  const lower = value.toLowerCase();
+  const upper = value.toUpperCase();
+  if (lower !== value) variants.add(lower);
+  if (upper !== value) variants.add(upper);
+  const title = value.length > 0 ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
+  if (title !== value) variants.add(title);
+  return Array.from(variants);
+};
+
+const buildPrefixTasks = (
+  usersRef: ReturnType<typeof collection>,
+  fields: string[],
+  prefixes: string[],
+  maxResults: number,
+  results: Map<string, ImpersonationUser>
+) => {
+  const tasks: Array<() => Promise<void>> = [];
+  for (const field of fields) {
+    for (const prefix of prefixes) {
+      tasks.push(async () => {
+        if (results.size >= maxResults) return;
+        try {
+          const snapshot = await getDocs(
+            query(
+              usersRef,
+              orderBy(field),
+              startAt(prefix),
+              endAt(`${prefix}\uf8ff`),
+              limit(maxResults)
+            )
+          );
+          snapshot.forEach((docSnap: any) => {
+            const mapped = mapImpersonationUser(docSnap);
+            if (mapped) {
+              results.set(mapped.uid, mapped);
+            }
+          });
+        } catch (error) {
+          console.warn(`Impersonation search failed for ${field}:`, error);
+        }
+      });
+    }
+  }
+  return tasks;
+};
+
+const runTasksWithConcurrency = async (
+  tasks: Array<() => Promise<void>>,
+  concurrency: number,
+  results: Map<string, ImpersonationUser>,
+  maxResults: number
+) => {
+  let index = 0;
+  const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, async () => {
+    while (index < tasks.length) {
+      if (results.size >= maxResults) return;
+      const task = tasks[index];
+      index += 1;
+      await task();
+    }
+  });
+  await Promise.all(workers);
+};
+
+export const searchUsersForImpersonationFast = async (rawQuery: string): Promise<ImpersonationUser[]> => {
+  const queryText = rawQuery.trim();
+  if (!queryText || queryText.length < 2) return [];
+
+  const usersRef = collection(db, 'users');
+  const results = new Map<string, ImpersonationUser>();
+  const maxResults = 6;
+
+  const variants = buildVariants(queryText);
+  const fields = ['displayName', 'organizationName', 'hospitalName', 'bloodBankName'];
+  const tasks = buildPrefixTasks(usersRef, fields, variants, maxResults, results);
+  await runTasksWithConcurrency(tasks, 3, results, maxResults);
+
+  return Array.from(results.values());
+};
+
 const mapImpersonationUser = (docSnap: any): ImpersonationUser | null => {
   const data = docSnap.data?.() ?? docSnap.data ?? {};
   const role = data.role || 'donor';
@@ -77,6 +160,7 @@ export const searchUsersForImpersonation = async (rawQuery: string): Promise<Imp
 
   const usersRef = collection(db, 'users');
   const results = new Map<string, ImpersonationUser>();
+  const maxResults = 10;
 
   const addSnapshot = (snapshot: any) => {
     snapshot.forEach((docSnap: any) => {
@@ -111,46 +195,10 @@ export const searchUsersForImpersonation = async (rawQuery: string): Promise<Imp
     return Array.from(results.values());
   }
 
-  const buildVariants = (value: string) => {
-    const variants = new Set<string>();
-    variants.add(value);
-    const lower = value.toLowerCase();
-    const upper = value.toUpperCase();
-    if (lower !== value) variants.add(lower);
-    if (upper !== value) variants.add(upper);
-    const title = value.length > 0 ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
-    if (title !== value) variants.add(title);
-    return Array.from(variants);
-  };
-
-  const runPrefixSearch = async (field: string, prefixes: string[]) => {
-    for (const prefix of prefixes) {
-      try {
-        const snapshot = await getDocs(
-          query(
-            usersRef,
-            orderBy(field),
-            startAt(prefix),
-            endAt(`${prefix}\uf8ff`),
-            limit(20)
-          )
-        );
-        addSnapshot(snapshot);
-      } catch (error) {
-        console.warn(`Impersonation search failed for ${field}:`, error);
-      }
-      if (results.size >= 20) {
-        return;
-      }
-    }
-  };
-
   const variants = buildVariants(queryText);
   const fields = ['displayName', 'organizationName', 'hospitalName', 'bloodBankName', 'name'];
-  for (const field of fields) {
-    await runPrefixSearch(field, variants);
-    if (results.size >= 20) break;
-  }
+  const tasks = buildPrefixTasks(usersRef, fields, variants, maxResults, results);
+  await runTasksWithConcurrency(tasks, 3, results, maxResults);
 
   return Array.from(results.values());
 };
