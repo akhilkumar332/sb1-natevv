@@ -12,7 +12,7 @@ export interface UserRecord {
   uid: string;
   displayName: string;
   email: string;
-  role: 'donor' | 'bloodbank' | 'hospital' | 'ngo' | 'admin';
+  role: 'donor' | 'bloodbank' | 'hospital' | 'ngo' | 'admin' | 'superadmin';
   status: 'active' | 'inactive' | 'suspended' | 'pending_verification';
   verified: boolean;
   createdAt: Date;
@@ -391,7 +391,7 @@ export const useAdminData = (): UseAdminDataReturn => {
       const totalDonors = users.filter(u => u.role === 'donor').length;
       const totalHospitals = users.filter(u => u.role === 'bloodbank' || u.role === 'hospital').length;
       const totalNGOs = users.filter(u => u.role === 'ngo').length;
-      const totalAdmins = users.filter(u => u.role === 'admin').length;
+      const totalAdmins = users.filter(u => u.role === 'admin' || u.role === 'superadmin').length;
       const activeUsers = users.filter(u => u.status === 'active').length;
       const inactiveUsers = users.filter(u => u.status === 'inactive').length;
       const pendingVerification = users.filter(u => u.status === 'pending_verification').length;

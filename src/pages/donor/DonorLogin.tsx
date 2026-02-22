@@ -1,5 +1,5 @@
 // src/pages/auth/DonorLogin.tsx
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Phone, Droplet, Heart, Shield, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,12 +8,14 @@ import { useLogin } from '../../hooks/useLogin';
 import 'react-phone-number-input/style.css';
 import LogoMark from '../../components/LogoMark';
 import PwaInstallCta from '../../components/PwaInstallCta';
+import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
 
 export function DonorLogin() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, isSuperAdmin, setPortalRole, profileResolved } = useAuth();
   const hasNavigated = useRef(false);
+  const [showPortalModal, setShowPortalModal] = useState(false);
   const {
     formData,
     otpResendTimer,
@@ -34,6 +36,15 @@ export function DonorLogin() {
       return;
     }
 
+    if (!profileResolved) {
+      return;
+    }
+
+    if (isSuperAdmin) {
+      setShowPortalModal(true);
+      return;
+    }
+
     if (user.role !== 'donor') {
       return;
     }
@@ -49,9 +60,20 @@ export function DonorLogin() {
     } else {
       navigate(`/donor/dashboard${pendingSearch}`);
     }
-  }, [user, navigate, location.search]);
+  }, [isSuperAdmin, navigate, location.search, profileResolved, user]);
 
-  if (user && user.role === 'donor') {
+  if (user && !profileResolved) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex items-center gap-3 text-gray-600">
+          <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-medium">Checking account…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (user && user.role === 'donor' && !isSuperAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex items-center gap-3 text-gray-600">
@@ -61,6 +83,12 @@ export function DonorLogin() {
       </div>
     );
   }
+
+  const handlePortalSelect = (role: 'donor' | 'ngo' | 'bloodbank' | 'admin') => {
+    setPortalRole(role);
+    hasNavigated.current = true;
+    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+  };
 
   const renderInitialForm = () => (
     <div className="space-y-6">
@@ -168,6 +196,11 @@ export function DonorLogin() {
 
   return (
     <div className="min-h-screen flex">
+      <SuperAdminPortalModal
+        isOpen={showPortalModal && Boolean(user) && isSuperAdmin}
+        currentPortal="donor"
+        onSelect={handlePortalSelect}
+      />
       {/* Left Side - Gradient Background with Info */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-red-800 relative overflow-hidden">
         {/* Animated Background Elements */}

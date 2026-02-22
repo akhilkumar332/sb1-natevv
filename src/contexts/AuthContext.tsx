@@ -27,6 +27,7 @@ import {
   doc,
   setDoc, 
   getDoc, 
+  getDocFromServer,
   updateDoc, 
   arrayUnion,
   serverTimestamp, 
@@ -43,6 +44,7 @@ import { getDeviceId, getDeviceInfo } from '../utils/device';
 import { normalizePhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
 import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../services/referral.service';
+import { logAuditEvent } from '../services/audit.service';
 import { clearReferralTracking, getReferralReferrerUid, getReferralTracking } from '../utils/referralTracking';
 import { buildPublicDonorPayload } from '../utils/publicDonor';
 import { PhoneAuthError } from '../errors/PhoneAuthError';
@@ -67,8 +69,9 @@ interface User {
   phone?: string;
   createdAt?: Date;
   lastLoginAt?: Date;
-  role?: 'donor' | 'ngo' | 'bloodbank' | 'hospital' | 'admin';
+  role?: 'donor' | 'ngo' | 'bloodbank' | 'hospital' | 'admin' | 'superadmin';
   status?: 'active' | 'inactive' | 'suspended' | 'pending_verification' | 'deleted';
+  breakGlass?: boolean;
   address?: string;
   city?: string;
   state?: string;
@@ -153,6 +156,8 @@ const normalizeUserDate = (value?: any): Date | null => {
   return null;
 };
 
+type PortalRole = 'donor' | 'ngo' | 'bloodbank' | 'admin';
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -176,6 +181,11 @@ interface AuthContextType {
   updateEmailAddress: (email: string) => Promise<void>;
   unlinkGoogleProvider: () => Promise<void>;
   unlinkPhoneProvider: () => Promise<void>;
+  portalRole: PortalRole | null;
+  setPortalRole: (role: PortalRole | null) => void;
+  effectiveRole: User['role'] | null;
+  isSuperAdmin: boolean;
+  profileResolved: boolean;
 }
 
 interface LoginResponse {
@@ -186,6 +196,7 @@ interface LoginResponse {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const pendingPhoneLinkKey = 'pendingPhoneLink';
+const portalRoleStorageKey = 'bh_superadmin_portal_role';
 const userCacheKey = 'bh_user_cache';
 const userCacheAtKey = 'bh_user_cache_at';
 const userCacheTtlMs = 24 * 60 * 60 * 1000;
@@ -213,6 +224,20 @@ const serializeUserForCache = (user: User) => ({
       }
     : undefined,
 });
+
+const isPortalRole = (value?: string | null): value is PortalRole => (
+  value === 'donor' || value === 'ngo' || value === 'bloodbank' || value === 'admin'
+);
+
+const readPortalRole = (): PortalRole | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(portalRoleStorageKey);
+    return isPortalRole(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+};
 
 const hydrateCachedUser = (raw: any): User => ({
   ...raw,
@@ -337,13 +362,24 @@ type UserFetchResult = {
   missing: boolean;
 };
 
+const getUserDocSnapshot = async (userRef: DocumentReference): Promise<DocumentSnapshot> => {
+  try {
+    return await getDocFromServer(userRef);
+  } catch (error: any) {
+    if (error?.code === 'permission-denied') {
+      throw error;
+    }
+    return await getDoc(userRef);
+  }
+};
+
 const updateUserInFirestore = async (
   firebaseUser: FirebaseUser,
   additionalData?: Partial<User>
 ): Promise<UserFetchResult> => {
   try {
     const userRef: DocumentReference = doc(db, 'users', firebaseUser.uid);
-    const userDoc: DocumentSnapshot = await getDoc(userRef);
+    const userDoc: DocumentSnapshot = await getUserDocSnapshot(userRef);
 
     // If user document doesn't exist, return null
     if (!userDoc.exists()) {
@@ -466,6 +502,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(!initialCachedUser);
   const [authLoading, setAuthLoading] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [portalRoleState, setPortalRoleState] = useState<PortalRole | null>(readPortalRole);
+  const [profileResolved, setProfileResolved] = useState(!initialCachedUser);
   const logoutChannel = new BroadcastChannel('auth_logout');
   const referralApplyAttemptedRef = useRef(false);
   const recentLoginRef = useRef<{ uid: string; at: number; user?: User } | null>(null);
@@ -489,6 +527,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+
+  const setPortalRole = (role: PortalRole | null) => {
+    const previousRole = portalRoleState;
+    setPortalRoleState(role);
+    if (typeof window !== 'undefined') {
+      try {
+        if (role) {
+          sessionStorage.setItem(portalRoleStorageKey, role);
+        } else {
+          sessionStorage.removeItem(portalRoleStorageKey);
+        }
+      } catch {
+        // ignore storage errors
+      }
+    }
+
+    const currentUser = userRef.current;
+    if (currentUser?.uid && currentUser.role === 'superadmin' && previousRole !== role) {
+      void logAuditEvent({
+        actorUid: currentUser.uid,
+        actorRole: currentUser.role,
+        action: role ? 'portal_switch' : 'portal_clear',
+        metadata: {
+          from: previousRole ?? null,
+          to: role ?? null,
+          path: typeof window !== 'undefined' ? window.location.pathname : undefined,
+        },
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.uid) {
+      if (portalRoleState !== null) {
+        setPortalRole(null);
+      }
+      return;
+    }
+    if (user.role !== 'superadmin' && portalRoleState !== null) {
+      setPortalRole(null);
+    }
+  }, [portalRoleState, user?.role, user?.uid]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -556,7 +636,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       pushInitRef.current = null;
       return;
     }
-    if (!['donor', 'ngo', 'bloodbank'].includes(user.role || '')) {
+    const pushRole = user.role === 'superadmin' ? portalRoleState : user.role;
+    if (!pushRole || !['donor', 'ngo', 'bloodbank'].includes(pushRole)) {
       return;
     }
     if (pushInitRef.current === user.uid) return;
@@ -609,7 +690,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     enablePushOnLogin();
-  }, [user?.role, user?.uid]);
+  }, [portalRoleState, user?.role, user?.uid]);
 
   useEffect(() => {
     if (!user?.uid || user.role !== 'donor') return;
@@ -686,17 +767,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const recentLogin = recentLoginRef.current;
           const currentUser = userRef.current;
           const cachedUser = readCachedUser();
+          if (!currentUser || currentUser.uid !== firebaseUser.uid) {
+            setProfileResolved(false);
+          }
 
           if (recentLogin && recentLogin.uid === firebaseUser.uid && now - recentLogin.at < 15000) {
             if (!currentUser || currentUser.uid !== firebaseUser.uid) {
               setUser(recentLogin.user || cachedUser || currentUser || null);
             }
+            setProfileResolved(true);
             setLoading(false);
             void updateSessionMetadata(firebaseUser, recentLogin.user || cachedUser || currentUser || undefined);
             return;
           }
 
           if (currentUser && currentUser.uid === firebaseUser.uid) {
+            setProfileResolved(true);
             setLoading(false);
             void updateSessionMetadata(firebaseUser, currentUser);
             return;
@@ -704,6 +790,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           if (cachedUser && cachedUser.uid === firebaseUser.uid) {
             setUser(cachedUser);
+            setProfileResolved(false);
             setLoading(false);
             void updateSessionMetadata(firebaseUser, cachedUser);
             void updateUserInFirestore(firebaseUser)
@@ -745,6 +832,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                       logProfileIssue('cached-profile-retry-failed', retryError, { uid: firebaseUser.uid });
                     });
                 }, 7000);
+              })
+              .finally(() => {
+                setProfileResolved(true);
               });
             return;
           }
@@ -830,12 +920,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               } as User);
             }
           }
+          setProfileResolved(true);
         } else {
           setUser(null);
+          setProfileResolved(true);
         }
       } catch (error) {
         console.error('Error in auth state change:', error);
         setUser(null);
+        setProfileResolved(true);
       } finally {
         setLoading(false);
       }
@@ -1010,6 +1103,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const matchedUser = matches[0];
         const matchedUid = matchedUser.uid || matchedUser.id;
 
+        if (matchedUser.role === 'superadmin') {
+          await signOut(auth);
+          throw new PhoneAuthError('Superadmin can only sign in with Google.', 'superadmin_google_only');
+        }
         if (matchedUser.role && matchedUser.role !== 'donor') {
           await signOut(auth);
           throw new PhoneAuthError("You're not a Donor", 'role_mismatch');
@@ -1043,6 +1140,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const userData = userDoc.data() as User;
+      if (userData.role === 'superadmin') {
+        await signOut(auth);
+        throw new PhoneAuthError('Superadmin can only sign in with Google.', 'superadmin_google_only');
+      }
       const existingDob = convertTimestampToDate(userData?.dateOfBirth);
       const existingBhId = userData?.bhId;
       const generatedBhId = existingBhId
@@ -1341,7 +1442,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Check if user exists in Firestore
       const userRef = doc(db, 'users', result.user.uid);
-      const userDoc = await getDoc(userRef);
+      const userDoc = await getUserDocSnapshot(userRef);
 
       if (!userDoc.exists()) {
         await signOut(auth);
@@ -1352,6 +1453,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = await result.user.getIdToken();
 
       const userDocData = userDoc.data() as User;
+      if (userDocData.role === 'superadmin') {
+        await signOut(auth);
+        throw new Error('Superadmin can only sign in with Google.');
+      }
       const existingDob = convertTimestampToDate(userDocData?.dateOfBirth);
       const existingBhId = userDocData?.bhId;
       const generatedBhId = existingBhId
@@ -1540,7 +1645,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Check if user exists before proceeding
       const userRef = doc(db, 'users', result.user.uid);
-      const userDoc = await getDoc(userRef);
+      const userDoc = await getUserDocSnapshot(userRef);
 
       if (!userDoc.exists()) {
         await signOut(auth);
@@ -1658,14 +1763,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     navigate: NavigateFunction,
     options: { redirectTo?: string; showToast?: boolean } = {}
   ) => {
+    const resolvedRole = user?.role === 'superadmin' ? portalRoleState : user?.role;
     const resolvedRedirect = options.redirectTo ?? (
-      user?.role === 'ngo'
+      resolvedRole === 'ngo'
         ? '/ngo/login'
-        : user?.role === 'bloodbank'
+        : resolvedRole === 'bloodbank'
           ? '/bloodbank/login'
-          : user?.role === 'admin'
+          : resolvedRole === 'admin'
             ? '/admin/login'
-            : '/donor/login'
+            : resolvedRole === 'donor'
+              ? '/donor/login'
+              : '/admin/login'
     );
     const { showToast = true } = options;
     let hadError = false;
@@ -1675,6 +1783,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hadError = true;
       console.error('Logout error:', error);
     }
+
+    setPortalRole(null);
 
     try {
       // Broadcast logout event to other tabs
@@ -1701,10 +1811,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       throw new Error('No user logged in');
     }
-    console.log('Updating user profile with:', data);
+    const isPrivileged = user.role === 'admin' || user.role === 'superadmin';
+    const sanitizedData: Partial<User> = { ...data };
+    if (!isPrivileged) {
+      if (Object.prototype.hasOwnProperty.call(sanitizedData, 'role')) {
+        delete sanitizedData.role;
+      }
+      if (Object.prototype.hasOwnProperty.call(sanitizedData, 'breakGlass')) {
+        delete sanitizedData.breakGlass;
+      }
+    }
+    console.log('Updating user profile with:', sanitizedData);
     try {
-      const nextDateOfBirth = data.dateOfBirth ?? user.dateOfBirth;
-      const nextPostalCode = data.postalCode ?? user.postalCode;
+      const nextDateOfBirth = sanitizedData.dateOfBirth ?? user.dateOfBirth;
+      const nextPostalCode = sanitizedData.postalCode ?? user.postalCode;
       const existingBhId = user.bhId;
       const generatedBhId = existingBhId
         ? null
@@ -1714,31 +1834,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             uid: user.uid
           });
 
-      const phoneNumberNormalized = data.phoneNumber
-        ? normalizePhoneNumber(data.phoneNumber)
+      const phoneNumberNormalized = sanitizedData.phoneNumber
+        ? normalizePhoneNumber(sanitizedData.phoneNumber)
         : undefined;
 
       await setDoc(
         doc(db, 'users', user.uid),
         {
-          ...data,
+          ...sanitizedData,
           ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
           onboardingCompleted: true, // Set this to true upon successful completion
           ...(existingBhId ? {} : generatedBhId ? { bhId: generatedBhId } : {})
         },
         { merge: true }
       );
+      if (isPrivileged && sanitizedData.role && sanitizedData.role !== user.role) {
+        void logAuditEvent({
+          actorUid: user.uid,
+          actorRole: user.role || 'admin',
+          action: 'role_change',
+          targetUid: user.uid,
+          metadata: {
+            from: user.role ?? null,
+            to: sanitizedData.role,
+            source: 'updateUserProfile',
+          },
+        });
+      }
       const nextUser = {
         ...user,
-        ...data,
+        ...sanitizedData,
         ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
         onboardingCompleted: true,
         bhId: user.bhId || generatedBhId || undefined
       } as User;
 
-      const nextRole = data.role ?? user.role;
-      const nextStatus = data.status ?? user.status;
-      const nextOnboarding = data.onboardingCompleted ?? true;
+      const nextRole = sanitizedData.role ?? user.role;
+      const nextStatus = sanitizedData.status ?? user.status;
+      const nextOnboarding = sanitizedData.onboardingCompleted ?? true;
       const canPublishPublicDonor = nextRole === 'donor'
         && nextOnboarding === true
         && (!nextStatus || nextStatus === 'active');
@@ -1760,7 +1893,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(prev => ({
         ...prev,
-        ...data,
+        ...sanitizedData,
         ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
         onboardingCompleted: true, // Ensure this is updated in the state
         bhId: prev?.bhId || generatedBhId || undefined
@@ -1771,9 +1904,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const isSuperAdmin = user?.role === 'superadmin';
+  const effectiveRole = isSuperAdmin ? portalRoleState : user?.role;
+  const effectiveUser = isSuperAdmin && portalRoleState && user
+    ? ({
+        ...user,
+        role: portalRoleState,
+      } as User)
+    : user;
+
   return (
     <AuthContext.Provider value={{
-      user,
+      user: effectiveUser,
       loading,
       authLoading,
       loginWithGoogle,
@@ -1794,7 +1936,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       confirmPhoneUpdate,
       updateEmailAddress,
       unlinkGoogleProvider,
-      unlinkPhoneProvider
+      unlinkPhoneProvider,
+      portalRole: portalRoleState,
+      setPortalRole,
+      effectiveRole: effectiveRole ?? null,
+      isSuperAdmin,
+      profileResolved,
     }}>
       {children}
     </AuthContext.Provider>

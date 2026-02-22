@@ -1,9 +1,8 @@
 // src/components/Navbar.tsx
 import React, { useEffect, useState, Suspense } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, LogOut, LayoutDashboard, Heart, ChevronDown } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, X, LogOut, LayoutDashboard, Heart, ChevronDown, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import LogoMark from './LogoMark';
 import NotificationBadge from './shared/NotificationBadge';
 import { gamificationService } from '../services/gamification.service';
@@ -87,6 +86,22 @@ interface NavLinkProps {
   children: React.ReactNode;
 }
 
+type PortalRole = 'donor' | 'ngo' | 'bloodbank' | 'admin';
+
+const portalLabels: Record<PortalRole, string> = {
+  donor: 'Donor',
+  ngo: 'NGO',
+  bloodbank: 'Blood Bank',
+  admin: 'Admin',
+};
+
+const portalOptions: Array<{ role: PortalRole; label: string }> = [
+  { role: 'donor', label: 'Donor' },
+  { role: 'ngo', label: 'NGO' },
+  { role: 'bloodbank', label: 'Blood Bank' },
+  { role: 'admin', label: 'Admin' },
+];
+
 function DesktopNavLink({ to, children }: NavLinkProps) {
   const location = useLocation();
   const isActive = location.pathname === to;
@@ -167,12 +182,24 @@ function SigninDropdown() {
 }
 
 function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: string; hideDashboardLink?: boolean }) {
-  const { user, logout } = useAuth();
+  const { user, logout, isSuperAdmin, portalRole, setPortalRole } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     await logout(navigate);
+  };
+
+  const currentPortal = portalRole
+    ?? (portalOptions.some(option => option.role === user?.role)
+      ? (user?.role as PortalRole)
+      : null);
+
+  const handleReturnToPicker = () => {
+    const targetPortal = currentPortal && currentPortal !== 'admin' ? currentPortal : 'admin';
+    setPortalRole(null);
+    setIsOpen(false);
+    navigate(targetPortal === 'admin' ? '/admin/login' : `/${targetPortal}/login`);
   };
 
   // Get dashboard path based on user role
@@ -185,6 +212,8 @@ function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: 
       case 'ngo':
         return '/ngo/dashboard';
       case 'admin':
+        return '/admin/dashboard';
+      case 'superadmin':
         return '/admin/dashboard';
       default:
         return '/donor/dashboard';
@@ -246,6 +275,20 @@ function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: 
                 <div className="h-px bg-gradient-to-r from-transparent via-red-200 to-transparent my-1"></div>
               </>
             )}
+            {isSuperAdmin && (
+              <>
+                <button
+                  onClick={handleReturnToPicker}
+                  className="flex items-center w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 transition-all duration-300 group"
+                >
+                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-r from-red-500 to-red-600 mr-3 shadow-md transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                    <Shield className="w-4 h-4 text-white" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+                  </div>
+                  <span className="font-semibold">Return to portal picker</span>
+                </button>
+                <div className="h-px bg-gradient-to-r from-transparent via-red-200 to-transparent my-1"></div>
+              </>
+            )}
             <button
               onClick={handleLogout}
               className="flex items-center w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 transition-all duration-300 group"
@@ -301,13 +344,53 @@ function MobileAuthMenu({ onClose }: { onClose?: () => void }) {
   );
 }
 
-function MobileUserMenu({ onClose, achievementLabel, hideDashboardLink }: { onClose?: () => void; achievementLabel?: string; hideDashboardLink?: boolean }) {
-  const { user, logout } = useAuth();
+function MobileUserMenu({
+  onClose,
+  achievementLabel,
+  hideDashboardLink,
+  currentPortal,
+  onPortalSelect,
+}: {
+  onClose?: () => void;
+  achievementLabel?: string;
+  hideDashboardLink?: boolean;
+  currentPortal?: PortalRole | null;
+  onPortalSelect?: (role: PortalRole) => void;
+}) {
+  const { user, logout, isSuperAdmin, portalRole, setPortalRole } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     await logout(navigate);
     if (onClose) onClose();
+  };
+
+  const resolvedPortal = currentPortal
+    ?? portalRole
+    ?? (portalOptions.some(option => option.role === user?.role)
+      ? (user?.role as PortalRole)
+      : null);
+
+  const handlePortalSwitch = (role: PortalRole) => {
+    if (resolvedPortal === role) {
+      if (onClose) onClose();
+      return;
+    }
+    if (onPortalSelect) {
+      onPortalSelect(role);
+      if (onClose) onClose();
+      return;
+    }
+    setPortalRole(role);
+    if (onClose) onClose();
+    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+  };
+
+  const handleReturnToPicker = () => {
+    const targetPortal = resolvedPortal && resolvedPortal !== 'admin' ? resolvedPortal : 'admin';
+    setPortalRole(null);
+    if (onClose) onClose();
+    navigate(targetPortal === 'admin' ? '/admin/login' : `/${targetPortal}/login`);
   };
 
   // Get dashboard path based on user role
@@ -320,6 +403,8 @@ function MobileUserMenu({ onClose, achievementLabel, hideDashboardLink }: { onCl
       case 'ngo':
         return '/ngo/dashboard';
       case 'admin':
+        return '/admin/dashboard';
+      case 'superadmin':
         return '/admin/dashboard';
       default:
         return '/donor/dashboard';
@@ -363,6 +448,40 @@ function MobileUserMenu({ onClose, achievementLabel, hideDashboardLink }: { onCl
           <span className="font-medium">Dashboard</span>
         </Link>
       )}
+      {isSuperAdmin && (
+        <>
+          <div className="rounded-xl border border-red-100 bg-white/80 px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-red-600">SuperAdmin Mode</p>
+            <p className="text-xs text-gray-500">Quick portal switch</p>
+            <div className="mt-3 grid gap-2">
+              {portalOptions.map((option) => {
+                const isActive = resolvedPortal === option.role;
+                return (
+                  <button
+                    key={option.role}
+                    type="button"
+                    onClick={() => handlePortalSwitch(option.role)}
+                    className={`w-full rounded-lg px-3 py-2 text-xs font-semibold transition-all ${
+                      isActive
+                        ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-sm'
+                        : 'border border-gray-200 bg-white text-gray-700 hover:border-red-200 hover:bg-red-50'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <button
+            onClick={handleReturnToPicker}
+            className="flex items-center w-full px-4 py-3 text-gray-700 hover:bg-red-50 rounded-xl transition-all group"
+          >
+            <Shield className="w-5 h-5 mr-3 text-red-600 group-hover:scale-110 transition-transform" />
+            <span className="font-medium">Return to portal picker</span>
+          </button>
+        </>
+      )}
       <button
         onClick={handleLogout}
         className="flex items-center w-full px-4 py-3 text-gray-700 hover:bg-red-50 rounded-xl transition-all group"
@@ -376,18 +495,43 @@ function MobileUserMenu({ onClose, achievementLabel, hideDashboardLink }: { onCl
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
-  const { user, authLoading } = useAuth();
+  const [pendingPortal, setPendingPortal] = useState<PortalRole | null>(null);
+  const { user, authLoading, isSuperAdmin, portalRole, setPortalRole } = useAuth();
+  const navigate = useNavigate();
   const location = useLocation();
   const isDonorDashboard = user?.role === 'donor' && location.pathname.startsWith('/donor/dashboard');
   const isNgoDashboard = user?.role === 'ngo' && location.pathname.startsWith('/ngo/dashboard');
   const isBloodbankDashboard = user?.role === 'bloodbank' && location.pathname.startsWith('/bloodbank/dashboard');
+  const isAdminDashboard = location.pathname.startsWith('/admin/dashboard');
   const hideDonorNav = isDonorDashboard;
-  const hideDashboardLink = hideDonorNav;
+  const hideDashboardLink = isDonorDashboard || isNgoDashboard || isBloodbankDashboard || isAdminDashboard;
   const showNotificationBadge = isDonorDashboard || isNgoDashboard || isBloodbankDashboard;
   const topBadge = useTopDonorBadge(user);
   const achievementLabel = topBadge.name
     ? `${topBadge.icon ? `${topBadge.icon} ` : ''}${topBadge.name}`
     : (user?.role === 'donor' ? 'New Donor' : '');
+  const currentPortal = portalRole
+    ?? (portalOptions.some(option => option.role === user?.role)
+      ? (user?.role as PortalRole)
+      : null);
+
+  const handlePortalSelect = (role: PortalRole) => {
+    if (!isSuperAdmin) return;
+    if (role === currentPortal) return;
+    setPendingPortal(role);
+  };
+
+  const confirmPortalSwitch = () => {
+    if (!pendingPortal) return;
+    const nextPortal = pendingPortal;
+    setPendingPortal(null);
+    setPortalRole(nextPortal);
+    navigate(nextPortal === 'admin' ? '/admin/dashboard' : `/${nextPortal}/dashboard`);
+  };
+
+  const cancelPortalSwitch = () => {
+    setPendingPortal(null);
+  };
 
   const LoadingFallback = () => (
     <div className="flex items-center space-x-2">
@@ -439,6 +583,33 @@ const Navbar: React.FC = () => {
                 ) : (
                   <Suspense fallback={<LoadingFallback />}>
                     <div className="flex items-center gap-3">
+                      {isSuperAdmin && (
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center rounded-full bg-red-600 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-white shadow-sm">
+                            SuperAdmin Mode
+                          </span>
+                          <div className="flex items-center gap-1 rounded-full border border-red-100 bg-white/80 p-1 shadow-sm">
+                            {portalOptions.map((option) => {
+                              const isActive = currentPortal === option.role;
+                              return (
+                                <button
+                                  key={option.role}
+                                  type="button"
+                                  onClick={() => handlePortalSelect(option.role)}
+                                  className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-all ${
+                                    isActive
+                                      ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-sm'
+                                      : 'text-gray-600 hover:bg-red-50'
+                                  }`}
+                                  aria-pressed={isActive}
+                                >
+                                  {option.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                       {showNotificationBadge && (
                         <NotificationBadge className="rounded-full border border-red-100 bg-red-50 hover:bg-red-100" />
                       )}
@@ -468,6 +639,14 @@ const Navbar: React.FC = () => {
           </div>
         </div>
       </nav>
+
+      {isSuperAdmin && currentPortal && currentPortal !== 'admin' && (
+        <div className="border-b border-amber-200 bg-amber-50">
+          <div className="container mx-auto px-4 py-2 text-xs font-medium text-amber-900 sm:text-sm">
+            You are acting as <span className="font-semibold">{portalLabels[currentPortal]}</span> portal.
+          </div>
+        </div>
+      )}
 
       {/* Mobile Menu - Modern Drawer Style - Outside navbar for proper positioning */}
       {isOpen && (
@@ -533,7 +712,13 @@ const Navbar: React.FC = () => {
                 ) : (
                   <div className="animate-slideInRight" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
                     <Suspense fallback={<LoadingFallback />}>
-                      <MobileUserMenu onClose={() => setIsOpen(false)} achievementLabel={achievementLabel} hideDashboardLink={hideDashboardLink} />
+                      <MobileUserMenu
+                        onClose={() => setIsOpen(false)}
+                        achievementLabel={achievementLabel}
+                        hideDashboardLink={hideDashboardLink}
+                        currentPortal={currentPortal}
+                        onPortalSelect={handlePortalSelect}
+                      />
                     </Suspense>
                   </div>
                 )}
@@ -549,6 +734,38 @@ const Navbar: React.FC = () => {
             </div>
           </div>
         </>
+      )}
+
+      {pendingPortal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm rounded-2xl border border-red-100 bg-white shadow-2xl">
+            <div className="border-b border-red-100 px-6 py-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-red-600">Confirm switch</p>
+              <h3 className="text-lg font-semibold text-gray-900">Switch portal?</h3>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-gray-600">
+                You are about to switch to the <span className="font-semibold">{portalLabels[pendingPortal]}</span> portal.
+              </p>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={cancelPortalSwitch}
+                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmPortalSwitch}
+                  className="rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:from-red-700 hover:to-red-800"
+                >
+                  Switch portal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

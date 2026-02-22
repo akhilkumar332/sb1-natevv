@@ -94,7 +94,12 @@ export const useLogin = () => {
       setOtpLoading(true);
       const verifiedUser = await verifyOTP(confirmationResult, sanitizedOtp);
       if (verifiedUser.role !== 'donor') {
-        toast.error("You're not a Donor", { id: 'role-mismatch-donor' });
+        toast.error(
+          verifiedUser.role === 'superadmin'
+            ? 'Superadmin can only sign in with Google.'
+            : "You're not a Donor",
+          { id: 'role-mismatch-donor' }
+        );
         await logout(navigate, { redirectTo: '/donor/login', showToast: false });
         return;
       }
@@ -120,6 +125,10 @@ export const useLogin = () => {
         }
         if (error.code === 'role_mismatch') {
           toast.error("You're not a Donor", { id: 'role-mismatch-donor' });
+          return;
+        }
+        if (error.code === 'superadmin_google_only') {
+          toast.error('Superadmin can only sign in with Google.');
           return;
         }
         if (error.code === 'link_required') {
@@ -163,9 +172,16 @@ export const useLogin = () => {
     try {
       setGoogleLoading(true);
       const result = await loginWithGoogle();
-      if (result.user.role !== 'donor') {
+      if (result.user.role !== 'donor' && result.user.role !== 'superadmin') {
         toast.error("You're not a Donor", { id: 'role-mismatch-donor' });
         await logout(navigate, { redirectTo: '/donor/login', showToast: false });
+        return;
+      }
+      if (result.user.role === 'superadmin') {
+        if (result?.token) {
+          handleLoginSuccess(result.token);
+        }
+        toast.success('Select a portal to continue.');
         return;
       }
       if (result?.token && result?.user) {

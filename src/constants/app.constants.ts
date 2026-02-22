@@ -72,7 +72,7 @@ export const BLOOD_COMPATIBILITY: Record<BloodType, BloodType[]> = {
 // USER ROLES
 // ============================================================================
 
-export const USER_ROLES: readonly UserRole[] = ['donor', 'bloodbank', 'hospital', 'ngo', 'admin'] as const;
+export const USER_ROLES: readonly UserRole[] = ['donor', 'bloodbank', 'hospital', 'ngo', 'admin', 'superadmin'] as const;
 
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
   donor: 'Blood Donor',
@@ -80,6 +80,7 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
   hospital: 'Hospital (Legacy)',
   ngo: 'NGO / Organization',
   admin: 'Administrator',
+  superadmin: 'SuperAdmin',
 };
 
 // ============================================================================

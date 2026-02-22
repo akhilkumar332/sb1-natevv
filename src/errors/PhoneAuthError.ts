@@ -1,4 +1,9 @@
-export type PhoneAuthErrorCode = 'not_registered' | 'multiple_accounts' | 'role_mismatch' | 'link_required';
+export type PhoneAuthErrorCode =
+  | 'not_registered'
+  | 'multiple_accounts'
+  | 'role_mismatch'
+  | 'link_required'
+  | 'superadmin_google_only';
 
 export class PhoneAuthError extends Error {
   code: PhoneAuthErrorCode;

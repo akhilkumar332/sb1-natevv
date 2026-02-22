@@ -8,15 +8,26 @@ import LogoMark from '../../components/LogoMark';
 import PwaInstallCta from '../../components/PwaInstallCta';
 import { authStorage } from '../../utils/authStorage';
 import { auth } from '../../firebase';
+import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
 
 export function NgoLogin() {
   const navigate = useNavigate();
-  const { user, loginWithGoogle, logout } = useAuth();
+  const { user, loginWithGoogle, logout, isSuperAdmin, setPortalRole, profileResolved } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showPortalModal, setShowPortalModal] = useState(false);
   const hasRedirected = useRef(false);
 
   useEffect(() => {
     if (!user || hasRedirected.current) {
+      return;
+    }
+
+    if (!profileResolved) {
+      return;
+    }
+
+    if (isSuperAdmin) {
+      setShowPortalModal(true);
       return;
     }
 
@@ -28,12 +39,20 @@ export function NgoLogin() {
     const targetPath = user.onboardingCompleted ? '/ngo/dashboard' : '/ngo/onboarding';
     hasRedirected.current = true;
     navigate(targetPath);
-  }, [user, navigate]);
+  }, [isSuperAdmin, navigate, profileResolved, user]);
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     try {
       const response = await loginWithGoogle();
+      if (response.user.role === 'superadmin') {
+        const token = response?.token ?? (await auth.currentUser?.getIdToken());
+        if (token) {
+          authStorage.setAuthToken(token);
+        }
+        setShowPortalModal(true);
+        return;
+      }
       if (response.user.role !== 'ngo') {
         toast.error("You're not an NGO", { id: 'role-mismatch-ngo' });
         await logout(navigate, { redirectTo: '/ngo/login', showToast: false });
@@ -57,7 +76,18 @@ export function NgoLogin() {
     }
   };
 
-  if (user && user.role === 'ngo') {
+  if (user && !profileResolved) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex items-center gap-3 text-gray-600">
+          <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-medium">Checking account…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (user && user.role === 'ngo' && !isSuperAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex items-center gap-3 text-gray-600">
@@ -68,8 +98,19 @@ export function NgoLogin() {
     );
   }
 
+  const handlePortalSelect = (role: 'donor' | 'ngo' | 'bloodbank' | 'admin') => {
+    setPortalRole(role);
+    hasRedirected.current = true;
+    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+  };
+
   return (
     <div className="min-h-screen flex">
+      <SuperAdminPortalModal
+        isOpen={showPortalModal && Boolean(user) && isSuperAdmin}
+        currentPortal="ngo"
+        onSelect={handlePortalSelect}
+      />
       {/* Left Side - Gradient Background with Info */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-amber-600 relative overflow-hidden">
         {/* Animated Background Elements */}

@@ -14,7 +14,7 @@ import { Timestamp } from 'firebase/firestore';
 
 export type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
 export type Gender = 'Male' | 'Female' | 'Other';
-export type UserRole = 'donor' | 'bloodbank' | 'ngo' | 'admin' | 'hospital';
+export type UserRole = 'donor' | 'bloodbank' | 'ngo' | 'admin' | 'superadmin' | 'hospital';
 export type UserStatus = 'active' | 'inactive' | 'suspended' | 'pending_verification';
 export type DonorLevel = 'New Donor' | 'Rookie' | 'Regular' | 'Super' | 'Hero' | 'Legend' | 'Champion';
 export type StaffRole = 'viewer' | 'editor' | 'manager';
@@ -43,6 +43,7 @@ export interface User {
   role: UserRole;
   status: UserStatus;
   verified: boolean;
+  breakGlass?: boolean;
   staffRole?: StaffRole;
   parentHospitalId?: string;
   branchId?: string;
@@ -117,6 +118,20 @@ export interface User {
   // Metadata
   howHeardAboutUs?: string;
   interestedInVolunteering?: boolean;
+}
+
+// ============================================================================
+// COLLECTION: auditLogs
+// ============================================================================
+
+export interface AuditLog {
+  id?: string;
+  actorUid: string;
+  actorRole: UserRole | string;
+  action: string;
+  targetUid?: string;
+  metadata?: Record<string, any>;
+  createdAt: Timestamp;
 }
 
 // ============================================================================

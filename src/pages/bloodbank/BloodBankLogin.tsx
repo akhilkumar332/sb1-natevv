@@ -6,15 +6,28 @@ import toast from 'react-hot-toast';
 import { Building2, Users, Activity, Shield } from 'lucide-react';
 import LogoMark from '../../components/LogoMark';
 import PwaInstallCta from '../../components/PwaInstallCta';
+import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
+import { authStorage } from '../../utils/authStorage';
+import { auth } from '../../firebase';
 
 export function BloodBankLogin() {
   const navigate = useNavigate();
-  const { user, loginWithGoogle, logout } = useAuth();
+  const { user, loginWithGoogle, logout, isSuperAdmin, setPortalRole, profileResolved } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showPortalModal, setShowPortalModal] = useState(false);
   const hasRedirected = useRef(false);
 
   useEffect(() => {
     if (!user || hasRedirected.current) {
+      return;
+    }
+
+    if (!profileResolved) {
+      return;
+    }
+
+    if (isSuperAdmin) {
+      setShowPortalModal(true);
       return;
     }
 
@@ -26,12 +39,20 @@ export function BloodBankLogin() {
     const targetPath = user.onboardingCompleted ? '/bloodbank/dashboard' : '/bloodbank/onboarding';
     hasRedirected.current = true;
     navigate(targetPath);
-  }, [user, navigate]);
+  }, [isSuperAdmin, navigate, profileResolved, user]);
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     try {
       const response = await loginWithGoogle();
+      if (response.user.role === 'superadmin') {
+        const token = response?.token ?? (await auth.currentUser?.getIdToken());
+        if (token) {
+          authStorage.setAuthToken(token);
+        }
+        setShowPortalModal(true);
+        return;
+      }
       if (response.user.role !== 'bloodbank' && response.user.role !== 'hospital') {
         toast.error("You're not a BloodBank Admin", { id: 'role-mismatch-bloodbank' });
         await logout(navigate, { redirectTo: '/bloodbank/login', showToast: false });
@@ -51,8 +72,30 @@ export function BloodBankLogin() {
     }
   };
 
+  const handlePortalSelect = (role: 'donor' | 'ngo' | 'bloodbank' | 'admin') => {
+    setPortalRole(role);
+    hasRedirected.current = true;
+    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+  };
+
+  if (user && !profileResolved) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex items-center gap-3 text-gray-600">
+          <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-medium">Checking account…</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex">
+      <SuperAdminPortalModal
+        isOpen={showPortalModal && Boolean(user) && isSuperAdmin}
+        currentPortal="bloodbank"
+        onSelect={handlePortalSelect}
+      />
       {/* Left Side - Gradient Background with Info */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-yellow-500 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>

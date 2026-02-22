@@ -41,7 +41,14 @@ service cloud.firestore {
      * Check if user is admin
      */
     function isAdmin() {
-      return hasRole('admin');
+      return hasRole('admin') || hasRole('superadmin');
+    }
+
+    /**
+     * Check if user is superadmin
+     */
+    function isSuperAdmin() {
+      return hasRole('superadmin');
     }
 
     /**
@@ -283,14 +290,14 @@ service cloud.firestore {
       allow read: if isAuthenticated();
 
       // Users can create their own document during registration
-      allow create: if isAuthenticated() && isOwner(userId);
+      allow create: if isAuthenticated() && isOwner(userId) && !(request.resource.data.breakGlass == true);
 
       // Users can update their own data, admins can update any
       // Prevent users from changing their own role/verification/status
       // Allow self-service soft delete (status = deleted) with limited fields
       allow update: if isAuthenticated() && (
         (isOwner(userId) && (
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'verified', 'status']) ||
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'verified', 'status', 'breakGlass']) ||
           (
             request.resource.data.status == 'deleted' &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deletedAt', 'updatedAt'])
@@ -301,6 +308,18 @@ service cloud.firestore {
 
       // Only admins can delete users
       allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: auditLogs
+    // ========================================================================
+
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.action is string;
+      allow update, delete: if false;
     }
 
     // ========================================================================

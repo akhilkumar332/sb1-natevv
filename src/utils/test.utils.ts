@@ -555,6 +555,6 @@ export const randomBloodType = (): BloodType => {
  * @returns Random user role
  */
 export const randomUserRole = (): UserRole => {
-  const roles: UserRole[] = ['donor', 'bloodbank', 'hospital', 'ngo', 'admin'];
+  const roles: UserRole[] = ['donor', 'bloodbank', 'hospital', 'ngo', 'admin', 'superadmin'];
   return randomItem(roles);
 };

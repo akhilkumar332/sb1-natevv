@@ -47,7 +47,7 @@ export const isNGO = (user: User | null): boolean => {
  * @returns Boolean indicating if user is an admin
  */
 export const isAdmin = (user: User | null): boolean => {
-  return user?.role === 'admin';
+  return user?.role === 'admin' || user?.role === 'superadmin';
 };
 
 /**
@@ -290,6 +290,8 @@ export const getDashboardRoute = (user: User | null): string => {
       return '/ngo/dashboard';
     case 'admin':
       return '/admin/dashboard';
+    case 'superadmin':
+      return '/admin/dashboard';
     default:
       return '/';
   }
@@ -312,6 +314,8 @@ export const getOnboardingRoute = (user: User | null): string => {
     case 'ngo':
       return '/ngo/onboarding';
     case 'admin':
+      return '/admin/onboarding';
+    case 'superadmin':
       return '/admin/onboarding';
     default:
       return '/';
@@ -425,6 +429,7 @@ export const getRoleDisplayText = (role: UserRole): string => {
     hospital: 'Hospital (Legacy)',
     ngo: 'NGO',
     admin: 'Administrator',
+    superadmin: 'SuperAdmin',
   };
   return roleMap[role] || 'Unknown';
 };

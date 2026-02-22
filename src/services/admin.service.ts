@@ -33,6 +33,7 @@ import {
 } from '../types/database.types';
 import { extractQueryData, getServerTimestamp } from '../utils/firestore.utils';
 import { DatabaseError, ValidationError, NotFoundError, PermissionError } from '../utils/errorHandler';
+import { logAuditEvent } from './audit.service';
 
 // ============================================================================
 // USER MANAGEMENT
@@ -133,9 +134,10 @@ export const updateUserStatus = async (
   try {
     // Verify admin permissions
     const adminDoc = await getDoc(doc(db, 'users', adminId));
-    if (!adminDoc.exists() || adminDoc.data().role !== 'admin') {
+    if (!adminDoc.exists() || !['admin', 'superadmin'].includes(adminDoc.data().role)) {
       throw new PermissionError('Only admins can update user status');
     }
+    const adminRole = adminDoc.data().role || 'admin';
 
     await updateDoc(doc(db, 'users', userId), {
       status,
@@ -152,6 +154,14 @@ export const updateUserStatus = async (
       read: false,
       priority: 'high',
       createdAt: getServerTimestamp(),
+    });
+
+    await logAuditEvent({
+      actorUid: adminId,
+      actorRole: adminRole,
+      action: 'admin_update_user_status',
+      targetUid: userId,
+      metadata: { status },
     });
   } catch (error) {
     if (error instanceof PermissionError) {
@@ -173,9 +183,10 @@ export const verifyUserAccount = async (
   try {
     // Verify admin permissions
     const adminDoc = await getDoc(doc(db, 'users', adminId));
-    if (!adminDoc.exists() || adminDoc.data().role !== 'admin') {
+    if (!adminDoc.exists() || !['admin', 'superadmin'].includes(adminDoc.data().role)) {
       throw new PermissionError('Only admins can verify user accounts');
     }
+    const adminRole = adminDoc.data().role || 'admin';
 
     await updateDoc(doc(db, 'users', userId), {
       verified: true,
@@ -193,6 +204,13 @@ export const verifyUserAccount = async (
       read: false,
       priority: 'high',
       createdAt: getServerTimestamp(),
+    });
+
+    await logAuditEvent({
+      actorUid: adminId,
+      actorRole: adminRole,
+      action: 'admin_verify_user',
+      targetUid: userId,
     });
   } catch (error) {
     if (error instanceof PermissionError) {
@@ -214,13 +232,14 @@ export const deleteUserAccount = async (
   try {
     // Verify admin permissions
     const adminDoc = await getDoc(doc(db, 'users', adminId));
-    if (!adminDoc.exists() || adminDoc.data().role !== 'admin') {
+    if (!adminDoc.exists() || !['admin', 'superadmin'].includes(adminDoc.data().role)) {
       throw new PermissionError('Only admins can delete user accounts');
     }
+    const adminRole = adminDoc.data().role || 'admin';
 
     // Prevent deleting admin accounts
     const userDoc = await getDoc(doc(db, 'users', userId));
-    if (userDoc.exists() && userDoc.data().role === 'admin') {
+    if (userDoc.exists() && ['admin', 'superadmin'].includes(userDoc.data().role)) {
       throw new ValidationError('Cannot delete admin accounts');
     }
 
@@ -228,6 +247,14 @@ export const deleteUserAccount = async (
     await updateDoc(doc(db, 'users', userId), {
       status: 'inactive',
       updatedAt: getServerTimestamp(),
+    });
+
+    await logAuditEvent({
+      actorUid: adminId,
+      actorRole: adminRole,
+      action: 'admin_delete_user',
+      targetUid: userId,
+      metadata: { status: 'inactive' },
     });
   } catch (error) {
     if (error instanceof PermissionError || error instanceof ValidationError) {
@@ -327,9 +354,10 @@ export const approveVerificationRequest = async (
   try {
     // Verify admin permissions
     const adminDoc = await getDoc(doc(db, 'users', adminId));
-    if (!adminDoc.exists() || adminDoc.data().role !== 'admin') {
+    if (!adminDoc.exists() || !['admin', 'superadmin'].includes(adminDoc.data().role)) {
       throw new PermissionError('Only admins can approve verification requests');
     }
+    const adminRole = adminDoc.data().role || 'admin';
 
     const requestDoc = await getDoc(doc(db, 'verificationRequests', requestId));
     if (!requestDoc.exists()) {
@@ -365,6 +393,17 @@ export const approveVerificationRequest = async (
       priority: 'high',
       createdAt: getServerTimestamp(),
     });
+
+    await logAuditEvent({
+      actorUid: adminId,
+      actorRole: adminRole,
+      action: 'admin_approve_verification',
+      targetUid: request.userId,
+      metadata: {
+        requestId,
+        organizationType: request.organizationType,
+      },
+    });
   } catch (error) {
     if (error instanceof PermissionError || error instanceof NotFoundError) {
       throw error;
@@ -387,9 +426,10 @@ export const rejectVerificationRequest = async (
   try {
     // Verify admin permissions
     const adminDoc = await getDoc(doc(db, 'users', adminId));
-    if (!adminDoc.exists() || adminDoc.data().role !== 'admin') {
+    if (!adminDoc.exists() || !['admin', 'superadmin'].includes(adminDoc.data().role)) {
       throw new PermissionError('Only admins can reject verification requests');
     }
+    const adminRole = adminDoc.data().role || 'admin';
 
     if (!rejectionReason || rejectionReason.trim().length === 0) {
       throw new ValidationError('Rejection reason is required');
@@ -422,6 +462,18 @@ export const rejectVerificationRequest = async (
       priority: 'high',
       createdAt: getServerTimestamp(),
     });
+
+    await logAuditEvent({
+      actorUid: adminId,
+      actorRole: adminRole,
+      action: 'admin_reject_verification',
+      targetUid: request.userId,
+      metadata: {
+        requestId,
+        organizationType: request.organizationType,
+        reason: rejectionReason,
+      },
+    });
   } catch (error) {
     if (error instanceof PermissionError || error instanceof NotFoundError || error instanceof ValidationError) {
       throw error;
@@ -442,14 +494,22 @@ export const markVerificationUnderReview = async (
   try {
     // Verify admin permissions
     const adminDoc = await getDoc(doc(db, 'users', adminId));
-    if (!adminDoc.exists() || adminDoc.data().role !== 'admin') {
+    if (!adminDoc.exists() || !['admin', 'superadmin'].includes(adminDoc.data().role)) {
       throw new PermissionError('Only admins can update verification requests');
     }
+    const adminRole = adminDoc.data().role || 'admin';
 
     await updateDoc(doc(db, 'verificationRequests', requestId), {
       status: 'under_review',
       reviewedBy: adminId,
       updatedAt: getServerTimestamp(),
+    });
+
+    await logAuditEvent({
+      actorUid: adminId,
+      actorRole: adminRole,
+      action: 'admin_mark_under_review',
+      metadata: { requestId },
     });
   } catch (error) {
     if (error instanceof PermissionError) {
@@ -477,7 +537,7 @@ export const getPlatformStats = async () => {
       donors: users.filter(u => u.role === 'donor').length,
       hospitals: users.filter(u => u.role === 'bloodbank' || u.role === 'hospital').length,
       ngos: users.filter(u => u.role === 'ngo').length,
-      admins: users.filter(u => u.role === 'admin').length,
+      admins: users.filter(u => u.role === 'admin' || u.role === 'superadmin').length,
     };
 
     const usersByStatus = {
