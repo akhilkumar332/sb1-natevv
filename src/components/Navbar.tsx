@@ -515,6 +515,7 @@ const Navbar: React.FC = () => {
     setPortalRole,
     isImpersonating,
     impersonationSession,
+    impersonationTransition,
     stopImpersonation,
   } = useAuth();
   const navigate = useNavigate();
@@ -676,9 +677,10 @@ const Navbar: React.FC = () => {
             </span>
             <button
               onClick={() => void stopImpersonation()}
-              className="self-start sm:self-auto rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-900 transition hover:bg-amber-200"
+              disabled={impersonationTransition === 'stopping'}
+              className="self-start sm:self-auto rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-900 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              Stop impersonation
+              {impersonationTransition === 'stopping' ? 'Stopping…' : 'Stop impersonation'}
             </button>
           </div>
         </div>

@@ -221,6 +221,7 @@ interface AuthContextType {
   isSuperAdmin: boolean;
   impersonationSession: ImpersonationSession | null;
   isImpersonating: boolean;
+  impersonationTransition: 'starting' | 'stopping' | null;
   startImpersonation: (target: Pick<User, 'uid'> | User) => Promise<ImpersonationTarget | null>;
   stopImpersonation: () => Promise<void>;
   profileResolved: boolean;
@@ -593,6 +594,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [impersonationSession, setImpersonationSession] = useState<ImpersonationSession | null>(
     readImpersonationSession
   );
+  const [impersonationTransition, setImpersonationTransition] = useState<'starting' | 'stopping' | null>(null);
   const [profileResolved, setProfileResolved] = useState(!initialCachedUser);
   const logoutChannel = new BroadcastChannel('auth_logout');
   const referralApplyAttemptedRef = useRef(false);
@@ -656,11 +658,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     target: Pick<User, 'uid'> | User
   ): Promise<ImpersonationTarget | null> => {
     const actor = userRef.current;
+    setImpersonationTransition('starting');
     if (!actor || actor.role !== 'superadmin') {
       toast.error('Only superadmins can impersonate users.');
       trackImpersonationEvent('impersonation_denied', {
         reason: 'not_superadmin',
       });
+      setImpersonationTransition(null);
       return null;
     }
 
@@ -670,6 +674,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       trackImpersonationEvent('impersonation_denied', {
         reason: 'missing_target_uid',
       });
+      setImpersonationTransition(null);
       return null;
     }
 
@@ -720,6 +725,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Failed to start impersonation:', error);
       toast.error(error?.message || 'Failed to start impersonation.');
       updateImpersonationSession(null);
+      setImpersonationTransition(null);
       trackImpersonationEvent('impersonation_failed', {
         reason: 'exception',
         targetUid,
@@ -744,6 +750,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       return;
     }
+    setImpersonationTransition('stopping');
 
     const attemptResume = async (resumeToken: string) => {
       await signInWithCustomToken(auth, resumeToken);
@@ -773,6 +780,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           reason: 'resume_failed',
         });
         updateImpersonationSession({ ...session, status: 'active' });
+        setImpersonationTransition(null);
         return;
       }
 
@@ -798,6 +806,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           reason: 'resume_refresh_failed',
         });
         updateImpersonationSession({ ...session, status: 'active' });
+        setImpersonationTransition(null);
         return;
       }
     }
@@ -823,6 +832,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setPortalRole(null);
     }
   }, [impersonationSession, portalRoleState, user?.role, user?.uid]);
+
+  useEffect(() => {
+    if (!impersonationTransition) return;
+    if (impersonationTransition === 'starting') {
+      if (impersonationSession && user?.uid === impersonationSession.targetUid) {
+        setImpersonationTransition(null);
+      }
+      return;
+    }
+    if (impersonationTransition === 'stopping') {
+      if (!impersonationSession && user?.uid) {
+        setImpersonationTransition(null);
+      }
+    }
+  }, [impersonationSession, impersonationTransition, user?.uid]);
 
   useEffect(() => {
     if (!impersonationSession) return;
@@ -862,6 +886,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const elapsed = Date.now() - impersonationSession.startedAt;
     if (elapsed >= thresholdMs) {
       updateImpersonationSession(null);
+      setImpersonationTransition(null);
       return;
     }
 
@@ -870,6 +895,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!latest || latest.status !== 'starting') return;
       if (userRef.current?.uid !== latest.actorUid) return;
       updateImpersonationSession(null);
+      setImpersonationTransition(null);
     }, thresholdMs - elapsed);
 
     return () => window.clearTimeout(timeoutId);
@@ -2093,6 +2119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     options: { redirectTo?: string; showToast?: boolean } = {}
   ) => {
     updateImpersonationSession(null);
+    setImpersonationTransition(null);
     const resolvedRole = user?.role === 'superadmin' ? portalRoleState : user?.role;
     const resolvedRedirect = options.redirectTo ?? (
       resolvedRole === 'ngo'
@@ -2276,6 +2303,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isSuperAdmin,
       impersonationSession,
       isImpersonating,
+      impersonationTransition,
       startImpersonation,
       stopImpersonation,
       profileResolved,

@@ -21,6 +21,7 @@ export function AdminLogin() {
     startImpersonation,
     impersonationSession,
     isImpersonating,
+    impersonationTransition,
     effectiveRole,
     profileResolved,
   } = useAuth();
@@ -42,7 +43,7 @@ export function AdminLogin() {
       return;
     }
 
-    if (!profileResolved) {
+    if (!profileResolved && !isImpersonating && impersonationTransition !== 'stopping') {
       return;
     }
 
@@ -69,7 +70,16 @@ export function AdminLogin() {
     const targetPath = user.onboardingCompleted ? '/admin/dashboard' : '/admin/onboarding';
     hasRedirected.current = true;
     navigate(targetPath);
-  }, [effectiveRole, impersonationSession?.targetRole, isImpersonating, isSuperAdmin, navigate, profileResolved, user]);
+  }, [
+    effectiveRole,
+    impersonationSession?.targetRole,
+    impersonationTransition,
+    isImpersonating,
+    isSuperAdmin,
+    navigate,
+    profileResolved,
+    user,
+  ]);
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
@@ -151,6 +161,7 @@ export function AdminLogin() {
               role: impersonationSession.targetRole ?? null,
             }
           : null}
+        impersonationLoading={impersonationTransition === 'starting'}
       />
       {/* Left Side - Gradient Background with Info */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-red-800 relative overflow-hidden">

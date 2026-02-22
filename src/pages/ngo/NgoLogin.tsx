@@ -22,6 +22,7 @@ export function NgoLogin() {
     startImpersonation,
     impersonationSession,
     isImpersonating,
+    impersonationTransition,
     effectiveRole,
     profileResolved,
   } = useAuth();
@@ -43,7 +44,7 @@ export function NgoLogin() {
       return;
     }
 
-    if (!profileResolved) {
+    if (!profileResolved && !isImpersonating && impersonationTransition !== 'stopping') {
       return;
     }
 
@@ -70,7 +71,16 @@ export function NgoLogin() {
     const targetPath = user.onboardingCompleted ? '/ngo/dashboard' : '/ngo/onboarding';
     hasRedirected.current = true;
     navigate(targetPath);
-  }, [effectiveRole, impersonationSession?.targetRole, isImpersonating, isSuperAdmin, navigate, profileResolved, user]);
+  }, [
+    effectiveRole,
+    impersonationSession?.targetRole,
+    impersonationTransition,
+    isImpersonating,
+    isSuperAdmin,
+    navigate,
+    profileResolved,
+    user,
+  ]);
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
@@ -167,6 +177,7 @@ export function NgoLogin() {
               role: impersonationSession.targetRole ?? null,
             }
           : null}
+        impersonationLoading={impersonationTransition === 'starting'}
       />
       {/* Left Side - Gradient Background with Info */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-amber-600 relative overflow-hidden">

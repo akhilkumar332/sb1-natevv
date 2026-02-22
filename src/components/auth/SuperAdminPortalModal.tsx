@@ -15,6 +15,7 @@ interface SuperAdminPortalModalProps {
     email?: string | null;
     role?: string | null;
   } | null;
+  impersonationLoading?: boolean;
 }
 
 const portalLabels: Record<PortalRole, string> = {
@@ -32,6 +33,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
   onSelect,
   onImpersonate,
   impersonationUser,
+  impersonationLoading = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<ImpersonationUser[]>([]);
@@ -91,7 +93,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
   };
 
   const confirmImpersonation = () => {
-    if (!pendingImpersonation || !onImpersonate) return;
+    if (!pendingImpersonation || !onImpersonate || impersonationLoading) return;
     onImpersonate(pendingImpersonation);
     setPendingImpersonation(null);
   };
@@ -166,27 +168,35 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
                     placeholder="Type at least 2 characters"
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 pr-10 text-sm text-gray-700 transition-all focus:border-red-300 focus:outline-none"
+                    disabled={impersonationLoading}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 pr-10 text-sm text-gray-700 transition-all focus:border-red-300 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
                   />
                   <Search className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
                 </div>
               </div>
 
               <div className="mt-3 space-y-2">
+                {impersonationLoading && (
+                  <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    <span className="h-3 w-3 animate-spin rounded-full border border-amber-400 border-t-transparent" />
+                    Switching user…
+                  </div>
+                )}
                 {searchLoading && (
                   <p className="text-xs text-gray-500">Searching…</p>
                 )}
                 {!searchLoading && searchError && (
                   <p className="text-xs text-red-600">{searchError}</p>
                 )}
-                {!searchLoading && !searchError && searchTerm.trim().length >= 2 && searchResults.length === 0 && (
+                {!impersonationLoading && !searchLoading && !searchError && searchTerm.trim().length >= 2 && searchResults.length === 0 && (
                   <p className="text-xs text-gray-500">No users found.</p>
                 )}
                 {searchResults.map((user) => (
                   <button
                     key={user.uid}
                     onClick={() => handleImpersonateClick(user)}
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50"
+                    disabled={impersonationLoading}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -227,7 +237,8 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
             <div className="mt-5 flex gap-3">
               <button
                 onClick={confirmImpersonation}
-                className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                disabled={impersonationLoading}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 Yes, impersonate
               </button>

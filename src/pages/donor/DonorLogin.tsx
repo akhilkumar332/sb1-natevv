@@ -21,6 +21,7 @@ export function DonorLogin() {
     startImpersonation,
     impersonationSession,
     isImpersonating,
+    impersonationTransition,
     effectiveRole,
     profileResolved,
   } = useAuth();
@@ -55,7 +56,7 @@ export function DonorLogin() {
       return;
     }
 
-    if (!profileResolved) {
+    if (!profileResolved && !isImpersonating && impersonationTransition !== 'stopping') {
       return;
     }
 
@@ -89,7 +90,17 @@ export function DonorLogin() {
     } else {
       navigate(`/donor/dashboard${pendingSearch}`);
     }
-  }, [effectiveRole, impersonationSession?.targetRole, isImpersonating, isSuperAdmin, navigate, location.search, profileResolved, user]);
+  }, [
+    effectiveRole,
+    impersonationSession?.targetRole,
+    impersonationTransition,
+    isImpersonating,
+    isSuperAdmin,
+    navigate,
+    location.search,
+    profileResolved,
+    user,
+  ]);
 
   if (user && !profileResolved) {
     return (
@@ -255,6 +266,7 @@ export function DonorLogin() {
               role: impersonationSession.targetRole ?? null,
             }
           : null}
+        impersonationLoading={impersonationTransition === 'starting'}
       />
       {/* Left Side - Gradient Background with Info */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-red-800 relative overflow-hidden">
