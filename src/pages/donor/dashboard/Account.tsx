@@ -194,7 +194,6 @@ const DonorAccount = () => {
           ...(user.notificationPreferences || {}),
           push: false,
         },
-        fcmTokens: [],
         updatedAt: serverTimestamp(),
       });
     }

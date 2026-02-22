@@ -61,7 +61,6 @@ function NgoAccount() {
           ...(user.notificationPreferences || {}),
           push: false,
         },
-        fcmTokens: [],
         updatedAt: serverTimestamp(),
       });
     }

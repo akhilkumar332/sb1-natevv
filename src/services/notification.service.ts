@@ -16,12 +16,14 @@ import {
   arrayUnion,
   arrayRemove,
   Timestamp,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Notification as NotificationData, Coordinates, NotificationType, NotificationPriority } from '../types/database.types';
 import { FCM_CONFIG } from '../config/fcm.config';
 import { calculateDistance } from '../utils/geolocation';
 import { DatabaseError } from '../utils/errorHandler';
+import type { DeviceInfo } from '../utils/device';
 
 // ============================================================================
 // FCM TOKEN MANAGEMENT
@@ -127,6 +129,33 @@ export const saveFCMToken = async (userId: string, token: string): Promise<void>
 };
 
 /**
+ * Save FCM token to user document for a specific device
+ */
+export const saveFCMDeviceToken = async (
+  userId: string,
+  deviceId: string,
+  token: string,
+  deviceInfo?: DeviceInfo | null
+): Promise<void> => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    const detailsPayload = {
+      token,
+      info: deviceInfo || {},
+      updatedAt: Timestamp.now(),
+    };
+    await updateDoc(userRef, {
+      fcmTokens: arrayUnion(token),
+      lastTokenUpdate: Timestamp.now(),
+      [`fcmDeviceTokens.${deviceId}`]: token,
+      [`fcmDeviceDetails.${deviceId}`]: detailsPayload,
+    } as any);
+  } catch (error) {
+    throw new DatabaseError('Failed to save FCM token');
+  }
+};
+
+/**
  * Remove FCM token from user document
  */
 export const removeFCMToken = async (
@@ -139,6 +168,26 @@ export const removeFCMToken = async (
     await updateDoc(userRef, {
       fcmTokens: arrayRemove(token),
     });
+  } catch (error) {
+    throw new DatabaseError('Failed to remove FCM token');
+  }
+};
+
+/**
+ * Remove FCM token for a specific device
+ */
+export const removeFCMDeviceToken = async (
+  userId: string,
+  deviceId: string,
+  token: string
+): Promise<void> => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      fcmTokens: arrayRemove(token),
+      [`fcmDeviceTokens.${deviceId}`]: deleteField(),
+      [`fcmDeviceDetails.${deviceId}`]: deleteField(),
+    } as any);
   } catch (error) {
     throw new DatabaseError('Failed to remove FCM token');
   }
@@ -160,13 +209,19 @@ export const deleteFCMToken = async (messaging: Messaging): Promise<void> => {
  */
 export const initializeFCM = async (
   userId: string,
-  messaging: Messaging
+  messaging: Messaging,
+  deviceId?: string | null,
+  deviceInfo?: DeviceInfo | null
 ): Promise<string | null> => {
   try {
     const token = await requestNotificationPermission(messaging);
 
     if (token) {
-      await saveFCMToken(userId, token);
+      if (deviceId) {
+        await saveFCMDeviceToken(userId, deviceId, token, deviceInfo);
+      } else {
+        await saveFCMToken(userId, token);
+      }
       return token;
     }
 

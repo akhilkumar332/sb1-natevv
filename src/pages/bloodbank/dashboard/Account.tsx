@@ -61,7 +61,6 @@ function BloodBankAccount() {
           ...(user.notificationPreferences || {}),
           push: false,
         },
-        fcmTokens: [],
         updatedAt: serverTimestamp(),
       });
     }

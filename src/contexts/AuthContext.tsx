@@ -39,6 +39,7 @@ import { auth, db, googleProvider } from '../firebase';
 import { getMessaging } from 'firebase/messaging';
 import { initializeFCM } from '../services/notification.service';
 import { generateBhId } from '../utils/bhId';
+import { getDeviceId, getDeviceInfo } from '../utils/device';
 import { normalizePhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
 import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../services/referral.service';
@@ -569,11 +570,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const hasTokens = Array.isArray(user.fcmTokens) && user.fcmTokens.length > 0;
-        if (hasTokens) {
-          return;
-        }
-
+        const deviceId = getDeviceId();
+        const deviceInfo = getDeviceInfo();
         const storedToken = (() => {
           try {
             return localStorage.getItem('fcmToken');
@@ -583,16 +581,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })();
 
         if (storedToken) {
-          await updateDoc(doc(db, 'users', user.uid), {
+          const updatePayload: Record<string, any> = {
             fcmTokens: arrayUnion(storedToken),
             lastTokenUpdate: serverTimestamp(),
-          });
+          };
+          if (deviceId) {
+            updatePayload[`fcmDeviceTokens.${deviceId}`] = storedToken;
+            updatePayload[`fcmDeviceDetails.${deviceId}`] = {
+              token: storedToken,
+              info: deviceInfo || {},
+              updatedAt: serverTimestamp(),
+            };
+          }
+          await updateDoc(doc(db, 'users', user.uid), updatePayload);
           return;
         }
 
         if (Notification.permission === 'granted') {
           const messaging = getMessaging();
-          const token = await initializeFCM(user.uid, messaging);
+          const token = await initializeFCM(user.uid, messaging, deviceId, deviceInfo);
           if (token) {
             try {
               localStorage.setItem('fcmToken', token);

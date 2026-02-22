@@ -10,8 +10,10 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   initializeFCM,
   deleteFCMToken,
+  removeFCMDeviceToken,
   removeFCMToken,
 } from '../services/notification.service';
+import { getDeviceId, getDeviceInfo } from '../utils/device';
 
 // ============================================================================
 // PUSH NOTIFICATIONS HOOK
@@ -37,6 +39,8 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
   const [error, setError] = useState<Error | null>(null);
   const [messaging, setMessaging] = useState<Messaging | null>(null);
   const tokenStorageKey = 'fcmToken';
+  const deviceId = getDeviceId();
+  const deviceInfo = getDeviceInfo();
   const readStoredToken = () => {
     try {
       return localStorage.getItem(tokenStorageKey);
@@ -80,7 +84,7 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
     setError(null);
 
     try {
-      const fcmToken = await initializeFCM(user.uid, messaging);
+      const fcmToken = await initializeFCM(user.uid, messaging, deviceId, deviceInfo);
 
       if (fcmToken) {
         setToken(fcmToken);
@@ -116,7 +120,11 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
     setError(null);
 
     try {
-      await removeFCMToken(user.uid, tokenToRemove);
+      if (deviceId) {
+        await removeFCMDeviceToken(user.uid, deviceId, tokenToRemove);
+      } else {
+        await removeFCMToken(user.uid, tokenToRemove);
+      }
       await deleteFCMToken(messaging);
       setToken(null);
       try {
