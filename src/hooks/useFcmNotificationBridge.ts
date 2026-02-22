@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import { useForegroundMessages } from './usePushNotifications';
 import { getQueuedFcmMessages, removeQueuedFcmMessages } from '../utils/fcmQueue';
 import { saveFcmNotification } from '../services/fcmNotification.service';
+import { sendFcmToBridge } from '../services/fcmBridge.service';
+import { useAuth } from '../contexts/AuthContext';
 
 const SUPPORTED_ROLES = new Set(['donor', 'ngo', 'bloodbank']);
 
@@ -14,15 +15,21 @@ export const useFcmNotificationBridge = () => {
   const canBridge = Boolean(user?.uid && isSupportedRole);
 
   useForegroundMessages({
-    enabled: canBridge,
+    enabled: true,
     onMessage: async (payload) => {
-      if (!user?.uid) return;
       const targetUserId = payload?.data?.userId;
-      if (targetUserId && targetUserId !== user.uid) return;
+      if (user?.uid && targetUserId && targetUserId !== user.uid) return;
       try {
-        await saveFcmNotification(user.uid, user.role || 'donor', payload);
+        if (user?.uid && isSupportedRole) {
+          await saveFcmNotification(user.uid, user.role || 'donor', payload);
+        } else if (targetUserId) {
+          await sendFcmToBridge(payload);
+        }
       } catch (error) {
         console.warn('Failed to persist foreground FCM notification:', error);
+        if (targetUserId) {
+          await sendFcmToBridge(payload);
+        }
       }
     },
   });
@@ -48,6 +55,7 @@ export const useFcmNotificationBridge = () => {
           idsToRemove.push(entry.id);
         } catch (error) {
           console.warn('Failed to persist queued FCM notification:', error);
+          await sendFcmToBridge(payload);
         }
       }
       await removeQueuedFcmMessages(idsToRemove);

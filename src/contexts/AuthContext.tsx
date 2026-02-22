@@ -28,6 +28,7 @@ import {
   setDoc, 
   getDoc, 
   updateDoc, 
+  arrayUnion,
   serverTimestamp, 
   DocumentReference,
   DocumentSnapshot,
@@ -36,7 +37,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { getMessaging } from 'firebase/messaging';
-import { deleteFCMToken, removeFCMToken, initializeFCM } from '../services/notification.service';
+import { initializeFCM } from '../services/notification.service';
 import { generateBhId } from '../utils/bhId';
 import { normalizePhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
@@ -523,15 +524,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const enablePushOnLogin = async () => {
       try {
-        if (!user.notificationPreferences || user.notificationPreferences.push !== true) {
-          await updateDoc(doc(db, 'users', user.uid), {
-            notificationPreferences: {
-              ...(user.notificationPreferences || {}),
-              push: true,
-            },
-            updatedAt: serverTimestamp(),
-          });
+        if (user.notificationPreferences?.push === false) {
+          return;
         }
+
+        const hasTokens = Array.isArray(user.fcmTokens) && user.fcmTokens.length > 0;
+        if (hasTokens) {
+          return;
+        }
+
+        const storedToken = (() => {
+          try {
+            return localStorage.getItem('fcmToken');
+          } catch {
+            return null;
+          }
+        })();
+
+        if (storedToken) {
+          await updateDoc(doc(db, 'users', user.uid), {
+            fcmTokens: arrayUnion(storedToken),
+            lastTokenUpdate: serverTimestamp(),
+          });
+          return;
+        }
+
         if (Notification.permission === 'granted') {
           const messaging = getMessaging();
           const token = await initializeFCM(user.uid, messaging);
@@ -544,7 +561,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (error) {
-        console.warn('Failed to enable push on login:', error);
+        console.warn('Failed to ensure push token on login:', error);
       }
     };
 
@@ -1548,35 +1565,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleLogout = async () => {
     let signOutFailed = false;
-    try {
-      const storedToken = (() => {
-        try {
-          return localStorage.getItem('fcmToken');
-        } catch {
-          return null;
-        }
-      })();
-      if (storedToken && user?.uid) {
-        try {
-          await removeFCMToken(user.uid, storedToken);
-        } catch (error) {
-          console.warn('Failed to remove FCM token from user profile:', error);
-        }
-        try {
-          const messaging = getMessaging();
-          await deleteFCMToken(messaging);
-        } catch (error) {
-          console.warn('Failed to delete FCM token locally:', error);
-        }
-        try {
-          localStorage.removeItem('fcmToken');
-        } catch {
-          // ignore
-        }
-      }
-    } catch (error) {
-      console.warn('FCM logout cleanup failed:', error);
-    }
 
     try {
       // Clear user state early so dashboards unmount listeners before sign-out.
