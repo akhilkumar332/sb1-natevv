@@ -5,6 +5,12 @@
   "start_url": "/bloodbank/login",
   "scope": "/bloodbank/",
   "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
   "background_color": "#f0fdf4",
   "theme_color": "#16a34a",
   "icons": [
@@ -18,7 +24,34 @@
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Blood Bank Dashboard (Desktop)"
+    },
+    {
+      "src": "/screenshots/mobile.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "label": "Blood Bank Dashboard (Mobile)"
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+bloodhub",
+      "url": "/bloodbank/dashboard?protocol=%s"
     }
   ],
   "shortcuts": [

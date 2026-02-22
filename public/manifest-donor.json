@@ -5,6 +5,12 @@
   "start_url": "/donor/login",
   "scope": "/donor/",
   "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
   "background_color": "#fff5f5",
   "theme_color": "#dc2626",
   "icons": [
@@ -18,7 +24,34 @@
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Donor Dashboard (Desktop)"
+    },
+    {
+      "src": "/screenshots/mobile.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "label": "Donor Dashboard (Mobile)"
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+bloodhub",
+      "url": "/donor/dashboard?protocol=%s"
     }
   ],
   "shortcuts": [

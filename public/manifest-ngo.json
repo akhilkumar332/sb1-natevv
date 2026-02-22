@@ -5,6 +5,12 @@
   "start_url": "/ngo/login",
   "scope": "/ngo/",
   "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
   "background_color": "#eff6ff",
   "theme_color": "#2563eb",
   "icons": [
@@ -18,7 +24,34 @@
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "NGO Dashboard (Desktop)"
+    },
+    {
+      "src": "/screenshots/mobile.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "label": "NGO Dashboard (Mobile)"
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+bloodhub",
+      "url": "/ngo/dashboard?protocol=%s"
     }
   ],
   "shortcuts": [
