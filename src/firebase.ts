@@ -24,7 +24,6 @@ googleProvider.setCustomParameters({
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
   experimentalAutoDetectLongPolling: true,
-  useFetchStreams: false,
 });
 
 export default app;
