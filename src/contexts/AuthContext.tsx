@@ -490,6 +490,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleOnline = () => {
+      if (!userRef.current?.uid) return;
+      enableNetwork(db)
+        .then(() => {
+          firestoreNetworkDisabledRef.current = false;
+        })
+        .catch((error) => {
+          console.warn('Failed to re-enable Firestore network (online):', error);
+        });
+    };
+
+    const handleOffline = () => {
+      if (!userRef.current?.uid) return;
+      disableNetwork(db)
+        .then(() => {
+          firestoreNetworkDisabledRef.current = true;
+        })
+        .catch((error) => {
+          console.warn('Failed to disable Firestore network (offline):', error);
+        });
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    if (navigator.onLine) {
+      handleOnline();
+    } else {
+      handleOffline();
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!user?.uid) return;
     if (!firestoreNetworkDisabledRef.current) return;
     enableNetwork(db)
