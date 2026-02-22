@@ -17,6 +17,8 @@ import {
   arrayRemove,
   Timestamp,
   deleteField,
+  runTransaction,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Notification as NotificationData, Coordinates, NotificationType, NotificationPriority } from '../types/database.types';
@@ -157,14 +159,31 @@ export const saveFCMDeviceToken = async (
     const detailsPayload = {
       token,
       info: deviceInfo || {},
-      updatedAt: Timestamp.now(),
+      updatedAt: serverTimestamp(),
     };
-    await updateDoc(userRef, {
-      fcmTokens: arrayUnion(token),
-      lastTokenUpdate: Timestamp.now(),
-      [`fcmDeviceTokens.${deviceId}`]: token,
-      [`fcmDeviceDetails.${deviceId}`]: detailsPayload,
-    } as any);
+    await runTransaction(db, async (tx) => {
+      const snapshot = await tx.get(userRef);
+      const existingToken = snapshot.exists()
+        ? (snapshot.data() as any)?.fcmDeviceTokens?.[deviceId]
+        : undefined;
+
+      if (existingToken && existingToken !== token) {
+        tx.update(userRef, {
+          fcmTokens: arrayRemove(existingToken),
+        });
+      }
+
+      tx.set(
+        userRef,
+        {
+          fcmTokens: arrayUnion(token),
+          lastTokenUpdate: serverTimestamp(),
+          [`fcmDeviceTokens.${deviceId}`]: token,
+          [`fcmDeviceDetails.${deviceId}`]: detailsPayload,
+        },
+        { merge: true }
+      );
+    });
   } catch (error) {
     throw new DatabaseError('Failed to save FCM token');
   }

@@ -37,7 +37,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { getMessaging } from 'firebase/messaging';
-import { initializeFCM } from '../services/notification.service';
+import { initializeFCM, saveFCMDeviceToken } from '../services/notification.service';
 import { generateBhId } from '../utils/bhId';
 import { getDeviceId, getDeviceInfo } from '../utils/device';
 import { normalizePhoneNumber } from '../utils/phone';
@@ -581,19 +581,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })();
 
         if (storedToken) {
-          const updatePayload: Record<string, any> = {
-            fcmTokens: arrayUnion(storedToken),
-            lastTokenUpdate: serverTimestamp(),
-          };
           if (deviceId) {
-            updatePayload[`fcmDeviceTokens.${deviceId}`] = storedToken;
-            updatePayload[`fcmDeviceDetails.${deviceId}`] = {
-              token: storedToken,
-              info: deviceInfo || {},
-              updatedAt: serverTimestamp(),
-            };
+            await saveFCMDeviceToken(user.uid, deviceId, storedToken, deviceInfo);
+          } else {
+            await updateDoc(doc(db, 'users', user.uid), {
+              fcmTokens: arrayUnion(storedToken),
+              lastTokenUpdate: serverTimestamp(),
+            });
           }
-          await updateDoc(doc(db, 'users', user.uid), updatePayload);
           return;
         }
 
