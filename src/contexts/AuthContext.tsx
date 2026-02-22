@@ -92,6 +92,7 @@ interface User {
   preferredLanguage?: string;
   howHeardAboutUs?: string;
   interestedInVolunteering?: boolean;
+  fcmTokens?: string[];
   organizationName?: string;
   registrationNumber?: string;
   ngoType?: string;
