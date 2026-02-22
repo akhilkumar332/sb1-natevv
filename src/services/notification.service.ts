@@ -54,11 +54,26 @@ const ensureMessagingServiceWorker = async () => {
   }
   const scope = '/firebase-cloud-messaging-push-scope';
   try {
-    let registration = await navigator.serviceWorker.getRegistration(scope);
+    const isFcmRegistration = (registration: ServiceWorkerRegistration) => {
+      const worker = registration.active || registration.waiting || registration.installing;
+      return Boolean(worker && worker.scriptURL && worker.scriptURL.includes('/firebase-messaging-sw.js'));
+    };
+
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    let registration = registrations.find(isFcmRegistration) || null;
+
     if (!registration) {
+      registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope });
+    } else if (registration.scope && !registration.scope.endsWith('/firebase-cloud-messaging-push-scope/')) {
+      // Re-register with the expected scope if we somehow picked up a mismatched registration.
       registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope });
     }
     if (registration) {
+      try {
+        await registration.update();
+      } catch {
+        // ignore update failures
+      }
       await waitForServiceWorkerActivation(registration);
     }
     return registration || null;
