@@ -198,7 +198,7 @@ function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: 
   const handleReturnToPicker = () => {
     const targetPortal = currentPortal && currentPortal !== 'admin' ? currentPortal : 'admin';
     if (isImpersonating) {
-      stopImpersonation();
+      void stopImpersonation();
     }
     setPortalRole(null);
     setIsOpen(false);
@@ -395,7 +395,7 @@ function MobileUserMenu({
   const handleReturnToPicker = () => {
     const targetPortal = resolvedPortal && resolvedPortal !== 'admin' ? resolvedPortal : 'admin';
     if (isImpersonating) {
-      stopImpersonation();
+      void stopImpersonation();
     }
     setPortalRole(null);
     if (onClose) onClose();
@@ -514,7 +514,7 @@ const Navbar: React.FC = () => {
     portalRole,
     setPortalRole,
     isImpersonating,
-    impersonatedUser,
+    impersonationSession,
     stopImpersonation,
   } = useAuth();
   const navigate = useNavigate();
@@ -664,25 +664,22 @@ const Navbar: React.FC = () => {
         </div>
       </nav>
 
-      {isSuperAdmin && isImpersonating && impersonatedUser && (
+      {isImpersonating && impersonationSession && (
         <div className="border-b border-amber-200 bg-amber-50">
           <div className="container mx-auto px-4 py-2 text-xs font-medium text-amber-900 sm:text-sm flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <span>
               You are impersonating{' '}
               <span className="font-semibold">
-                {impersonatedUser.displayName || impersonatedUser.email || 'User'}
-              </span>{' '}
-              ({impersonatedUser.role || 'user'}).
+                {impersonationSession.targetDisplayName || impersonationSession.targetEmail || 'User'}
+              </span>
+              {impersonationSession.targetRole ? ` (${impersonationSession.targetRole})` : '.'}
             </span>
             <button
-              onClick={stopImpersonation}
+              onClick={() => void stopImpersonation()}
               className="self-start sm:self-auto rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-900 transition hover:bg-amber-200"
             >
               Stop impersonation
             </button>
-          </div>
-          <div className="container mx-auto px-4 pb-2 text-[11px] text-amber-700">
-            Note: Some owner-only features may not work in UI-level impersonation.
           </div>
         </div>
       )}

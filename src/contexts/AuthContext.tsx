@@ -1,5 +1,5 @@
 // src/contexts/AuthContext.tsx
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { NavigateFunction } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -12,6 +12,7 @@ import {
   ConfirmationResult,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInWithCustomToken,
   sendPasswordResetEmail,
   updateProfile,
   sendEmailVerification,
@@ -39,16 +40,27 @@ import {
 import { auth, db, googleProvider } from '../firebase';
 import { getMessaging } from 'firebase/messaging';
 import { initializeFCM, saveFCMDeviceToken } from '../services/notification.service';
+import { requestImpersonation, requestImpersonationResume } from '../services/impersonation.service';
 import { generateBhId } from '../utils/bhId';
 import { getDeviceId, getDeviceInfo } from '../utils/device';
 import { normalizePhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
 import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../services/referral.service';
 import { logAuditEvent } from '../services/audit.service';
-import { monitoringService } from '../services/monitoring.service';
 import { clearReferralTracking, getReferralReferrerUid, getReferralTracking } from '../utils/referralTracking';
 import { buildPublicDonorPayload } from '../utils/publicDonor';
 import { PhoneAuthError } from '../errors/PhoneAuthError';
+import { authStorage } from '../utils/authStorage';
+
+const trackImpersonationEvent = (eventName: string, params?: Record<string, any>) => {
+  void import('../services/monitoring.service')
+    .then(({ monitoringService }) => {
+      monitoringService.trackEvent(eventName, params);
+    })
+    .catch(() => {
+      // ignore analytics failures
+    });
+};
 
 // Define window recaptcha type
 declare global {
@@ -160,6 +172,26 @@ const normalizeUserDate = (value?: any): Date | null => {
 
 type PortalRole = 'donor' | 'ngo' | 'bloodbank' | 'admin';
 
+type ImpersonationTarget = {
+  uid: string;
+  role?: User['role'] | null;
+  email?: string | null;
+  displayName?: string | null;
+  status?: User['status'] | null;
+};
+
+type ImpersonationSession = {
+  actorUid: string;
+  targetUid: string;
+  targetRole?: User['role'] | null;
+  targetEmail?: string | null;
+  targetDisplayName?: string | null;
+  resumeToken: string;
+  basePortalRole: PortalRole | null;
+  startedAt: number;
+  status?: 'starting' | 'active' | 'stopping';
+};
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -187,10 +219,10 @@ interface AuthContextType {
   setPortalRole: (role: PortalRole | null) => void;
   effectiveRole: User['role'] | null;
   isSuperAdmin: boolean;
-  impersonatedUser: User | null;
+  impersonationSession: ImpersonationSession | null;
   isImpersonating: boolean;
-  startImpersonation: (target: Pick<User, 'uid'> | User) => Promise<User | null>;
-  stopImpersonation: () => void;
+  startImpersonation: (target: Pick<User, 'uid'> | User) => Promise<ImpersonationTarget | null>;
+  stopImpersonation: () => Promise<void>;
   profileResolved: boolean;
 }
 
@@ -204,7 +236,6 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const pendingPhoneLinkKey = 'pendingPhoneLink';
 const portalRoleStorageKey = 'bh_superadmin_portal_role';
 const impersonationStorageKey = 'bh_superadmin_impersonation';
-const impersonationPortalRoleStorageKey = 'bh_superadmin_impersonation_portal_role';
 const userCacheKey = 'bh_user_cache';
 const userCacheAtKey = 'bh_user_cache_at';
 const userCacheTtlMs = 24 * 60 * 60 * 1000;
@@ -263,27 +294,51 @@ const hydrateCachedUser = (raw: any): User => ({
     : undefined,
 });
 
-const readImpersonatedUser = (): User | null => {
+const readImpersonationSession = (): ImpersonationSession | null => {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = sessionStorage.getItem(impersonationStorageKey);
+    const raw = localStorage.getItem(impersonationStorageKey)
+      ?? sessionStorage.getItem(impersonationStorageKey);
     if (!raw) return null;
-    return hydrateCachedUser(JSON.parse(raw));
+    const parsed = JSON.parse(raw) as ImpersonationSession;
+    if (!parsed?.actorUid || !parsed?.targetUid || !parsed?.resumeToken) {
+      return null;
+    }
+    const status = parsed.status === 'starting' || parsed.status === 'stopping'
+      ? parsed.status
+      : 'active';
+    return {
+      ...parsed,
+      status,
+      basePortalRole: isPortalRole(parsed.basePortalRole) ? parsed.basePortalRole : null,
+      startedAt: typeof parsed.startedAt === 'number' ? parsed.startedAt : Date.now(),
+    };
   } catch {
     return null;
   }
 };
 
-const readImpersonationPortalRole = (): { role: PortalRole | null; hasValue: boolean } => {
-  if (typeof window === 'undefined') return { role: null, hasValue: false };
+const persistImpersonationSession = (session: ImpersonationSession | null) => {
+  if (typeof window === 'undefined') return;
   try {
-    const raw = sessionStorage.getItem(impersonationPortalRoleStorageKey);
-    if (!raw) return { role: null, hasValue: false };
-    const parsed = JSON.parse(raw) as { role?: string | null };
-    const role = isPortalRole(parsed?.role) ? parsed.role : null;
-    return { role, hasValue: true };
+    if (session) {
+      const raw = JSON.stringify(session);
+      localStorage.setItem(impersonationStorageKey, raw);
+      sessionStorage.setItem(impersonationStorageKey, raw);
+    } else {
+      localStorage.removeItem(impersonationStorageKey);
+      sessionStorage.removeItem(impersonationStorageKey);
+    }
   } catch {
-    return { role: null, hasValue: false };
+    try {
+      if (session) {
+        sessionStorage.setItem(impersonationStorageKey, JSON.stringify(session));
+      } else {
+        sessionStorage.removeItem(impersonationStorageKey);
+      }
+    } catch {
+      // ignore storage errors
+    }
   }
 };
 
@@ -385,31 +440,6 @@ const normalizeEligibilityChecklist = (checklist: any) => {
     rested: Boolean(checklist.rested),
     ateMeal: Boolean(checklist.ateMeal),
     ...(updatedAt ? { updatedAt } : {}),
-  };
-};
-
-const normalizeImpersonationUser = (docId: string, data: Record<string, any>): User => {
-  const baseUser: User = {
-    uid: data.uid || docId,
-    email: data.email ?? null,
-    displayName: data.displayName ?? data.name ?? null,
-    photoURL: data.photoURL ?? null,
-    phoneNumber: data.phoneNumber ?? data.phone ?? null,
-    phoneNumberNormalized: data.phoneNumberNormalized,
-    role: data.role ?? 'donor',
-    status: data.status ?? 'active',
-    verified: data.verified ?? false,
-    ...data,
-  };
-
-  return {
-    ...baseUser,
-    createdAt: convertTimestampToDate(baseUser.createdAt),
-    lastLoginAt: convertTimestampToDate(baseUser.lastLoginAt),
-    lastDonation: convertTimestampToDate(baseUser.lastDonation),
-    dateOfBirth: convertTimestampToDate(baseUser.dateOfBirth),
-    availableUntil: baseUser.availableUntil ? convertTimestampToDate(baseUser.availableUntil) || null : null,
-    eligibilityChecklist: normalizeEligibilityChecklist(baseUser.eligibilityChecklist),
   };
 };
 
@@ -560,12 +590,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authLoading, setAuthLoading] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [portalRoleState, setPortalRoleState] = useState<PortalRole | null>(readPortalRole);
-  const [impersonatedUser, setImpersonatedUser] = useState<User | null>(readImpersonatedUser);
-  const impersonationPortalState = useRef(readImpersonationPortalRole());
-  const [impersonationBasePortalRole, setImpersonationBasePortalRole] = useState<PortalRole | null>(
-    impersonationPortalState.current.role
+  const [impersonationSession, setImpersonationSession] = useState<ImpersonationSession | null>(
+    readImpersonationSession
   );
-  const impersonationBasePortalRoleSetRef = useRef(impersonationPortalState.current.hasValue);
   const [profileResolved, setProfileResolved] = useState(!initialCachedUser);
   const logoutChannel = new BroadcastChannel('auth_logout');
   const referralApplyAttemptedRef = useRef(false);
@@ -575,6 +602,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const profileRetryTimeoutRef = useRef<number | null>(null);
   const pushInitRef = useRef<string | null>(null);
   const firestoreNetworkDisabledRef = useRef(false);
+  const updateImpersonationSession = useCallback((session: ImpersonationSession | null) => {
+    setImpersonationSession(session);
+    persistImpersonationSession(session);
+  }, []);
 
   const logProfileIssue = (label: string, error: unknown, context?: Record<string, unknown>) => {
     const err = error as any;
@@ -621,11 +652,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const startImpersonation = async (target: Pick<User, 'uid'> | User): Promise<User | null> => {
+  const startImpersonation = async (
+    target: Pick<User, 'uid'> | User
+  ): Promise<ImpersonationTarget | null> => {
     const actor = userRef.current;
     if (!actor || actor.role !== 'superadmin') {
       toast.error('Only superadmins can impersonate users.');
-      monitoringService.trackEvent('impersonation_denied', {
+      trackImpersonationEvent('impersonation_denied', {
         reason: 'not_superadmin',
       });
       return null;
@@ -634,90 +667,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const targetUid = target?.uid;
     if (!targetUid) {
       toast.error('Unable to resolve the selected user.');
-      monitoringService.trackEvent('impersonation_denied', {
+      trackImpersonationEvent('impersonation_denied', {
         reason: 'missing_target_uid',
       });
       return null;
     }
 
     try {
-      if (!impersonationBasePortalRoleSetRef.current) {
-        const payload = { role: portalRoleState ?? null };
-        impersonationBasePortalRoleSetRef.current = true;
-        setImpersonationBasePortalRole(payload.role);
-        if (typeof window !== 'undefined') {
-          try {
-            sessionStorage.setItem(impersonationPortalRoleStorageKey, JSON.stringify(payload));
-          } catch {
-            // ignore storage errors
-          }
+      const response = await requestImpersonation(targetUid);
+      const targetUser = response?.targetUser;
+      if (!response?.targetToken || !response?.resumeToken || !targetUser?.uid) {
+        toast.error('Impersonation failed. Please try again.');
+        trackImpersonationEvent('impersonation_failed', {
+          reason: 'missing_token',
+          targetUid,
+        });
+        return null;
+      }
+
+      const session: ImpersonationSession = {
+        actorUid: actor.uid,
+        targetUid: targetUser.uid,
+        targetRole: targetUser.role ?? null,
+        targetEmail: targetUser.email ?? null,
+        targetDisplayName: targetUser.displayName ?? null,
+        resumeToken: response.resumeToken,
+        basePortalRole: portalRoleState ?? null,
+        startedAt: Date.now(),
+        status: 'starting',
+      };
+      updateImpersonationSession(session);
+
+      await signInWithCustomToken(auth, response.targetToken);
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        if (idToken) {
+          authStorage.setAuthToken(idToken);
         }
+      } catch {
+        // ignore token refresh errors
       }
 
-      const targetRef = doc(db, 'users', targetUid);
-      const snapshot = await getUserDocSnapshot(targetRef);
-      if (!snapshot.exists()) {
-        toast.error('User not found.');
-        monitoringService.trackEvent('impersonation_denied', {
-          reason: 'not_found',
-          targetUid,
-        });
-        return null;
-      }
-
-      const data = snapshot.data();
-      if ((data?.role || 'donor') === 'superadmin') {
-        toast.error('Cannot impersonate a superadmin.');
-        monitoringService.trackEvent('impersonation_denied', {
-          reason: 'target_superadmin',
-          targetUid,
-        });
-        return null;
-      }
-      if (data?.status === 'deleted') {
-        toast.error('Cannot impersonate a deleted user.');
-        monitoringService.trackEvent('impersonation_denied', {
-          reason: 'target_deleted',
-          targetUid,
-        });
-        return null;
-      }
-
-      const normalizedUser = normalizeImpersonationUser(snapshot.id, data || {});
-      setImpersonatedUser(normalizedUser);
-      if (typeof window !== 'undefined') {
-        try {
-          sessionStorage.setItem(
-            impersonationStorageKey,
-            JSON.stringify(serializeUserForCache(normalizedUser))
-          );
-        } catch {
-          // ignore storage errors
-        }
-      }
-
-      void logAuditEvent({
+      trackImpersonationEvent('impersonation_start', {
         actorUid: actor.uid,
         actorRole: actor.role || 'superadmin',
-        action: 'impersonation_start',
-        targetUid: normalizedUser.uid,
-        metadata: {
-          targetRole: normalizedUser.role ?? null,
-          targetEmail: normalizedUser.email ?? null,
-        },
-      });
-      monitoringService.trackEvent('impersonation_start', {
-        actorUid: actor.uid,
-        actorRole: actor.role || 'superadmin',
-        targetUid: normalizedUser.uid,
-        targetRole: normalizedUser.role ?? null,
+        targetUid: targetUser.uid,
+        targetRole: targetUser.role ?? null,
       });
 
-      return normalizedUser;
-    } catch (error) {
+      return targetUser;
+    } catch (error: any) {
       console.error('Failed to start impersonation:', error);
-      toast.error('Failed to start impersonation.');
-      monitoringService.trackEvent('impersonation_failed', {
+      toast.error(error?.message || 'Failed to start impersonation.');
+      updateImpersonationSession(null);
+      trackImpersonationEvent('impersonation_failed', {
         reason: 'exception',
         targetUid,
       });
@@ -725,52 +728,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const stopImpersonation = () => {
-    const actor = userRef.current;
-    const target = impersonatedUser;
-    setImpersonatedUser(null);
-    if (typeof window !== 'undefined') {
+  const shouldRefreshResumeToken = (error: any) => {
+    const code = error?.code;
+    return code === 'auth/invalid-custom-token'
+      || code === 'auth/custom-token-mismatch'
+      || code === 'auth/invalid-credential';
+  };
+
+  const stopImpersonation = async () => {
+    const session = impersonationSession;
+    if (!session?.resumeToken) {
+      toast.error('Unable to resume admin session.');
+      trackImpersonationEvent('impersonation_failed', {
+        reason: 'missing_resume_token',
+      });
+      return;
+    }
+
+    const attemptResume = async (resumeToken: string) => {
+      await signInWithCustomToken(auth, resumeToken);
       try {
-        sessionStorage.removeItem(impersonationStorageKey);
-      } catch {
-        // ignore storage errors
-      }
-    }
-
-    if (impersonationBasePortalRoleSetRef.current) {
-      const restoreRole = impersonationBasePortalRole ?? null;
-      setPortalRole(restoreRole);
-      impersonationBasePortalRoleSetRef.current = false;
-      setImpersonationBasePortalRole(null);
-      if (typeof window !== 'undefined') {
-        try {
-          sessionStorage.removeItem(impersonationPortalRoleStorageKey);
-        } catch {
-          // ignore storage errors
+        const idToken = await auth.currentUser?.getIdToken();
+        if (idToken) {
+          authStorage.setAuthToken(idToken);
         }
+      } catch {
+        // ignore token refresh errors
       }
-    } else if (portalRoleState) {
-      setPortalRole(null);
+    };
+
+    const stoppingSession: ImpersonationSession = {
+      ...session,
+      status: 'stopping',
+    };
+    updateImpersonationSession(stoppingSession);
+
+    try {
+      await attemptResume(stoppingSession.resumeToken);
+    } catch (error) {
+      if (!shouldRefreshResumeToken(error)) {
+        console.error('Failed to resume admin session:', error);
+        toast.error('Failed to resume admin session.');
+        trackImpersonationEvent('impersonation_failed', {
+          reason: 'resume_failed',
+        });
+        updateImpersonationSession({ ...session, status: 'active' });
+        return;
+      }
+
+      try {
+        const refreshed = await requestImpersonationResume();
+        if (!refreshed?.resumeToken) {
+          throw new Error('Missing refreshed resume token.');
+        }
+        const refreshedSession: ImpersonationSession = {
+          ...stoppingSession,
+          resumeToken: refreshed.resumeToken,
+        };
+        updateImpersonationSession(refreshedSession);
+        await attemptResume(refreshed.resumeToken);
+        trackImpersonationEvent('impersonation_resume_refresh', {
+          actorUid: session.actorUid,
+          targetUid: session.targetUid,
+        });
+      } catch (refreshError) {
+        console.error('Failed to resume admin session:', refreshError);
+        toast.error('Failed to resume admin session.');
+        trackImpersonationEvent('impersonation_failed', {
+          reason: 'resume_refresh_failed',
+        });
+        updateImpersonationSession({ ...session, status: 'active' });
+        return;
+      }
     }
 
-    if (actor?.uid && target?.uid) {
-      void logAuditEvent({
-        actorUid: actor.uid,
-        actorRole: actor.role || 'superadmin',
-        action: 'impersonation_stop',
-        targetUid: target.uid,
-        metadata: {
-          targetRole: target.role ?? null,
-          targetEmail: target.email ?? null,
-        },
-      });
-      monitoringService.trackEvent('impersonation_stop', {
-        actorUid: actor.uid,
-        actorRole: actor.role || 'superadmin',
-        targetUid: target.uid,
-        targetRole: target.role ?? null,
-      });
-    }
+    trackImpersonationEvent('impersonation_stop', {
+      actorUid: session.actorUid,
+      targetUid: session.targetUid,
+      targetRole: session.targetRole ?? null,
+    });
   };
 
   useEffect(() => {
@@ -780,36 +816,87 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return;
     }
-    if (user.role !== 'superadmin' && portalRoleState !== null) {
+    if (impersonationSession) {
+      return;
+    }
+    if (user.role && user.role !== 'superadmin' && portalRoleState !== null) {
       setPortalRole(null);
     }
-  }, [portalRoleState, user?.role, user?.uid]);
+  }, [impersonationSession, portalRoleState, user?.role, user?.uid]);
 
   useEffect(() => {
-    if (!user?.uid || user.role !== 'superadmin') {
-      if (impersonatedUser) {
-        setImpersonatedUser(null);
-        if (typeof window !== 'undefined') {
-          try {
-            sessionStorage.removeItem(impersonationStorageKey);
-          } catch {
-            // ignore storage errors
-          }
-        }
-      }
-      if (impersonationBasePortalRoleSetRef.current) {
-        impersonationBasePortalRoleSetRef.current = false;
-        setImpersonationBasePortalRole(null);
-        if (typeof window !== 'undefined') {
-          try {
-            sessionStorage.removeItem(impersonationPortalRoleStorageKey);
-          } catch {
-            // ignore storage errors
-          }
-        }
-      }
+    if (!impersonationSession) return;
+    if (!user?.uid) {
+      updateImpersonationSession(null);
+      return;
     }
-  }, [impersonatedUser, user?.role, user?.uid]);
+
+    if (user.uid === impersonationSession.targetUid) {
+      if (impersonationSession.status === 'starting') {
+        updateImpersonationSession({
+          ...impersonationSession,
+          status: 'active',
+        });
+      }
+      return;
+    }
+
+    if (user.uid === impersonationSession.actorUid) {
+      if (impersonationSession.status === 'starting') {
+        return;
+      }
+      setPortalRole(impersonationSession.basePortalRole ?? null);
+      updateImpersonationSession(null);
+      return;
+    }
+
+    updateImpersonationSession(null);
+  }, [impersonationSession, user?.uid, updateImpersonationSession]);
+
+  useEffect(() => {
+    if (!impersonationSession || !user?.uid) return;
+    if (user.uid !== impersonationSession.actorUid) return;
+    if (impersonationSession.status !== 'starting') return;
+
+    const thresholdMs = 15000;
+    const elapsed = Date.now() - impersonationSession.startedAt;
+    if (elapsed >= thresholdMs) {
+      updateImpersonationSession(null);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const latest = readImpersonationSession();
+      if (!latest || latest.status !== 'starting') return;
+      if (userRef.current?.uid !== latest.actorUid) return;
+      updateImpersonationSession(null);
+    }, thresholdMs - elapsed);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [impersonationSession, user?.uid, updateImpersonationSession]);
+
+  useEffect(() => {
+    if (!impersonationSession || !user?.uid) return;
+    if (user.uid !== impersonationSession.targetUid) return;
+    if (impersonationSession.status === 'starting') return;
+
+    let isActive = true;
+    auth.currentUser?.getIdTokenResult()
+      .then((result) => {
+        if (!isActive) return;
+        const claims = result?.claims as Record<string, any> | undefined;
+        if (claims?.impersonatedBy !== impersonationSession.actorUid) {
+          updateImpersonationSession(null);
+        }
+      })
+      .catch(() => {
+        // ignore token claim validation errors
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [impersonationSession, user?.uid, updateImpersonationSession]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1989,6 +2076,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('lastLoginTime');
       localStorage.removeItem(userCacheKey);
       localStorage.removeItem(userCacheAtKey);
+      localStorage.removeItem(impersonationStorageKey);
       // Optional: Clear any cached data
       indexedDB.deleteDatabase('firebaseLocalStorageDb');
     } catch (error) {
@@ -2004,9 +2092,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     navigate: NavigateFunction,
     options: { redirectTo?: string; showToast?: boolean } = {}
   ) => {
-    if (impersonatedUser) {
-      stopImpersonation();
-    }
+    updateImpersonationSession(null);
     const resolvedRole = user?.role === 'superadmin' ? portalRoleState : user?.role;
     const resolvedRedirect = options.redirectTo ?? (
       resolvedRole === 'ngo'
@@ -2055,9 +2141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       throw new Error('No user logged in');
     }
-    const actor = user;
-    const targetUser = actor.role === 'superadmin' && impersonatedUser ? impersonatedUser : user;
-    const isPrivileged = actor.role === 'admin' || actor.role === 'superadmin';
+    const isPrivileged = user.role === 'admin' || user.role === 'superadmin';
     const sanitizedData: Partial<User> = { ...data };
     if (!isPrivileged) {
       if (Object.prototype.hasOwnProperty.call(sanitizedData, 'role')) {
@@ -2069,15 +2153,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     console.log('Updating user profile with:', sanitizedData);
     try {
-      const nextDateOfBirth = sanitizedData.dateOfBirth ?? targetUser.dateOfBirth;
-      const nextPostalCode = sanitizedData.postalCode ?? targetUser.postalCode;
-      const existingBhId = targetUser.bhId;
+      const nextDateOfBirth = sanitizedData.dateOfBirth ?? user.dateOfBirth;
+      const nextPostalCode = sanitizedData.postalCode ?? user.postalCode;
+      const existingBhId = user.bhId;
       const generatedBhId = existingBhId
         ? null
         : generateBhId({
             dateOfBirth: nextDateOfBirth,
             postalCode: nextPostalCode || undefined,
-            uid: targetUser.uid
+            uid: user.uid
           });
 
       const phoneNumberNormalized = sanitizedData.phoneNumber
@@ -2085,7 +2169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         : undefined;
 
       await setDoc(
-        doc(db, 'users', targetUser.uid),
+        doc(db, 'users', user.uid),
         {
           ...sanitizedData,
           ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
@@ -2094,29 +2178,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
         { merge: true }
       );
-      if (isPrivileged && sanitizedData.role && sanitizedData.role !== targetUser.role) {
+      if (isPrivileged && sanitizedData.role && sanitizedData.role !== user.role) {
         void logAuditEvent({
-          actorUid: actor.uid,
-          actorRole: actor.role || 'admin',
+          actorUid: user.uid,
+          actorRole: user.role || 'admin',
           action: 'role_change',
-          targetUid: targetUser.uid,
+          targetUid: user.uid,
           metadata: {
-            from: targetUser.role ?? null,
+            from: user.role ?? null,
             to: sanitizedData.role,
             source: 'updateUserProfile',
           },
         });
       }
       const nextUser = {
-        ...targetUser,
+        ...user,
         ...sanitizedData,
         ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
         onboardingCompleted: true,
-        bhId: targetUser.bhId || generatedBhId || undefined
+        bhId: user.bhId || generatedBhId || undefined
       } as User;
 
-      const nextRole = sanitizedData.role ?? targetUser.role;
-      const nextStatus = sanitizedData.status ?? targetUser.status;
+      const nextRole = sanitizedData.role ?? user.role;
+      const nextStatus = sanitizedData.status ?? user.status;
       const nextOnboarding = sanitizedData.onboardingCompleted ?? true;
       const canPublishPublicDonor = nextRole === 'donor'
         && nextOnboarding === true
@@ -2125,7 +2209,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (canPublishPublicDonor) {
         try {
           await setDoc(
-            doc(db, 'publicDonors', targetUser.uid),
+            doc(db, 'publicDonors', user.uid),
             {
               ...buildPublicDonorPayload(nextUser),
               updatedAt: serverTimestamp(),
@@ -2137,34 +2221,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      if (actor.role === 'superadmin' && impersonatedUser) {
-        setImpersonatedUser(prev => {
-          if (!prev) return prev;
-          const next = {
-            ...prev,
-            ...sanitizedData,
-            ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
-            onboardingCompleted: true, // Ensure this is updated in the state
-            bhId: prev?.bhId || generatedBhId || undefined
-          } as User;
-          if (typeof window !== 'undefined') {
-            try {
-              sessionStorage.setItem(impersonationStorageKey, JSON.stringify(serializeUserForCache(next)));
-            } catch {
-              // ignore storage errors
-            }
-          }
-          return next;
-        });
-      } else {
-        setUser(prev => ({
-          ...prev,
-          ...sanitizedData,
-          ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
-          onboardingCompleted: true, // Ensure this is updated in the state
-          bhId: prev?.bhId || generatedBhId || undefined
-        } as User));
-      }
+      setUser(prev => ({
+        ...prev,
+        ...sanitizedData,
+        ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
+        onboardingCompleted: true, // Ensure this is updated in the state
+        bhId: prev?.bhId || generatedBhId || undefined
+      } as User));
     } catch (error) {
       console.error('Error updating user profile:', error);
       throw error; // Re-throw the error so the caller can handle it
@@ -2172,20 +2235,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isSuperAdmin = user?.role === 'superadmin';
-  const isImpersonating = isSuperAdmin && Boolean(impersonatedUser);
-  const effectiveRole = isImpersonating
-    ? impersonatedUser?.role
-    : isSuperAdmin
-      ? portalRoleState
-      : user?.role;
-  const effectiveUser = isImpersonating
-    ? impersonatedUser
-    : isSuperAdmin && portalRoleState && user
-      ? ({
-          ...user,
-          role: portalRoleState,
-        } as User)
-      : user;
+  const isImpersonating = Boolean(
+    impersonationSession && user?.uid && user.uid === impersonationSession.targetUid
+  );
+  const effectiveRole = isSuperAdmin ? portalRoleState : user?.role;
+  const effectiveUser = isSuperAdmin && portalRoleState && user
+    ? ({
+        ...user,
+        role: portalRoleState,
+      } as User)
+    : user;
 
   return (
     <AuthContext.Provider value={{
@@ -2215,7 +2274,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setPortalRole,
       effectiveRole: effectiveRole ?? null,
       isSuperAdmin,
-      impersonatedUser,
+      impersonationSession,
       isImpersonating,
       startImpersonation,
       stopImpersonation,

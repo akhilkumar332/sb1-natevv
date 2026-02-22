@@ -18,11 +18,11 @@ export function NgoLogin() {
     loginWithGoogle,
     logout,
     isSuperAdmin,
-    isImpersonating,
-    effectiveRole,
     setPortalRole,
     startImpersonation,
-    impersonatedUser,
+    impersonationSession,
+    isImpersonating,
+    effectiveRole,
     profileResolved,
   } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -47,16 +47,17 @@ export function NgoLogin() {
       return;
     }
 
-    if (isSuperAdmin) {
-      if (isImpersonating) {
-        const role = resolvePortalRole(effectiveRole ?? user.role ?? null);
-        if (role) {
-          hasRedirected.current = true;
-          setShowPortalModal(false);
-          navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
-          return;
-        }
+    if (isImpersonating) {
+      const role = resolvePortalRole(impersonationSession?.targetRole ?? user.role ?? null);
+      if (role) {
+        hasRedirected.current = true;
+        setShowPortalModal(false);
+        navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+        return;
       }
+    }
+
+    if (isSuperAdmin) {
       setShowPortalModal(true);
       return;
     }
@@ -69,7 +70,7 @@ export function NgoLogin() {
     const targetPath = user.onboardingCompleted ? '/ngo/dashboard' : '/ngo/onboarding';
     hasRedirected.current = true;
     navigate(targetPath);
-  }, [effectiveRole, isImpersonating, isSuperAdmin, navigate, profileResolved, user]);
+  }, [effectiveRole, impersonationSession?.targetRole, isImpersonating, isSuperAdmin, navigate, profileResolved, user]);
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
@@ -147,7 +148,6 @@ export function NgoLogin() {
             : resolved.role === 'admin'
               ? 'admin'
               : 'donor';
-    setPortalRole(role);
     hasRedirected.current = true;
     setShowPortalModal(false);
     navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
@@ -160,7 +160,13 @@ export function NgoLogin() {
         currentPortal="ngo"
         onSelect={handlePortalSelect}
         onImpersonate={handleImpersonate}
-        impersonationUser={impersonatedUser}
+        impersonationUser={impersonationSession
+          ? {
+              displayName: impersonationSession.targetDisplayName,
+              email: impersonationSession.targetEmail,
+              role: impersonationSession.targetRole ?? null,
+            }
+          : null}
       />
       {/* Left Side - Gradient Background with Info */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-amber-600 relative overflow-hidden">

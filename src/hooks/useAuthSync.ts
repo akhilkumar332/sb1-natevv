@@ -10,7 +10,7 @@ const CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes instead of every 
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 export const useAuthSync = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, impersonationSession } = useAuth();
   const navigate = useNavigate();
   const lastCheckRef = useRef(Date.now());
 
@@ -30,22 +30,33 @@ export const useAuthSync = () => {
 
       if (!authToken && user) {
         // Token is missing but user is logged in - try to recover token first
-        auth.currentUser?.getIdToken()
+        const tokenPromise = auth.currentUser?.getIdToken();
+        if (!tokenPromise) {
+          if (!impersonationSession) {
+            logout(navigate);
+          }
+          return;
+        }
+        tokenPromise
           .then((token) => {
             if (token) {
               authStorage.setAuthToken(token);
-            } else {
+            } else if (!impersonationSession) {
               logout(navigate);
             }
           })
-          .catch(() => logout(navigate));
+          .catch(() => {
+            if (!impersonationSession) {
+              logout(navigate);
+            }
+          });
         return;
       }
 
       if (lastLoginTime) {
         const timeElapsed = now - parseInt(lastLoginTime);
         // Force logout after 24 hours of inactivity
-        if (timeElapsed > SESSION_DURATION) {
+        if (timeElapsed > SESSION_DURATION && !impersonationSession) {
           logout(navigate);
         }
       }
@@ -70,5 +81,5 @@ export const useAuthSync = () => {
       clearInterval(intervalId);
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [user, navigate, logout]);
+  }, [user, navigate, logout, impersonationSession]);
 };

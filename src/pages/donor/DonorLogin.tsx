@@ -17,11 +17,11 @@ export function DonorLogin() {
   const {
     user,
     isSuperAdmin,
-    isImpersonating,
-    effectiveRole,
     setPortalRole,
     startImpersonation,
-    impersonatedUser,
+    impersonationSession,
+    isImpersonating,
+    effectiveRole,
     profileResolved,
   } = useAuth();
   const hasNavigated = useRef(false);
@@ -59,16 +59,17 @@ export function DonorLogin() {
       return;
     }
 
-    if (isSuperAdmin) {
-      if (isImpersonating) {
-        const role = resolvePortalRole(effectiveRole ?? user.role ?? null);
-        if (role) {
-          hasNavigated.current = true;
-          setShowPortalModal(false);
-          navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
-          return;
-        }
+    if (isImpersonating) {
+      const role = resolvePortalRole(impersonationSession?.targetRole ?? user.role ?? null);
+      if (role) {
+        hasNavigated.current = true;
+        setShowPortalModal(false);
+        navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+        return;
       }
+    }
+
+    if (isSuperAdmin) {
       setShowPortalModal(true);
       return;
     }
@@ -88,7 +89,7 @@ export function DonorLogin() {
     } else {
       navigate(`/donor/dashboard${pendingSearch}`);
     }
-  }, [effectiveRole, isImpersonating, isSuperAdmin, navigate, location.search, profileResolved, user]);
+  }, [effectiveRole, impersonationSession?.targetRole, isImpersonating, isSuperAdmin, navigate, location.search, profileResolved, user]);
 
   if (user && !profileResolved) {
     return (
@@ -131,7 +132,6 @@ export function DonorLogin() {
             : resolved.role === 'admin'
               ? 'admin'
               : 'donor';
-    setPortalRole(role);
     hasNavigated.current = true;
     setShowPortalModal(false);
     navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
@@ -248,7 +248,13 @@ export function DonorLogin() {
         currentPortal="donor"
         onSelect={handlePortalSelect}
         onImpersonate={handleImpersonate}
-        impersonationUser={impersonatedUser}
+        impersonationUser={impersonationSession
+          ? {
+              displayName: impersonationSession.targetDisplayName,
+              email: impersonationSession.targetEmail,
+              role: impersonationSession.targetRole ?? null,
+            }
+          : null}
       />
       {/* Left Side - Gradient Background with Info */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-red-800 relative overflow-hidden">

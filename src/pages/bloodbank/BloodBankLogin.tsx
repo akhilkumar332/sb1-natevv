@@ -18,11 +18,11 @@ export function BloodBankLogin() {
     loginWithGoogle,
     logout,
     isSuperAdmin,
-    isImpersonating,
-    effectiveRole,
     setPortalRole,
     startImpersonation,
-    impersonatedUser,
+    impersonationSession,
+    isImpersonating,
+    effectiveRole,
     profileResolved,
   } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -47,16 +47,17 @@ export function BloodBankLogin() {
       return;
     }
 
-    if (isSuperAdmin) {
-      if (isImpersonating) {
-        const role = resolvePortalRole(effectiveRole ?? user.role ?? null);
-        if (role) {
-          hasRedirected.current = true;
-          setShowPortalModal(false);
-          navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
-          return;
-        }
+    if (isImpersonating) {
+      const role = resolvePortalRole(impersonationSession?.targetRole ?? user.role ?? null);
+      if (role) {
+        hasRedirected.current = true;
+        setShowPortalModal(false);
+        navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+        return;
       }
+    }
+
+    if (isSuperAdmin) {
       setShowPortalModal(true);
       return;
     }
@@ -69,7 +70,7 @@ export function BloodBankLogin() {
     const targetPath = user.onboardingCompleted ? '/bloodbank/dashboard' : '/bloodbank/onboarding';
     hasRedirected.current = true;
     navigate(targetPath);
-  }, [effectiveRole, isImpersonating, isSuperAdmin, navigate, profileResolved, user]);
+  }, [effectiveRole, impersonationSession?.targetRole, isImpersonating, isSuperAdmin, navigate, profileResolved, user]);
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
@@ -121,7 +122,6 @@ export function BloodBankLogin() {
             : resolved.role === 'admin'
               ? 'admin'
               : 'donor';
-    setPortalRole(role);
     hasRedirected.current = true;
     setShowPortalModal(false);
     navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
@@ -145,7 +145,13 @@ export function BloodBankLogin() {
         currentPortal="bloodbank"
         onSelect={handlePortalSelect}
         onImpersonate={handleImpersonate}
-        impersonationUser={impersonatedUser}
+        impersonationUser={impersonationSession
+          ? {
+              displayName: impersonationSession.targetDisplayName,
+              email: impersonationSession.targetEmail,
+              role: impersonationSession.targetRole ?? null,
+            }
+          : null}
       />
       {/* Left Side - Gradient Background with Info */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-yellow-500 relative overflow-hidden">

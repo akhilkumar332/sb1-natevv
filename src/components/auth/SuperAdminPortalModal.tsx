@@ -222,7 +222,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
               {pendingImpersonation.role ? ` (${pendingImpersonation.role})` : ''}.
             </p>
             <p className="mt-2 text-xs text-amber-700">
-              Note: Some owner-only features may not work in UI-level impersonation.
+              This will switch your session to the selected user until you stop impersonation.
             </p>
             <div className="mt-5 flex gap-3">
               <button
