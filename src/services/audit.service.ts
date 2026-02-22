@@ -6,6 +6,8 @@ export type AuditAction =
   | 'role_change'
   | 'portal_switch'
   | 'portal_clear'
+  | 'impersonation_start'
+  | 'impersonation_stop'
   | 'admin_update_user_status'
   | 'admin_verify_user'
   | 'admin_delete_user'

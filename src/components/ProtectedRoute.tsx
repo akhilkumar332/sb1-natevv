@@ -5,7 +5,7 @@ import Loading from './Loading';
 import { toast } from 'react-hot-toast';
 
 const ProtectedRoute = () => {
-  const { user, authLoading, loading, portalRole, effectiveRole, isSuperAdmin } = useAuth();
+  const { user, authLoading, loading, portalRole, effectiveRole, isSuperAdmin, isImpersonating } = useAuth();
   const location = useLocation();
   const lastDeniedRef = useRef<string | null>(null);
 
@@ -21,7 +21,12 @@ const ProtectedRoute = () => {
     bloodbank: '/bloodbank',
   } as const;
 
-  const activeRole = isSuperAdmin ? portalRole : (effectiveRole ?? user?.role);
+  const resolvedImpersonatedRole = effectiveRole === 'hospital' ? 'bloodbank' : effectiveRole;
+  const activeRole = isImpersonating
+    ? resolvedImpersonatedRole
+    : isSuperAdmin
+      ? portalRole
+      : (effectiveRole ?? user?.role);
 
   if (!user) {
     for (const role in rolePaths) {
@@ -30,7 +35,7 @@ const ProtectedRoute = () => {
       }
     }
   } else {
-    if (isSuperAdmin && !portalRole) {
+    if (isSuperAdmin && !portalRole && !isImpersonating) {
       for (const role in rolePaths) {
         if (location.pathname.startsWith(rolePaths[role as keyof typeof rolePaths])) {
           return <Navigate to={`${rolePaths[role as keyof typeof rolePaths]}/login`} replace />;

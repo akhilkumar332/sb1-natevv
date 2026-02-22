@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Phone, Droplet, Heart, Shield, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import type { ImpersonationUser } from '../../services/admin.service';
 import PhoneInput from 'react-phone-number-input';
 import { useLogin } from '../../hooks/useLogin';
 import 'react-phone-number-input/style.css';
@@ -13,7 +14,16 @@ import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
 export function DonorLogin() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isSuperAdmin, setPortalRole, profileResolved } = useAuth();
+  const {
+    user,
+    isSuperAdmin,
+    isImpersonating,
+    effectiveRole,
+    setPortalRole,
+    startImpersonation,
+    impersonatedUser,
+    profileResolved,
+  } = useAuth();
   const hasNavigated = useRef(false);
   const [showPortalModal, setShowPortalModal] = useState(false);
   const {
@@ -31,6 +41,15 @@ export function DonorLogin() {
     handleGoogleLogin
   } = useLogin();
 
+  const resolvePortalRole = (role?: string | null) => {
+    if (!role) return null;
+    if (role === 'hospital') return 'bloodbank';
+    if (role === 'bloodbank' || role === 'ngo' || role === 'admin' || role === 'donor') {
+      return role;
+    }
+    return 'donor';
+  };
+
   useEffect(() => {
     if (!user || hasNavigated.current) {
       return;
@@ -41,6 +60,15 @@ export function DonorLogin() {
     }
 
     if (isSuperAdmin) {
+      if (isImpersonating) {
+        const role = resolvePortalRole(effectiveRole ?? user.role ?? null);
+        if (role) {
+          hasNavigated.current = true;
+          setShowPortalModal(false);
+          navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+          return;
+        }
+      }
       setShowPortalModal(true);
       return;
     }
@@ -60,7 +88,7 @@ export function DonorLogin() {
     } else {
       navigate(`/donor/dashboard${pendingSearch}`);
     }
-  }, [isSuperAdmin, navigate, location.search, profileResolved, user]);
+  }, [effectiveRole, isImpersonating, isSuperAdmin, navigate, location.search, profileResolved, user]);
 
   if (user && !profileResolved) {
     return (
@@ -87,6 +115,25 @@ export function DonorLogin() {
   const handlePortalSelect = (role: 'donor' | 'ngo' | 'bloodbank' | 'admin') => {
     setPortalRole(role);
     hasNavigated.current = true;
+    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+  };
+
+  const handleImpersonate = async (target: ImpersonationUser) => {
+    const resolved = await startImpersonation(target);
+    if (!resolved) return;
+    const role =
+      resolved.role === 'hospital'
+        ? 'bloodbank'
+        : resolved.role === 'ngo'
+          ? 'ngo'
+          : resolved.role === 'bloodbank'
+            ? 'bloodbank'
+            : resolved.role === 'admin'
+              ? 'admin'
+              : 'donor';
+    setPortalRole(role);
+    hasNavigated.current = true;
+    setShowPortalModal(false);
     navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
   };
 
@@ -200,6 +247,8 @@ export function DonorLogin() {
         isOpen={showPortalModal && Boolean(user) && isSuperAdmin}
         currentPortal="donor"
         onSelect={handlePortalSelect}
+        onImpersonate={handleImpersonate}
+        impersonationUser={impersonatedUser}
       />
       {/* Left Side - Gradient Background with Info */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-red-800 relative overflow-hidden">

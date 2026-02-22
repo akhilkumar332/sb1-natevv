@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import type { ImpersonationUser } from '../../services/admin.service';
 import toast from 'react-hot-toast';
 import { Heart, Users, Calendar, TrendingUp, Shield } from 'lucide-react';
 import LogoMark from '../../components/LogoMark';
@@ -12,10 +13,30 @@ import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
 
 export function NgoLogin() {
   const navigate = useNavigate();
-  const { user, loginWithGoogle, logout, isSuperAdmin, setPortalRole, profileResolved } = useAuth();
+  const {
+    user,
+    loginWithGoogle,
+    logout,
+    isSuperAdmin,
+    isImpersonating,
+    effectiveRole,
+    setPortalRole,
+    startImpersonation,
+    impersonatedUser,
+    profileResolved,
+  } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPortalModal, setShowPortalModal] = useState(false);
   const hasRedirected = useRef(false);
+
+  const resolvePortalRole = (role?: string | null) => {
+    if (!role) return null;
+    if (role === 'hospital') return 'bloodbank';
+    if (role === 'bloodbank' || role === 'ngo' || role === 'admin' || role === 'donor') {
+      return role;
+    }
+    return 'ngo';
+  };
 
   useEffect(() => {
     if (!user || hasRedirected.current) {
@@ -27,6 +48,15 @@ export function NgoLogin() {
     }
 
     if (isSuperAdmin) {
+      if (isImpersonating) {
+        const role = resolvePortalRole(effectiveRole ?? user.role ?? null);
+        if (role) {
+          hasRedirected.current = true;
+          setShowPortalModal(false);
+          navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+          return;
+        }
+      }
       setShowPortalModal(true);
       return;
     }
@@ -39,7 +69,7 @@ export function NgoLogin() {
     const targetPath = user.onboardingCompleted ? '/ngo/dashboard' : '/ngo/onboarding';
     hasRedirected.current = true;
     navigate(targetPath);
-  }, [isSuperAdmin, navigate, profileResolved, user]);
+  }, [effectiveRole, isImpersonating, isSuperAdmin, navigate, profileResolved, user]);
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
@@ -104,12 +134,33 @@ export function NgoLogin() {
     navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
   };
 
+  const handleImpersonate = async (target: ImpersonationUser) => {
+    const resolved = await startImpersonation(target);
+    if (!resolved) return;
+    const role =
+      resolved.role === 'hospital'
+        ? 'bloodbank'
+        : resolved.role === 'ngo'
+          ? 'ngo'
+          : resolved.role === 'bloodbank'
+            ? 'bloodbank'
+            : resolved.role === 'admin'
+              ? 'admin'
+              : 'donor';
+    setPortalRole(role);
+    hasRedirected.current = true;
+    setShowPortalModal(false);
+    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+  };
+
   return (
     <div className="min-h-screen flex">
       <SuperAdminPortalModal
         isOpen={showPortalModal && Boolean(user) && isSuperAdmin}
         currentPortal="ngo"
         onSelect={handlePortalSelect}
+        onImpersonate={handleImpersonate}
+        impersonationUser={impersonatedUser}
       />
       {/* Left Side - Gradient Background with Info */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-amber-600 relative overflow-hidden">

@@ -182,7 +182,7 @@ function SigninDropdown() {
 }
 
 function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: string; hideDashboardLink?: boolean }) {
-  const { user, logout, isSuperAdmin, portalRole, setPortalRole } = useAuth();
+  const { user, logout, isSuperAdmin, portalRole, setPortalRole, isImpersonating, stopImpersonation } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -197,6 +197,9 @@ function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: 
 
   const handleReturnToPicker = () => {
     const targetPortal = currentPortal && currentPortal !== 'admin' ? currentPortal : 'admin';
+    if (isImpersonating) {
+      stopImpersonation();
+    }
     setPortalRole(null);
     setIsOpen(false);
     navigate(targetPortal === 'admin' ? '/admin/login' : `/${targetPortal}/login`);
@@ -357,7 +360,7 @@ function MobileUserMenu({
   currentPortal?: PortalRole | null;
   onPortalSelect?: (role: PortalRole) => void;
 }) {
-  const { user, logout, isSuperAdmin, portalRole, setPortalRole } = useAuth();
+  const { user, logout, isSuperAdmin, portalRole, setPortalRole, isImpersonating, stopImpersonation } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -372,6 +375,9 @@ function MobileUserMenu({
       : null);
 
   const handlePortalSwitch = (role: PortalRole) => {
+    if (isImpersonating) {
+      return;
+    }
     if (resolvedPortal === role) {
       if (onClose) onClose();
       return;
@@ -388,6 +394,9 @@ function MobileUserMenu({
 
   const handleReturnToPicker = () => {
     const targetPortal = resolvedPortal && resolvedPortal !== 'admin' ? resolvedPortal : 'admin';
+    if (isImpersonating) {
+      stopImpersonation();
+    }
     setPortalRole(null);
     if (onClose) onClose();
     navigate(targetPortal === 'admin' ? '/admin/login' : `/${targetPortal}/login`);
@@ -456,15 +465,17 @@ function MobileUserMenu({
             <div className="mt-3 grid gap-2">
               {portalOptions.map((option) => {
                 const isActive = resolvedPortal === option.role;
+                const isDisabled = isImpersonating;
                 return (
                   <button
                     key={option.role}
                     type="button"
                     onClick={() => handlePortalSwitch(option.role)}
+                    disabled={isDisabled}
                     className={`w-full rounded-lg px-3 py-2 text-xs font-semibold transition-all ${
                       isActive
                         ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-sm'
-                        : 'border border-gray-200 bg-white text-gray-700 hover:border-red-200 hover:bg-red-50'
+                        : `border border-gray-200 bg-white text-gray-700 ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'hover:border-red-200 hover:bg-red-50'}`
                     }`}
                   >
                     {option.label}
@@ -496,7 +507,16 @@ function MobileUserMenu({
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [pendingPortal, setPendingPortal] = useState<PortalRole | null>(null);
-  const { user, authLoading, isSuperAdmin, portalRole, setPortalRole } = useAuth();
+  const {
+    user,
+    authLoading,
+    isSuperAdmin,
+    portalRole,
+    setPortalRole,
+    isImpersonating,
+    impersonatedUser,
+    stopImpersonation,
+  } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const isDonorDashboard = user?.role === 'donor' && location.pathname.startsWith('/donor/dashboard');
@@ -517,11 +537,13 @@ const Navbar: React.FC = () => {
 
   const handlePortalSelect = (role: PortalRole) => {
     if (!isSuperAdmin) return;
+    if (isImpersonating) return;
     if (role === currentPortal) return;
     setPendingPortal(role);
   };
 
   const confirmPortalSwitch = () => {
+    if (isImpersonating) return;
     if (!pendingPortal) return;
     const nextPortal = pendingPortal;
     setPendingPortal(null);
@@ -591,15 +613,17 @@ const Navbar: React.FC = () => {
                           <div className="flex items-center gap-1 rounded-full border border-red-100 bg-white/80 p-1 shadow-sm">
                             {portalOptions.map((option) => {
                               const isActive = currentPortal === option.role;
+                              const isDisabled = isImpersonating;
                               return (
                                 <button
                                   key={option.role}
                                   type="button"
                                   onClick={() => handlePortalSelect(option.role)}
+                                  disabled={isDisabled}
                                   className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-all ${
                                     isActive
                                       ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-sm'
-                                      : 'text-gray-600 hover:bg-red-50'
+                                      : `text-gray-600 ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'hover:bg-red-50'}`
                                   }`}
                                   aria-pressed={isActive}
                                 >
@@ -640,7 +664,30 @@ const Navbar: React.FC = () => {
         </div>
       </nav>
 
-      {isSuperAdmin && currentPortal && currentPortal !== 'admin' && (
+      {isSuperAdmin && isImpersonating && impersonatedUser && (
+        <div className="border-b border-amber-200 bg-amber-50">
+          <div className="container mx-auto px-4 py-2 text-xs font-medium text-amber-900 sm:text-sm flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              You are impersonating{' '}
+              <span className="font-semibold">
+                {impersonatedUser.displayName || impersonatedUser.email || 'User'}
+              </span>{' '}
+              ({impersonatedUser.role || 'user'}).
+            </span>
+            <button
+              onClick={stopImpersonation}
+              className="self-start sm:self-auto rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-900 transition hover:bg-amber-200"
+            >
+              Stop impersonation
+            </button>
+          </div>
+          <div className="container mx-auto px-4 pb-2 text-[11px] text-amber-700">
+            Note: Some owner-only features may not work in UI-level impersonation.
+          </div>
+        </div>
+      )}
+
+      {isSuperAdmin && !isImpersonating && currentPortal && currentPortal !== 'admin' && (
         <div className="border-b border-amber-200 bg-amber-50">
           <div className="container mx-auto px-4 py-2 text-xs font-medium text-amber-900 sm:text-sm">
             You are acting as <span className="font-semibold">{portalLabels[currentPortal]}</span> portal.

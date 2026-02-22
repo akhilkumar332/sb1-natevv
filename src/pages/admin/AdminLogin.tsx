@@ -6,15 +6,36 @@ import toast from 'react-hot-toast';
 import { Settings, Lock, BarChart3, Shield } from 'lucide-react';
 import LogoMark from '../../components/LogoMark';
 import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
+import type { ImpersonationUser } from '../../services/admin.service';
 import { authStorage } from '../../utils/authStorage';
 import { auth } from '../../firebase';
 
 export function AdminLogin() {
   const navigate = useNavigate();
-  const { user, loginWithGoogle, logout, isSuperAdmin, setPortalRole, profileResolved } = useAuth();
+  const {
+    user,
+    loginWithGoogle,
+    logout,
+    isSuperAdmin,
+    isImpersonating,
+    effectiveRole,
+    setPortalRole,
+    startImpersonation,
+    impersonatedUser,
+    profileResolved,
+  } = useAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPortalModal, setShowPortalModal] = useState(false);
   const hasRedirected = useRef(false);
+
+  const resolvePortalRole = (role?: string | null) => {
+    if (!role) return null;
+    if (role === 'hospital') return 'bloodbank';
+    if (role === 'bloodbank' || role === 'ngo' || role === 'admin' || role === 'donor') {
+      return role;
+    }
+    return 'admin';
+  };
 
   useEffect(() => {
     if (!user || hasRedirected.current) {
@@ -26,6 +47,15 @@ export function AdminLogin() {
     }
 
     if (isSuperAdmin) {
+      if (isImpersonating) {
+        const role = resolvePortalRole(effectiveRole ?? user.role ?? null);
+        if (role) {
+          hasRedirected.current = true;
+          setShowPortalModal(false);
+          navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+          return;
+        }
+      }
       setShowPortalModal(true);
       return;
     }
@@ -38,7 +68,7 @@ export function AdminLogin() {
     const targetPath = user.onboardingCompleted ? '/admin/dashboard' : '/admin/onboarding';
     hasRedirected.current = true;
     navigate(targetPath);
-  }, [isSuperAdmin, navigate, profileResolved, user]);
+  }, [effectiveRole, isImpersonating, isSuperAdmin, navigate, profileResolved, user]);
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
@@ -77,6 +107,25 @@ export function AdminLogin() {
     navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
   };
 
+  const handleImpersonate = async (target: ImpersonationUser) => {
+    const resolved = await startImpersonation(target);
+    if (!resolved) return;
+    const role =
+      resolved.role === 'hospital'
+        ? 'bloodbank'
+        : resolved.role === 'ngo'
+          ? 'ngo'
+          : resolved.role === 'bloodbank'
+            ? 'bloodbank'
+            : resolved.role === 'admin'
+              ? 'admin'
+              : 'donor';
+    setPortalRole(role);
+    hasRedirected.current = true;
+    setShowPortalModal(false);
+    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+  };
+
   if (user && !profileResolved) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -94,6 +143,8 @@ export function AdminLogin() {
         isOpen={showPortalModal && Boolean(user) && isSuperAdmin}
         currentPortal="admin"
         onSelect={handlePortalSelect}
+        onImpersonate={handleImpersonate}
+        impersonationUser={impersonatedUser}
       />
       {/* Left Side - Gradient Background with Info */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-red-600 via-red-700 to-red-800 relative overflow-hidden">

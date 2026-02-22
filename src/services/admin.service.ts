@@ -20,6 +20,8 @@ import {
   updateDoc,
   doc,
   Timestamp,
+  startAt,
+  endAt,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
@@ -34,6 +36,124 @@ import {
 import { extractQueryData, getServerTimestamp } from '../utils/firestore.utils';
 import { DatabaseError, ValidationError, NotFoundError, PermissionError } from '../utils/errorHandler';
 import { logAuditEvent } from './audit.service';
+
+export type ImpersonationUser = {
+  uid: string;
+  displayName: string;
+  email: string | null;
+  role: User['role'];
+  bhId?: string | null;
+  photoURL?: string | null;
+  status?: User['status'];
+};
+
+const mapImpersonationUser = (docSnap: any): ImpersonationUser | null => {
+  const data = docSnap.data?.() ?? docSnap.data ?? {};
+  const role = data.role || 'donor';
+  const status = data.status || 'active';
+  if (role === 'superadmin' || status === 'deleted') {
+    return null;
+  }
+  return {
+    uid: data.uid || docSnap.id,
+    displayName: data.displayName
+      || data.name
+      || data.organizationName
+      || data.hospitalName
+      || data.bloodBankName
+      || data.contactPerson
+      || 'User',
+    email: data.email || null,
+    role,
+    bhId: data.bhId || null,
+    photoURL: data.photoURL || null,
+    status,
+  };
+};
+
+export const searchUsersForImpersonation = async (rawQuery: string): Promise<ImpersonationUser[]> => {
+  const queryText = rawQuery.trim();
+  if (!queryText || queryText.length < 2) return [];
+
+  const usersRef = collection(db, 'users');
+  const results = new Map<string, ImpersonationUser>();
+
+  const addSnapshot = (snapshot: any) => {
+    snapshot.forEach((docSnap: any) => {
+      const mapped = mapImpersonationUser(docSnap);
+      if (mapped) {
+        results.set(mapped.uid, mapped);
+      }
+    });
+  };
+
+  if (queryText.includes('@')) {
+    const normalizedEmail = queryText.toLowerCase();
+    const emailQueries = normalizedEmail !== queryText
+      ? [queryText, normalizedEmail]
+      : [queryText];
+    for (const email of emailQueries) {
+      const snapshot = await getDocs(
+        query(usersRef, where('email', '==', email), limit(20))
+      );
+      addSnapshot(snapshot);
+      if (results.size >= 20) break;
+    }
+    return Array.from(results.values());
+  }
+
+  if (queryText.toUpperCase().startsWith('BH')) {
+    const normalizedBhId = queryText.toUpperCase();
+    const snapshot = await getDocs(
+      query(usersRef, where('bhId', '==', normalizedBhId), limit(20))
+    );
+    addSnapshot(snapshot);
+    return Array.from(results.values());
+  }
+
+  const buildVariants = (value: string) => {
+    const variants = new Set<string>();
+    variants.add(value);
+    const lower = value.toLowerCase();
+    const upper = value.toUpperCase();
+    if (lower !== value) variants.add(lower);
+    if (upper !== value) variants.add(upper);
+    const title = value.length > 0 ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
+    if (title !== value) variants.add(title);
+    return Array.from(variants);
+  };
+
+  const runPrefixSearch = async (field: string, prefixes: string[]) => {
+    for (const prefix of prefixes) {
+      try {
+        const snapshot = await getDocs(
+          query(
+            usersRef,
+            orderBy(field),
+            startAt(prefix),
+            endAt(`${prefix}\uf8ff`),
+            limit(20)
+          )
+        );
+        addSnapshot(snapshot);
+      } catch (error) {
+        console.warn(`Impersonation search failed for ${field}:`, error);
+      }
+      if (results.size >= 20) {
+        return;
+      }
+    }
+  };
+
+  const variants = buildVariants(queryText);
+  const fields = ['displayName', 'organizationName', 'hospitalName', 'bloodBankName', 'name'];
+  for (const field of fields) {
+    await runPrefixSearch(field, variants);
+    if (results.size >= 20) break;
+  }
+
+  return Array.from(results.values());
+};
 
 // ============================================================================
 // USER MANAGEMENT
