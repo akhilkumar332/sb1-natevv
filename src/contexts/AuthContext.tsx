@@ -613,6 +613,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user?.uid || user.role !== 'donor') return;
     if (user.onboardingCompleted !== true) return;
     if (user.status && user.status !== 'active') return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    if (firestoreNetworkDisabledRef.current) return;
     const payload = buildPublicDonorPayload(user);
     const payloadKey = JSON.stringify({
       uid: user.uid,

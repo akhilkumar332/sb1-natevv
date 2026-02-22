@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
-const serviceAccountPath = path.resolve(rootDir, 'secrets', 'serviceAccount.json');
+const serviceAccountPath = path.resolve(rootDir, 'secrets', 'firebase-admin-sdk.json');
 
 const getArg = (name) => {
   const prefix = `--${name}=`;

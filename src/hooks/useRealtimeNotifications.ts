@@ -4,7 +4,7 @@
  * Real-time notification listener using Firebase onSnapshot
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   collection,
   query,
@@ -43,6 +43,16 @@ export const useRealtimeNotifications = ({
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [useFallback, setUseFallback] = useState(false);
+  const notificationsRef = useRef<Notification[]>([]);
+
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
+
+  useEffect(() => {
+    setUseFallback(false);
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) {
@@ -68,65 +78,59 @@ export const useRealtimeNotifications = ({
       return err?.code === 'failed-precondition' || message.includes('requires an index');
     };
 
-    let unsubscribe = () => {};
-    const attachListener = (useFallback: boolean) => {
-      const q = useFallback ? fallbackQuery : orderedQuery;
-      unsubscribe();
-      unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          try {
-            let notificationData = extractQueryData<Notification>(snapshot, [
-              'createdAt',
-              'readAt',
-              'expiresAt',
-            ]);
+    const q = useFallback ? fallbackQuery : orderedQuery;
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        try {
+          let notificationData = extractQueryData<Notification>(snapshot, [
+            'createdAt',
+            'readAt',
+            'expiresAt',
+          ]);
 
-            if (useFallback) {
-              notificationData = notificationData.sort((a, b) => {
-                const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : a.createdAt?.toDate?.().getTime?.() || 0;
-                const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : b.createdAt?.toDate?.().getTime?.() || 0;
-                return bTime - aTime;
-              }).slice(0, limitCount);
-            }
-
-            // Detect new notifications
-            if (notifications.length > 0 && notificationData.length > 0) {
-              const latestNotification = notificationData[0];
-              const wasNew = !notifications.find(n => n.id === latestNotification.id);
-
-              if (wasNew && onNewNotification) {
-                onNewNotification(latestNotification);
-              }
-            }
-
-            setNotifications(notificationData);
-            setUnreadCount(notificationData.filter(n => !n.read).length);
-            setLoading(false);
-          } catch (err) {
-            console.error('Error processing notifications:', err);
-            setError('Failed to load notifications');
-            setLoading(false);
+          if (useFallback) {
+            notificationData = notificationData.sort((a, b) => {
+              const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : a.createdAt?.toDate?.().getTime?.() || 0;
+              const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : b.createdAt?.toDate?.().getTime?.() || 0;
+              return bTime - aTime;
+            }).slice(0, limitCount);
           }
-        },
-        (err) => {
-          if (!useFallback && isIndexError(err)) {
-            console.warn('Notifications query missing index; falling back to client-side sort.');
-            attachListener(true);
-            return;
+
+          // Detect new notifications
+          if (notificationsRef.current.length > 0 && notificationData.length > 0) {
+            const latestNotification = notificationData[0];
+            const wasNew = !notificationsRef.current.find(n => n.id === latestNotification.id);
+
+            if (wasNew && onNewNotification) {
+              onNewNotification(latestNotification);
+            }
           }
-          console.error('Error listening to notifications:', err);
-          setError('Failed to listen to notifications');
+
+          setNotifications(notificationData);
+          setUnreadCount(notificationData.filter(n => !n.read).length);
+          setLoading(false);
+        } catch (err) {
+          console.error('Error processing notifications:', err);
+          setError('Failed to load notifications');
           setLoading(false);
         }
-      );
-    };
-
-    attachListener(false);
+      },
+      (err) => {
+        if (!useFallback && isIndexError(err)) {
+          console.warn('Notifications query missing index; falling back to client-side sort.');
+          setUseFallback(true);
+          return;
+        }
+        console.error('Error listening to notifications:', err);
+        setError('Failed to listen to notifications');
+        setLoading(false);
+      }
+    );
 
     // Cleanup listener on unmount
     return () => unsubscribe();
-  }, [userId, limitCount]);
+  }, [userId, limitCount, useFallback, onNewNotification]);
 
   return {
     notifications,
