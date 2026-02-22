@@ -105,7 +105,8 @@ export const useVersionCheck = () => {
 
     const fetchVersion = async (source: 'initial' | 'poll' | 'visibility' = 'poll') => {
       try {
-        const response = await fetch(VERSION_URL, { cache: 'no-store' });
+        const cacheBustUrl = `${VERSION_URL}?ts=${Date.now()}`;
+        const response = await fetch(cacheBustUrl, { cache: 'no-store' });
         if (!response.ok) {
           return;
         }

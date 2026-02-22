@@ -10,7 +10,11 @@ self.skipWaiting();
 cleanupOutdatedCaches();
 const precacheManifest = (self.__WB_MANIFEST || []).filter((entry) => {
   const url = typeof entry === 'string' ? entry : entry.url;
-  return url !== '/firebase-messaging-sw.js' && url !== '/firebase-config.js';
+  return (
+    url !== '/firebase-messaging-sw.js' &&
+    url !== '/firebase-config.js' &&
+    !url.endsWith('/version.json')
+  );
 });
 precacheAndRoute(precacheManifest);
 
