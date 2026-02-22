@@ -14,6 +14,12 @@ import {
   removeFCMToken,
 } from '../services/notification.service';
 import { getDeviceId, getDeviceInfo } from '../utils/device';
+import {
+  clearStoredFcmToken,
+  readStoredFcmToken,
+  writeFcmTokenMeta,
+  writeStoredFcmToken,
+} from '../utils/fcmStorage';
 
 // ============================================================================
 // PUSH NOTIFICATIONS HOOK
@@ -38,16 +44,8 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [messaging, setMessaging] = useState<Messaging | null>(null);
-  const tokenStorageKey = 'fcmToken';
   const deviceId = getDeviceId();
   const deviceInfo = getDeviceInfo();
-  const readStoredToken = () => {
-    try {
-      return localStorage.getItem(tokenStorageKey);
-    } catch {
-      return null;
-    }
-  };
 
   // Initialize messaging
   useEffect(() => {
@@ -60,11 +58,15 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
   }, []);
 
   useEffect(() => {
-    const storedToken = readStoredToken();
+    if (!user?.uid) {
+      setToken(null);
+      return;
+    }
+    const storedToken = readStoredFcmToken(user.uid);
     if (storedToken) {
       setToken(storedToken);
     }
-  }, []);
+  }, [user?.uid]);
 
   // Check current permission status
   useEffect(() => {
@@ -88,11 +90,8 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
 
       if (fcmToken) {
         setToken(fcmToken);
-        try {
-          localStorage.setItem(tokenStorageKey, fcmToken);
-        } catch {
-          // ignore
-        }
+        writeStoredFcmToken(user.uid, fcmToken);
+        writeFcmTokenMeta(user.uid, { token: fcmToken, deviceId, savedAt: Date.now() });
       }
       if (typeof window !== 'undefined' && 'Notification' in window) {
         setPermission(Notification.permission);
@@ -111,7 +110,7 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
 
   // Unsubscribe from notifications
   const unsubscribe = useCallback(async () => {
-    const tokenToRemove = token || readStoredToken();
+    const tokenToRemove = token || (user?.uid ? readStoredFcmToken(user.uid) : null);
     if (!user || !messaging || !tokenToRemove) {
       return;
     }
@@ -127,11 +126,7 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
       }
       await deleteFCMToken(messaging);
       setToken(null);
-      try {
-        localStorage.removeItem(tokenStorageKey);
-      } catch {
-        // ignore
-      }
+      clearStoredFcmToken(user.uid);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to unsubscribe'));
     } finally {

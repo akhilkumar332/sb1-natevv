@@ -30,11 +30,33 @@ export const getDeviceId = (): string | null => {
   try {
     const existing = localStorage.getItem(DEVICE_ID_KEY);
     if (existing) return existing;
+    try {
+      const sessionExisting = sessionStorage.getItem(DEVICE_ID_KEY);
+      if (sessionExisting) return sessionExisting;
+    } catch {
+      // ignore
+    }
     const id = generateDeviceId();
-    localStorage.setItem(DEVICE_ID_KEY, id);
+    try {
+      localStorage.setItem(DEVICE_ID_KEY, id);
+    } catch {
+      try {
+        sessionStorage.setItem(DEVICE_ID_KEY, id);
+      } catch {
+        // ignore
+      }
+    }
     return id;
   } catch {
-    return null;
+    try {
+      const sessionExisting = sessionStorage.getItem(DEVICE_ID_KEY);
+      if (sessionExisting) return sessionExisting;
+      const id = generateDeviceId();
+      sessionStorage.setItem(DEVICE_ID_KEY, id);
+      return id;
+    } catch {
+      return null;
+    }
   }
 };
 

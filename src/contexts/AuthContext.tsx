@@ -51,6 +51,7 @@ import { clearReferralTracking, getReferralReferrerUid, getReferralTracking } fr
 import { buildPublicDonorPayload } from '../utils/publicDonor';
 import { PhoneAuthError } from '../errors/PhoneAuthError';
 import { authStorage } from '../utils/authStorage';
+import { readFcmTokenMeta, readStoredFcmToken, writeFcmTokenMeta, writeStoredFcmToken } from '../utils/fcmStorage';
 
 const trackImpersonationEvent = (eventName: string, params?: Record<string, any>) => {
   void import('../services/monitoring.service')
@@ -1007,22 +1008,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const deviceId = getDeviceId();
         const deviceInfo = getDeviceInfo();
-        const storedToken = (() => {
-          try {
-            return localStorage.getItem('fcmToken');
-          } catch {
-            return null;
-          }
-        })();
+        const storedToken = readStoredFcmToken(user.uid);
+        const meta = readFcmTokenMeta(user.uid);
+        const shouldSkipSave = Boolean(
+          storedToken
+          && meta?.token === storedToken
+          && meta?.deviceId === deviceId
+          && Date.now() - meta.savedAt < 12 * 60 * 60 * 1000
+        );
 
         if (storedToken) {
-          if (deviceId) {
-            await saveFCMDeviceToken(user.uid, deviceId, storedToken, deviceInfo);
-          } else {
-            await updateDoc(doc(db, 'users', user.uid), {
-              fcmTokens: arrayUnion(storedToken),
-              lastTokenUpdate: serverTimestamp(),
-            });
+          if (!shouldSkipSave) {
+            if (deviceId) {
+              await saveFCMDeviceToken(user.uid, deviceId, storedToken, deviceInfo);
+            } else {
+              await updateDoc(doc(db, 'users', user.uid), {
+                fcmTokens: arrayUnion(storedToken),
+                lastTokenUpdate: serverTimestamp(),
+              });
+            }
+            writeFcmTokenMeta(user.uid, { token: storedToken, deviceId, savedAt: Date.now() });
           }
           return;
         }
@@ -1032,7 +1037,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const token = await initializeFCM(user.uid, messaging, deviceId, deviceInfo);
           if (token) {
             try {
-              localStorage.setItem('fcmToken', token);
+              writeStoredFcmToken(user.uid, token);
+              writeFcmTokenMeta(user.uid, { token, deviceId, savedAt: Date.now() });
             } catch {
               // ignore
             }
