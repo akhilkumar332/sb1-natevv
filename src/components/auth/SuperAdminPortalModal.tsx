@@ -56,6 +56,8 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
   const [pendingImpersonation, setPendingImpersonation] = useState<ImpersonationUser | null>(null);
   const [recentImpersonations, setRecentImpersonations] = useState<ImpersonationUser[]>([]);
   const [impersonationReason, setImpersonationReason] = useState('');
+  const [showRecentDrawer, setShowRecentDrawer] = useState(false);
+  const [recentPage, setRecentPage] = useState(1);
   const otherPortals = portalOrder.filter((role) => role !== currentPortal);
   const cacheRef = React.useRef(new Map<string, { results: ImpersonationUser[]; at: number }>());
   const fastCacheRef = React.useRef(new Map<string, { results: ImpersonationUser[]; at: number }>());
@@ -73,13 +75,16 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
     return name.includes(normalized) || email.includes(normalized) || bhId.includes(normalized);
   }, []);
 
+  const RECENT_MAX_ITEMS = 50;
+  const RECENT_PAGE_SIZE = 10;
+
   const readRecent = React.useCallback(() => {
     if (typeof window === 'undefined') return [];
     try {
       const raw = localStorage.getItem(recentStorageKey);
       if (!raw) return [];
       const parsed = JSON.parse(raw) as ImpersonationUser[];
-      return Array.isArray(parsed) ? parsed.slice(0, 10) : [];
+      return Array.isArray(parsed) ? parsed.slice(0, RECENT_MAX_ITEMS) : [];
     } catch {
       return [];
     }
@@ -88,7 +93,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
   const writeRecent = React.useCallback((next: ImpersonationUser[]) => {
     if (typeof window === 'undefined') return;
     try {
-      localStorage.setItem(recentStorageKey, JSON.stringify(next.slice(0, 10)));
+      localStorage.setItem(recentStorageKey, JSON.stringify(next.slice(0, RECENT_MAX_ITEMS)));
     } catch {
       // ignore
     }
@@ -96,7 +101,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
 
   const pushRecent = React.useCallback((user: ImpersonationUser) => {
     setRecentImpersonations((prev) => {
-      const next = [user, ...prev.filter((item) => item.uid !== user.uid)].slice(0, 10);
+      const next = [user, ...prev.filter((item) => item.uid !== user.uid)].slice(0, RECENT_MAX_ITEMS);
       writeRecent(next);
       return next;
     });
@@ -110,6 +115,8 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
       setSearchError(null);
       setPendingImpersonation(null);
       setImpersonationReason('');
+      setShowRecentDrawer(false);
+      setRecentPage(1);
       return;
     }
     setRecentImpersonations(readRecent());
@@ -221,18 +228,29 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
     onImpersonate(pendingImpersonation, reason ? reason : undefined);
     setPendingImpersonation(null);
     setImpersonationReason('');
+    setShowRecentDrawer(false);
+    setRecentPage(1);
   };
 
   const cancelImpersonation = () => {
     setPendingImpersonation(null);
   };
 
+  const recentPreview = recentImpersonations.slice(0, 3);
+  const totalRecentPages = Math.max(1, Math.ceil(recentImpersonations.length / RECENT_PAGE_SIZE));
+  const clampedRecentPage = Math.min(recentPage, totalRecentPages);
+  const recentStartIndex = (clampedRecentPage - 1) * RECENT_PAGE_SIZE;
+  const recentPageItems = recentImpersonations.slice(
+    recentStartIndex,
+    recentStartIndex + RECENT_PAGE_SIZE
+  );
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-      <div className="w-full max-w-4xl rounded-3xl border border-red-100 bg-white shadow-2xl">
-        <div className="flex items-center justify-between rounded-t-3xl bg-gradient-to-r from-red-600 via-red-700 to-red-800 px-8 py-5 text-white">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/50 backdrop-blur-sm px-3 py-4 sm:px-4 sm:py-6">
+      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl border border-red-100 bg-white shadow-2xl">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-t-3xl bg-gradient-to-r from-red-600 via-red-700 to-red-800 px-5 sm:px-8 py-5 text-white">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
               <Shield className="h-6 w-6 text-white" />
@@ -249,7 +267,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
             </div>
           )}
         </div>
-        <div className="px-8 py-6 space-y-6">
+        <div className="px-5 sm:px-8 py-6 space-y-6">
           {impersonationUser && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
               Acting as{' '}
@@ -348,10 +366,24 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                   )}
                   {!impersonationLoading && searchTerm.trim().length < 2 && recentImpersonations.length > 0 && (
                     <>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                        Recent impersonations
-                      </p>
-                      {recentImpersonations.map((user) => (
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                          Recent impersonations
+                        </p>
+                        {recentImpersonations.length > 3 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowRecentDrawer(true);
+                              setRecentPage(1);
+                            }}
+                            className="text-[10px] font-semibold uppercase tracking-widest text-red-600 hover:text-red-700"
+                          >
+                            View all
+                          </button>
+                        )}
+                      </div>
+                      {recentPreview.map((user) => (
                         <button
                           key={`recent-${user.uid}`}
                           onClick={() => handleImpersonateClick(user)}
@@ -460,6 +492,81 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showRecentDrawer && (
+        <div className="fixed inset-0 z-[55] flex items-end sm:items-center justify-center bg-black/50 px-4 py-4">
+          <div className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl max-h-[75vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Recent impersonations</p>
+                <p className="text-sm text-gray-600">
+                  Showing {recentStartIndex + 1}-{Math.min(recentStartIndex + RECENT_PAGE_SIZE, recentImpersonations.length)} of {recentImpersonations.length}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRecentDrawer(false)}
+                className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-4 space-y-2">
+              {recentPageItems.map((user) => (
+                <button
+                  key={`drawer-${user.uid}`}
+                  onClick={() => handleImpersonateClick(user)}
+                  disabled={restrictedStatuses.has(user.status || '')}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {user.displayName || user.email || 'User'}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {user.email || 'No email'}
+                        {user.bhId ? ` · ${user.bhId}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 text-right">
+                      <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+                        {user.role}
+                      </span>
+                      <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest ${getStatusStyle(user.status)}`}>
+                        {getStatusLabel(user.status)}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            {recentImpersonations.length > RECENT_PAGE_SIZE && (
+              <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4">
+                <button
+                  type="button"
+                  onClick={() => setRecentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={clampedRecentPage === 1}
+                  className="rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Previous
+                </button>
+                <span className="text-xs font-semibold text-gray-600">
+                  Page {clampedRecentPage} of {totalRecentPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRecentPage((prev) => Math.min(totalRecentPages, prev + 1))}
+                  disabled={clampedRecentPage === totalRecentPages}
+                  className="rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
