@@ -4,6 +4,7 @@ import type { UserRole, UserStatus } from '../types/database.types';
 export type ImpersonationResponse = {
   targetToken: string;
   resumeToken: string;
+  impersonationId?: string;
   targetUser: {
     uid: string;
     role?: UserRole | null;
@@ -18,7 +19,10 @@ export type ImpersonationResumeResponse = {
   actorUid?: string | null;
 };
 
-export const requestImpersonation = async (targetUid: string): Promise<ImpersonationResponse> => {
+export const requestImpersonation = async (
+  targetUid: string,
+  options?: { reason?: string; caseId?: string }
+): Promise<ImpersonationResponse> => {
   if (!targetUid) {
     throw new Error('Target user is required.');
   }
@@ -34,7 +38,11 @@ export const requestImpersonation = async (targetUid: string): Promise<Impersona
       'Content-Type': 'application/json',
       Authorization: `Bearer ${idToken}`,
     },
-    body: JSON.stringify({ targetUid }),
+    body: JSON.stringify({
+      targetUid,
+      ...(options?.reason ? { reason: options.reason } : {}),
+      ...(options?.caseId ? { caseId: options.caseId } : {}),
+    }),
   });
 
   if (!response.ok) {
@@ -59,7 +67,9 @@ export const requestImpersonation = async (targetUid: string): Promise<Impersona
   return response.json();
 };
 
-export const requestImpersonationResume = async (): Promise<ImpersonationResumeResponse> => {
+export const requestImpersonationResume = async (
+  options?: { impersonationId?: string }
+): Promise<ImpersonationResumeResponse> => {
   const idToken = await auth.currentUser?.getIdToken(true);
   if (!idToken) {
     throw new Error('Authentication token unavailable.');
@@ -71,6 +81,9 @@ export const requestImpersonationResume = async (): Promise<ImpersonationResumeR
       'Content-Type': 'application/json',
       Authorization: `Bearer ${idToken}`,
     },
+    body: JSON.stringify({
+      ...(options?.impersonationId ? { impersonationId: options.impersonationId } : {}),
+    }),
   });
 
   if (!response.ok) {

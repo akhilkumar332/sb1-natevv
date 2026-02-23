@@ -130,8 +130,8 @@ export function DonorLogin() {
     navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
   };
 
-  const handleImpersonate = async (target: ImpersonationUser) => {
-    const resolved = await startImpersonation(target);
+  const handleImpersonate = async (target: ImpersonationUser, reason?: string) => {
+    const resolved = await startImpersonation(target, { ...(reason ? { reason } : {}) });
     if (!resolved) return;
     const role =
       resolved.role === 'hospital'

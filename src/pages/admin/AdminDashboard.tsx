@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Users,
   Heart,
@@ -33,7 +34,8 @@ import BhIdBanner from '../../components/BhIdBanner';
 import { useAuth } from '../../contexts/AuthContext';
 
 function AdminDashboard() {
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verification' | 'emergency' | 'reports'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -170,6 +172,15 @@ function AdminDashboard() {
                 <RefreshCw className="w-5 h-5" />
                 Refresh
               </button>
+              {isSuperAdmin && (
+                <button
+                  onClick={() => navigate('/admin/impersonation-audit')}
+                  className="bg-white border border-blue-200 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-50 transition-all font-semibold flex items-center gap-2"
+                >
+                  <Shield className="w-5 h-5" />
+                  Impersonation Audit
+                </button>
+              )}
               <button className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all font-semibold flex items-center gap-2">
                 <Download className="w-5 h-5" />
                 Export Data

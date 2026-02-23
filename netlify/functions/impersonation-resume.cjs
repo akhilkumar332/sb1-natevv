@@ -22,6 +22,15 @@ const getAuthToken = (headers) => {
   return match ? match[1] : null;
 };
 
+const getClientIp = (headers) => {
+  const forwarded = headers?.['x-forwarded-for']
+    || headers?.['x-nf-client-connection-ip']
+    || headers?.['client-ip']
+    || '';
+  if (!forwarded) return null;
+  return String(forwarded).split(',')[0].trim() || null;
+};
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return {
@@ -44,10 +53,21 @@ exports.handler = async (event) => {
     return { statusCode: 401, body: JSON.stringify({ error: 'Missing auth token' }) };
   }
 
+  let payload = null;
+  try {
+    payload = JSON.parse(event.body || '{}');
+  } catch {
+    payload = null;
+  }
+  const impersonationId = typeof payload?.impersonationId === 'string'
+    ? payload.impersonationId.trim()
+    : '';
+
   try {
     initAdmin();
     const decoded = await admin.auth().verifyIdToken(idToken);
     const actorUid = decoded.impersonatedBy;
+    const targetUid = decoded.uid;
 
     if (!actorUid || typeof actorUid !== 'string') {
       return { statusCode: 403, body: JSON.stringify({ error: 'Not an impersonated session' }) };
@@ -59,6 +79,33 @@ exports.handler = async (event) => {
     if (actorRole !== 'superadmin') {
       return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
     }
+
+    await db.collection('auditLogs').add({
+      actorUid,
+      actorRole: actorRole || 'superadmin',
+      action: 'impersonation_stop',
+      targetUid: targetUid || null,
+      metadata: {
+        impersonationId: impersonationId || null,
+        impersonatedAt: decoded.impersonatedAt || null,
+      },
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await db.collection('impersonationEvents').add({
+      actorUid,
+      actorRole: actorRole || 'superadmin',
+      action: 'impersonation_stop',
+      targetUid: targetUid || null,
+      status: 'stopped',
+      metadata: {
+        impersonationId: impersonationId || null,
+        impersonatedAt: decoded.impersonatedAt || null,
+      },
+      ip: getClientIp(event.headers),
+      userAgent: event.headers?.['user-agent'] || null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
     const resumeToken = await admin.auth().createCustomToken(actorUid, {
       resumeFromImpersonation: true,

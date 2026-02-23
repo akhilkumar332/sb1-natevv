@@ -102,6 +102,17 @@ const portalOptions: Array<{ role: PortalRole; label: string }> = [
   { role: 'admin', label: 'Admin' },
 ];
 
+const IMPERSONATION_TTL_MS = 30 * 60 * 1000;
+
+const formatImpersonationRemaining = (ms: number) => {
+  const safeMs = Math.max(ms, 0);
+  const totalMinutes = Math.ceil(safeMs / 60000);
+  if (totalMinutes < 60) return `${totalMinutes}m`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+};
+
 function DesktopNavLink({ to, children }: NavLinkProps) {
   const location = useLocation();
   const isActive = location.pathname === to;
@@ -507,6 +518,7 @@ function MobileUserMenu({
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [pendingPortal, setPendingPortal] = useState<PortalRole | null>(null);
+  const [impersonationRemaining, setImpersonationRemaining] = useState<string | null>(null);
   const {
     user,
     authLoading,
@@ -535,6 +547,21 @@ const Navbar: React.FC = () => {
     ?? (portalOptions.some(option => option.role === user?.role)
       ? (user?.role as PortalRole)
       : null);
+
+  useEffect(() => {
+    if (!impersonationSession) {
+      setImpersonationRemaining(null);
+      return;
+    }
+    const expiresAt = impersonationSession.expiresAt
+      ?? (impersonationSession.startedAt + IMPERSONATION_TTL_MS);
+    const updateRemaining = () => {
+      setImpersonationRemaining(formatImpersonationRemaining(expiresAt - Date.now()));
+    };
+    updateRemaining();
+    const intervalId = window.setInterval(updateRemaining, 30_000);
+    return () => window.clearInterval(intervalId);
+  }, [impersonationSession]);
 
   const handlePortalSelect = (role: PortalRole) => {
     if (!isSuperAdmin) return;
@@ -668,13 +695,18 @@ const Navbar: React.FC = () => {
       {isImpersonating && impersonationSession && (
         <div className="border-b border-amber-200 bg-amber-50">
           <div className="container mx-auto px-4 py-2 text-xs font-medium text-amber-900 sm:text-sm flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              You are impersonating{' '}
-              <span className="font-semibold">
-                {impersonationSession.targetDisplayName || impersonationSession.targetEmail || 'User'}
+            <div className="flex flex-col gap-1">
+              <span>
+                You are impersonating{' '}
+                <span className="font-semibold">
+                  {impersonationSession.targetDisplayName || impersonationSession.targetEmail || 'User'}
+                </span>
+                {impersonationSession.targetRole ? ` (${impersonationSession.targetRole})` : '.'}
               </span>
-              {impersonationSession.targetRole ? ` (${impersonationSession.targetRole})` : '.'}
-            </span>
+              <span className="text-[11px] text-amber-800">
+                Reason: {impersonationSession.reason || 'Not provided'} · Time remaining: {impersonationRemaining || '—'}
+              </span>
+            </div>
             <button
               onClick={() => void stopImpersonation()}
               disabled={impersonationTransition === 'stopping'}

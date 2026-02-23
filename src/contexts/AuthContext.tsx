@@ -187,9 +187,11 @@ type ImpersonationSession = {
   targetRole?: User['role'] | null;
   targetEmail?: string | null;
   targetDisplayName?: string | null;
-  resumeToken: string;
+  impersonationId?: string | null;
+  reason?: string | null;
   basePortalRole: PortalRole | null;
   startedAt: number;
+  expiresAt?: number;
   status?: 'starting' | 'active' | 'stopping';
 };
 
@@ -223,7 +225,10 @@ interface AuthContextType {
   impersonationSession: ImpersonationSession | null;
   isImpersonating: boolean;
   impersonationTransition: 'starting' | 'stopping' | null;
-  startImpersonation: (target: Pick<User, 'uid'> | User) => Promise<ImpersonationTarget | null>;
+  startImpersonation: (
+    target: Pick<User, 'uid'> | User,
+    options?: { reason?: string }
+  ) => Promise<ImpersonationTarget | null>;
   stopImpersonation: () => Promise<void>;
   profileResolved: boolean;
 }
@@ -241,6 +246,7 @@ const impersonationStorageKey = 'bh_superadmin_impersonation';
 const userCacheKey = 'bh_user_cache';
 const userCacheAtKey = 'bh_user_cache_at';
 const userCacheTtlMs = 24 * 60 * 60 * 1000;
+const IMPERSONATION_TTL_MS = 30 * 60 * 1000;
 
 const parseCachedDate = (value?: string | null) => {
   if (!value) return undefined;
@@ -299,21 +305,33 @@ const hydrateCachedUser = (raw: any): User => ({
 const readImpersonationSession = (): ImpersonationSession | null => {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(impersonationStorageKey)
-      ?? sessionStorage.getItem(impersonationStorageKey);
+    const raw = sessionStorage.getItem(impersonationStorageKey);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ImpersonationSession;
-    if (!parsed?.actorUid || !parsed?.targetUid || !parsed?.resumeToken) {
+    if (!parsed?.actorUid || !parsed?.targetUid) {
       return null;
     }
     const status = parsed.status === 'starting' || parsed.status === 'stopping'
       ? parsed.status
       : 'active';
+    const startedAt = typeof parsed.startedAt === 'number' ? parsed.startedAt : Date.now();
+    const expiresAt = typeof parsed.expiresAt === 'number'
+      ? parsed.expiresAt
+      : startedAt + IMPERSONATION_TTL_MS;
+    if (Date.now() >= expiresAt) {
+      try {
+        sessionStorage.removeItem(impersonationStorageKey);
+      } catch {
+        // ignore storage errors
+      }
+      return null;
+    }
     return {
       ...parsed,
       status,
       basePortalRole: isPortalRole(parsed.basePortalRole) ? parsed.basePortalRole : null,
-      startedAt: typeof parsed.startedAt === 'number' ? parsed.startedAt : Date.now(),
+      startedAt,
+      expiresAt,
     };
   } catch {
     return null;
@@ -325,10 +343,8 @@ const persistImpersonationSession = (session: ImpersonationSession | null) => {
   try {
     if (session) {
       const raw = JSON.stringify(session);
-      localStorage.setItem(impersonationStorageKey, raw);
       sessionStorage.setItem(impersonationStorageKey, raw);
     } else {
-      localStorage.removeItem(impersonationStorageKey);
       sessionStorage.removeItem(impersonationStorageKey);
     }
   } catch {
@@ -604,6 +620,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const publicDonorSyncRef = useRef<string | null>(null);
   const profileRetryTimeoutRef = useRef<number | null>(null);
   const pushInitRef = useRef<string | null>(null);
+  const impersonationChannelRef = useRef<BroadcastChannel | null>(null);
+  const impersonationSessionRef = useRef<ImpersonationSession | null>(impersonationSession);
   const firestoreNetworkDisabledRef = useRef(false);
   const updateImpersonationSession = useCallback((session: ImpersonationSession | null) => {
     setImpersonationSession(session);
@@ -624,6 +642,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+
+  useEffect(() => {
+    impersonationSessionRef.current = impersonationSession;
+  }, [impersonationSession]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
+    const channel = new BroadcastChannel('bh_impersonation_sync');
+    impersonationChannelRef.current = channel;
+    channel.onmessage = (event) => {
+      const data = event?.data as
+        | { type: 'start'; session: ImpersonationSession }
+        | { type: 'stop'; actorUid: string; targetUid: string; impersonationId?: string | null }
+        | null;
+      if (!data) return;
+
+      if (data.type === 'start' && data.session) {
+        const session = data.session;
+        const currentUid = userRef.current?.uid;
+        if (!currentUid) return;
+        if (currentUid !== session.actorUid && currentUid !== session.targetUid) return;
+        updateImpersonationSession({
+          ...session,
+          status: session.status === 'starting' || session.status === 'stopping' ? session.status : 'starting',
+          expiresAt: typeof session.expiresAt === 'number'
+            ? session.expiresAt
+            : (session.startedAt || Date.now()) + IMPERSONATION_TTL_MS,
+        });
+        if (session.status === 'starting') {
+          setImpersonationTransition('starting');
+        }
+      }
+
+      if (data.type === 'stop') {
+        const session = impersonationSessionRef.current;
+        if (!session) return;
+        if (session.actorUid !== data.actorUid || session.targetUid !== data.targetUid) return;
+        updateImpersonationSession(null);
+        setImpersonationTransition(null);
+      }
+    };
+
+    return () => {
+      channel.close();
+      impersonationChannelRef.current = null;
+    };
+  }, [updateImpersonationSession]);
 
   const setPortalRole = (role: PortalRole | null) => {
     const previousRole = portalRoleState;
@@ -656,7 +721,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const startImpersonation = async (
-    target: Pick<User, 'uid'> | User
+    target: Pick<User, 'uid'> | User,
+    options?: { reason?: string }
   ): Promise<ImpersonationTarget | null> => {
     const actor = userRef.current;
     setImpersonationTransition('starting');
@@ -680,9 +746,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const response = await requestImpersonation(targetUid);
+      const response = await requestImpersonation(targetUid, {
+        ...(options?.reason ? { reason: options.reason } : {}),
+      });
       const targetUser = response?.targetUser;
-      if (!response?.targetToken || !response?.resumeToken || !targetUser?.uid) {
+      if (!response?.targetToken || !targetUser?.uid) {
         toast.error('Impersonation failed. Please try again.');
         trackImpersonationEvent('impersonation_failed', {
           reason: 'missing_token',
@@ -691,18 +759,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null;
       }
 
+      const startedAt = Date.now();
       const session: ImpersonationSession = {
         actorUid: actor.uid,
         targetUid: targetUser.uid,
         targetRole: targetUser.role ?? null,
         targetEmail: targetUser.email ?? null,
         targetDisplayName: targetUser.displayName ?? null,
-        resumeToken: response.resumeToken,
+        impersonationId: response.impersonationId ?? null,
+        reason: options?.reason?.trim() || null,
         basePortalRole: portalRoleState ?? null,
-        startedAt: Date.now(),
+        startedAt,
+        expiresAt: startedAt + IMPERSONATION_TTL_MS,
         status: 'starting',
       };
       updateImpersonationSession(session);
+      impersonationChannelRef.current?.postMessage({ type: 'start', session });
 
       await signInWithCustomToken(auth, response.targetToken);
       try {
@@ -719,6 +791,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         actorRole: actor.role || 'superadmin',
         targetUid: targetUser.uid,
         targetRole: targetUser.role ?? null,
+        impersonationId: response.impersonationId ?? null,
+        reason: options?.reason?.trim() || null,
       });
 
       return targetUser;
@@ -735,22 +809,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const shouldRefreshResumeToken = (error: any) => {
-    const code = error?.code;
-    return code === 'auth/invalid-custom-token'
-      || code === 'auth/custom-token-mismatch'
-      || code === 'auth/invalid-credential';
-  };
-
   const stopImpersonation = async () => {
     const session = impersonationSession;
-    if (!session?.resumeToken) {
-      toast.error('Unable to resume admin session.');
-      trackImpersonationEvent('impersonation_failed', {
-        reason: 'missing_resume_token',
-      });
-      return;
-    }
+    if (!session?.actorUid || !session?.targetUid) return;
     setImpersonationTransition('stopping');
 
     const attemptResume = async (resumeToken: string) => {
@@ -772,50 +833,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updateImpersonationSession(stoppingSession);
 
     try {
-      await attemptResume(stoppingSession.resumeToken);
+      const refreshed = await requestImpersonationResume({
+        ...(session.impersonationId ? { impersonationId: session.impersonationId } : {}),
+      });
+      if (!refreshed?.resumeToken) {
+        throw new Error('Missing resume token.');
+      }
+      await attemptResume(refreshed.resumeToken);
     } catch (error) {
-      if (!shouldRefreshResumeToken(error)) {
-        console.error('Failed to resume admin session:', error);
-        toast.error('Failed to resume admin session.');
-        trackImpersonationEvent('impersonation_failed', {
-          reason: 'resume_failed',
-        });
-        updateImpersonationSession({ ...session, status: 'active' });
-        setImpersonationTransition(null);
-        return;
-      }
-
-      try {
-        const refreshed = await requestImpersonationResume();
-        if (!refreshed?.resumeToken) {
-          throw new Error('Missing refreshed resume token.');
-        }
-        const refreshedSession: ImpersonationSession = {
-          ...stoppingSession,
-          resumeToken: refreshed.resumeToken,
-        };
-        updateImpersonationSession(refreshedSession);
-        await attemptResume(refreshed.resumeToken);
-        trackImpersonationEvent('impersonation_resume_refresh', {
-          actorUid: session.actorUid,
-          targetUid: session.targetUid,
-        });
-      } catch (refreshError) {
-        console.error('Failed to resume admin session:', refreshError);
-        toast.error('Failed to resume admin session.');
-        trackImpersonationEvent('impersonation_failed', {
-          reason: 'resume_refresh_failed',
-        });
-        updateImpersonationSession({ ...session, status: 'active' });
-        setImpersonationTransition(null);
-        return;
-      }
+      console.error('Failed to resume admin session:', error);
+      toast.error('Failed to resume admin session.');
+      trackImpersonationEvent('impersonation_failed', {
+        reason: 'resume_failed',
+        actorUid: session.actorUid,
+        targetUid: session.targetUid,
+      });
+      updateImpersonationSession({ ...session, status: 'active' });
+      setImpersonationTransition(null);
+      return;
     }
 
     trackImpersonationEvent('impersonation_stop', {
       actorUid: session.actorUid,
       targetUid: session.targetUid,
       targetRole: session.targetRole ?? null,
+      impersonationId: session.impersonationId ?? null,
+    });
+    impersonationChannelRef.current?.postMessage({
+      type: 'stop',
+      actorUid: session.actorUid,
+      targetUid: session.targetUid,
+      impersonationId: session.impersonationId ?? null,
     });
   };
 
@@ -876,7 +924,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     updateImpersonationSession(null);
-  }, [impersonationSession, user?.uid, updateImpersonationSession]);
+  }, [impersonationSession, user?.uid, updateImpersonationSession, stopImpersonation]);
 
   useEffect(() => {
     if (!impersonationSession || !user?.uid) return;
@@ -914,6 +962,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const claims = result?.claims as Record<string, any> | undefined;
         if (claims?.impersonatedBy !== impersonationSession.actorUid) {
           updateImpersonationSession(null);
+          return;
+        }
+        if (typeof claims?.impersonatedAt === 'number') {
+          const elapsed = Date.now() - claims.impersonatedAt;
+          if (elapsed >= IMPERSONATION_TTL_MS) {
+            void stopImpersonation();
+          }
         }
       })
       .catch(() => {
@@ -924,6 +979,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isActive = false;
     };
   }, [impersonationSession, user?.uid, updateImpersonationSession]);
+
+  useEffect(() => {
+    if (!impersonationSession) return;
+    const expiresAt = typeof impersonationSession.expiresAt === 'number'
+      ? impersonationSession.expiresAt
+      : impersonationSession.startedAt + IMPERSONATION_TTL_MS;
+    const remaining = expiresAt - Date.now();
+    if (remaining <= 0) {
+      if (user?.uid === impersonationSession.targetUid) {
+        void stopImpersonation();
+      } else {
+        updateImpersonationSession(null);
+        setImpersonationTransition(null);
+      }
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const latest = readImpersonationSession();
+      if (!latest) return;
+      if (Date.now() < expiresAt) return;
+      if (userRef.current?.uid === latest.targetUid) {
+        void stopImpersonation();
+      } else {
+        updateImpersonationSession(null);
+        setImpersonationTransition(null);
+      }
+    }, remaining);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [impersonationSession, user?.uid, updateImpersonationSession, stopImpersonation]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (impersonationSession) return;
+    auth.currentUser?.getIdTokenResult()
+      .then((result) => {
+        const claims = result?.claims as Record<string, any> | undefined;
+        const actorUid = claims?.impersonatedBy;
+        if (!actorUid || typeof actorUid !== 'string') return;
+        const startedAt = typeof claims?.impersonatedAt === 'number'
+          ? claims.impersonatedAt
+          : Date.now();
+        updateImpersonationSession({
+          actorUid,
+          targetUid: user.uid,
+          targetRole: user.role ?? null,
+          targetEmail: user.email ?? null,
+          targetDisplayName: user.displayName ?? null,
+          impersonationId: null,
+          reason: null,
+          basePortalRole: null,
+          startedAt,
+          expiresAt: startedAt + IMPERSONATION_TTL_MS,
+          status: 'active',
+        });
+      })
+      .catch(() => {
+        // ignore claim read errors
+      });
+  }, [impersonationSession, updateImpersonationSession, user?.displayName, user?.email, user?.role, user?.uid]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

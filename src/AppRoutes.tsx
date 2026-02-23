@@ -90,6 +90,7 @@ const NgoReferrals = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Referrals
 const AdminLogin = lazy(() => lazyLoad(import('./pages/admin/AdminLogin')));
 const AdminDashboard = lazy(() => lazyLoad(import('./pages/admin/AdminDashboard')));
 const AdminOnboarding = lazy(() => lazyLoad(import('./pages/admin/AdminOnboarding')));
+const ImpersonationAudit = lazy(() => lazyLoad(import('./pages/admin/ImpersonationAudit')));
 const FindDonors = lazy(() => lazyLoad(import('./pages/FindDonors')));
 const RequestBlood = lazy(() => lazyLoad(import('./pages/RequestBlood')));
 const About = lazy(() => lazyLoad(import('./pages/About')));
@@ -162,6 +163,7 @@ const AppRoutes = () => {
         </Route>
         <Route path="/admin/onboarding" element={<AdminOnboarding />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/impersonation-audit" element={<ImpersonationAudit />} />
       </Route>
 
       {/* 404 Route */}

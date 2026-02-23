@@ -135,6 +135,25 @@ export interface AuditLog {
 }
 
 // ============================================================================
+// COLLECTION: impersonationEvents
+// ============================================================================
+
+export interface ImpersonationEvent {
+  id?: string;
+  actorUid: string;
+  actorRole?: UserRole | string;
+  targetUid?: string | null;
+  action: string;
+  status?: string | null;
+  reason?: string | null;
+  caseId?: string | null;
+  metadata?: Record<string, any> | null;
+  ip?: string | null;
+  userAgent?: string | null;
+  createdAt: Timestamp;
+}
+
+// ============================================================================
 // COLLECTION: donations
 // ============================================================================
 
