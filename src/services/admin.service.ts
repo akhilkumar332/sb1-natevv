@@ -22,6 +22,7 @@ import {
   Timestamp,
   startAt,
   endAt,
+  QueryConstraint,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
@@ -154,6 +155,45 @@ const mapImpersonationUser = (docSnap: any): ImpersonationUser | null => {
   };
 };
 
+const USER_DATE_FIELDS: Array<keyof User> = ['createdAt', 'lastLoginAt', 'lastDonation', 'dateOfBirth'];
+
+const toMillis = (value: any): number => {
+  if (!value) return 0;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value?.toDate === 'function') return value.toDate().getTime();
+  if (typeof value?.seconds === 'number') return value.seconds * 1000;
+  return 0;
+};
+
+const sortByCreatedAtDesc = (users: User[]): User[] => {
+  return [...users].sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+};
+
+const isRecoverableUsersQueryError = (error: unknown): boolean => {
+  const code = (error as any)?.code;
+  const message = String((error as any)?.message || '').toLowerCase();
+  return (
+    code === 'failed-precondition'
+    || code === 'invalid-argument'
+    || message.includes('requires an index')
+    || message.includes('the query requires an index')
+  );
+};
+
+const buildUsersQuery = (
+  role?: 'donor' | 'bloodbank' | 'hospital' | 'ngo' | 'admin',
+  status?: 'active' | 'inactive' | 'suspended' | 'pending_verification',
+  limitCount: number = 100,
+  includeOrderBy: boolean = true
+) => {
+  const constraints: QueryConstraint[] = [];
+  if (role) constraints.push(where('role', '==', role));
+  if (status) constraints.push(where('status', '==', status));
+  if (includeOrderBy) constraints.push(orderBy('createdAt', 'desc'));
+  constraints.push(limit(limitCount));
+  return query(collection(db, 'users'), ...constraints);
+};
+
 export const searchUsersForImpersonation = async (rawQuery: string): Promise<ImpersonationUser[]> => {
   const queryText = rawQuery.trim();
   if (!queryText || queryText.length < 2) return [];
@@ -220,40 +260,40 @@ export const getAllUsers = async (
   limitCount: number = 100
 ): Promise<User[]> => {
   try {
-    let q;
-
-    if (role && status) {
-      q = query(
-        collection(db, 'users'),
-        where('role', '==', role),
-        where('status', '==', status),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount)
-      );
-    } else if (role) {
-      q = query(
-        collection(db, 'users'),
-        where('role', '==', role),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount)
-      );
-    } else if (status) {
-      q = query(
-        collection(db, 'users'),
-        where('status', '==', status),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount)
-      );
-    } else {
-      q = query(
-        collection(db, 'users'),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount)
-      );
+    try {
+      const primarySnapshot = await getDocs(buildUsersQuery(role, status, limitCount, true));
+      return extractQueryData<User>(primarySnapshot, USER_DATE_FIELDS);
+    } catch (primaryError) {
+      if (!isRecoverableUsersQueryError(primaryError)) {
+        throw primaryError;
+      }
+      console.warn('Primary users query failed, retrying with relaxed constraints.', primaryError);
     }
 
-    const snapshot = await getDocs(q);
-    return extractQueryData<User>(snapshot, ['createdAt', 'lastLoginAt', 'lastDonation', 'dateOfBirth']);
+    try {
+      const relaxedSnapshot = await getDocs(buildUsersQuery(role, status, limitCount, false));
+      const relaxedUsers = extractQueryData<User>(relaxedSnapshot, USER_DATE_FIELDS);
+      return sortByCreatedAtDesc(relaxedUsers).slice(0, limitCount);
+    } catch (relaxedError) {
+      if (!isRecoverableUsersQueryError(relaxedError)) {
+        throw relaxedError;
+      }
+      console.warn('Relaxed users query failed, falling back to broad query and client-side filters.', relaxedError);
+    }
+
+    const broadLimit = Math.max(limitCount * 4, 1000);
+    const broadSnapshot = await getDocs(
+      query(
+        collection(db, 'users'),
+        orderBy('createdAt', 'desc'),
+        limit(broadLimit)
+      )
+    );
+    const broadUsers = extractQueryData<User>(broadSnapshot, USER_DATE_FIELDS);
+    const filteredUsers = broadUsers.filter((entry) => (
+      (!role || entry.role === role) && (!status || entry.status === status)
+    ));
+    return filteredUsers.slice(0, limitCount);
   } catch (error) {
     throw new DatabaseError('Failed to fetch users');
   }

@@ -10,7 +10,16 @@ import {
   UserCog,
   FileText,
 } from 'lucide-react';
-import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import {
+  collection,
+  DocumentData,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  QueryDocumentSnapshot,
+  startAfter,
+} from 'firebase/firestore';
 import { db } from '../../firebase';
 import { timestampToDate } from '../../utils/firestore.utils';
 import { useAuth } from '../../contexts/AuthContext';
@@ -51,6 +60,26 @@ const STATUS_BADGE: Record<string, string> = {
   error: 'bg-red-100 text-red-700 border-red-200',
 };
 
+const PAGE_SIZE_OPTIONS = [50, 100, 200] as const;
+
+const mapEventDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): ImpersonationEvent => {
+  const data = docSnap.data() as Record<string, any>;
+  return {
+    id: docSnap.id,
+    actorUid: data.actorUid || '',
+    actorRole: data.actorRole || null,
+    targetUid: data.targetUid || null,
+    action: data.action || 'unknown',
+    status: data.status || null,
+    reason: data.reason || null,
+    caseId: data.caseId || null,
+    metadata: data.metadata || null,
+    ip: data.ip || null,
+    userAgent: data.userAgent || null,
+    createdAt: timestampToDate(data.createdAt) || null,
+  } as ImpersonationEvent;
+};
+
 const ImpersonationAudit = () => {
   const { isSuperAdmin } = useAuth();
   const [events, setEvents] = useState<ImpersonationEvent[]>([]);
@@ -58,47 +87,107 @@ const ImpersonationAudit = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [actionFilter, setActionFilter] = useState('all');
+  const [pageSize, setPageSize] = useState<number>(100);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [hasNextPage, setHasNextPage] = useState<boolean>(false);
+  const [pageCursors, setPageCursors] = useState<Record<number, QueryDocumentSnapshot<DocumentData> | null>>({
+    1: null,
+  });
 
-  const fetchEvents = useCallback(async () => {
+  const fetchEvents = useCallback(async (
+    page: number,
+    cursor: QueryDocumentSnapshot<DocumentData> | null,
+    options?: { reset?: boolean }
+  ) => {
+    if (!isSuperAdmin) {
+      setEvents([]);
+      setCurrentPage(1);
+      setHasNextPage(false);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+    const shouldReset = options?.reset === true;
     setLoading(true);
     setError(null);
     try {
-      const snapshot = await getDocs(
-        query(
-          collection(db, 'impersonationEvents'),
-          orderBy('createdAt', 'desc'),
-          limit(200)
-        )
-      );
-      const mapped = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as Record<string, any>;
-        return {
-          id: docSnap.id,
-          actorUid: data.actorUid || '',
-          actorRole: data.actorRole || null,
-          targetUid: data.targetUid || null,
-          action: data.action || 'unknown',
-          status: data.status || null,
-          reason: data.reason || null,
-          caseId: data.caseId || null,
-          metadata: data.metadata || null,
-          ip: data.ip || null,
-          userAgent: data.userAgent || null,
-          createdAt: timestampToDate(data.createdAt) || null,
-        } as ImpersonationEvent;
+      const baseQuery = cursor
+        ? query(
+            collection(db, 'impersonationEvents'),
+            orderBy('createdAt', 'desc'),
+            startAfter(cursor),
+            limit(pageSize + 1)
+          )
+        : query(
+            collection(db, 'impersonationEvents'),
+            orderBy('createdAt', 'desc'),
+            limit(pageSize + 1)
+          );
+
+      const snapshot = await getDocs(baseQuery);
+      const docs = snapshot.docs;
+      const moreAvailable = docs.length > pageSize;
+      const pageDocs = moreAvailable ? docs.slice(0, pageSize) : docs;
+
+      setEvents(pageDocs.map(mapEventDoc));
+      setCurrentPage(page);
+      setHasNextPage(moreAvailable);
+
+      const lastDoc = pageDocs.length > 0 ? pageDocs[pageDocs.length - 1] : null;
+      setPageCursors((prev) => {
+        const next: Record<number, QueryDocumentSnapshot<DocumentData> | null> = shouldReset
+          ? { 1: null }
+          : { ...prev };
+        next[page] = cursor;
+        if (moreAvailable && lastDoc) {
+          next[page + 1] = lastDoc;
+        } else {
+          delete next[page + 1];
+        }
+        return next;
       });
-      setEvents(mapped);
     } catch (err) {
       console.error('Failed to load impersonation events', err);
       setError('Unable to load impersonation events. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isSuperAdmin, pageSize]);
 
   useEffect(() => {
-    void fetchEvents();
-  }, [fetchEvents]);
+    if (!isSuperAdmin) {
+      setEvents([]);
+      setCurrentPage(1);
+      setHasNextPage(false);
+      setPageCursors({ 1: null });
+      setLoading(false);
+      return;
+    }
+    setCurrentPage(1);
+    setHasNextPage(false);
+    setPageCursors({ 1: null });
+    void fetchEvents(1, null, { reset: true });
+  }, [fetchEvents, isSuperAdmin, pageSize]);
+
+  const refreshCurrentPage = () => {
+    const cursor = pageCursors[currentPage] ?? null;
+    void fetchEvents(currentPage, cursor);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage <= 1) return;
+    const previousPage = currentPage - 1;
+    const cursor = pageCursors[previousPage] ?? null;
+    void fetchEvents(previousPage, cursor);
+  };
+
+  const handleNextPage = () => {
+    if (!hasNextPage) return;
+    const nextPage = currentPage + 1;
+    if (!(nextPage in pageCursors)) return;
+    const cursor = pageCursors[nextPage] ?? null;
+    void fetchEvents(nextPage, cursor);
+  };
 
   const filteredEvents = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -125,9 +214,12 @@ const ImpersonationAudit = () => {
     });
   }, [actionFilter, events, searchTerm]);
 
+  const canGoPrev = currentPage > 1;
+  const canGoNext = hasNextPage && (currentPage + 1 in pageCursors);
+
   if (!isSuperAdmin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
           <Shield className="w-14 h-14 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Restricted Access</h2>
@@ -138,7 +230,7 @@ const ImpersonationAudit = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100 p-6">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
           <div>
@@ -147,7 +239,7 @@ const ImpersonationAudit = () => {
           </div>
           <div className="flex flex-wrap gap-3">
             <button
-              onClick={fetchEvents}
+              onClick={refreshCurrentPage}
               className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all font-semibold flex items-center gap-2"
             >
               <RefreshCw className="w-4 h-4" />
@@ -156,8 +248,8 @@ const ImpersonationAudit = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg border border-blue-100 p-6 mb-6">
-          <div className="grid gap-4 lg:grid-cols-[1.2fr_0.6fr]">
+        <div className="bg-white rounded-2xl shadow-lg border border-red-100 p-6 mb-6">
+          <div className="grid gap-4 lg:grid-cols-[1.2fr_0.6fr_0.5fr]">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-widest text-gray-400">Search</label>
               <div className="relative mt-2">
@@ -165,7 +257,7 @@ const ImpersonationAudit = () => {
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder="Search by uid, email, action, ip, or reason"
-                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 pr-10 text-sm text-gray-700 focus:border-blue-400 focus:outline-none"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 pr-10 text-sm text-gray-700 focus:border-red-400 focus:outline-none"
                 />
                 <Search className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
               </div>
@@ -175,7 +267,7 @@ const ImpersonationAudit = () => {
               <select
                 value={actionFilter}
                 onChange={(event) => setActionFilter(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 focus:border-blue-400 focus:outline-none"
+                className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 focus:border-red-400 focus:outline-none"
               >
                 <option value="all">All actions</option>
                 <option value="impersonation_start">Start</option>
@@ -184,26 +276,61 @@ const ImpersonationAudit = () => {
                 <option value="impersonation_error">Error</option>
               </select>
             </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-widest text-gray-400">Page size</label>
+              <select
+                value={pageSize}
+                onChange={(event) => setPageSize(Number(event.target.value))}
+                className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 focus:border-red-400 focus:outline-none"
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size} / page
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg border border-blue-100">
+        <div className="bg-white rounded-2xl shadow-lg border border-red-100">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <div className="flex items-center gap-2 text-gray-700 font-semibold">
               <FileText className="w-5 h-5" />
-              {filteredEvents.length} events
+              {filteredEvents.length} events on page {currentPage}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePrevPage}
+                disabled={loading || !canGoPrev}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span className="text-xs font-semibold text-gray-500">Page {currentPage}</span>
+              <button
+                type="button"
+                onClick={handleNextPage}
+                disabled={loading || !canGoNext}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
             </div>
           </div>
 
           {loading ? (
             <div className="p-8 text-center text-gray-500">
-              <Clock className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-3" />
+              <Clock className="w-8 h-8 text-red-600 animate-spin mx-auto mb-3" />
               Loading impersonation events...
             </div>
           ) : error ? (
             <div className="p-8 text-center text-red-600">{error}</div>
           ) : filteredEvents.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No impersonation events found.</div>
+            <div className="p-8 text-center text-gray-500">
+              {events.length === 0 ? 'No impersonation events found.' : 'No events on this page match current filters.'}
+            </div>
           ) : (
             <div className="divide-y divide-gray-100">
               {filteredEvents.map((event) => (

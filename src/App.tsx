@@ -35,6 +35,7 @@ function App() {
     '/donor/dashboard',
     '/ngo/dashboard',
     '/bloodbank/dashboard',
+    '/admin/dashboard',
     '/donor/onboarding',
     '/ngo/onboarding',
     '/bloodbank/onboarding',
@@ -43,6 +44,7 @@ function App() {
     '/donor/dashboard',
     '/ngo/dashboard',
     '/bloodbank/dashboard',
+    '/admin/dashboard',
   ];
 
   const hideCompletely = noFooterRoutes.has(location.pathname)

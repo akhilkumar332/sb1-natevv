@@ -88,9 +88,24 @@ const NgoAnalytics = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Analytics
 const NgoAccount = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Account')));
 const NgoReferrals = lazy(() => lazyLoad(import('./pages/ngo/dashboard/Referrals')));
 const AdminLogin = lazy(() => lazyLoad(import('./pages/admin/AdminLogin')));
-const AdminDashboard = lazy(() => lazyLoad(import('./pages/admin/AdminDashboard')));
+const AdminPortal = lazy(() => lazyLoad(import('./pages/admin/AdminPortal')));
 const AdminOnboarding = lazy(() => lazyLoad(import('./pages/admin/AdminOnboarding')));
 const ImpersonationAudit = lazy(() => lazyLoad(import('./pages/admin/ImpersonationAudit')));
+const AdminOverview = lazy(() => lazyLoad(import('./pages/admin/dashboard/Overview')));
+const AdminUsers = lazy(() => lazyLoad(import('./pages/admin/dashboard/Users')));
+const AdminDonors = lazy(() => lazyLoad(import('./pages/admin/dashboard/Donors')));
+const AdminNgos = lazy(() => lazyLoad(import('./pages/admin/dashboard/Ngos')));
+const AdminBloodBanks = lazy(() => lazyLoad(import('./pages/admin/dashboard/BloodBanks')));
+const AdminVerification = lazy(() => lazyLoad(import('./pages/admin/dashboard/Verification')));
+const AdminEmergencyRequests = lazy(() => lazyLoad(import('./pages/admin/dashboard/EmergencyRequests')));
+const AdminInventoryAlerts = lazy(() => lazyLoad(import('./pages/admin/dashboard/InventoryAlerts')));
+const AdminCampaigns = lazy(() => lazyLoad(import('./pages/admin/dashboard/Campaigns')));
+const AdminVolunteersPartnerships = lazy(() => lazyLoad(import('./pages/admin/dashboard/VolunteersPartnerships')));
+const AdminAppointmentsDonations = lazy(() => lazyLoad(import('./pages/admin/dashboard/AppointmentsDonations')));
+const AdminAnalyticsReports = lazy(() => lazyLoad(import('./pages/admin/dashboard/AnalyticsReports')));
+const AdminAuditSecurity = lazy(() => lazyLoad(import('./pages/admin/dashboard/AuditSecurity')));
+const AdminNotifications = lazy(() => lazyLoad(import('./pages/admin/dashboard/Notifications')));
+const AdminSettings = lazy(() => lazyLoad(import('./pages/admin/dashboard/Settings')));
 const FindDonors = lazy(() => lazyLoad(import('./pages/FindDonors')));
 const RequestBlood = lazy(() => lazyLoad(import('./pages/RequestBlood')));
 const About = lazy(() => lazyLoad(import('./pages/About')));
@@ -162,7 +177,26 @@ const AppRoutes = () => {
           <Route path="account" element={<NgoAccount />} />
         </Route>
         <Route path="/admin/onboarding" element={<AdminOnboarding />} />
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/dashboard" element={<AdminPortal />}>
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<AdminOverview />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="donors" element={<AdminDonors />} />
+          <Route path="ngos" element={<AdminNgos />} />
+          <Route path="bloodbanks" element={<AdminBloodBanks />} />
+          <Route path="verification" element={<AdminVerification />} />
+          <Route path="emergency-requests" element={<AdminEmergencyRequests />} />
+          <Route path="inventory-alerts" element={<AdminInventoryAlerts />} />
+          <Route path="campaigns" element={<AdminCampaigns />} />
+          <Route path="volunteers-partnerships" element={<AdminVolunteersPartnerships />} />
+          <Route path="appointments-donations" element={<AdminAppointmentsDonations />} />
+          <Route path="analytics-reports" element={<AdminAnalyticsReports />} />
+          <Route path="reports" element={<Navigate to="/admin/dashboard/analytics-reports" replace />} />
+          <Route path="audit-security" element={<AdminAuditSecurity />} />
+          <Route path="impersonation-audit" element={<ImpersonationAudit />} />
+          <Route path="notifications" element={<AdminNotifications />} />
+          <Route path="settings" element={<AdminSettings />} />
+        </Route>
         <Route path="/admin/impersonation-audit" element={<ImpersonationAudit />} />
       </Route>
 

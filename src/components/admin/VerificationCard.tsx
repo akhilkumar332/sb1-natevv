@@ -64,7 +64,7 @@ export const VerificationCard: React.FC<VerificationCardProps> = ({
   const getStatusColor = (status: typeof request.status) => {
     const colorMap = {
       pending: 'bg-yellow-100 text-yellow-800',
-      under_review: 'bg-blue-100 text-blue-800',
+      under_review: 'bg-red-100 text-red-800',
       approved: 'bg-green-100 text-green-800',
       rejected: 'bg-red-100 text-red-800',
     };
@@ -165,7 +165,7 @@ export const VerificationCard: React.FC<VerificationCardProps> = ({
           {onViewDocuments && (
             <button
               onClick={() => onViewDocuments(request)}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
             >
               View Documents
             </button>
@@ -205,7 +205,7 @@ export const VerificationCard: React.FC<VerificationCardProps> = ({
             <textarea
               value={reviewNotes}
               onChange={e => setReviewNotes(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
               rows={2}
               placeholder="Add any notes about this verification..."
             />

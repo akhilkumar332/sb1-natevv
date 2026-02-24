@@ -89,7 +89,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ request, onClose
                   }}
                   className={`w-full text-left p-3 rounded-lg mb-2 transition-colors ${
                     selectedDocIndex === index
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-red-600 text-white'
                       : 'bg-white hover:bg-gray-100 text-gray-900'
                   }`}
                 >
@@ -98,14 +98,14 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ request, onClose
                   </div>
                   <div
                     className={`text-xs ${
-                      selectedDocIndex === index ? 'text-blue-100' : 'text-gray-500'
+                      selectedDocIndex === index ? 'text-red-100' : 'text-gray-500'
                     }`}
                   >
                     {doc.name}
                   </div>
                   <div
                     className={`text-xs mt-1 ${
-                      selectedDocIndex === index ? 'text-blue-100' : 'text-gray-400'
+                      selectedDocIndex === index ? 'text-red-100' : 'text-gray-400'
                     }`}
                   >
                     {formatDateTime(doc.uploadedAt)}
@@ -128,7 +128,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ request, onClose
                 </div>
                 <button
                   onClick={() => handleDownload(selectedDoc.url, selectedDoc.name)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
                 >
                   <svg
                     className="w-5 h-5"
@@ -155,7 +155,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ request, onClose
                       <p className="text-gray-600 mb-4">Failed to load image</p>
                       <button
                         onClick={() => handleDownload(selectedDoc.url, selectedDoc.name)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
                       >
                         Download to View
                       </button>
@@ -196,7 +196,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ request, onClose
                     </p>
                     <button
                       onClick={() => handleDownload(selectedDoc.url, selectedDoc.name)}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
                     >
                       Download to View
                     </button>

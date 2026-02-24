@@ -209,7 +209,7 @@ export function AdminOnboarding() {
         return (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold flex items-center">
-              <User className="mr-2 text-indigo-500" /> 
+              <User className="mr-2 text-red-500" /> 
               Personal Information
             </h2>
             <div>
@@ -219,7 +219,7 @@ export function AdminOnboarding() {
                   type="text"
                   name="name" value={formData.name}
                   onChange={handleChange}
-                  className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
                   required
                 />
               </div>
@@ -230,7 +230,7 @@ export function AdminOnboarding() {
                 name="gender"
                 value={formData.gender}
                 onChange={handleChange}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
                 required
               >
                 <option value="">Select Gender</option>
@@ -246,7 +246,7 @@ export function AdminOnboarding() {
                 name="dateOfBirth"
                 value={formData.dateOfBirth}
                 onChange={handleChange}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
@@ -256,7 +256,7 @@ export function AdminOnboarding() {
         return (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold flex items-center">
-              <MapPin className="mr-2 text-indigo-500" /> 
+              <MapPin className="mr-2 text-red-500" /> 
               Contact Information
             </h2>
             <div>
@@ -266,7 +266,7 @@ export function AdminOnboarding() {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
@@ -277,7 +277,7 @@ export function AdminOnboarding() {
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
@@ -288,7 +288,7 @@ export function AdminOnboarding() {
                 name="address"
                 value={formData.address}
                 onChange={handleChange}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
@@ -299,7 +299,7 @@ export function AdminOnboarding() {
                 name="city"
                 value={formData.city}
                 onChange={handleChange}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
@@ -310,7 +310,7 @@ export function AdminOnboarding() {
                 name="state"
                 value={formData.state}
                 onChange={handleChange}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
@@ -321,7 +321,7 @@ export function AdminOnboarding() {
                 name="postalCode"
                 value={formData.postalCode}
                 onChange={handleChange}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
@@ -331,7 +331,7 @@ export function AdminOnboarding() {
         return (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold flex items-center">
-              <Droplet className="mr-2 text-indigo-500" /> 
+              <Droplet className="mr-2 text-red-500" /> 
               Medical Information
             </h2>
             <div>
@@ -340,7 +340,7 @@ export function AdminOnboarding() {
                 name="bloodType"
                 value={formData.bloodType}
                 onChange={handleChange}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
                 required
               >
                 <option value="" disabled>Select Blood Type</option>
@@ -356,7 +356,7 @@ export function AdminOnboarding() {
                 name="lastDonation"
                 value={formData.lastDonation}
                 onChange={handleChange}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
               />
             </div>
             <div>
@@ -365,7 +365,7 @@ export function AdminOnboarding() {
                 name="medicalConditions"
                 value={formData.medicalConditions}
                 onChange={handleChange}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
               />
             </div>
           </div>
@@ -374,12 +374,12 @@ export function AdminOnboarding() {
         return (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold flex items-center">
-              <Briefcase className="mr-2 text-indigo-500" /> 
+              <Briefcase className="mr-2 text-red-500" /> 
               Additional Information
             </h2>
             <div>
               <label className="block text-sm font-medium text-gray-700 flex items-center">
-                <Globe className="mr-2 text-indigo-500" />
+                <Globe className="mr-2 text-red-500" />
                Occupation
               </label>
               <input
@@ -387,13 +387,13 @@ export function AdminOnboarding() {
                 name="occupation"
                 value={formData.occupation}
                 onChange={handleChange}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 flex items-center">
-                <Globe className="mr-2 text-indigo-500" />
+                <Globe className="mr-2 text-red-500" />
                 Preferred Language
               </label>
               <input
@@ -401,13 +401,13 @@ export function AdminOnboarding() {
                 name="preferredLanguage"
                 value={formData.preferredLanguage}
                 onChange={handleChange}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 flex items-center">
-                <Globe className="mr-2 text-indigo-500" />
+                <Globe className="mr-2 text-red-500" />
                 How did you hear about us?
               </label>
               <input
@@ -415,13 +415,13 @@ export function AdminOnboarding() {
                 name="howHeardAboutUs"
                 value={formData.howHeardAboutUs}
                 onChange={handleChange}
-                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:border-red-500 focus:ring-red-500"
                 required
               />
             </div>
             <div>
             <label className="block text-sm font-medium text-gray-700 flex items-center">
-                <Heart className="mr-2 text-indigo-500" />
+                <Heart className="mr-2 text-red-500" />
                 Interested in Volunteering?
               </label>
               <input
@@ -429,7 +429,7 @@ export function AdminOnboarding() {
                 name="interestedInVolunteering"
                 checked={formData.interestedInVolunteering}
                 onChange={handleChange}
-                className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                className="h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
               />
             </div>
           </div>
@@ -445,7 +445,7 @@ export function AdminOnboarding() {
                   name="privacyPolicyAgreed"
                   checked={formData.privacyPolicyAgreed}
                   onChange={handleChange}
-                  className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  className="h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                   required
                 />
                 <span className="ml-2">I agree to the Privacy Policy</span>
@@ -458,7 +458,7 @@ export function AdminOnboarding() {
                   name="termsOfServiceAgreed"
                   checked={formData.termsOfServiceAgreed}
                   onChange={handleChange}
-                  className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  className="h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                   required
                 />
                 <span className="ml-2">I agree to the Terms of Service</span>
@@ -476,12 +476,12 @@ export function AdminOnboarding() {
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold flex items-center">
-        <Calendar className="mr-2 text-indigo-500" />
+        <Calendar className="mr-2 text-red-500" />
         Admin Onboarding
       </h1>
       <div className="mt-4">
         <div className="relative">
-          <div className="absolute top-0 left-0 h-1 bg-indigo-500" style={{ width: `${progress}%` }} />
+          <div className="absolute top-0 left-0 h-1 bg-red-500" style={{ width: `${progress}%` }} />
           <div className="h-1 bg-gray-200" />
         </div>
       </div>
@@ -497,7 +497,7 @@ export function AdminOnboarding() {
         {currentStep < 4 ? (
           <button 
             onClick={nextStep} 
-            className="bg-indigo-600 text-white px-4 py-2 rounded"
+            className="bg-red-600 text-white px-4 py-2 rounded"
           >
             Next
           </button>
