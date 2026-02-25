@@ -93,6 +93,7 @@ const AdminOnboarding = lazy(() => lazyLoad(import('./pages/admin/AdminOnboardin
 const ImpersonationAudit = lazy(() => lazyLoad(import('./pages/admin/ImpersonationAudit')));
 const AdminOverview = lazy(() => lazyLoad(import('./pages/admin/dashboard/Overview')));
 const AdminUsers = lazy(() => lazyLoad(import('./pages/admin/dashboard/Users')));
+const AdminUserDetail = lazy(() => lazyLoad(import('./pages/admin/dashboard/UserDetail')));
 const AdminDonors = lazy(() => lazyLoad(import('./pages/admin/dashboard/Donors')));
 const AdminNgos = lazy(() => lazyLoad(import('./pages/admin/dashboard/Ngos')));
 const AdminBloodBanks = lazy(() => lazyLoad(import('./pages/admin/dashboard/BloodBanks')));
@@ -181,9 +182,13 @@ const AppRoutes = () => {
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<AdminOverview />} />
           <Route path="users" element={<AdminUsers />} />
+          <Route path="users/:uid" element={<AdminUserDetail />} />
           <Route path="donors" element={<AdminDonors />} />
+          <Route path="donors/:uid" element={<AdminUserDetail />} />
           <Route path="ngos" element={<AdminNgos />} />
+          <Route path="ngos/:uid" element={<AdminUserDetail />} />
           <Route path="bloodbanks" element={<AdminBloodBanks />} />
+          <Route path="bloodbanks/:uid" element={<AdminUserDetail />} />
           <Route path="verification" element={<AdminVerification />} />
           <Route path="emergency-requests" element={<AdminEmergencyRequests />} />
           <Route path="inventory-alerts" element={<AdminInventoryAlerts />} />

@@ -337,7 +337,8 @@ export const getUserById = async (userId: string): Promise<User> => {
 export const updateUserStatus = async (
   userId: string,
   status: 'active' | 'inactive' | 'suspended' | 'pending_verification',
-  adminId: string
+  adminId: string,
+  reason?: string
 ): Promise<void> => {
   try {
     // Verify admin permissions
@@ -369,7 +370,7 @@ export const updateUserStatus = async (
       actorRole: adminRole,
       action: 'admin_update_user_status',
       targetUid: userId,
-      metadata: { status },
+      metadata: { status, ...(reason ? { reason } : {}) },
     });
   } catch (error) {
     if (error instanceof PermissionError) {
@@ -386,7 +387,8 @@ export const updateUserStatus = async (
  */
 export const verifyUserAccount = async (
   userId: string,
-  adminId: string
+  adminId: string,
+  reason?: string
 ): Promise<void> => {
   try {
     // Verify admin permissions
@@ -419,6 +421,7 @@ export const verifyUserAccount = async (
       actorRole: adminRole,
       action: 'admin_verify_user',
       targetUid: userId,
+      metadata: reason ? { reason } : undefined,
     });
   } catch (error) {
     if (error instanceof PermissionError) {
@@ -435,7 +438,8 @@ export const verifyUserAccount = async (
  */
 export const deleteUserAccount = async (
   userId: string,
-  adminId: string
+  adminId: string,
+  reason?: string
 ): Promise<void> => {
   try {
     // Verify admin permissions
@@ -462,7 +466,7 @@ export const deleteUserAccount = async (
       actorRole: adminRole,
       action: 'admin_delete_user',
       targetUid: userId,
-      metadata: { status: 'inactive' },
+      metadata: { status: 'inactive', ...(reason ? { reason } : {}) },
     });
   } catch (error) {
     if (error instanceof PermissionError || error instanceof ValidationError) {

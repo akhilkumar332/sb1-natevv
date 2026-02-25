@@ -1,4 +1,5 @@
 export type AdminUserRoleFilter = 'all' | 'donor' | 'ngo' | 'bloodbank';
+export type AdminKpiRange = '7d' | '30d' | '90d' | '12m';
 
 export const adminQueryKeys = {
   root: ['admin'] as const,
@@ -7,6 +8,14 @@ export const adminQueryKeys = {
   usersRoot: ['admin', 'users'] as const,
   users: (role: AdminUserRoleFilter = 'all', limit: number = 800) =>
     ['admin', 'users', { role, limit }] as const,
+  userDetailRoot: ['admin', 'userDetail'] as const,
+  userDetail: (uid: string) => ['admin', 'userDetail', uid] as const,
+  userSecurity: (uid: string) => ['admin', 'userSecurity', uid] as const,
+  userKpis: (uid: string, range: AdminKpiRange = '90d') => ['admin', 'userKpis', uid, { range }] as const,
+  userReferrals: (uid: string, filters?: { role?: string; status?: string; search?: string }) =>
+    ['admin', 'userReferrals', uid, filters || {}] as const,
+  userTimeline: (uid: string, filters?: { kind?: string; search?: string }) =>
+    ['admin', 'userTimeline', uid, filters || {}] as const,
   verificationRoot: ['admin', 'verificationRequests'] as const,
   verificationRequests: (limit: number = 500) => ['admin', 'verificationRequests', { limit }] as const,
   emergencyRoot: ['admin', 'emergencyRequests'] as const,
@@ -32,4 +41,3 @@ export const adminQueryKeys = {
   auditRoot: ['admin', 'auditLogs'] as const,
   auditLogs: (limit: number = 1000) => ['admin', 'auditLogs', { limit }] as const,
 };
-

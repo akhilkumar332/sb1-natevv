@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { adminQueryKeys, type AdminUserRoleFilter } from '../../constants/adminQueryKeys';
+import { adminQueryKeys, type AdminKpiRange, type AdminUserRoleFilter } from '../../constants/adminQueryKeys';
 import { getAdminCacheKey, readAdminCache, writeAdminCache } from '../../utils/adminCache';
 import {
   getAllUsers,
@@ -12,6 +12,17 @@ import {
   getRecentActivity,
   getVerificationRequests,
 } from '../../services/admin.service';
+import {
+  getAdminUserDetail,
+  getAdminUserKpis,
+  getAdminUserReferrals,
+  getAdminUserSecurity,
+  getAdminUserTimeline,
+  type AdminUserKpis,
+  type AdminUserReferral,
+  type AdminUserSecurity,
+  type AdminUserTimelineItem,
+} from '../../services/adminUserDetail.service';
 import type { BloodInventory, BloodRequest, User, VerificationRequest } from '../../types/database.types';
 
 type PlatformStatsResponse = Awaited<ReturnType<typeof getPlatformStats>>;
@@ -72,6 +83,7 @@ const useCachedAdminQuery = <T,>(
     gcTime?: number;
     refetchInterval?: number;
     refetchIntervalInBackground?: boolean;
+    enabled?: boolean;
   },
 ) => {
   const cacheKey = getAdminCacheKey(queryKey);
@@ -87,6 +99,7 @@ const useCachedAdminQuery = <T,>(
     gcTime: options?.gcTime,
     refetchInterval: options?.refetchInterval,
     refetchIntervalInBackground: options?.refetchIntervalInBackground,
+    enabled: options?.enabled,
   });
 };
 
@@ -367,6 +380,87 @@ export const useAdminAuditLogs = (limitCount: number = 1000) =>
       gcTime: 10 * 60 * 1000,
       refetchInterval: 60 * 1000,
       refetchIntervalInBackground: true,
+    },
+  );
+
+export const useAdminUserDetail = (uid: string) =>
+  useCachedAdminQuery<User>(
+    adminQueryKeys.userDetail(uid),
+    5 * 60 * 1000,
+    ['createdAt', 'updatedAt', 'lastLoginAt', 'lastDonation', 'dateOfBirth'],
+    () => getAdminUserDetail(uid),
+    {
+      staleTime: 2 * 60 * 1000,
+      gcTime: 15 * 60 * 1000,
+      refetchInterval: 2 * 60 * 1000,
+      refetchIntervalInBackground: true,
+      enabled: Boolean(uid),
+    },
+  );
+
+export const useAdminUserSecurity = (uid: string) =>
+  useCachedAdminQuery<AdminUserSecurity>(
+    adminQueryKeys.userSecurity(uid),
+    2 * 60 * 1000,
+    ['updatedAt', 'createdAt'],
+    () => getAdminUserSecurity(uid),
+    {
+      staleTime: 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchInterval: 60 * 1000,
+      refetchIntervalInBackground: true,
+      enabled: Boolean(uid),
+    },
+  );
+
+export const useAdminUserKpis = (uid: string, roleHint?: string, range: AdminKpiRange = '90d') =>
+  useCachedAdminQuery<AdminUserKpis>(
+    adminQueryKeys.userKpis(uid, range),
+    5 * 60 * 1000,
+    [],
+    () => getAdminUserKpis(uid, roleHint, range),
+    {
+      staleTime: 2 * 60 * 1000,
+      gcTime: 15 * 60 * 1000,
+      refetchInterval: 2 * 60 * 1000,
+      refetchIntervalInBackground: true,
+      enabled: Boolean(uid),
+    },
+  );
+
+export const useAdminUserReferrals = (
+  uid: string,
+  filters?: { role?: string; status?: string; search?: string },
+) =>
+  useCachedAdminQuery<AdminUserReferral[]>(
+    adminQueryKeys.userReferrals(uid, filters),
+    5 * 60 * 1000,
+    ['referredAt', 'createdAt'],
+    () => getAdminUserReferrals(uid, filters),
+    {
+      staleTime: 2 * 60 * 1000,
+      gcTime: 15 * 60 * 1000,
+      refetchInterval: 2 * 60 * 1000,
+      refetchIntervalInBackground: true,
+      enabled: Boolean(uid),
+    },
+  );
+
+export const useAdminUserTimeline = (
+  uid: string,
+  filters?: { kind?: string; search?: string },
+) =>
+  useCachedAdminQuery<AdminUserTimelineItem[]>(
+    adminQueryKeys.userTimeline(uid, filters),
+    2 * 60 * 1000,
+    ['createdAt'],
+    () => getAdminUserTimeline(uid, filters),
+    {
+      staleTime: 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchInterval: 60 * 1000,
+      refetchIntervalInBackground: true,
+      enabled: Boolean(uid),
     },
   );
 
