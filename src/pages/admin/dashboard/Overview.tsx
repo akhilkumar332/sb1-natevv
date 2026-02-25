@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Activity, AlertTriangle, Bell, Droplet, Shield, Users } from 'lucide-react';
-import { useAdminData } from '../../../hooks/useAdminData';
+import { useAdminOverviewData } from '../../../hooks/admin/useAdminQueries';
 
 function AdminOverviewPage() {
   const {
@@ -13,33 +13,29 @@ function AdminOverviewPage() {
     loading,
     error,
     refreshData,
-  } = useAdminData();
-
-  if (loading) {
-    return (
-      <div className="rounded-2xl border border-red-100 bg-white p-8 text-center shadow-sm">
-        <p className="text-sm font-semibold text-gray-600">Loading overview...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
-        <p className="font-semibold text-red-700">{error}</p>
-        <button
-          type="button"
-          onClick={refreshData}
-          className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
+  } = useAdminOverviewData();
 
   return (
     <div className="space-y-6">
+      {loading && (
+        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
+          Refreshing overview data...
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={refreshData}
+              className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">

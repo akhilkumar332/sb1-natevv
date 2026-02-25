@@ -1,17 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Eye, ShieldCheck, UserCheck, UserMinus, UserX } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import type { User } from '../../../types/database.types';
 import { timestampToDate } from '../../../utils/firestore.utils';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   deleteUserAccount,
-  getAllUsers,
   updateUserStatus,
   verifyUserAccount,
 } from '../../../services/admin.service';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import { useAdminUsers } from '../../../hooks/admin/useAdminQueries';
+import { adminQueryKeys } from '../../../constants/adminQueryKeys';
 
 type RoleFilter = 'all' | 'donor' | 'ngo' | 'bloodbank';
 type StatusFilter = 'all' | 'active' | 'inactive' | 'suspended' | 'pending_verification';
@@ -55,73 +57,45 @@ export function AdminUsersPage({
   description = 'Manage users across all portal roles.',
 }: AdminUsersPageProps) {
   const { user: authUser, isSuperAdmin } = useAuth();
-  const [users, setUsers] = useState<UserRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [processingUid, setProcessingUid] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
 
-  const loadUsers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      let rawUsers: User[] = [];
-      if (roleFilter === 'donor') {
-        rawUsers = await getAllUsers('donor', undefined, 500);
-      } else if (roleFilter === 'ngo') {
-        rawUsers = await getAllUsers('ngo', undefined, 500);
-      } else if (roleFilter === 'bloodbank') {
-        const [bloodbanks, hospitals] = await Promise.all([
-          getAllUsers('bloodbank', undefined, 500),
-          getAllUsers('hospital', undefined, 500),
-        ]);
-        rawUsers = [...bloodbanks, ...hospitals];
-      } else {
-        rawUsers = await getAllUsers(undefined, undefined, 800);
+  const usersQuery = useAdminUsers(roleFilter);
+  const loading = usersQuery.isLoading;
+  const error = usersQuery.error instanceof Error ? usersQuery.error.message : null;
+
+  const users = useMemo<UserRow[]>(() => {
+    const rawUsers: User[] = usersQuery.data || [];
+    const deduped = new Map<string, User>();
+    rawUsers.forEach((entry) => {
+      const key = entry.uid || entry.id;
+      if (!key) return;
+      if (!deduped.has(key)) {
+        deduped.set(key, entry);
       }
+    });
 
-      const deduped = new Map<string, User>();
-      rawUsers.forEach((entry) => {
-        const key = entry.uid || entry.id;
-        if (!key) return;
-        if (!deduped.has(key)) {
-          deduped.set(key, entry);
-        }
-      });
-
-      const mapped = Array.from(deduped.values())
-        .map((entry) => ({
-          id: entry.id || entry.uid,
-          uid: entry.uid,
-          displayName: entry.displayName || entry.organizationName || entry.hospitalName || entry.bloodBankName || 'User',
-          email: entry.email || '-',
-          role: normalizeRole(entry.role),
-          status: entry.status || 'active',
-          verified: Boolean(entry.verified),
-          city: entry.city,
-          bhId: entry.bhId,
-          createdAt: toDate(entry.createdAt),
-          lastLoginAt: toDate(entry.lastLoginAt),
-        }))
-        .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-
-      setUsers(mapped);
-    } catch (fetchError) {
-      console.error('Failed to load admin users', fetchError);
-      setError('Unable to load users.');
-      setUsers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [roleFilter]);
-
-  useEffect(() => {
-    void loadUsers();
-  }, [loadUsers]);
+    return Array.from(deduped.values())
+      .map((entry) => ({
+        id: entry.id || entry.uid,
+        uid: entry.uid,
+        displayName: entry.displayName || entry.organizationName || entry.hospitalName || entry.bloodBankName || 'User',
+        email: entry.email || '-',
+        role: normalizeRole(entry.role),
+        status: entry.status || 'active',
+        verified: Boolean(entry.verified),
+        city: entry.city,
+        bhId: entry.bhId,
+        createdAt: toDate(entry.createdAt),
+        lastLoginAt: toDate(entry.lastLoginAt),
+      }))
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+  }, [usersQuery.data]);
 
   useEffect(() => {
     setPage(1);
@@ -188,7 +162,11 @@ export function AdminUsersPage({
     try {
       await updateUserStatus(target.uid, nextStatus, authUser.uid);
       toast.success(`Updated status to ${nextStatus}`);
-      await loadUsers();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.overviewRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.platformStatsRoot }),
+      ]);
     } catch (updateError: any) {
       toast.error(updateError?.message || 'Failed to update status.');
     } finally {
@@ -203,7 +181,12 @@ export function AdminUsersPage({
     try {
       await verifyUserAccount(target.uid, authUser.uid);
       toast.success('User verified');
-      await loadUsers();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.verificationRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.overviewRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.platformStatsRoot }),
+      ]);
     } catch (verifyError: any) {
       toast.error(verifyError?.message || 'Failed to verify user.');
     } finally {
@@ -218,7 +201,11 @@ export function AdminUsersPage({
     try {
       await deleteUserAccount(target.uid, authUser.uid);
       toast.success('User deactivated');
-      await loadUsers();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.overviewRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.platformStatsRoot }),
+      ]);
     } catch (deleteError: any) {
       toast.error(deleteError?.message || 'Failed to deactivate user.');
     } finally {
@@ -236,7 +223,7 @@ export function AdminUsersPage({
           </div>
           <button
             type="button"
-            onClick={loadUsers}
+            onClick={() => void usersQuery.refetch()}
             className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
           >
             Refresh
@@ -266,11 +253,16 @@ export function AdminUsersPage({
         rightContent={<span className="text-xs font-semibold text-gray-500">{filteredUsers.length} users</span>}
       />
 
-      {loading ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">Loading users...</div>
-      ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-red-700">{error}</div>
-      ) : pagedUsers.length === 0 ? (
+      {loading && (
+        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
+          Refreshing users...
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
+      )}
+
+      {pagedUsers.length === 0 ? (
         <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">
           No users found for current filters.
         </div>

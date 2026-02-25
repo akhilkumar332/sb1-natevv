@@ -169,7 +169,7 @@ const sortByCreatedAtDesc = (users: User[]): User[] => {
   return [...users].sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
 };
 
-const isRecoverableUsersQueryError = (error: unknown): boolean => {
+const isRecoverableQueryError = (error: unknown): boolean => {
   const code = (error as any)?.code;
   const message = String((error as any)?.message || '').toLowerCase();
   return (
@@ -264,7 +264,7 @@ export const getAllUsers = async (
       const primarySnapshot = await getDocs(buildUsersQuery(role, status, limitCount, true));
       return extractQueryData<User>(primarySnapshot, USER_DATE_FIELDS);
     } catch (primaryError) {
-      if (!isRecoverableUsersQueryError(primaryError)) {
+      if (!isRecoverableQueryError(primaryError)) {
         throw primaryError;
       }
       console.warn('Primary users query failed, retrying with relaxed constraints.', primaryError);
@@ -275,7 +275,7 @@ export const getAllUsers = async (
       const relaxedUsers = extractQueryData<User>(relaxedSnapshot, USER_DATE_FIELDS);
       return sortByCreatedAtDesc(relaxedUsers).slice(0, limitCount);
     } catch (relaxedError) {
-      if (!isRecoverableUsersQueryError(relaxedError)) {
+      if (!isRecoverableQueryError(relaxedError)) {
         throw relaxedError;
       }
       console.warn('Relaxed users query failed, falling back to broad query and client-side filters.', relaxedError);
@@ -906,6 +906,25 @@ export const getInventoryAlerts = async (): Promise<BloodInventory[]> => {
     const snapshot = await getDocs(q);
     return extractQueryData<BloodInventory>(snapshot, ['lastRestocked', 'updatedAt']);
   } catch (error) {
+    if (isRecoverableQueryError(error)) {
+      try {
+        const [criticalSnapshot, lowSnapshot] = await Promise.all([
+          getDocs(query(collection(db, 'bloodInventory'), where('status', '==', 'critical'), limit(50))),
+          getDocs(query(collection(db, 'bloodInventory'), where('status', '==', 'low'), limit(50))),
+        ]);
+
+        const merged = [
+          ...extractQueryData<BloodInventory>(criticalSnapshot, ['lastRestocked', 'updatedAt']),
+          ...extractQueryData<BloodInventory>(lowSnapshot, ['lastRestocked', 'updatedAt']),
+        ];
+
+        return merged
+          .sort((a, b) => (a.units || 0) - (b.units || 0))
+          .slice(0, 50);
+      } catch (fallbackError) {
+        console.warn('Inventory alerts fallback query failed:', fallbackError);
+      }
+    }
     throw new DatabaseError('Failed to fetch inventory alerts');
   }
 };
@@ -934,6 +953,43 @@ export const getEmergencyRequests = async (): Promise<BloodRequest[]> => {
       'updatedAt',
     ]);
   } catch (error) {
+    if (isRecoverableQueryError(error)) {
+      try {
+        const fallbackSnapshot = await getDocs(
+          query(
+            collection(db, 'bloodRequests'),
+            where('isEmergency', '==', true),
+            where('status', '==', 'active'),
+            limit(100)
+          )
+        );
+        const fallback = extractQueryData<BloodRequest>(fallbackSnapshot, [
+          'requestedAt',
+          'neededBy',
+          'expiresAt',
+          'fulfilledAt',
+          'createdAt',
+          'updatedAt',
+        ]);
+        return fallback
+          .sort((a, b) => {
+            const aMs = typeof a.requestedAt?.toDate === 'function'
+              ? a.requestedAt.toDate().getTime()
+              : a.requestedAt instanceof Date
+                ? a.requestedAt.getTime()
+                : 0;
+            const bMs = typeof b.requestedAt?.toDate === 'function'
+              ? b.requestedAt.toDate().getTime()
+              : b.requestedAt instanceof Date
+                ? b.requestedAt.getTime()
+                : 0;
+            return bMs - aMs;
+          })
+          .slice(0, 20);
+      } catch (fallbackError) {
+        console.warn('Emergency requests fallback query failed:', fallbackError);
+      }
+    }
     throw new DatabaseError('Failed to fetch emergency requests');
   }
 };

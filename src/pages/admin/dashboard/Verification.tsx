@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import type { VerificationRequest } from '../../../types/database.types';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   approveVerificationRequest,
-  getVerificationRequests,
   markVerificationUnderReview,
   rejectVerificationRequest,
 } from '../../../services/admin.service';
@@ -12,44 +12,25 @@ import VerificationCard from '../../../components/admin/VerificationCard';
 import DocumentViewer from '../../../components/admin/DocumentViewer';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import { useAdminVerificationRequests } from '../../../hooks/admin/useAdminQueries';
+import { adminQueryKeys } from '../../../constants/adminQueryKeys';
 
 type StatusFilter = 'all' | 'pending' | 'under_review' | 'approved' | 'rejected';
 type TypeFilter = 'all' | 'bloodbank' | 'hospital' | 'ngo';
 
 function VerificationPage() {
   const { user } = useAuth();
-  const [requests, setRequests] = useState<VerificationRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [activeDocRequest, setActiveDocRequest] = useState<VerificationRequest | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-
-  const loadRequests = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getVerificationRequests(undefined, 500);
-      const sorted = [...data].sort((a, b) => {
-        const dateA = a.submittedAt instanceof Date ? a.submittedAt.getTime() : 0;
-        const dateB = b.submittedAt instanceof Date ? b.submittedAt.getTime() : 0;
-        return dateB - dateA;
-      });
-      setRequests(sorted);
-    } catch (fetchError: any) {
-      setError(fetchError?.message || 'Unable to load verification requests.');
-      setRequests([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadRequests();
-  }, [loadRequests]);
+  const requestsQuery = useAdminVerificationRequests(500);
+  const loading = requestsQuery.isLoading;
+  const error = requestsQuery.error instanceof Error ? requestsQuery.error.message : null;
+  const requests = requestsQuery.data || [];
 
   useEffect(() => {
     setPage(1);
@@ -98,7 +79,12 @@ function VerificationPage() {
       try {
         await approveVerificationRequest(requestId, user!.uid, notes);
         toast.success('Verification approved');
-        await loadRequests();
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: adminQueryKeys.verificationRoot }),
+          queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot }),
+          queryClient.invalidateQueries({ queryKey: adminQueryKeys.overviewRoot }),
+          queryClient.invalidateQueries({ queryKey: adminQueryKeys.platformStatsRoot }),
+        ]);
       } catch (approveError: any) {
         toast.error(approveError?.message || 'Failed to approve request.');
       }
@@ -110,7 +96,11 @@ function VerificationPage() {
       try {
         await rejectVerificationRequest(requestId, user!.uid, reason);
         toast.success('Verification rejected');
-        await loadRequests();
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: adminQueryKeys.verificationRoot }),
+          queryClient.invalidateQueries({ queryKey: adminQueryKeys.overviewRoot }),
+          queryClient.invalidateQueries({ queryKey: adminQueryKeys.platformStatsRoot }),
+        ]);
       } catch (rejectError: any) {
         toast.error(rejectError?.message || 'Failed to reject request.');
       }
@@ -122,7 +112,10 @@ function VerificationPage() {
       try {
         await markVerificationUnderReview(requestId, user!.uid);
         toast.success('Request moved to under review');
-        await loadRequests();
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: adminQueryKeys.verificationRoot }),
+          queryClient.invalidateQueries({ queryKey: adminQueryKeys.overviewRoot }),
+        ]);
       } catch (reviewError: any) {
         toast.error(reviewError?.message || 'Failed to update request status.');
       }
@@ -139,7 +132,7 @@ function VerificationPage() {
           </div>
           <button
             type="button"
-            onClick={loadRequests}
+            onClick={() => void requestsQuery.refetch()}
             className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
           >
             Refresh
@@ -179,13 +172,16 @@ function VerificationPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">{filtered.length} requests</span>}
       />
 
-      {loading ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">
-          Loading verification requests...
+      {loading && (
+        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
+          Refreshing verification queue...
         </div>
-      ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-red-700">{error}</div>
-      ) : paged.length === 0 ? (
+      )}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
+      )}
+
+      {paged.length === 0 ? (
         <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">
           No verification requests found for selected filters.
         </div>

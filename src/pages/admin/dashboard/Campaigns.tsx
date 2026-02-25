@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { collection, getDocs, orderBy, query, doc, updateDoc, limit } from 'firebase/firestore';
+import { useQueryClient } from '@tanstack/react-query';
+import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { getServerTimestamp, timestampToDate } from '../../../utils/firestore.utils';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import { useAdminCampaigns } from '../../../hooks/admin/useAdminQueries';
+import { adminQueryKeys } from '../../../constants/adminQueryKeys';
 
 type CampaignRow = {
   id: string;
@@ -32,48 +35,33 @@ const toDate = (value: any): Date | undefined => {
 };
 
 function CampaignsPage() {
+  const queryClient = useQueryClient();
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-
-  const loadCampaigns = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const snapshot = await getDocs(query(collection(db, 'campaigns'), orderBy('createdAt', 'desc'), limit(1000)));
-      const rows = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as Record<string, any>;
-        return {
-          id: docSnap.id,
-          title: data.title || data.name || 'Campaign',
-          ngoId: data.ngoId || '-',
-          status: data.status || 'draft',
-          type: data.type || 'blood-drive',
-          target: Number(data.target || data.targetDonors || 0),
-          achieved: Number(data.achieved || 0),
-          city: data.city || data.location?.city,
-          state: data.state || data.location?.state,
-          startDate: toDate(data.startDate),
-          endDate: toDate(data.endDate),
-        } as CampaignRow;
-      });
-      setCampaigns(rows);
-    } catch (fetchError: any) {
-      setError(fetchError?.message || 'Unable to load campaigns.');
-      setCampaigns([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const campaignsQuery = useAdminCampaigns(1000);
+  const loading = campaignsQuery.isLoading;
+  const error = campaignsQuery.error instanceof Error ? campaignsQuery.error.message : null;
 
   useEffect(() => {
-    void loadCampaigns();
-  }, [loadCampaigns]);
+    const rows = (campaignsQuery.data || []).map((entry) => ({
+      id: entry.id || '',
+      title: entry.title || entry.name || 'Campaign',
+      ngoId: entry.ngoId || '-',
+      status: entry.status || 'draft',
+      type: entry.type || 'blood-drive',
+      target: Number(entry.target || entry.targetDonors || 0),
+      achieved: Number(entry.achieved || 0),
+      city: entry.city || (entry.location as any)?.city,
+      state: entry.state || (entry.location as any)?.state,
+      startDate: toDate(entry.startDate),
+      endDate: toDate(entry.endDate),
+    })) as CampaignRow[];
+    setCampaigns(rows.filter((entry) => Boolean(entry.id)));
+  }, [campaignsQuery.data]);
 
   useEffect(() => {
     setPage(1);
@@ -114,7 +102,11 @@ function CampaignsPage() {
         updatedAt: getServerTimestamp(),
       });
       toast.success(`Campaign marked ${nextStatus}`);
-      await loadCampaigns();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.campaignsRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.recentActivityRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.platformStatsRoot }),
+      ]);
     } catch (updateError: any) {
       toast.error(updateError?.message || 'Failed to update campaign status.');
     } finally {
@@ -132,7 +124,7 @@ function CampaignsPage() {
           </div>
           <button
             type="button"
-            onClick={loadCampaigns}
+            onClick={() => void campaignsQuery.refetch()}
             className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
           >
             Refresh
@@ -161,11 +153,16 @@ function CampaignsPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">{filtered.length} campaigns</span>}
       />
 
-      {loading ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">Loading campaigns...</div>
-      ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-red-700">{error}</div>
-      ) : paged.length === 0 ? (
+      {loading && (
+        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
+          Refreshing campaigns...
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
+      )}
+
+      {paged.length === 0 ? (
         <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No campaigns found.</div>
       ) : (
         <>

@@ -536,7 +536,7 @@ const Navbar: React.FC = () => {
   const isNgoDashboard = user?.role === 'ngo' && location.pathname.startsWith('/ngo/dashboard');
   const isBloodbankDashboard = user?.role === 'bloodbank' && location.pathname.startsWith('/bloodbank/dashboard');
   const isAdminDashboard = location.pathname.startsWith('/admin/dashboard');
-  const hideDonorNav = isDonorDashboard;
+  const hideDonorNav = isDonorDashboard || isAdminDashboard;
   const hideDashboardLink = isDonorDashboard || isNgoDashboard || isBloodbankDashboard || isAdminDashboard;
   const showNotificationBadge = isDonorDashboard || isNgoDashboard || isBloodbankDashboard;
   const topBadge = useTopDonorBadge(user);

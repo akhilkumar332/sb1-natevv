@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { BellRing, MailCheck } from 'lucide-react';
-import { collection, doc, getDocs, limit, orderBy, query, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { getServerTimestamp, timestampToDate } from '../../../utils/firestore.utils';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import { useAdminNotifications } from '../../../hooks/admin/useAdminQueries';
+import { adminQueryKeys } from '../../../constants/adminQueryKeys';
 
 type NotificationRow = {
   id: string;
@@ -30,47 +33,32 @@ const toDate = (value: any): Date | undefined => {
 };
 
 function NotificationsPage() {
+  const queryClient = useQueryClient();
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-
-  const loadNotifications = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const snapshot = await getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(1000)));
-      const rows = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as Record<string, any>;
-        return {
-          id: docSnap.id,
-          userId: data.userId || '-',
-          userRole: data.userRole,
-          type: data.type || 'general',
-          title: data.title || 'Notification',
-          message: data.message || '',
-          priority: data.priority || 'medium',
-          read: Boolean(data.read),
-          createdAt: toDate(data.createdAt),
-        } as NotificationRow;
-      });
-      setNotifications(rows);
-    } catch (fetchError: any) {
-      setError(fetchError?.message || 'Unable to load notifications.');
-      setNotifications([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const notificationsQuery = useAdminNotifications(1000);
+  const loading = notificationsQuery.isLoading;
+  const error = notificationsQuery.error instanceof Error ? notificationsQuery.error.message : null;
 
   useEffect(() => {
-    void loadNotifications();
-  }, [loadNotifications]);
+    const rows = (notificationsQuery.data || []).map((entry) => ({
+      id: entry.id || '',
+      userId: entry.userId || '-',
+      userRole: entry.userRole,
+      type: entry.type || 'general',
+      title: entry.title || 'Notification',
+      message: entry.message || '',
+      priority: entry.priority || 'medium',
+      read: Boolean(entry.read),
+      createdAt: toDate(entry.createdAt),
+    })) as NotificationRow[];
+    setNotifications(rows.filter((entry) => Boolean(entry.id)));
+  }, [notificationsQuery.data]);
 
   useEffect(() => {
     setPage(1);
@@ -105,7 +93,7 @@ function NotificationsPage() {
         updatedAt: getServerTimestamp(),
       });
       toast.success(read ? 'Marked as read' : 'Marked as unread');
-      await loadNotifications();
+      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.notificationsRoot });
     } catch (updateError: any) {
       toast.error(updateError?.message || 'Failed to update notification.');
     } finally {
@@ -123,7 +111,7 @@ function NotificationsPage() {
           </div>
           <button
             type="button"
-            onClick={loadNotifications}
+            onClick={() => void notificationsQuery.refetch()}
             className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
           >
             Refresh
@@ -160,11 +148,16 @@ function NotificationsPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">{filtered.length} notifications</span>}
       />
 
-      {loading ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">Loading notifications...</div>
-      ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-red-700">{error}</div>
-      ) : paged.length === 0 ? (
+      {loading && (
+        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
+          Refreshing notifications...
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
+      )}
+
+      {paged.length === 0 ? (
         <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No notifications found.</div>
       ) : (
         <>

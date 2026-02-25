@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, UserCog } from 'lucide-react';
-import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
-import { db } from '../../../firebase';
 import { timestampToDate } from '../../../utils/firestore.utils';
 import { useAuth } from '../../../contexts/AuthContext';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import { useAdminAuditLogs } from '../../../hooks/admin/useAdminQueries';
 
 type AuditRow = {
   id: string;
@@ -28,40 +27,24 @@ const toDate = (value: any): Date | undefined => {
 function AuditSecurityPage() {
   const { isSuperAdmin } = useAuth();
   const [events, setEvents] = useState<AuditRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-
-  const loadEvents = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const snapshot = await getDocs(query(collection(db, 'auditLogs'), orderBy('createdAt', 'desc'), limit(1000)));
-      const rows = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as Record<string, any>;
-        return {
-          id: docSnap.id,
-          actorUid: data.actorUid || '-',
-          actorRole: data.actorRole,
-          action: data.action || 'unknown',
-          targetUid: data.targetUid,
-          createdAt: toDate(data.createdAt),
-        } as AuditRow;
-      });
-      setEvents(rows);
-    } catch (fetchError: any) {
-      setError(fetchError?.message || 'Unable to load audit logs.');
-      setEvents([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const auditQuery = useAdminAuditLogs(1000);
+  const loading = auditQuery.isLoading;
+  const error = auditQuery.error instanceof Error ? auditQuery.error.message : null;
 
   useEffect(() => {
-    void loadEvents();
-  }, [loadEvents]);
+    const rows = (auditQuery.data || []).map((entry) => ({
+      id: entry.id || '',
+      actorUid: entry.actorUid || '-',
+      actorRole: entry.actorRole,
+      action: entry.action || 'unknown',
+      targetUid: entry.targetUid,
+      createdAt: toDate(entry.createdAt),
+    })) as AuditRow[];
+    setEvents(rows.filter((entry) => Boolean(entry.id)));
+  }, [auditQuery.data]);
 
   useEffect(() => {
     setPage(1);
@@ -93,7 +76,7 @@ function AuditSecurityPage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={loadEvents}
+              onClick={() => void auditQuery.refetch()}
               className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
             >
               Refresh
@@ -122,11 +105,16 @@ function AuditSecurityPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">{filtered.length} events</span>}
       />
 
-      {loading ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">Loading audit logs...</div>
-      ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-red-700">{error}</div>
-      ) : paged.length === 0 ? (
+      {loading && (
+        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
+          Refreshing audit logs...
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
+      )}
+
+      {paged.length === 0 ? (
         <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No audit events found.</div>
       ) : (
         <>

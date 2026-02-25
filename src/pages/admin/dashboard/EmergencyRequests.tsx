@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { doc, updateDoc } from 'firebase/firestore';
 import type { BloodRequest } from '../../../types/database.types';
 import { db } from '../../../firebase';
 import { getServerTimestamp, timestampToDate } from '../../../utils/firestore.utils';
-import { getEmergencyRequests } from '../../../services/admin.service';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import { useAdminEmergencyRequests } from '../../../hooks/admin/useAdminQueries';
+import { adminQueryKeys } from '../../../constants/adminQueryKeys';
 
 type UrgencyFilter = 'all' | 'critical' | 'high' | 'medium' | 'low';
 type StatusFilter = 'all' | 'active' | 'partially_fulfilled' | 'fulfilled' | 'expired' | 'cancelled';
@@ -34,45 +36,34 @@ const toDate = (value: any): Date | undefined => {
 };
 
 function EmergencyRequestsPage() {
+  const queryClient = useQueryClient();
   const [requests, setRequests] = useState<RequestRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-
-  const loadRequests = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getEmergencyRequests();
-      const mapped = data.map((entry: BloodRequest) => ({
-        id: entry.id || '',
-        requesterName: entry.requesterName || (entry as any).hospitalName || 'Requester',
-        bloodType: entry.bloodType || '-',
-        units: entry.units || 0,
-        urgency: entry.urgency || 'medium',
-        status: entry.status || 'active',
-        city: entry.location?.city,
-        state: entry.location?.state,
-        requestedAt: toDate(entry.requestedAt),
-        neededBy: toDate(entry.neededBy),
-      }));
-      setRequests(mapped.filter((entry) => Boolean(entry.id)));
-    } catch (fetchError: any) {
-      setError(fetchError?.message || 'Unable to load emergency requests.');
-      setRequests([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const emergencyQuery = useAdminEmergencyRequests();
+  const loading = emergencyQuery.isLoading;
+  const error = emergencyQuery.error instanceof Error ? emergencyQuery.error.message : null;
 
   useEffect(() => {
-    void loadRequests();
-  }, [loadRequests]);
+    const data = emergencyQuery.data || [];
+    const mapped = data.map((entry: BloodRequest) => ({
+      id: entry.id || '',
+      requesterName: entry.requesterName || (entry as any).hospitalName || 'Requester',
+      bloodType: entry.bloodType || '-',
+      units: entry.units || 0,
+      urgency: entry.urgency || 'medium',
+      status: entry.status || 'active',
+      city: entry.location?.city,
+      state: entry.location?.state,
+      requestedAt: toDate(entry.requestedAt),
+      neededBy: toDate(entry.neededBy),
+    }));
+    setRequests(mapped.filter((entry) => Boolean(entry.id)));
+  }, [emergencyQuery.data]);
 
   useEffect(() => {
     setPage(1);
@@ -115,7 +106,11 @@ function EmergencyRequestsPage() {
         ...(nextStatus === 'fulfilled' ? { fulfilledAt: getServerTimestamp() } : {}),
       });
       toast.success(`Request marked as ${nextStatus}`);
-      await loadRequests();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.emergencyRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.recentActivityRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.overviewRoot }),
+      ]);
     } catch (updateError: any) {
       toast.error(updateError?.message || 'Failed to update request.');
     } finally {
@@ -133,7 +128,7 @@ function EmergencyRequestsPage() {
           </div>
           <button
             type="button"
-            onClick={loadRequests}
+            onClick={() => void emergencyQuery.refetch()}
             className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
           >
             Refresh
@@ -175,11 +170,16 @@ function EmergencyRequestsPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">{filtered.length} requests</span>}
       />
 
-      {loading ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">Loading emergency requests...</div>
-      ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-red-700">{error}</div>
-      ) : paged.length === 0 ? (
+      {loading && (
+        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
+          Refreshing emergency requests...
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
+      )}
+
+      {paged.length === 0 ? (
         <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No requests found.</div>
       ) : (
         <>

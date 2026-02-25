@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { collection, doc, getDocs, limit, orderBy, query, updateDoc } from 'firebase/firestore';
+import { useQueryClient } from '@tanstack/react-query';
+import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { getServerTimestamp, timestampToDate } from '../../../utils/firestore.utils';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import { useAdminAppointments, useAdminDonations } from '../../../hooks/admin/useAdminQueries';
+import { adminQueryKeys } from '../../../constants/adminQueryKeys';
 
 type AppointmentRow = {
   id: string;
@@ -36,8 +39,7 @@ const toDate = (value: any): Date | undefined => {
 };
 
 function AppointmentsDonationsPage() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [appointments, setAppointments] = useState<AppointmentRow[]>([]);
   const [donations, setDonations] = useState<DonationRow[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -45,58 +47,39 @@ function AppointmentsDonationsPage() {
   const [appointmentPage, setAppointmentPage] = useState(1);
   const [donationPage, setDonationPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [appointmentSnapshot, donationSnapshot] = await Promise.all([
-        getDocs(query(collection(db, 'appointments'), orderBy('scheduledDate', 'desc'), limit(1000))),
-        getDocs(query(collection(db, 'donations'), orderBy('donationDate', 'desc'), limit(1000))),
-      ]);
-
-      const appointmentRows = appointmentSnapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as Record<string, any>;
-        return {
-          id: docSnap.id,
-          donorName: data.donorName || 'Donor',
-          donorId: data.donorId,
-          hospitalId: data.hospitalId || '-',
-          bloodType: data.bloodType || '-',
-          status: data.status || 'scheduled',
-          scheduledDate: toDate(data.scheduledDate),
-        } as AppointmentRow;
-      });
-
-      const donationRows = donationSnapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as Record<string, any>;
-        return {
-          id: docSnap.id,
-          donorName: data.donorName || 'Donor',
-          donorId: data.donorId,
-          hospitalId: data.hospitalId || '-',
-          bloodType: data.bloodType || '-',
-          units: Number(data.units || 0),
-          status: data.status || 'pending',
-          donationDate: toDate(data.donationDate),
-        } as DonationRow;
-      });
-
-      setAppointments(appointmentRows);
-      setDonations(donationRows);
-    } catch (fetchError: any) {
-      console.error('Failed to load appointments/donations', fetchError);
-      setError(fetchError?.message || 'Unable to load appointments and donations.');
-      setAppointments([]);
-      setDonations([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const appointmentsQuery = useAdminAppointments(1000);
+  const donationsQuery = useAdminDonations(1000);
+  const loading = appointmentsQuery.isLoading || donationsQuery.isLoading;
+  const error = (appointmentsQuery.error || donationsQuery.error) instanceof Error
+    ? ((appointmentsQuery.error || donationsQuery.error) as Error).message
+    : null;
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    const appointmentRows = (appointmentsQuery.data || []).map((entry) => ({
+      id: entry.id || '',
+      donorName: entry.donorName || 'Donor',
+      donorId: entry.donorId,
+      hospitalId: entry.hospitalId || '-',
+      bloodType: entry.bloodType || '-',
+      status: entry.status || 'scheduled',
+      scheduledDate: toDate(entry.scheduledDate),
+    })) as AppointmentRow[];
+    setAppointments(appointmentRows.filter((entry) => Boolean(entry.id)));
+  }, [appointmentsQuery.data]);
+
+  useEffect(() => {
+    const donationRows = (donationsQuery.data || []).map((entry) => ({
+      id: entry.id || '',
+      donorName: entry.donorName || 'Donor',
+      donorId: entry.donorId,
+      hospitalId: entry.hospitalId || '-',
+      bloodType: entry.bloodType || '-',
+      units: Number(entry.units || 0),
+      status: entry.status || 'pending',
+      donationDate: toDate(entry.donationDate),
+    })) as DonationRow[];
+    setDonations(donationRows.filter((entry) => Boolean(entry.id)));
+  }, [donationsQuery.data]);
 
   useEffect(() => {
     setAppointmentPage(1);
@@ -137,7 +120,10 @@ function AppointmentsDonationsPage() {
     try {
       await updateDoc(doc(db, 'appointments', id), { status, updatedAt: getServerTimestamp() });
       toast.success(`Appointment marked ${status}`);
-      await loadData();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.appointmentsRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.recentActivityRoot }),
+      ]);
     } catch (updateError: any) {
       toast.error(updateError?.message || 'Failed to update appointment status.');
     } finally {
@@ -150,7 +136,11 @@ function AppointmentsDonationsPage() {
     try {
       await updateDoc(doc(db, 'donations', id), { status, updatedAt: getServerTimestamp() });
       toast.success(`Donation marked ${status}`);
-      await loadData();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.donationsRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.recentActivityRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.platformStatsRoot }),
+      ]);
     } catch (updateError: any) {
       toast.error(updateError?.message || 'Failed to update donation status.');
     } finally {
@@ -168,7 +158,10 @@ function AppointmentsDonationsPage() {
           </div>
           <button
             type="button"
-            onClick={loadData}
+            onClick={() => {
+              void appointmentsQuery.refetch();
+              void donationsQuery.refetch();
+            }}
             className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
           >
             Refresh
@@ -183,12 +176,16 @@ function AppointmentsDonationsPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">Appointments {appointmentFiltered.length} • Donations {donationFiltered.length}</span>}
       />
 
-      {loading ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">Loading appointments and donations...</div>
-      ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-red-700">{error}</div>
-      ) : (
-        <>
+      {loading && (
+        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
+          Refreshing appointments and donations...
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
+      )}
+
+      <>
           <section className="space-y-3">
             <h3 className="text-lg font-bold text-gray-900">Appointments</h3>
             {appointmentPaged.length === 0 ? (
@@ -437,8 +434,7 @@ function AppointmentsDonationsPage() {
               onPageSizeChange={setPageSize}
             />
           </section>
-        </>
-      )}
+      </>
     </div>
   );
 }

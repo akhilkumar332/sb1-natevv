@@ -5,7 +5,7 @@
  * Shows platform metrics, growth trends, and geographic distribution
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Users, Droplet, Building2, TrendingUp } from 'lucide-react';
 import { StatsCard } from './StatsCard';
 import { LineChart } from './LineChart';
@@ -14,68 +14,37 @@ import { BarChart } from './BarChart';
 import { DateRangeFilter } from './DateRangeFilter';
 import { ExportButton } from './ExportButton';
 import {
-  getPlatformStats,
-  getUserGrowthTrend,
-  getBloodTypeDistribution,
-  getGeographicDistribution,
-  type PlatformStats,
-  type TrendData,
-  type BloodTypeDistribution,
-  type GeographicDistribution,
-} from '../../services/analytics.service';
+  useBloodTypeDistribution,
+  useGeographicDistribution,
+  usePlatformStats,
+  useUserGrowthTrend,
+} from '../../hooks/useAnalyticsQuery';
 
 /**
  * AdminAnalyticsDashboard Component
  */
 export const AdminAnalyticsDashboard: React.FC = () => {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<PlatformStats | null>(null);
-  const [growthData, setGrowthData] = useState<TrendData[]>([]);
-  const [bloodTypeData, setBloodTypeData] = useState<BloodTypeDistribution[]>([]);
-  const [geoData, setGeoData] = useState<GeographicDistribution[]>([]);
-  const [dateRange, setDateRange] = useState({ start: new Date(), end: new Date() });
-
-  // Initialize date range (last year)
-  useEffect(() => {
+  const [dateRange, setDateRange] = useState(() => {
     const end = new Date();
     const start = new Date();
     start.setFullYear(end.getFullYear() - 1);
-    setDateRange({ start, end });
-  }, []);
+    return { start, end };
+  });
+  const dateRangeQuery = useMemo(() => ({
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+  }), [dateRange]);
 
-  // Load analytics data
-  useEffect(() => {
-    const loadAnalytics = async () => {
-      try {
-        setLoading(true);
+  const platformStatsQuery = usePlatformStats();
+  const growthQuery = useUserGrowthTrend(dateRangeQuery);
+  const bloodTypeQuery = useBloodTypeDistribution();
+  const geoQuery = useGeographicDistribution();
 
-        // Load platform stats
-        const platformStats = await getPlatformStats();
-        setStats(platformStats);
-
-        // Load user growth trend
-        const growth = await getUserGrowthTrend({
-          startDate: dateRange.start,
-          endDate: dateRange.end,
-        });
-        setGrowthData(growth);
-
-        // Load blood type distribution
-        const bloodTypes = await getBloodTypeDistribution();
-        setBloodTypeData(bloodTypes);
-
-        // Load geographic distribution
-        const geo = await getGeographicDistribution();
-        setGeoData(geo.slice(0, 10)); // Top 10 locations
-      } catch (error) {
-        console.error('Error loading analytics:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadAnalytics();
-  }, [dateRange]);
+  const stats = platformStatsQuery.data || null;
+  const growthData = growthQuery.data || [];
+  const bloodTypeData = bloodTypeQuery.data || [];
+  const geoData = (geoQuery.data || []).slice(0, 10);
+  const loading = platformStatsQuery.isLoading || growthQuery.isLoading || bloodTypeQuery.isLoading || geoQuery.isLoading;
 
   const handleDateRangeChange = (start: Date, end: Date) => {
     setDateRange({ start, end });

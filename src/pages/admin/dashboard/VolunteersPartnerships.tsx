@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { doc, updateDoc, collection, getDocs, limit, query, orderBy } from 'firebase/firestore';
+import { useQueryClient } from '@tanstack/react-query';
+import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { getServerTimestamp, timestampToDate } from '../../../utils/firestore.utils';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import { useAdminPartnerships, useAdminVolunteers } from '../../../hooks/admin/useAdminQueries';
+import { adminQueryKeys } from '../../../constants/adminQueryKeys';
 
 type VolunteerRow = {
   id: string;
@@ -36,8 +39,7 @@ const toDate = (value: any): Date | undefined => {
 };
 
 function VolunteersPartnershipsPage() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [volunteers, setVolunteers] = useState<VolunteerRow[]>([]);
   const [partnerships, setPartnerships] = useState<PartnershipRow[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -46,58 +48,39 @@ function VolunteersPartnershipsPage() {
   const [volunteerPage, setVolunteerPage] = useState(1);
   const [partnershipPage, setPartnershipPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [volunteerSnapshot, partnershipSnapshot] = await Promise.all([
-        getDocs(query(collection(db, 'volunteers'), orderBy('createdAt', 'desc'), limit(1000))),
-        getDocs(query(collection(db, 'partnerships'), orderBy('createdAt', 'desc'), limit(1000))),
-      ]);
-
-      const volunteerRows = volunteerSnapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as Record<string, any>;
-        return {
-          id: docSnap.id,
-          ngoId: data.ngoId || '-',
-          userId: data.userId,
-          name: data.name || data.displayName || 'Volunteer',
-          role: data.role || 'Volunteer',
-          status: data.status || 'active',
-          hours: Number(data.hoursContributed || 0),
-          joinedAt: toDate(data.joinDate || data.joinedAt || data.createdAt),
-        } as VolunteerRow;
-      });
-
-      const partnershipRows = partnershipSnapshot.docs.map((docSnap) => {
-        const data = docSnap.data() as Record<string, any>;
-        return {
-          id: docSnap.id,
-          ngoId: data.ngoId || '-',
-          partnerId: data.partnerId,
-          organization: data.partnerName || data.organization || data.name || 'Partner',
-          type: data.partnerType || data.type || 'community',
-          status: data.status || 'active',
-          since: toDate(data.startDate || data.since || data.createdAt),
-        } as PartnershipRow;
-      });
-
-      setVolunteers(volunteerRows);
-      setPartnerships(partnershipRows);
-    } catch (fetchError: any) {
-      console.error('Failed to load volunteers/partnerships', fetchError);
-      setError(fetchError?.message || 'Unable to load volunteers and partnerships.');
-      setVolunteers([]);
-      setPartnerships([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const volunteersQuery = useAdminVolunteers(1000);
+  const partnershipsQuery = useAdminPartnerships(1000);
+  const loading = volunteersQuery.isLoading || partnershipsQuery.isLoading;
+  const error = (volunteersQuery.error || partnershipsQuery.error) instanceof Error
+    ? ((volunteersQuery.error || partnershipsQuery.error) as Error).message
+    : null;
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    const volunteerRows = (volunteersQuery.data || []).map((entry) => ({
+      id: entry.id || '',
+      ngoId: entry.ngoId || '-',
+      userId: entry.userId,
+      name: entry.name || (entry as any).displayName || 'Volunteer',
+      role: entry.role || 'Volunteer',
+      status: entry.status || 'active',
+      hours: Number(entry.hoursContributed || 0),
+      joinedAt: toDate((entry as any).joinDate || (entry as any).joinedAt || entry.createdAt),
+    })) as VolunteerRow[];
+    setVolunteers(volunteerRows.filter((entry) => Boolean(entry.id)));
+  }, [volunteersQuery.data]);
+
+  useEffect(() => {
+    const partnershipRows = (partnershipsQuery.data || []).map((entry) => ({
+      id: entry.id || '',
+      ngoId: entry.ngoId || '-',
+      partnerId: (entry as any).partnerId,
+      organization: (entry as any).partnerName || entry.organization || (entry as any).name || 'Partner',
+      type: (entry as any).partnerType || entry.type || 'community',
+      status: entry.status || 'active',
+      since: toDate((entry as any).startDate || entry.since || entry.createdAt),
+    })) as PartnershipRow[];
+    setPartnerships(partnershipRows.filter((entry) => Boolean(entry.id)));
+  }, [partnershipsQuery.data]);
 
   useEffect(() => {
     setVolunteerPage(1);
@@ -138,7 +121,7 @@ function VolunteersPartnershipsPage() {
     try {
       await updateDoc(doc(db, 'volunteers', id), { status, updatedAt: getServerTimestamp() });
       toast.success(`Volunteer marked ${status}`);
-      await loadData();
+      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.volunteersRoot });
     } catch (updateError: any) {
       toast.error(updateError?.message || 'Failed to update volunteer status.');
     } finally {
@@ -151,7 +134,7 @@ function VolunteersPartnershipsPage() {
     try {
       await updateDoc(doc(db, 'partnerships', id), { status, updatedAt: getServerTimestamp() });
       toast.success(`Partnership marked ${status}`);
-      await loadData();
+      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.partnershipsRoot });
     } catch (updateError: any) {
       toast.error(updateError?.message || 'Failed to update partnership status.');
     } finally {
@@ -169,7 +152,10 @@ function VolunteersPartnershipsPage() {
           </div>
           <button
             type="button"
-            onClick={loadData}
+            onClick={() => {
+              void volunteersQuery.refetch();
+              void partnershipsQuery.refetch();
+            }}
             className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
           >
             Refresh
@@ -184,12 +170,16 @@ function VolunteersPartnershipsPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">Volunteers {volunteerFiltered.length} • Partnerships {partnershipFiltered.length}</span>}
       />
 
-      {loading ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">Loading volunteers and partnerships...</div>
-      ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-red-700">{error}</div>
-      ) : (
-        <>
+      {loading && (
+        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
+          Refreshing volunteers and partnerships...
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
+      )}
+
+      <>
           <section className="space-y-3">
             <h3 className="text-lg font-bold text-gray-900">Volunteers</h3>
             {volunteerPaged.length === 0 ? (
@@ -422,8 +412,7 @@ function VolunteersPartnershipsPage() {
               onPageSizeChange={setPageSize}
             />
           </section>
-        </>
-      )}
+      </>
     </div>
   );
 }

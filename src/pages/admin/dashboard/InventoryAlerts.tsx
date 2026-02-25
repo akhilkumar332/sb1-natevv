@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PackageOpen } from 'lucide-react';
 import type { BloodInventory } from '../../../types/database.types';
-import { getInventoryAlerts } from '../../../services/admin.service';
 import { timestampToDate } from '../../../utils/firestore.utils';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import { useAdminInventoryAlerts } from '../../../hooks/admin/useAdminQueries';
 
 type StatusFilter = 'all' | 'critical' | 'low' | 'adequate' | 'surplus';
 
@@ -30,41 +30,29 @@ const toDate = (value: any): Date | undefined => {
 
 function InventoryAlertsPage() {
   const [items, setItems] = useState<InventoryRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-
-  const loadItems = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getInventoryAlerts();
-      const mapped = data.map((entry: BloodInventory) => ({
-        id: entry.id || '',
-        hospitalId: entry.hospitalId,
-        branchId: entry.branchId,
-        bloodType: entry.bloodType,
-        units: entry.units || 0,
-        status: entry.status || 'adequate',
-        criticalLevel: entry.criticalLevel || 0,
-        lowLevel: entry.lowLevel || 0,
-        updatedAt: toDate(entry.updatedAt),
-      }));
-      setItems(mapped.filter((entry) => Boolean(entry.id)));
-    } catch (fetchError: any) {
-      setError(fetchError?.message || 'Unable to load inventory alerts.');
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const inventoryQuery = useAdminInventoryAlerts();
+  const loading = inventoryQuery.isLoading;
+  const error = inventoryQuery.error instanceof Error ? inventoryQuery.error.message : null;
 
   useEffect(() => {
-    void loadItems();
-  }, [loadItems]);
+    const data = inventoryQuery.data || [];
+    const mapped = data.map((entry: BloodInventory) => ({
+      id: entry.id || '',
+      hospitalId: entry.hospitalId,
+      branchId: entry.branchId,
+      bloodType: entry.bloodType,
+      units: entry.units || 0,
+      status: entry.status || 'adequate',
+      criticalLevel: entry.criticalLevel || 0,
+      lowLevel: entry.lowLevel || 0,
+      updatedAt: toDate(entry.updatedAt),
+    }));
+    setItems(mapped.filter((entry) => Boolean(entry.id)));
+  }, [inventoryQuery.data]);
 
   useEffect(() => {
     setPage(1);
@@ -100,7 +88,7 @@ function InventoryAlertsPage() {
           </div>
           <button
             type="button"
-            onClick={loadItems}
+            onClick={() => void inventoryQuery.refetch()}
             className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
           >
             Refresh
@@ -128,11 +116,16 @@ function InventoryAlertsPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">{filtered.length} alerts</span>}
       />
 
-      {loading ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">Loading inventory alerts...</div>
-      ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-red-700">{error}</div>
-      ) : paged.length === 0 ? (
+      {loading && (
+        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
+          Refreshing inventory alerts...
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
+      )}
+
+      {paged.length === 0 ? (
         <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No inventory alerts found.</div>
       ) : (
         <>
