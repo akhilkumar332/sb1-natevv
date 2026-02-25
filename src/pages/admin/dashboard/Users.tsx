@@ -3,6 +3,7 @@ import { Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { User } from '../../../types/database.types';
 import { timestampToDate } from '../../../utils/firestore.utils';
+import { normalizeUserStatus } from '../../../utils/adminUserStatus';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
 import { useAdminUsers } from '../../../hooks/admin/useAdminQueries';
@@ -76,7 +77,7 @@ export function AdminUsersPage({
         displayName: entry.displayName || entry.organizationName || entry.hospitalName || entry.bloodBankName || 'User',
         email: entry.email || '-',
         role: normalizeRole(entry.role),
-        status: entry.status || 'active',
+        status: normalizeUserStatus(entry.status),
         verified: Boolean(entry.verified),
         city: entry.city,
         bhId: entry.bhId,

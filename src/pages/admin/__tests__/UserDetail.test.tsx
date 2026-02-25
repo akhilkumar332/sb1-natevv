@@ -128,8 +128,31 @@ describe('Admin UserDetail page', () => {
       </QueryClientProvider>
     );
 
-    expect(await screen.findByText('Set Active')).toBeInTheDocument();
+    expect(screen.queryByText('Set Active')).not.toBeInTheDocument();
     expect(await screen.findByText('Suspend')).toBeInTheDocument();
     expect(await screen.findByText('Deactivate')).toBeInTheDocument();
+  });
+
+  it('shows Set Active when status is not active', async () => {
+    setupMocks();
+    userDetailMock.mockReturnValue({
+      data: { ...baseUser, status: 'Suspended' },
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(
+      <QueryClientProvider client={createClient()}>
+        <MemoryRouter initialEntries={['/admin/dashboard/users/u1?tab=profile']}>
+          <Routes>
+            <Route path="/admin/dashboard/users/:uid" element={<UserDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText('Set Active')).toBeInTheDocument();
   });
 });

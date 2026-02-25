@@ -329,6 +329,7 @@ function UserDetailPage() {
       <UserDetailQuickActions
         canModify={canModify}
         verified={Boolean(user?.verified)}
+        status={user?.status}
         onAction={(action) => setPendingAction({ type: action })}
       />
 
