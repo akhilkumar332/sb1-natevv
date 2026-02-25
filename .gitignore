@@ -42,3 +42,6 @@ public/firebase-config.js
 # secrets
 secrets/
 **/firebase-admin-sdk.json
+
+# project docs artifacts
+docs/

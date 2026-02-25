@@ -75,7 +75,15 @@ describe('Admin UserDetail page', () => {
   const setupMocks = () => {
     useAuthMock.mockReturnValue({ user: { uid: 'admin-1' }, isSuperAdmin: false });
     userDetailMock.mockReturnValue({ data: baseUser, isLoading: false, isFetching: false, error: null, refetch: vi.fn() });
-    securityMock.mockReturnValue({ data: { activeFcmTokens: [], loginIps: [] }, isFetching: false, refetch: vi.fn() });
+    securityMock.mockReturnValue({
+      data: {
+        activeFcmTokens: [],
+        activeTokenMeta: [],
+        loginIps: [],
+      },
+      isFetching: false,
+      refetch: vi.fn(),
+    });
     kpisMock.mockReturnValue({ data: { cards: [], trend: [] }, isLoading: false, refetch: vi.fn() });
     referralsMock.mockReturnValue({ data: [], isLoading: false, isFetching: false, refetch: vi.fn() });
     timelineMock.mockReturnValue({ data: [], isLoading: false, isFetching: false, refetch: vi.fn() });
@@ -83,6 +91,15 @@ describe('Admin UserDetail page', () => {
 
   it('renders security tab from URL param', async () => {
     setupMocks();
+    securityMock.mockReturnValue({
+      data: {
+        activeFcmTokens: ['tok-1'],
+        activeTokenMeta: [{ token: 'tok-1', updatedAt: new Date('2026-02-01T10:00:00Z') }],
+        loginIps: [],
+      },
+      isFetching: false,
+      refetch: vi.fn(),
+    });
 
     render(
       <QueryClientProvider client={createClient()}>
@@ -95,6 +112,7 @@ describe('Admin UserDetail page', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Logged IP Addresses' })).toBeInTheDocument();
+    expect(await screen.findByText(/Last Updated:/)).toBeInTheDocument();
   });
 
   it('shows quick profile actions on profile tab', async () => {

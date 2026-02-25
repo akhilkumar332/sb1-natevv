@@ -10,11 +10,10 @@ import {
   doc,
   setDoc,
   updateDoc,
+  getDoc,
   query,
   where,
   getDocs,
-  arrayUnion,
-  arrayRemove,
   Timestamp,
   deleteField,
   runTransaction,
@@ -135,10 +134,29 @@ export const requestNotificationPermission = async (
 export const saveFCMToken = async (userId: string, token: string): Promise<void> => {
   try {
     const userRef = doc(db, 'users', userId);
+    await runTransaction(db, async (tx) => {
+      const snapshot = await tx.get(userRef);
+      const snapshotData = snapshot.exists() ? (snapshot.data() as any) : {};
+      const currentDetails = (snapshotData?.fcmDeviceDetails || {}) as Record<string, any>;
 
-    await updateDoc(userRef, {
-      fcmTokens: arrayUnion(token),
-      lastTokenUpdate: Timestamp.now(),
+      const normalizedToken = String(token || '').trim();
+      if (!normalizedToken) {
+        return;
+      }
+
+      const matchingDeviceId = Object.keys(currentDetails).find(
+        (deviceId) => String(currentDetails[deviceId]?.token || '').trim() === normalizedToken,
+      );
+      const fallbackDeviceId = matchingDeviceId || `anon_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+      tx.set(userRef, {
+        lastTokenUpdate: serverTimestamp(),
+        [`fcmDeviceDetails.${fallbackDeviceId}`]: {
+          token: normalizedToken,
+          info: {},
+          updatedAt: serverTimestamp(),
+        },
+      }, { merge: true });
     });
   } catch (error) {
     throw new DatabaseError('Failed to save FCM token');
@@ -162,25 +180,12 @@ export const saveFCMDeviceToken = async (
       updatedAt: serverTimestamp(),
     };
     await runTransaction(db, async (tx) => {
-      const snapshot = await tx.get(userRef);
-      const existingToken = snapshot.exists()
-        ? (snapshot.data() as any)?.fcmDeviceTokens?.[deviceId]
-        : undefined;
-
-      if (existingToken && existingToken !== token) {
-        tx.update(userRef, {
-          fcmTokens: arrayRemove(existingToken),
-        });
-      }
-
       tx.set(
         userRef,
         {
-          fcmTokens: arrayUnion(token),
-          lastTokenUpdate: serverTimestamp(),
-          [`fcmDeviceTokens.${deviceId}`]: token,
-          [`fcmDeviceDetails.${deviceId}`]: detailsPayload,
-        },
+        lastTokenUpdate: serverTimestamp(),
+        [`fcmDeviceDetails.${deviceId}`]: detailsPayload,
+      },
         { merge: true }
       );
     });
@@ -198,9 +203,18 @@ export const removeFCMToken = async (
 ): Promise<void> => {
   try {
     const userRef = doc(db, 'users', userId);
+    const snapshot = await getDoc(userRef);
+    const data = snapshot.exists() ? (snapshot.data() as any) : {};
+    const currentDeviceDetails = { ...(data.fcmDeviceDetails || {}) };
 
+    Object.keys(currentDeviceDetails).forEach((deviceId) => {
+      if (currentDeviceDetails[deviceId]?.token === token) {
+        delete currentDeviceDetails[deviceId];
+      }
+    });
     await updateDoc(userRef, {
-      fcmTokens: arrayRemove(token),
+      fcmDeviceDetails: currentDeviceDetails,
+      lastTokenUpdate: serverTimestamp(),
     });
   } catch (error) {
     throw new DatabaseError('Failed to remove FCM token');
@@ -217,10 +231,10 @@ export const removeFCMDeviceToken = async (
 ): Promise<void> => {
   try {
     const userRef = doc(db, 'users', userId);
+    void token;
     await updateDoc(userRef, {
-      fcmTokens: arrayRemove(token),
-      [`fcmDeviceTokens.${deviceId}`]: deleteField(),
       [`fcmDeviceDetails.${deviceId}`]: deleteField(),
+      lastTokenUpdate: serverTimestamp(),
     } as any);
   } catch (error) {
     throw new DatabaseError('Failed to remove FCM token');

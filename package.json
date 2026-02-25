@@ -24,6 +24,7 @@
     "deploy:rules": "firebase deploy --only firestore:rules,storage:rules",
     "deploy:indexes": "firebase deploy --only firestore:indexes",
     "migrate:bloodbank": "node scripts/migrate-hospital-to-bloodbank.mjs",
+    "migrate:fcm:remove-legacy": "node scripts/migrations/remove-legacy-fcm-keys.mjs",
     "firebase:emulators": "firebase emulators:start",
     "firebase:login": "firebase login",
     "firebase:init": "firebase init"

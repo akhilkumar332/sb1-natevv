@@ -174,6 +174,35 @@ function UserDetailPage() {
       return `${entry.ip} ${entry.userAgent || ''}`.toLowerCase().includes(term);
     });
   }, [ipFilterKind, ipSearch, securityQuery.data?.loginIps]);
+  const activeTokenMeta = useMemo(() => {
+    if (securityQuery.data?.activeTokenMeta && securityQuery.data.activeTokenMeta.length > 0) {
+      return securityQuery.data.activeTokenMeta;
+    }
+    const deviceMap = new Map<string, { updatedAt?: Date; deviceId?: string }>();
+    (securityQuery.data?.devices || []).forEach((device) => {
+      if (!device.token) return;
+      const normalizedToken = device.token.trim();
+      const existing = deviceMap.get(normalizedToken);
+      if (!existing) {
+        deviceMap.set(normalizedToken, { updatedAt: device.updatedAt, deviceId: device.deviceId });
+        return;
+      }
+      const prevTime = existing.updatedAt?.getTime() || 0;
+      const nextTime = device.updatedAt?.getTime() || 0;
+      if (nextTime >= prevTime) {
+        deviceMap.set(normalizedToken, { updatedAt: device.updatedAt, deviceId: device.deviceId });
+      }
+    });
+
+    return (securityQuery.data?.activeFcmTokens || []).map((token) => {
+      const normalizedToken = token.trim();
+      return {
+        token: normalizedToken,
+        updatedAt: deviceMap.get(normalizedToken)?.updatedAt,
+        deviceId: deviceMap.get(normalizedToken)?.deviceId,
+      };
+    });
+  }, [securityQuery.data?.activeFcmTokens, securityQuery.data?.activeTokenMeta, securityQuery.data?.devices]);
 
   const ipTotalPages = Math.max(1, Math.ceil(filteredIps.length / PAGE_SIZE));
   const pagedIps = filteredIps.slice((ipPage - 1) * PAGE_SIZE, ipPage * PAGE_SIZE);
@@ -373,17 +402,18 @@ function UserDetailPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm">
             <h3 className="text-lg font-semibold text-gray-900">Active FCM Tokens</h3>
-            {(securityQuery.data?.activeFcmTokens || []).length === 0 ? (
+            {activeTokenMeta.length === 0 ? (
               <p className="mt-3 text-sm text-gray-500">No active tokens.</p>
             ) : (
               <div className="mt-3 space-y-2">
-                {(securityQuery.data?.activeFcmTokens || []).map((token) => (
-                  <div key={token} className="rounded-lg border border-gray-100 p-2 text-xs text-gray-600">
-                    <p className="break-all">{token}</p>
+                {activeTokenMeta.map((tokenEntry) => (
+                  <div key={tokenEntry.token} className="rounded-lg border border-gray-100 p-2 text-xs text-gray-600">
+                    <p className="break-all">{tokenEntry.token}</p>
+                    <p className="mt-1 text-gray-500">Last Updated: {formatDateTime(tokenEntry.updatedAt)}</p>
                     <button
                       type="button"
                       disabled={!canModify}
-                      onClick={() => setPendingAction({ type: 'revokeToken', token })}
+                      onClick={() => setPendingAction({ type: 'revokeToken', token: tokenEntry.token })}
                       className="mt-2 rounded-md border border-red-200 px-2 py-1 font-semibold text-red-700 disabled:opacity-60"
                     >
                       Revoke Token

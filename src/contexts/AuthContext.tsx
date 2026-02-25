@@ -30,7 +30,6 @@ import {
   getDoc, 
   getDocFromServer,
   updateDoc, 
-  arrayUnion,
   serverTimestamp, 
   DocumentReference,
   DocumentSnapshot,
@@ -39,7 +38,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { getMessaging } from 'firebase/messaging';
-import { initializeFCM, saveFCMDeviceToken } from '../services/notification.service';
+import { initializeFCM, saveFCMDeviceToken, saveFCMToken } from '../services/notification.service';
 import { requestImpersonation, requestImpersonationResume } from '../services/impersonation.service';
 import { generateBhId } from '../utils/bhId';
 import { getDeviceId, getDeviceInfo } from '../utils/device';
@@ -1138,10 +1137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (deviceId) {
               await saveFCMDeviceToken(user.uid, deviceId, storedToken, deviceInfo);
             } else {
-              await updateDoc(doc(db, 'users', user.uid), {
-                fcmTokens: arrayUnion(storedToken),
-                lastTokenUpdate: serverTimestamp(),
-              });
+              await saveFCMToken(user.uid, storedToken);
             }
             writeFcmTokenMeta(user.uid, { token: storedToken, deviceId, savedAt: Date.now() });
           }

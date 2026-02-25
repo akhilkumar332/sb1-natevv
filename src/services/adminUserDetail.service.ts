@@ -26,6 +26,11 @@ export type AdminUserSecurity = {
     info?: JsonRecord;
   }>;
   activeFcmTokens: string[];
+  activeTokenMeta: Array<{
+    token: string;
+    updatedAt?: Date;
+    deviceId?: string;
+  }>;
   loginIps: Array<{
     ip: string;
     userAgent?: string;
@@ -164,16 +169,30 @@ export const getAdminUserSecurity = async (uid: string): Promise<AdminUserSecuri
   try {
     const userSnap = await getDoc(doc(db, 'users', uid));
     const userData = userSnap.exists() ? (userSnap.data() as JsonRecord) : {};
-    const fcmDeviceTokens = (userData.fcmDeviceTokens || {}) as JsonRecord;
     const fcmDeviceDetails = (userData.fcmDeviceDetails || {}) as JsonRecord;
-    const devices = Object.keys({ ...fcmDeviceTokens, ...fcmDeviceDetails }).map((deviceId) => {
+    const devices = Object.keys(fcmDeviceDetails).map((deviceId) => {
       const details = fcmDeviceDetails[deviceId] || {};
       return {
         deviceId,
-        token: fcmDeviceTokens[deviceId] || details.token,
+        token: typeof details.token === 'string' ? details.token.trim() : undefined,
         updatedAt: toDate(details.updatedAt),
         info: details.info || {},
       };
+    });
+    const tokenMetaMap = new Map<string, { updatedAt?: Date; deviceId?: string }>();
+    devices.forEach((device) => {
+      if (!device.token) return;
+      const normalizedToken = device.token.trim();
+      const existing = tokenMetaMap.get(normalizedToken);
+      if (!existing) {
+        tokenMetaMap.set(normalizedToken, { updatedAt: device.updatedAt, deviceId: device.deviceId });
+        return;
+      }
+      const existingTime = existing.updatedAt?.getTime() || 0;
+      const nextTime = device.updatedAt?.getTime() || 0;
+      if (nextTime >= existingTime) {
+        tokenMetaMap.set(normalizedToken, { updatedAt: device.updatedAt, deviceId: device.deviceId });
+      }
     });
 
     const impersonationQ = query(
@@ -222,9 +241,27 @@ export const getAdminUserSecurity = async (uid: string): Promise<AdminUserSecuri
 
     const mergedIps = sortByDateDesc([...impersonationRows, ...auditRows]).slice(0, 50);
 
+    const seen = new Set<string>();
+    const lastTokenUpdate = toDate(userData.lastTokenUpdate);
+    const activeFcmTokens = devices
+      .map((device) => (typeof device.token === 'string' ? device.token.trim() : ''))
+      .filter(Boolean)
+      .filter((token) => {
+      if (seen.has(token)) return false;
+      seen.add(token);
+      return true;
+    });
+
+    const activeTokenMeta = activeFcmTokens.map((token) => ({
+      token,
+      updatedAt: tokenMetaMap.get(token)?.updatedAt || lastTokenUpdate,
+      deviceId: tokenMetaMap.get(token)?.deviceId,
+    }));
+
     return {
       devices,
-      activeFcmTokens: Array.isArray(userData.fcmTokens) ? userData.fcmTokens : [],
+      activeFcmTokens,
+      activeTokenMeta,
       loginIps: mergedIps,
     };
   } catch (error) {
@@ -452,22 +489,15 @@ export const revokeUserFcmToken = async (
     const userSnap = await getDoc(doc(db, 'users', uid));
     if (!userSnap.exists()) throw new NotFoundError('User not found');
     const data = userSnap.data() as JsonRecord;
-    const fcmDeviceTokens = { ...(data.fcmDeviceTokens || {}) } as Record<string, string>;
     const fcmDeviceDetails = { ...(data.fcmDeviceDetails || {}) } as Record<string, JsonRecord>;
-    const nextTokens = Array.isArray(data.fcmTokens)
-      ? data.fcmTokens.filter((entry: string) => entry !== token)
-      : [];
 
-    Object.keys(fcmDeviceTokens).forEach((deviceId) => {
-      if (fcmDeviceTokens[deviceId] === token) {
-        delete fcmDeviceTokens[deviceId];
+    Object.keys(fcmDeviceDetails).forEach((deviceId) => {
+      if (fcmDeviceDetails[deviceId]?.token === token) {
         delete fcmDeviceDetails[deviceId];
       }
     });
 
     await updateDoc(doc(db, 'users', uid), {
-      fcmTokens: nextTokens,
-      fcmDeviceTokens,
       fcmDeviceDetails,
       updatedAt: serverTimestamp(),
     });
@@ -487,8 +517,6 @@ export const revokeUserFcmToken = async (
 export const revokeAllUserFcmTokens = async (uid: string, adminUid: string, reason: string) => {
   try {
     await updateDoc(doc(db, 'users', uid), {
-      fcmTokens: [],
-      fcmDeviceTokens: {},
       fcmDeviceDetails: {},
       updatedAt: serverTimestamp(),
     });
