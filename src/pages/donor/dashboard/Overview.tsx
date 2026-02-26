@@ -260,9 +260,9 @@ const DonorOverview = () => {
       </div>
 
       <div className="mb-6 grid gap-6 lg:grid-cols-2 lg:items-stretch">
-        <div className="relative flex flex-col overflow-hidden rounded-2xl border border-red-200 bg-gradient-to-br from-white via-red-50 to-white p-4 shadow-lg transition-transform duration-300 hover:-translate-y-1 animate-fadeIn lg:h-full dark:border-red-200">
-          <div className="absolute -top-16 -right-16 h-32 w-32 rounded-full bg-red-100/70 blur-2xl"></div>
-          <div className="absolute -bottom-16 -left-16 h-36 w-36 rounded-full bg-red-100/60 blur-2xl"></div>
+        <div className="relative flex flex-col overflow-hidden rounded-2xl border border-red-200 bg-gradient-to-br from-white via-red-50 to-white p-4 shadow-lg transition-transform duration-300 hover:-translate-y-1 animate-fadeIn lg:h-full dark:border-red-200 dark:from-[#0b1220] dark:via-[#101826] dark:to-[#0b1220]">
+          <div className="absolute -top-16 -right-16 h-32 w-32 rounded-full bg-red-100/70 blur-2xl dark:bg-red-100/30"></div>
+          <div className="absolute -bottom-16 -left-16 h-36 w-36 rounded-full bg-red-100/60 blur-2xl dark:bg-red-100/25"></div>
           {isLoading ? (
             <div className="relative space-y-5">
               <div className="h-3 w-40 rounded-full bg-gray-100 animate-pulse" />
@@ -333,15 +333,15 @@ const DonorOverview = () => {
                     </div>
                   )}
                   {shareOptions.showQr && qrCodeDataUrl && (
-                    <div className="flex items-center justify-between rounded-xl border border-red-100 bg-white/80 px-3 py-2 sm:col-span-2 dark:border-red-200 dark:bg-slate-700/80">
+                    <div className="flex items-center justify-between rounded-xl border border-red-100 bg-white/80 px-3 py-2 sm:col-span-2 dark:border-red-200 dark:bg-[#0f1726]/90">
                       <div>
-                        <p className="text-[11px] uppercase tracking-wide text-gray-500">Share QR</p>
-                        <p className="text-xs text-gray-600">Scan to open your donor profile link.</p>
+                        <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-500">Share QR</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-600">Scan to open your donor profile link.</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setQrPreviewOpen(true)}
-                        className="rounded-lg border border-red-100 bg-white p-1 transition-transform duration-300 hover:scale-105 dark:border-red-200 dark:bg-slate-700"
+                        className="rounded-lg border border-red-100 bg-white p-1 transition-transform duration-300 hover:scale-105 dark:border-red-200 dark:bg-[#0a0f1a]"
                         aria-label="Open QR preview"
                       >
                         <img src={qrCodeDataUrl} alt="BH ID QR" className="h-12 w-12 shrink-0" />
@@ -356,7 +356,7 @@ const DonorOverview = () => {
                   <button
                     type="button"
                     onClick={() => setShareOptionsOpen(true)}
-                    className="flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600 transition-all duration-300 hover:bg-red-50 dark:border-red-200 dark:bg-slate-700 dark:text-red-600 dark:hover:bg-red-50"
+                    className="flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600 transition-all duration-300 hover:bg-red-50 dark:border-red-200 dark:bg-[#0a0f1a] dark:text-red-600 dark:hover:bg-red-50"
                   >
                     <SlidersHorizontal className="h-3 w-3" />
                     Customize
@@ -365,7 +365,7 @@ const DonorOverview = () => {
                     type="button"
                     onClick={handleShareDonorCard}
                     disabled={shareCardLoading}
-                    className="flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600 transition-all duration-300 hover:bg-red-50 disabled:opacity-50"
+                    className="flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600 transition-all duration-300 hover:bg-red-50 disabled:opacity-50 dark:border-red-200 dark:bg-[#0a0f1a] dark:text-red-600 dark:hover:bg-red-50"
                   >
                     <Share2 className="h-3 w-3" />
                     {shareCardLoading ? 'Preparing' : 'Share Card'}

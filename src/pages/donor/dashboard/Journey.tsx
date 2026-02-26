@@ -515,14 +515,14 @@ const DonorJourney = () => {
               </div>
             </div>
             {latestCompletedDonation ? (
-              <div className="mb-6 rounded-xl border border-red-100 bg-red-50/60 px-4 py-3">
+              <div className="mb-6 rounded-xl border border-red-100 bg-red-50/60 px-4 py-3 dark:border-red-200 dark:bg-[#101826]">
                 <p className="text-[10px] uppercase tracking-wide text-red-600">Last donation summary</p>
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm">
                   <div>
                     <p className="font-semibold text-gray-900">{latestCompletedDonation.bloodBank || 'Donation'}</p>
                     <p className="text-xs text-gray-600">{latestCompletedDonation.location || 'Location not set'}</p>
                   </div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-gray-600 dark:text-gray-600">
                     <p>{formatDate(latestCompletedDonation.date)}</p>
                     <p>
                       {latestCompletedDonation.units} unit{latestCompletedDonation.units === 1 ? '' : 's'} •{' '}
@@ -740,13 +740,13 @@ const DonorJourney = () => {
             ) : (
               <div className="flex-1 overflow-y-auto pr-2">
                 {recentEarnedBadges.length > 0 && (
-                  <div className="mb-4 rounded-xl border border-red-100 bg-red-50/60 px-4 py-3">
+                  <div className="mb-4 rounded-xl border border-red-100 bg-red-50/60 px-4 py-3 dark:border-red-200 dark:bg-[#101826]">
                     <p className="text-[10px] uppercase tracking-wide text-red-600">Recently earned</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {recentEarnedBadges.map((badge: any) => (
                         <span
                           key={`recent-${badge.id}`}
-                          className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-800"
+                          className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-800 dark:bg-[#0a0f1a] dark:text-gray-700"
                         >
                           <span>{badge.icon}</span>
                           {badge.name}

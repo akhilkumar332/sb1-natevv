@@ -255,15 +255,15 @@ const DonorBloodDrives = () => {
                           </span>
                         </div>
 
-                        <div className="rounded-xl border border-gray-100 bg-gray-50/60 px-3 py-2 text-xs text-gray-600">
+                        <div className="rounded-xl border border-gray-100 bg-gray-50/60 px-3 py-2 text-xs text-gray-600 dark:border-gray-200 dark:bg-[#101826] dark:text-gray-600">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Calendar className="w-3 h-3 text-gray-500" />
-                            <span className="font-semibold text-gray-700">Starts:</span>
+                            <Calendar className="w-3 h-3 text-gray-500 dark:text-gray-500" />
+                            <span className="font-semibold text-gray-700 dark:text-gray-700">Starts:</span>
                             <span>{formatDateTime(campaign.startDate)}</span>
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
-                            <Calendar className="w-3 h-3 text-gray-400" />
-                            <span className="font-semibold text-gray-700">Ends:</span>
+                            <Calendar className="w-3 h-3 text-gray-400 dark:text-gray-500" />
+                            <span className="font-semibold text-gray-700 dark:text-gray-700">Ends:</span>
                             <span>{formatDateTime(campaign.endDate)}</span>
                           </div>
                         </div>

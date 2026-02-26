@@ -249,7 +249,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/50 backdrop-blur-sm px-3 py-4 sm:px-4 sm:py-6">
-      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl border border-red-100 bg-white shadow-2xl dark:border-red-200 dark:bg-slate-700">
+      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl border border-red-100 bg-white shadow-2xl dark:border-red-200 dark:bg-[#0b1220]">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-t-3xl bg-gradient-to-r from-red-600 via-red-700 to-red-800 px-5 sm:px-8 py-5 text-white">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
@@ -279,13 +279,13 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
           )}
 
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-5 dark:border-gray-200 dark:bg-slate-600/60">
+            <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-5 dark:border-gray-200 dark:bg-[#101826]/80">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-400 dark:text-gray-500">Portal Access</p>
                   <p className="mt-1 text-sm text-gray-600 dark:text-gray-600">Select a portal for this session.</p>
                 </div>
-                <span className="rounded-full border border-red-100 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-red-600 dark:border-red-200 dark:bg-slate-700 dark:text-red-600">
+                <span className="rounded-full border border-red-100 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-red-600 dark:border-red-200 dark:bg-[#0a0f1a] dark:text-red-600">
                   Current: {portalLabels[currentPortal]}
                 </span>
               </div>
@@ -300,7 +300,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                   <button
                     key={role}
                     onClick={() => onSelect(role)}
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-all duration-300 hover:border-red-200 hover:bg-red-50 dark:border-gray-200 dark:bg-slate-700 dark:text-gray-700 dark:hover:border-red-200 dark:hover:bg-red-50"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-all duration-300 hover:border-red-200 hover:bg-red-50 dark:border-gray-200 dark:bg-[#0a0f1a] dark:text-gray-700 dark:hover:border-red-200 dark:hover:bg-red-50"
                   >
                     Go to {portalLabels[role]}
                   </button>
@@ -309,7 +309,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
             </div>
 
             {onImpersonate && (
-              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-200 dark:bg-slate-700">
+              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-200 dark:bg-[#0f1726]">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-400 dark:text-gray-500">Impersonation</p>
@@ -332,7 +332,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                       onChange={(event) => setSearchTerm(event.target.value)}
                       placeholder="Type at least 2 characters"
                       disabled={impersonationLoading}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 pr-10 text-sm text-gray-700 transition-all focus:border-red-300 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-300 dark:bg-slate-700 dark:text-gray-700 dark:focus:border-red-200 dark:disabled:bg-gray-100 dark:disabled:text-gray-500"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 pr-10 text-sm text-gray-700 transition-all focus:border-red-300 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-300 dark:bg-[#0a0f1a] dark:text-gray-700 dark:focus:border-red-200 dark:disabled:bg-gray-100 dark:disabled:text-gray-500"
                     />
                     <Search className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-gray-400 dark:text-gray-500" />
                   </div>
@@ -348,7 +348,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                     placeholder="Add context for audit logs"
                     disabled={impersonationLoading}
                     rows={2}
-                    className="mt-2 w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 transition-all focus:border-red-300 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-300 dark:bg-slate-700 dark:text-gray-700 dark:focus:border-red-200 dark:disabled:bg-gray-100 dark:disabled:text-gray-500"
+                    className="mt-2 w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 transition-all focus:border-red-300 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-300 dark:bg-[#0a0f1a] dark:text-gray-700 dark:focus:border-red-200 dark:disabled:bg-gray-100 dark:disabled:text-gray-500"
                   />
                 </div>
 
@@ -388,7 +388,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                           key={`recent-${user.uid}`}
                           onClick={() => handleImpersonateClick(user)}
                           disabled={restrictedStatuses.has(user.status || '')}
-                          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-300 dark:bg-slate-700 dark:hover:border-red-200 dark:hover:bg-red-50"
+                          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-300 dark:bg-[#0a0f1a] dark:hover:border-red-200 dark:hover:bg-red-50"
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div>
@@ -427,7 +427,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                       key={user.uid}
                       onClick={() => handleImpersonateClick(user)}
                       disabled={impersonationLoading || restrictedStatuses.has(user.status || '')}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-300 dark:bg-slate-700 dark:hover:border-red-200 dark:hover:bg-red-50"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-300 dark:bg-[#0a0f1a] dark:hover:border-red-200 dark:hover:bg-red-50"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -459,7 +459,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
 
       {pendingImpersonation && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-300 dark:bg-slate-700">
+          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-300 dark:bg-[#0b1220]">
             <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-900">Confirm Impersonation</h4>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-600">
               You are about to impersonate{' '}
@@ -498,7 +498,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
 
       {showRecentDrawer && (
         <div className="fixed inset-0 z-[55] flex items-end sm:items-center justify-center bg-black/50 px-4 py-4">
-          <div className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl max-h-[75vh] overflow-y-auto dark:border-gray-300 dark:bg-slate-700">
+          <div className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl max-h-[75vh] overflow-y-auto dark:border-gray-300 dark:bg-[#0b1220]">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-200">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Recent impersonations</p>
@@ -520,7 +520,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                   key={`drawer-${user.uid}`}
                   onClick={() => handleImpersonateClick(user)}
                   disabled={restrictedStatuses.has(user.status || '')}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-300 dark:bg-slate-700 dark:hover:border-red-200 dark:hover:bg-red-50"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-300 dark:bg-[#0a0f1a] dark:hover:border-red-200 dark:hover:bg-red-50"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>

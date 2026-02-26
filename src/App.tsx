@@ -77,7 +77,7 @@ function App() {
 
   return (
     <LoadingProvider>
-      <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-slate-900">
+      <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
         <Navbar />
         <Suspense fallback={<Loading />}>
           <main className="flex-grow">

@@ -1465,18 +1465,18 @@ const DonorAccount = () => {
           )}
         </div>
 
-        <div className="rounded-2xl border border-red-200 bg-red-50/60 p-6 shadow-sm">
+        <div className="rounded-2xl border border-red-200 bg-red-50/60 p-6 shadow-sm dark:border-red-200 dark:bg-[#101826]">
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="text-lg font-bold text-red-700">Delete Account</h3>
-              <p className="text-xs text-red-700/80">This action is permanent and cannot be undone.</p>
+              <h3 className="text-lg font-bold text-red-700 dark:text-red-700">Delete Account</h3>
+              <p className="text-xs text-red-700/80 dark:text-red-600">This action is permanent and cannot be undone.</p>
             </div>
-            <div className="rounded-full bg-red-50 p-2">
+            <div className="rounded-full bg-red-50 p-2 dark:bg-[#0a0f1a]">
               <Trash2 className="h-5 w-5 text-red-600" />
             </div>
           </div>
           <div className="mt-4 space-y-3">
-            <p className="text-xs text-red-700/80">
+            <p className="text-xs text-red-700/80 dark:text-red-600">
               Type your registered email or phone number to confirm.
             </p>
             <input
@@ -1484,7 +1484,7 @@ const DonorAccount = () => {
               value={deleteConfirmInput}
               onChange={(event) => setDeleteConfirmInput(event.target.value)}
               placeholder="Email or phone number"
-              className="w-full rounded-xl border border-red-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
+              className="w-full rounded-xl border border-red-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100 dark:border-red-200 dark:bg-[#0a0f1a] dark:text-gray-700"
             />
             <button
               type="button"

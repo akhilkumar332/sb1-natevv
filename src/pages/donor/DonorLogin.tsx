@@ -1,5 +1,6 @@
 // src/pages/auth/DonorLogin.tsx
 import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Phone, Droplet, Heart, Shield, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -161,7 +162,7 @@ export function DonorLogin() {
             countryCallingCodeEditable={false}
             value={formData.identifier}
             onChange={(value) => handleIdentifierChange(value || '')}
-            className="block w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors"
+            className="block w-full rounded-xl border-2 border-gray-200 px-4 py-3 transition-colors focus:border-red-500 focus:outline-none [&_.PhoneInputInput]:bg-white [&_.PhoneInputInput]:text-gray-900 [&_.PhoneInputInput]:outline-none [&_.PhoneInputInput]:placeholder:text-gray-400 dark:[&_.PhoneInputInput]:bg-white dark:[&_.PhoneInputInput]:text-gray-900"
           />
           <Phone className="absolute right-4 top-3.5 h-5 w-5 text-gray-400" />
         </div>
@@ -202,9 +203,22 @@ export function DonorLogin() {
             type="text"
             required
             value={formData.otp}
-            onChange={handleChange}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              const numericOtp = event.target.value.replace(/\D/g, '').slice(0, 6);
+              handleChange({
+                ...event,
+                target: {
+                  ...event.target,
+                  name: 'otp',
+                  value: numericOtp,
+                },
+              } as ChangeEvent<HTMLInputElement>);
+            }}
             disabled={otpLoading}
             maxLength={6}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            autoComplete="one-time-code"
             className="block w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors text-center text-2xl font-bold tracking-widest disabled:opacity-50"
             placeholder="000000"
           />

@@ -240,7 +240,7 @@ function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: 
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-3 px-4 py-2 rounded-full bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all duration-300 border border-red-200"
+        className="flex items-center space-x-3 px-4 py-2 rounded-full bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all duration-300 border border-red-200 dark:from-[#0b1220] dark:to-[#101826] dark:hover:from-[#101826] dark:hover:to-[#172033] dark:border-gray-700"
       >
         {user?.photoURL ? (
           <img
@@ -435,7 +435,7 @@ function MobileUserMenu({
 
   return (
     <div className="space-y-3 border-t border-gray-200 pt-4 mt-4">
-      <div className="flex items-center space-x-3 px-4 py-3 bg-gradient-to-r from-red-50 to-pink-50 rounded-xl">
+      <div className="flex items-center space-x-3 px-4 py-3 bg-gradient-to-r from-red-50 to-pink-50 rounded-xl dark:from-[#0b1220] dark:to-[#101826] dark:border dark:border-gray-700">
         {user?.photoURL ? (
           <img
             src={user.photoURL}
@@ -594,7 +594,7 @@ const Navbar: React.FC = () => {
 
   return (
     <>
-      <nav className="relative bg-white/95 backdrop-blur-xl shadow-lg border-b border-white/50 sticky top-0 z-40 dark:bg-slate-700/95 dark:border-slate-500">
+      <nav className="relative bg-white/95 backdrop-blur-xl shadow-lg border-b border-white/50 sticky top-0 z-40 dark:bg-[#0a0f1a]/95 dark:border-gray-700">
         {/* Decorative gradient line */}
         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-red-600 to-transparent opacity-50"></div>
 
@@ -742,7 +742,7 @@ const Navbar: React.FC = () => {
           />
 
           {/* Drawer Menu */}
-          <div className="md:hidden fixed top-0 right-0 bottom-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl animate-slideInRight dark:bg-gray-900">
+          <div className="md:hidden fixed top-0 right-0 bottom-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl animate-slideInRight dark:bg-[#0a0f1a]">
             {/* Decorative gradient background */}
             <div className="absolute inset-0 bg-gradient-to-br from-red-50 via-white to-pink-50">
               <div className="absolute -top-20 -right-20 w-64 h-64 bg-gradient-to-r from-red-400 to-pink-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
@@ -812,7 +812,7 @@ const Navbar: React.FC = () => {
               </div>
 
               {/* Footer */}
-              <div className="p-6 border-t border-gray-200 bg-gradient-to-r from-red-50 to-pink-50 dark:border-gray-700 dark:from-gray-900 dark:to-gray-800">
+              <div className="p-6 border-t border-gray-200 bg-gradient-to-r from-red-50 to-pink-50 dark:border-gray-700 dark:from-gray-950 dark:to-gray-900">
                 <div className="flex items-center text-red-600 font-semibold justify-center">
                   <Heart className="w-4 h-4 mr-2 animate-pulse" />
                   <span className="text-sm">Saving Lives Together</span>

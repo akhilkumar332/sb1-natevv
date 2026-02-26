@@ -78,17 +78,17 @@ export const useVersionCheck = () => {
       const toastId = 'version-update';
       toast.custom(
         (t) => (
-          <div className={`pointer-events-auto w-full max-w-sm rounded-xl border border-amber-200 bg-amber-50 shadow-xl ${t.visible ? 'animate-fadeIn' : ''}`}>
+          <div className={`pointer-events-auto w-full max-w-sm rounded-xl border border-amber-200 bg-amber-50 shadow-xl dark:border-amber-200 dark:bg-[#0b1220] ${t.visible ? 'animate-fadeIn' : ''}`}>
             <div className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-amber-900">New version available</p>
-                  <p className="text-sm text-amber-800 mt-1">Refresh to load the latest updates.</p>
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-700">New version available</p>
+                  <p className="mt-1 text-sm text-amber-800 dark:text-gray-500">Refresh to load the latest updates.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleRefresh(nextVersion)}
-                  className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition-colors"
+                  className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700"
                 >
                   Refresh
                 </button>
