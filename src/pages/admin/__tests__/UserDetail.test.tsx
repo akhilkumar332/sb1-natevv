@@ -155,4 +155,49 @@ describe('Admin UserDetail page', () => {
 
     expect(await screen.findByText('Set Active')).toBeInTheDocument();
   });
+
+  it('shows tokens from user doc fallback when security query has no active tokens', async () => {
+    setupMocks();
+    userDetailMock.mockReturnValue({
+      data: {
+        ...baseUser,
+        fcmDeviceDetails: {
+          'device-1': {
+            token: 'tok-userdoc-1',
+            updatedAt: new Date('2026-02-26T11:01:39Z'),
+          },
+          'device-2': {
+            token: 'tok-userdoc-2',
+          },
+        },
+      },
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    securityMock.mockReturnValue({
+      data: {
+        activeFcmTokens: [],
+        activeTokenMeta: [],
+        devices: [],
+        loginIps: [],
+      },
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+
+    render(
+      <QueryClientProvider client={createClient()}>
+        <MemoryRouter initialEntries={['/admin/dashboard/users/u1?tab=security']}>
+          <Routes>
+            <Route path="/admin/dashboard/users/:uid" element={<UserDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText('tok-userdoc-1')).toBeInTheDocument();
+    expect(await screen.findByText('tok-userdoc-2')).toBeInTheDocument();
+  });
 });

@@ -81,8 +81,10 @@ const useCachedAdminQuery = <T,>(
   options?: {
     staleTime?: number;
     gcTime?: number;
-    refetchInterval?: number;
+    refetchInterval?: number | false;
     refetchIntervalInBackground?: boolean;
+    refetchOnMount?: boolean | 'always';
+    refetchOnWindowFocus?: boolean;
     enabled?: boolean;
   },
 ) => {
@@ -99,6 +101,8 @@ const useCachedAdminQuery = <T,>(
     gcTime: options?.gcTime,
     refetchInterval: options?.refetchInterval,
     refetchIntervalInBackground: options?.refetchIntervalInBackground,
+    refetchOnMount: options?.refetchOnMount,
+    refetchOnWindowFocus: options?.refetchOnWindowFocus,
     enabled: options?.enabled,
   });
 };
@@ -386,14 +390,16 @@ export const useAdminAuditLogs = (limitCount: number = 1000) =>
 export const useAdminUserDetail = (uid: string) =>
   useCachedAdminQuery<User>(
     adminQueryKeys.userDetail(uid),
-    5 * 60 * 1000,
+    0,
     ['createdAt', 'updatedAt', 'lastLoginAt', 'lastDonation', 'dateOfBirth'],
     () => getAdminUserDetail(uid),
     {
-      staleTime: 2 * 60 * 1000,
+      staleTime: 0,
       gcTime: 15 * 60 * 1000,
-      refetchInterval: 2 * 60 * 1000,
-      refetchIntervalInBackground: true,
+      refetchInterval: false,
+      refetchIntervalInBackground: false,
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: true,
       enabled: Boolean(uid),
     },
   );
@@ -401,14 +407,16 @@ export const useAdminUserDetail = (uid: string) =>
 export const useAdminUserSecurity = (uid: string) =>
   useCachedAdminQuery<AdminUserSecurity>(
     adminQueryKeys.userSecurity(uid),
-    2 * 60 * 1000,
+    0,
     ['updatedAt', 'createdAt'],
     () => getAdminUserSecurity(uid),
     {
-      staleTime: 60 * 1000,
+      staleTime: 0,
       gcTime: 10 * 60 * 1000,
-      refetchInterval: 60 * 1000,
-      refetchIntervalInBackground: true,
+      refetchInterval: false,
+      refetchIntervalInBackground: false,
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: true,
       enabled: Boolean(uid),
     },
   );

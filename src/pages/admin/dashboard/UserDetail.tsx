@@ -54,6 +54,14 @@ const formatDateTime = (value: any) => {
   return 'N/A';
 };
 
+const toJsDate = (value: any): Date | undefined => {
+  if (!value) return undefined;
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === 'function') return value.toDate();
+  if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
+  return undefined;
+};
+
 const formatRole = (role?: string | null) => {
   if (!role) return 'unknown';
   return role === 'hospital' ? 'bloodbank' : role;
@@ -159,6 +167,12 @@ function UserDetailPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, tabParam]);
 
+  useEffect(() => {
+    if (activeTab !== 'security') return;
+    void securityQuery.refetch();
+    void userQuery.refetch();
+  }, [activeTab, securityQuery.refetch, userQuery.refetch]);
+
   const canModify = useMemo(() => {
     if (!authUser?.uid || !user?.uid) return false;
     if (authUser.uid === user.uid) return false;
@@ -193,16 +207,59 @@ function UserDetailPage() {
         deviceMap.set(normalizedToken, { updatedAt: device.updatedAt, deviceId: device.deviceId });
       }
     });
+    const securityTokens = securityQuery.data?.activeFcmTokens || [];
+    if (securityTokens.length > 0) {
+      return securityTokens.map((token) => {
+        const normalizedToken = token.trim();
+        return {
+          token: normalizedToken,
+          updatedAt: deviceMap.get(normalizedToken)?.updatedAt,
+          deviceId: deviceMap.get(normalizedToken)?.deviceId,
+        };
+      });
+    }
 
-    return (securityQuery.data?.activeFcmTokens || []).map((token) => {
+    const userData = (user || {}) as Record<string, any>;
+    const userDeviceDetails = (userData.fcmDeviceDetails || {}) as Record<string, any>;
+    const userDeviceTokens = (userData.fcmDeviceTokens || {}) as Record<string, any>;
+    const userTokenMap = new Map<string, { updatedAt?: Date; deviceId?: string }>();
+
+    Object.keys(userDeviceDetails).forEach((deviceId) => {
+      const details = userDeviceDetails[deviceId] || {};
+      const token = typeof details.token === 'string' ? details.token.trim() : '';
+      if (!token) return;
+      userTokenMap.set(token, {
+        updatedAt: toJsDate(details.updatedAt),
+        deviceId,
+      });
+    });
+    Object.keys(userDeviceTokens).forEach((deviceId) => {
+      const token = typeof userDeviceTokens[deviceId] === 'string' ? userDeviceTokens[deviceId].trim() : '';
+      if (!token || userTokenMap.has(token)) return;
+      userTokenMap.set(token, { updatedAt: undefined, deviceId });
+    });
+
+    const legacyTokens = [
+      ...(Array.isArray(userData.fcmTokens) ? userData.fcmTokens : []),
+      userData.fcmToken,
+    ]
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter(Boolean);
+    legacyTokens.forEach((token) => {
+      if (!userTokenMap.has(token)) {
+        userTokenMap.set(token, { updatedAt: toJsDate(userData.lastTokenUpdate), deviceId: undefined });
+      }
+    });
+
+    return Array.from(userTokenMap.entries()).map(([token, meta]) => {
       const normalizedToken = token.trim();
       return {
         token: normalizedToken,
-        updatedAt: deviceMap.get(normalizedToken)?.updatedAt,
-        deviceId: deviceMap.get(normalizedToken)?.deviceId,
+        updatedAt: meta.updatedAt || deviceMap.get(normalizedToken)?.updatedAt,
+        deviceId: meta.deviceId || deviceMap.get(normalizedToken)?.deviceId,
       };
     });
-  }, [securityQuery.data?.activeFcmTokens, securityQuery.data?.activeTokenMeta, securityQuery.data?.devices]);
+  }, [securityQuery.data?.activeFcmTokens, securityQuery.data?.activeTokenMeta, securityQuery.data?.devices, user]);
 
   const ipTotalPages = Math.max(1, Math.ceil(filteredIps.length / PAGE_SIZE));
   const pagedIps = filteredIps.slice((ipPage - 1) * PAGE_SIZE, ipPage * PAGE_SIZE);
@@ -403,6 +460,16 @@ function UserDetailPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm">
             <h3 className="text-lg font-semibold text-gray-900">Active FCM Tokens</h3>
+            {securityQuery.data?.debug && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+                <p><span className="font-semibold">Debug Resolved Doc:</span> {securityQuery.data.debug.resolvedDocumentId}</p>
+                <p><span className="font-semibold">Debug Resolved UID:</span> {securityQuery.data.debug.resolvedUid}</p>
+                <p>
+                  <span className="font-semibold">Debug Token Counts:</span>{' '}
+                  details={securityQuery.data.debug.tokenCounts.fcmDeviceDetails}, tokens={securityQuery.data.debug.tokenCounts.fcmDeviceTokens}, legacy={securityQuery.data.debug.tokenCounts.legacy}
+                </p>
+              </div>
+            )}
             {activeTokenMeta.length === 0 ? (
               <p className="mt-3 text-sm text-gray-500">No active tokens.</p>
             ) : (

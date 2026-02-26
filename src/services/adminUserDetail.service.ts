@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteField,
   doc,
   documentId,
   getDoc,
@@ -37,6 +38,15 @@ export type AdminUserSecurity = {
     createdAt?: Date;
     source: 'impersonationEvents' | 'auditLogs';
   }>;
+  debug?: {
+    resolvedDocumentId: string;
+    resolvedUid: string;
+    tokenCounts: {
+      fcmDeviceDetails: number;
+      fcmDeviceTokens: number;
+      legacy: number;
+    };
+  };
 };
 
 export type AdminUserKpis = {
@@ -145,15 +155,131 @@ const safeOrderedQuery = async (q: ReturnType<typeof query>, fallbackQ: ReturnTy
   }
 };
 
+const asRecord = (value: any): JsonRecord => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as JsonRecord;
+};
+
+const extractFieldMap = (data: JsonRecord, rootKey: string): JsonRecord => {
+  const nested = { ...asRecord(data[rootKey]) };
+  const prefix = `${rootKey}.`;
+  Object.keys(data).forEach((key) => {
+    if (!key.startsWith(prefix)) return;
+    const childKey = key.slice(prefix.length).trim();
+    if (!childKey) return;
+    nested[childKey] = data[key];
+  });
+  return nested;
+};
+
+const countFcmTokens = (data: JsonRecord) => {
+  const fcmDeviceDetails = extractFieldMap(data, 'fcmDeviceDetails');
+  const fcmDeviceTokens = extractFieldMap(data, 'fcmDeviceTokens');
+  const detailTokens = Object.values(fcmDeviceDetails)
+    .map((entry: any) => (typeof entry?.token === 'string' ? entry.token.trim() : ''))
+    .filter(Boolean).length;
+  const deviceTokens = Object.values(fcmDeviceTokens)
+    .map((entry: any) => (typeof entry === 'string' ? entry.trim() : ''))
+    .filter(Boolean).length;
+  const legacyTokens = [
+    ...(Array.isArray(data.fcmTokens) ? data.fcmTokens : []),
+    data.fcmToken,
+  ]
+    .map((entry: any) => (typeof entry === 'string' ? entry.trim() : ''))
+    .filter(Boolean).length;
+  return Math.max(detailTokens, deviceTokens, legacyTokens);
+};
+
+const rankUserCandidate = (data: JsonRecord) => {
+  const tokenScore = countFcmTokens(data);
+  const updatedAtScore = toDate(data.updatedAt)?.getTime() || 0;
+  return { tokenScore, updatedAtScore };
+};
+
+const resolveUserDoc = async (uidOrDocId: string) => {
+  const directRef = doc(db, 'users', uidOrDocId);
+  let directSnap;
+  try {
+    directSnap = await getDoc(directRef);
+  } catch (_error) {
+    directSnap = null;
+  }
+  let uidDocSnap = null;
+  if (directSnap?.exists?.()) {
+    const directData = directSnap.data() as JsonRecord;
+    const embeddedUid = typeof directData.uid === 'string' ? directData.uid.trim() : '';
+    if (embeddedUid && embeddedUid !== directSnap.id) {
+      try {
+        const candidate = await getDoc(doc(db, 'users', embeddedUid));
+        if (candidate.exists()) {
+          uidDocSnap = candidate;
+        }
+      } catch (_error) {
+        uidDocSnap = null;
+      }
+    }
+  }
+  let byUidDocs: Array<{ id: string; data: () => JsonRecord }> = [];
+  try {
+    const byUidSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', uidOrDocId), limit(10)));
+    byUidDocs = byUidSnap.docs;
+  } catch (_error) {
+    byUidDocs = [];
+  }
+
+  const candidates = new Map<string, { id: string; data: JsonRecord; snap: any }>();
+  if (directSnap?.exists?.()) {
+    candidates.set(directSnap.id, {
+      id: directSnap.id,
+      data: directSnap.data() as JsonRecord,
+      snap: directSnap,
+    });
+  }
+  if (uidDocSnap?.exists?.()) {
+    candidates.set(uidDocSnap.id, {
+      id: uidDocSnap.id,
+      data: uidDocSnap.data() as JsonRecord,
+      snap: uidDocSnap,
+    });
+  }
+  byUidDocs.forEach((row) => {
+    candidates.set(row.id, {
+      id: row.id,
+      data: row.data() as JsonRecord,
+      snap: row,
+    });
+  });
+  if (candidates.size === 0) throw new NotFoundError('User not found');
+
+  const sorted = Array.from(candidates.values()).sort((a, b) => {
+    const aRank = rankUserCandidate(a.data);
+    const bRank = rankUserCandidate(b.data);
+    if (bRank.tokenScore !== aRank.tokenScore) return bRank.tokenScore - aRank.tokenScore;
+    if (bRank.updatedAtScore !== aRank.updatedAtScore) return bRank.updatedAtScore - aRank.updatedAtScore;
+    if (a.id === uidOrDocId) return -1;
+    if (b.id === uidOrDocId) return 1;
+    return 0;
+  });
+
+  const selected = sorted[0];
+  const resolvedUid = typeof selected.data.uid === 'string' && selected.data.uid.trim()
+    ? selected.data.uid.trim()
+    : selected.id;
+  return {
+    ref: doc(db, 'users', selected.id),
+    snap: selected.snap,
+    data: selected.data,
+    resolvedUid,
+  };
+};
+
 export const getAdminUserDetail = async (uid: string): Promise<User> => {
   try {
-    const snapshot = await getDoc(doc(db, 'users', uid));
-    if (!snapshot.exists()) throw new NotFoundError('User not found');
-    const data = snapshot.data() as JsonRecord;
+    const { snap: snapshot, data, resolvedUid } = await resolveUserDoc(uid);
     return {
       ...(data as User),
       id: snapshot.id,
-      uid,
+      uid: resolvedUid,
       createdAt: data.createdAt,
       lastLoginAt: data.lastLoginAt,
       dateOfBirth: data.dateOfBirth,
@@ -167,18 +293,44 @@ export const getAdminUserDetail = async (uid: string): Promise<User> => {
 
 export const getAdminUserSecurity = async (uid: string): Promise<AdminUserSecurity> => {
   try {
-    const userSnap = await getDoc(doc(db, 'users', uid));
-    const userData = userSnap.exists() ? (userSnap.data() as JsonRecord) : {};
-    const fcmDeviceDetails = (userData.fcmDeviceDetails || {}) as JsonRecord;
-    const devices = Object.keys(fcmDeviceDetails).map((deviceId) => {
+    const { snap, data: userData, resolvedUid } = await resolveUserDoc(uid);
+    const fcmDeviceDetails = extractFieldMap(userData, 'fcmDeviceDetails');
+    const fcmDeviceTokens = extractFieldMap(userData, 'fcmDeviceTokens');
+    const fcmDeviceDetailsCount = Object.values(fcmDeviceDetails).filter(
+      (entry: any) => typeof entry?.token === 'string' && entry.token.trim().length > 0,
+    ).length;
+    const fcmDeviceTokensCount = Object.values(fcmDeviceTokens).filter(
+      (entry: any) => typeof entry === 'string' && entry.trim().length > 0,
+    ).length;
+    const devicesById = new Map<string, { deviceId: string; token?: string; updatedAt?: Date; info?: JsonRecord }>();
+
+    Object.keys(fcmDeviceDetails).forEach((deviceId) => {
       const details = fcmDeviceDetails[deviceId] || {};
-      return {
+      devicesById.set(deviceId, {
         deviceId,
         token: typeof details.token === 'string' ? details.token.trim() : undefined,
         updatedAt: toDate(details.updatedAt),
         info: details.info || {},
-      };
+      });
     });
+
+    Object.keys(fcmDeviceTokens).forEach((deviceId) => {
+      const tokenValue = typeof fcmDeviceTokens[deviceId] === 'string' ? fcmDeviceTokens[deviceId].trim() : '';
+      if (!tokenValue) return;
+      const existing = devicesById.get(deviceId);
+      if (existing) {
+        if (!existing.token) existing.token = tokenValue;
+        return;
+      }
+      devicesById.set(deviceId, {
+        deviceId,
+        token: tokenValue,
+        updatedAt: undefined,
+        info: {},
+      });
+    });
+
+    const devices = Array.from(devicesById.values());
     const tokenMetaMap = new Map<string, { updatedAt?: Date; deviceId?: string }>();
     devices.forEach((device) => {
       if (!device.token) return;
@@ -195,56 +347,91 @@ export const getAdminUserSecurity = async (uid: string): Promise<AdminUserSecuri
       }
     });
 
-    const impersonationQ = query(
-      collection(db, 'impersonationEvents'),
-      where('targetUid', '==', uid),
-      orderBy('createdAt', 'desc'),
-      limit(50),
-    );
-    const impersonationFallbackQ = query(
-      collection(db, 'impersonationEvents'),
-      where('targetUid', '==', uid),
-      limit(100),
-    );
-    const impersonationSnap = await safeOrderedQuery(impersonationQ, impersonationFallbackQ);
-    const impersonationRows = impersonationSnap.docs
-      .map((row) => row.data() as JsonRecord)
-      .filter((entry) => entry.ip)
-      .map((entry) => ({
-        ip: String(entry.ip),
-        userAgent: entry.userAgent ? String(entry.userAgent) : undefined,
-        createdAt: toDate(entry.createdAt),
-        source: 'impersonationEvents' as const,
-      }));
+    let impersonationRows: Array<{
+      ip: string;
+      userAgent?: string;
+      createdAt?: Date;
+      source: 'impersonationEvents';
+    }> = [];
+    try {
+      const impersonationQ = query(
+        collection(db, 'impersonationEvents'),
+        where('targetUid', '==', resolvedUid),
+        orderBy('createdAt', 'desc'),
+        limit(50),
+      );
+      const impersonationFallbackQ = query(
+        collection(db, 'impersonationEvents'),
+        where('targetUid', '==', resolvedUid),
+        limit(100),
+      );
+      const impersonationSnap = await safeOrderedQuery(impersonationQ, impersonationFallbackQ);
+      impersonationRows = impersonationSnap.docs
+        .map((row) => row.data() as JsonRecord)
+        .filter((entry) => entry.ip)
+        .map((entry) => ({
+          ip: String(entry.ip),
+          userAgent: entry.userAgent ? String(entry.userAgent) : undefined,
+          createdAt: toDate(entry.createdAt),
+          source: 'impersonationEvents' as const,
+        }));
+    } catch (_error) {
+      impersonationRows = [];
+    }
 
-    const auditQ = query(
-      collection(db, 'auditLogs'),
-      where('targetUid', '==', uid),
-      orderBy('createdAt', 'desc'),
-      limit(50),
-    );
-    const auditFallbackQ = query(
-      collection(db, 'auditLogs'),
-      where('targetUid', '==', uid),
-      limit(100),
-    );
-    const auditSnap = await safeOrderedQuery(auditQ, auditFallbackQ);
-    const auditRows = auditSnap.docs
-      .map((row) => row.data() as JsonRecord)
-      .filter((entry) => entry.metadata?.ip || entry.ip)
-      .map((entry) => ({
-        ip: String(entry.metadata?.ip || entry.ip),
-        userAgent: entry.metadata?.userAgent || entry.userAgent,
-        createdAt: toDate(entry.createdAt),
-        source: 'auditLogs' as const,
-      }));
+    let auditRows: Array<{
+      ip: string;
+      userAgent?: string;
+      createdAt?: Date;
+      source: 'auditLogs';
+    }> = [];
+    try {
+      const auditQ = query(
+        collection(db, 'auditLogs'),
+        where('targetUid', '==', resolvedUid),
+        orderBy('createdAt', 'desc'),
+        limit(50),
+      );
+      const auditFallbackQ = query(
+        collection(db, 'auditLogs'),
+        where('targetUid', '==', resolvedUid),
+        limit(100),
+      );
+      const auditSnap = await safeOrderedQuery(auditQ, auditFallbackQ);
+      auditRows = auditSnap.docs
+        .map((row) => row.data() as JsonRecord)
+        .filter((entry) => entry.metadata?.ip || entry.ip)
+        .map((entry) => ({
+          ip: String(entry.metadata?.ip || entry.ip),
+          userAgent: entry.metadata?.userAgent || entry.userAgent,
+          createdAt: toDate(entry.createdAt),
+          source: 'auditLogs' as const,
+        }));
+    } catch (_error) {
+      auditRows = [];
+    }
 
     const mergedIps = sortByDateDesc([...impersonationRows, ...auditRows]).slice(0, 50);
 
+    const legacyTokenCandidates = [
+      ...(Array.isArray(userData.fcmTokens) ? userData.fcmTokens : []),
+      userData.fcmToken,
+    ]
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter(Boolean);
+    const legacyCount = legacyTokenCandidates.length;
+    legacyTokenCandidates.forEach((token) => {
+      if (!tokenMetaMap.has(token)) {
+        tokenMetaMap.set(token, { updatedAt: undefined, deviceId: undefined });
+      }
+    });
+
     const seen = new Set<string>();
     const lastTokenUpdate = toDate(userData.lastTokenUpdate);
-    const activeFcmTokens = devices
-      .map((device) => (typeof device.token === 'string' ? device.token.trim() : ''))
+    const activeFcmTokens = [
+      ...devices.map((device) => (typeof device.token === 'string' ? device.token.trim() : '')),
+      ...legacyTokenCandidates,
+    ]
       .filter(Boolean)
       .filter((token) => {
       if (seen.has(token)) return false;
@@ -263,6 +450,15 @@ export const getAdminUserSecurity = async (uid: string): Promise<AdminUserSecuri
       activeFcmTokens,
       activeTokenMeta,
       loginIps: mergedIps,
+      debug: {
+        resolvedDocumentId: snap.id,
+        resolvedUid,
+        tokenCounts: {
+          fcmDeviceDetails: fcmDeviceDetailsCount,
+          fcmDeviceTokens: fcmDeviceTokensCount,
+          legacy: legacyCount,
+        },
+      },
     };
   } catch (error) {
     throw new DatabaseError('Failed to load user security data');
@@ -486,27 +682,47 @@ export const revokeUserFcmToken = async (
   reason: string,
 ) => {
   try {
-    const userSnap = await getDoc(doc(db, 'users', uid));
-    if (!userSnap.exists()) throw new NotFoundError('User not found');
-    const data = userSnap.data() as JsonRecord;
-    const fcmDeviceDetails = { ...(data.fcmDeviceDetails || {}) } as Record<string, JsonRecord>;
+    const { ref: userRef, data, resolvedUid } = await resolveUserDoc(uid);
+    const fcmDeviceDetails = extractFieldMap(data, 'fcmDeviceDetails') as Record<string, JsonRecord>;
+    const fcmDeviceTokens = extractFieldMap(data, 'fcmDeviceTokens') as Record<string, string>;
+    const normalizedToken = String(token || '').trim();
+    const legacyFcmTokens = Array.isArray(data.fcmTokens) ? data.fcmTokens : [];
 
     Object.keys(fcmDeviceDetails).forEach((deviceId) => {
-      if (fcmDeviceDetails[deviceId]?.token === token) {
+      if (String(fcmDeviceDetails[deviceId]?.token || '').trim() === normalizedToken) {
         delete fcmDeviceDetails[deviceId];
       }
     });
 
-    await updateDoc(doc(db, 'users', uid), {
-      fcmDeviceDetails,
-      updatedAt: serverTimestamp(),
+    Object.keys(fcmDeviceTokens).forEach((deviceId) => {
+      if (String(fcmDeviceTokens[deviceId] || '').trim() === normalizedToken) {
+        delete fcmDeviceTokens[deviceId];
+      }
     });
+
+    const filteredLegacyTokens = legacyFcmTokens
+      .map((entry: unknown) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter((entry: string) => entry && entry !== normalizedToken);
+    const currentLegacyToken = typeof data.fcmToken === 'string' ? data.fcmToken.trim() : '';
+
+    const payload: Record<string, any> = {
+      fcmDeviceDetails,
+      fcmDeviceTokens,
+      fcmTokens: filteredLegacyTokens,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (currentLegacyToken === normalizedToken) {
+      payload.fcmToken = deleteField();
+    }
+
+    await updateDoc(userRef, payload);
 
     await logAuditEvent({
       actorUid: adminUid,
       actorRole: 'admin',
       action: 'admin_revoke_fcm_token',
-      targetUid: uid,
+      targetUid: resolvedUid,
       metadata: { tokenTail: token.slice(-8), reason },
     });
   } catch (error) {
@@ -516,8 +732,12 @@ export const revokeUserFcmToken = async (
 
 export const revokeAllUserFcmTokens = async (uid: string, adminUid: string, reason: string) => {
   try {
-    await updateDoc(doc(db, 'users', uid), {
+    const { ref: userRef, resolvedUid } = await resolveUserDoc(uid);
+    await updateDoc(userRef, {
       fcmDeviceDetails: {},
+      fcmDeviceTokens: {},
+      fcmTokens: [],
+      fcmToken: deleteField(),
       updatedAt: serverTimestamp(),
     });
 
@@ -525,7 +745,7 @@ export const revokeAllUserFcmTokens = async (uid: string, adminUid: string, reas
       actorUid: adminUid,
       actorRole: 'admin',
       action: 'admin_revoke_all_fcm_tokens',
-      targetUid: uid,
+      targetUid: resolvedUid,
       metadata: { reason },
     });
   } catch (error) {
