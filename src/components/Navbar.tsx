@@ -103,6 +103,57 @@ const portalOptions: Array<{ role: PortalRole; label: string }> = [
   { role: 'admin', label: 'Admin' },
 ];
 
+const donorDashboardLinks = [
+  { label: 'Overview', path: '/donor/dashboard/overview' },
+  { label: 'Readiness', path: '/donor/dashboard/readiness' },
+  { label: 'Requests', path: '/donor/dashboard/requests' },
+  { label: 'Blood Drives', path: '/donor/dashboard/blood-drives' },
+  { label: 'Journey', path: '/donor/dashboard/journey' },
+  { label: 'Referrals', path: '/donor/dashboard/referrals' },
+  { label: 'Account', path: '/donor/dashboard/account' },
+];
+
+const ngoDashboardLinks = [
+  { label: 'Overview', path: '/ngo/dashboard/overview' },
+  { label: 'Campaigns', path: '/ngo/dashboard/campaigns' },
+  { label: 'Volunteers', path: '/ngo/dashboard/volunteers' },
+  { label: 'Partnerships', path: '/ngo/dashboard/partnerships' },
+  { label: 'Donors', path: '/ngo/dashboard/donors' },
+  { label: 'Analytics', path: '/ngo/dashboard/analytics' },
+  { label: 'Referrals', path: '/ngo/dashboard/referrals' },
+  { label: 'Account', path: '/ngo/dashboard/account' },
+];
+
+const bloodbankDashboardLinks = [
+  { label: 'Overview', path: '/bloodbank/dashboard/overview' },
+  { label: 'Requests', path: '/bloodbank/dashboard/requests' },
+  { label: 'Donors', path: '/bloodbank/dashboard/donors' },
+  { label: 'Appointments', path: '/bloodbank/dashboard/appointments' },
+  { label: 'Inventory', path: '/bloodbank/dashboard/inventory' },
+  { label: 'Analytics', path: '/bloodbank/dashboard/analytics' },
+  { label: 'Referrals', path: '/bloodbank/dashboard/referrals' },
+  { label: 'Account', path: '/bloodbank/dashboard/account' },
+];
+
+const adminDashboardLinks = (isSuperAdmin: boolean) => [
+  { label: 'Overview', path: '/admin/dashboard/overview' },
+  { label: 'Users', path: '/admin/dashboard/users' },
+  { label: 'Donors', path: '/admin/dashboard/donors' },
+  { label: 'NGOs', path: '/admin/dashboard/ngos' },
+  { label: 'BloodBanks', path: '/admin/dashboard/bloodbanks' },
+  { label: 'Verification', path: '/admin/dashboard/verification' },
+  { label: 'Emergency', path: '/admin/dashboard/emergency-requests' },
+  { label: 'Inventory Alerts', path: '/admin/dashboard/inventory-alerts' },
+  { label: 'Campaigns', path: '/admin/dashboard/campaigns' },
+  { label: 'Volunteers & Partners', path: '/admin/dashboard/volunteers-partnerships' },
+  { label: 'Appointments', path: '/admin/dashboard/appointments-donations' },
+  { label: 'Analytics', path: '/admin/dashboard/analytics-reports' },
+  { label: 'Audit & Security', path: '/admin/dashboard/audit-security' },
+  ...(isSuperAdmin ? [{ label: 'Impersonation Audit', path: '/admin/dashboard/impersonation-audit' }] : []),
+  { label: 'Notifications', path: '/admin/dashboard/notifications' },
+  { label: 'Settings', path: '/admin/dashboard/settings' },
+];
+
 const IMPERSONATION_TTL_MS = 30 * 60 * 1000;
 
 const formatImpersonationRemaining = (ms: number) => {
@@ -537,9 +588,20 @@ const Navbar: React.FC = () => {
   const isNgoDashboard = user?.role === 'ngo' && location.pathname.startsWith('/ngo/dashboard');
   const isBloodbankDashboard = user?.role === 'bloodbank' && location.pathname.startsWith('/bloodbank/dashboard');
   const isAdminDashboard = location.pathname.startsWith('/admin/dashboard');
-  const hideDonorNav = isDonorDashboard || isAdminDashboard;
+  const hidePublicNav = isDonorDashboard || isNgoDashboard || isBloodbankDashboard || isAdminDashboard;
   const hideDashboardLink = isDonorDashboard || isNgoDashboard || isBloodbankDashboard || isAdminDashboard;
   const showNotificationBadge = isDonorDashboard || isNgoDashboard || isBloodbankDashboard;
+  const dashboardInfoChips = [
+    ...(user?.bhId && (isNgoDashboard || isBloodbankDashboard || isAdminDashboard)
+      ? [`BH ID: ${user.bhId}`]
+      : []),
+    ...(user?.registrationNumber && (isNgoDashboard || isBloodbankDashboard)
+      ? [`Reg ID: ${user.registrationNumber}`]
+      : []),
+    ...(isAdminDashboard
+      ? [`Role: ${isSuperAdmin ? 'superadmin' : 'admin'}`]
+      : []),
+  ];
   const topBadge = useTopDonorBadge(user);
   const achievementLabel = topBadge.name
     ? `${topBadge.icon ? `${topBadge.icon} ` : ''}${topBadge.name}`
@@ -615,13 +677,26 @@ const Navbar: React.FC = () => {
 
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center space-x-1">
-              {!hideDonorNav && (
+              {!hidePublicNav && (
                 <>
                   <DesktopNavLink to="/donors">Find Donors</DesktopNavLink>
                   <DesktopNavLink to="/request-blood">Request Blood</DesktopNavLink>
                   <DesktopNavLink to="/about">About</DesktopNavLink>
                   <DesktopNavLink to="/contact">Contact</DesktopNavLink>
                 </>
+              )}
+
+              {dashboardInfoChips.length > 0 && (
+                <div className="ml-2 hidden lg:flex items-center gap-2 rounded-full border border-red-100 bg-red-50/80 px-3 py-1.5 dark:border-gray-700 dark:bg-[#0b1220]/70">
+                  {dashboardInfoChips.map((chip) => (
+                    <span
+                      key={chip}
+                      className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold tracking-wide text-gray-700 dark:bg-[#101826] dark:text-gray-200"
+                    >
+                      {chip}
+                    </span>
+                  ))}
+                </div>
               )}
 
               <div className="ml-4">
@@ -685,12 +760,12 @@ const Navbar: React.FC = () => {
               )}
               <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all border border-red-200"
+                className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100 transition-all border border-red-200 dark:from-[#101826] dark:to-[#172033] dark:hover:from-[#172033] dark:hover:to-[#1f2b3f] dark:border-gray-700"
               >
                 {isOpen ? (
-                  <X className="w-5 h-5 text-red-600" />
+                  <X className="w-5 h-5 text-red-600 dark:text-gray-200" />
                 ) : (
-                  <Menu className="w-5 h-5 text-red-600" />
+                  <Menu className="w-5 h-5 text-red-600 dark:text-gray-200" />
                 )}
               </button>
             </div>
@@ -766,16 +841,31 @@ const Navbar: React.FC = () => {
                   <ThemeToggle className="px-2.5 py-2" />
                   <button
                     onClick={() => setIsOpen(false)}
-                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-50 hover:bg-red-100 transition-colors"
+                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-50 hover:bg-red-100 transition-colors dark:bg-[#101826] dark:hover:bg-[#172033]"
                   >
-                    <X className="w-5 h-5 text-red-600" />
+                    <X className="w-5 h-5 text-red-600 dark:text-gray-200" />
                   </button>
                 </div>
               </div>
 
+              {dashboardInfoChips.length > 0 && (
+                <div className="px-6 pt-3 pb-2 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex flex-wrap gap-2">
+                    {dashboardInfoChips.map((chip) => (
+                      <span
+                        key={chip}
+                        className="rounded-full border border-red-100 bg-red-50/80 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-gray-700 dark:border-gray-700 dark:bg-[#0b1220]/70 dark:text-gray-200"
+                      >
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Menu Items with staggered animation */}
               <div className="flex-1 overflow-y-auto p-6 space-y-2">
-                {!hideDonorNav && (
+                {!hidePublicNav && (
                   <>
                     <div className="animate-slideInRight" style={{ animationDelay: '0.1s', animationFillMode: 'both' }}>
                       <MobileNavLink to="/donors" onClick={() => setIsOpen(false)}>Find Donors</MobileNavLink>
@@ -790,6 +880,47 @@ const Navbar: React.FC = () => {
                       <MobileNavLink to="/contact" onClick={() => setIsOpen(false)}>Contact</MobileNavLink>
                     </div>
                   </>
+                )}
+
+                {isDonorDashboard && (
+                  <div className="space-y-2 border-b border-gray-200 pb-4 mb-4 dark:border-gray-700">
+                    <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">Donor Menu</p>
+                    {donorDashboardLinks.map((item) => (
+                      <MobileNavLink key={item.path} to={item.path} onClick={() => setIsOpen(false)}>
+                        {item.label}
+                      </MobileNavLink>
+                    ))}
+                  </div>
+                )}
+                {isNgoDashboard && (
+                  <div className="space-y-2 border-b border-gray-200 pb-4 mb-4 dark:border-gray-700">
+                    <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">NGO Menu</p>
+                    {ngoDashboardLinks.map((item) => (
+                      <MobileNavLink key={item.path} to={item.path} onClick={() => setIsOpen(false)}>
+                        {item.label}
+                      </MobileNavLink>
+                    ))}
+                  </div>
+                )}
+                {isBloodbankDashboard && (
+                  <div className="space-y-2 border-b border-gray-200 pb-4 mb-4 dark:border-gray-700">
+                    <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">BloodBank Menu</p>
+                    {bloodbankDashboardLinks.map((item) => (
+                      <MobileNavLink key={item.path} to={item.path} onClick={() => setIsOpen(false)}>
+                        {item.label}
+                      </MobileNavLink>
+                    ))}
+                  </div>
+                )}
+                {isAdminDashboard && (
+                  <div className="space-y-2 border-b border-gray-200 pb-4 mb-4 dark:border-gray-700">
+                    <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">Admin Menu</p>
+                    {adminDashboardLinks(isSuperAdmin).map((item) => (
+                      <MobileNavLink key={item.path} to={item.path} onClick={() => setIsOpen(false)}>
+                        {item.label}
+                      </MobileNavLink>
+                    ))}
+                  </div>
                 )}
 
                 {authLoading ? (

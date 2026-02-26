@@ -149,6 +149,12 @@ const BADGES: Omit<Badge, 'earned' | 'earnedDate' | 'progress'>[] = [
 ];
 
 class GamificationService {
+  private isOfflineFirestoreError(error: any): boolean {
+    const code = error?.code || '';
+    const message = String(error?.message || '').toLowerCase();
+    return code === 'unavailable' || message.includes('client is offline');
+  }
+
   private buildDefaultStats(userId: string, overrides: Partial<UserStats> = {}): UserStats {
     return {
       userId,
@@ -169,7 +175,9 @@ class GamificationService {
       const userSnap = await getDoc(userRef);
       return userSnap.exists() ? (userSnap.data() as User) : null;
     } catch (error) {
-      console.error('Error fetching user profile for gamification service:', error);
+      if (!this.isOfflineFirestoreError(error)) {
+        console.error('Error fetching user profile for gamification service:', error);
+      }
       return null;
     }
   }
@@ -338,7 +346,9 @@ class GamificationService {
         points,
       };
     } catch (error) {
-      console.warn('Failed to derive stats from donations', error);
+      if (!this.isOfflineFirestoreError(error)) {
+        console.warn('Failed to derive stats from donations', error);
+      }
       return fallback;
     }
   }
@@ -373,12 +383,16 @@ class GamificationService {
           updatedAt: serverTimestamp(),
         });
       } catch (error) {
-        console.warn('Unable to create user stats document, continuing with defaults:', error);
+        if (!this.isOfflineFirestoreError(error)) {
+          console.warn('Unable to create user stats document, continuing with defaults:', error);
+        }
       }
 
       return initialStats;
     } catch (error) {
-      console.error('Error fetching user stats, using fallback values:', error);
+      if (!this.isOfflineFirestoreError(error)) {
+        console.error('Error fetching user stats, using fallback values:', error);
+      }
       return this.buildStatsFromProfile(userId);
     }
   }
@@ -420,7 +434,9 @@ class GamificationService {
         try {
           await batch.commit();
         } catch (error) {
-          console.warn('Failed to backfill user badges', error);
+          if (!this.isOfflineFirestoreError(error)) {
+            console.warn('Failed to backfill user badges', error);
+          }
         }
       }
 
@@ -439,13 +455,17 @@ class GamificationService {
             { merge: true }
           );
         } catch (error) {
-          console.warn('Failed to backfill user stats from donations', error);
+          if (!this.isOfflineFirestoreError(error)) {
+            console.warn('Failed to backfill user stats from donations', error);
+          }
         }
       }
 
       return badges;
     } catch (error) {
-      console.error('Error fetching user badges, using calculated progress instead:', error);
+      if (!this.isOfflineFirestoreError(error)) {
+        console.error('Error fetching user badges, using calculated progress instead:', error);
+      }
       return this.buildBadgeList(stats, userData);
     }
   }

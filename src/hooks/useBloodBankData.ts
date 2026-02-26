@@ -587,6 +587,13 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
 
   useEffect(() => {
     if (!bloodBankId) return;
+    let isActive = true;
+    let unsubscribeInventory: (() => void) | null = null;
+    let unsubscribeRequests: (() => void) | null = null;
+    let idleFetchId: number | null = null;
+    let timeoutFetchId: ReturnType<typeof setTimeout> | null = null;
+    let idleBackgroundId: number | null = null;
+    let timeoutBackgroundId: ReturnType<typeof setTimeout> | null = null;
 
     const loadData = async () => {
       setError(null);
@@ -640,31 +647,29 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
 
       const scheduleBackground = (task: () => void) => {
         if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-          (window as any).requestIdleCallback(task);
+          idleBackgroundId = (window as any).requestIdleCallback(task);
         } else {
-          setTimeout(task, 0);
+          timeoutBackgroundId = setTimeout(task, 0);
         }
       };
 
       const runFetch = async () => {
         try {
-          const unsubscribeInventory = await fetchInventory();
-          const unsubscribeRequests = await fetchRequests();
+          unsubscribeInventory = await fetchInventory();
+          unsubscribeRequests = await fetchRequests();
 
+          if (!isActive) return;
           if (!usedCache) {
             setLoading(false);
           }
 
           scheduleBackground(() => {
+            if (!isActive) return;
             void fetchAppointments();
             void fetchDonations();
           });
-
-          return () => {
-            unsubscribeInventory();
-            unsubscribeRequests();
-          };
         } catch (err) {
+          if (!isActive) return;
           console.error('Error loading bloodbank data:', err);
           setError('Failed to load bloodbank data');
           setLoading(false);
@@ -672,13 +677,39 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
       };
 
       if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-        (window as any).requestIdleCallback(runFetch);
+        idleFetchId = (window as any).requestIdleCallback(() => {
+          void runFetch();
+        });
       } else {
-        setTimeout(runFetch, 0);
+        timeoutFetchId = setTimeout(() => {
+          void runFetch();
+        }, 0);
       }
     };
 
-    loadData();
+    void loadData();
+
+    return () => {
+      isActive = false;
+      if (idleFetchId !== null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        (window as any).cancelIdleCallback(idleFetchId);
+      }
+      if (idleBackgroundId !== null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        (window as any).cancelIdleCallback(idleBackgroundId);
+      }
+      if (timeoutFetchId !== null) {
+        window.clearTimeout(timeoutFetchId);
+      }
+      if (timeoutBackgroundId !== null) {
+        window.clearTimeout(timeoutBackgroundId);
+      }
+      if (unsubscribeInventory) {
+        unsubscribeInventory();
+      }
+      if (unsubscribeRequests) {
+        unsubscribeRequests();
+      }
+    };
   }, [bloodBankId]);
 
   useEffect(() => {

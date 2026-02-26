@@ -440,6 +440,10 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
 
   useEffect(() => {
     if (!ngoId) return;
+    let isActive = true;
+    let unsubscribeCampaigns: (() => void) | null = null;
+    let idleFetchId: number | null = null;
+    let timeoutFetchId: ReturnType<typeof setTimeout> | null = null;
 
     const loadData = async () => {
       let usedCache = false;
@@ -526,8 +530,9 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
 
       const runFetch = async () => {
         try {
-          const unsubscribeCampaigns = await fetchCampaigns();
+          unsubscribeCampaigns = await fetchCampaigns();
 
+          if (!isActive) return;
           if (!usedCache) {
             setLoading(false);
           }
@@ -535,11 +540,8 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
           await fetchVolunteers();
           await fetchPartnerships();
           await fetchDonorCommunity();
-
-          return () => {
-            unsubscribeCampaigns();
-          };
         } catch (err) {
+          if (!isActive) return;
           console.error('Error loading NGO data:', err);
           setError('Failed to load NGO data');
           setLoading(false);
@@ -547,13 +549,30 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       };
 
       if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-        (window as any).requestIdleCallback(runFetch);
+        idleFetchId = (window as any).requestIdleCallback(() => {
+          void runFetch();
+        });
       } else {
-        setTimeout(runFetch, 0);
+        timeoutFetchId = setTimeout(() => {
+          void runFetch();
+        }, 0);
       }
     };
 
-    loadData();
+    void loadData();
+
+    return () => {
+      isActive = false;
+      if (idleFetchId !== null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        (window as any).cancelIdleCallback(idleFetchId);
+      }
+      if (timeoutFetchId !== null) {
+        window.clearTimeout(timeoutFetchId);
+      }
+      if (unsubscribeCampaigns) {
+        unsubscribeCampaigns();
+      }
+    };
   }, [ngoId]);
 
   useEffect(() => {

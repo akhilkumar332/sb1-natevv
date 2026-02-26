@@ -20,9 +20,11 @@ googleProvider.setCustomParameters({
   // Add this to handle the COOP policy
   auth_type: 'popup',
 });
-// Force long polling to avoid "Fetch failed" issues on some networks/proxies.
+const forceLongPolling = import.meta.env.VITE_FIRESTORE_FORCE_LONG_POLLING === 'true';
 export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
+  ...(forceLongPolling
+    ? { experimentalForceLongPolling: true, useFetchStreams: false }
+    : { experimentalAutoDetectLongPolling: true }),
 });
 
 export default app;

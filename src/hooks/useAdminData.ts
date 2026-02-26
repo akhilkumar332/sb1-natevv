@@ -448,14 +448,18 @@ export const useAdminData = (): UseAdminDataReturn => {
 
   // Initial data fetch
   useEffect(() => {
+    let isActive = true;
+    let unsubscribeVerifications: (() => void) | null = null;
+    let unsubscribeRequests: (() => void) | null = null;
+
     const loadData = async () => {
       setLoading(true);
       setError(null);
 
       try {
         // Set up real-time listeners
-        const unsubscribeVerifications = await fetchVerificationRequests();
-        const unsubscribeRequests = await fetchEmergencyRequests();
+        unsubscribeVerifications = await fetchVerificationRequests();
+        unsubscribeRequests = await fetchEmergencyRequests();
 
         // Fetch other data
         await Promise.all([
@@ -463,21 +467,27 @@ export const useAdminData = (): UseAdminDataReturn => {
           fetchRecentActivity(),
         ]);
 
+        if (!isActive) return;
         setLoading(false);
-
-        // Cleanup listeners on unmount
-        return () => {
-          unsubscribeVerifications();
-          unsubscribeRequests();
-        };
       } catch (err) {
+        if (!isActive) return;
         console.error('Error loading admin data:', err);
         setError('Failed to load admin data');
         setLoading(false);
       }
     };
 
-    loadData();
+    void loadData();
+
+    return () => {
+      isActive = false;
+      if (unsubscribeVerifications) {
+        unsubscribeVerifications();
+      }
+      if (unsubscribeRequests) {
+        unsubscribeRequests();
+      }
+    };
   }, []);
 
   // Calculate stats and alerts when data changes

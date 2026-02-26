@@ -13,7 +13,6 @@ import {
   MapPinned,
   Trophy,
   RefreshCw,
-  Menu,
   X,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -59,6 +58,14 @@ type DonationFeedback = {
   updatedAt?: Date;
 };
 
+const pendingRequestSubmissionLocks = new Set<string>();
+const PENDING_REQUEST_SUCCESS_TOAST_ID = 'pending-donor-request-submit-success';
+const isOfflineFirestoreError = (error: any): boolean => {
+  const code = error?.code || '';
+  const message = String(error?.message || '').toLowerCase();
+  return code === 'unavailable' || message.includes('client is offline');
+};
+
 function DonorDashboard() {
   const {
     user,
@@ -76,7 +83,6 @@ function DonorDashboard() {
   const [showAllRequests, setShowAllRequests] = useState(false);
   const [showAllBadges, setShowAllBadges] = useState(false);
   const [showAllCamps, setShowAllCamps] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [linkPhoneNumber, setLinkPhoneNumber] = useState('');
   const [linkOtp, setLinkOtp] = useState('');
   const [linkConfirmation, setLinkConfirmation] = useState<ConfirmationResult | null>(null);
@@ -124,6 +130,7 @@ function DonorDashboard() {
   const donationTypeBackfillRef = useRef(false);
   const locationBackfillRef = useRef(false);
   const pendingRequestProcessedRef = useRef<string | null>(null);
+  const allowPendingAutoSubmitRef = useRef(false);
   const [eligibilityChecklist, setEligibilityChecklist] = useState({
     hydrated: false,
     weightOk: false,
@@ -1017,12 +1024,17 @@ function DonorDashboard() {
 
   useEffect(() => {
     if (!user?.uid || user.role !== 'donor' || !user.onboardingCompleted) return;
+    const pendingLockKey = `pending-request-submit:${user.uid}`;
+    if (pendingRequestSubmissionLocks.has(pendingLockKey)) return;
     const params = new URLSearchParams(location.search);
     const encoded = params.get('pendingRequest');
     const pendingKey = params.get('pendingRequestKey');
     const pendingFromSession = pendingKey ? loadPendingDonorRequestFromSession(pendingKey) : null;
     const pendingFromUrl = encoded ? decodePendingDonorRequest(encoded) : null;
     const pendingFromSearch = pendingFromSession || pendingFromUrl;
+    if (pendingFromSearch) {
+      allowPendingAutoSubmitRef.current = true;
+    }
     const pendingKeyFromUrl = pendingFromSearch
       ? Array.isArray((pendingFromSearch as PendingDonorRequestBatch).targets)
         ? `batch:${pendingFromSearch.createdAt}:${(pendingFromSearch as PendingDonorRequestBatch).targets.length}`
@@ -1055,6 +1067,9 @@ function DonorDashboard() {
 
       const pending = await loadPendingDonorRequestDoc(user.uid);
       if (!pending) return;
+      if (!allowPendingAutoSubmitRef.current) {
+        return;
+      }
 
       const payload = Array.isArray((pending as PendingDonorRequestBatch).targets)
         ? (pending as PendingDonorRequestBatch)
@@ -1094,20 +1109,29 @@ function DonorDashboard() {
           targets: filteredTargets,
         });
         await clearPendingDonorRequestDoc(user.uid);
-        toast.success('Your donor request has been submitted.');
+        allowPendingAutoSubmitRef.current = false;
+        toast.success('Your donor request has been submitted.', { id: PENDING_REQUEST_SUCCESS_TOAST_ID });
       } catch (error) {
-        console.error('Pending donor request submission failed:', error);
+        if (!isOfflineFirestoreError(error)) {
+          console.error('Pending donor request submission failed:', error);
+        }
         await clearPendingDonorRequestDoc(user.uid).catch(() => null);
         pendingRequestProcessedRef.current = pendingBatchKey;
-        toast.error('Failed to submit your donor request.');
+        allowPendingAutoSubmitRef.current = false;
       }
     };
 
+    pendingRequestSubmissionLocks.add(pendingLockKey);
     submitPending()
       .catch((error) => {
-        console.error('Pending donor request submission failed:', error);
-        toast.error('Failed to submit your donor request.');
+        if (!isOfflineFirestoreError(error)) {
+          console.error('Pending donor request submission failed:', error);
+        }
         pendingRequestProcessedRef.current = null;
+        allowPendingAutoSubmitRef.current = false;
+      })
+      .finally(() => {
+        pendingRequestSubmissionLocks.delete(pendingLockKey);
       });
   }, [user?.uid, user?.role, user?.onboardingCompleted, location.search, navigate, location.pathname]);
 
@@ -2514,19 +2538,6 @@ function DonorDashboard() {
               })}
             </div>
           </aside>
-          <div className="lg:hidden mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm"
-              >
-                <Menu className="h-4 w-4 text-red-600" />
-                Menu
-              </button>
-            </div>
-            <span className="text-xs uppercase tracking-[0.2em] text-red-600">Dashboard</span>
-          </div>
           <main className="min-w-0 flex-1">
             {user?.notificationPreferences?.push !== false && (
               <div className="mb-4">
@@ -2535,54 +2546,6 @@ function DonorDashboard() {
             )}
             <Outlet context={dashboardContext} />
           </main>
-        </div>
-      </div>
-      <div
-        className={`fixed inset-0 z-50 lg:hidden transition-opacity duration-300 ${
-          mobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-        aria-hidden={!mobileMenuOpen}
-      >
-        <button
-          type="button"
-          className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-          onClick={() => setMobileMenuOpen(false)}
-          aria-label="Close menu overlay"
-        />
-        <div
-          className={`absolute left-0 top-0 h-full w-72 bg-white p-4 shadow-2xl transition-transform duration-300 ${
-            mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
-        >
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-900">Donor Menu</p>
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(false)}
-              className="rounded-full p-2 hover:bg-gray-100"
-              aria-label="Close menu"
-            >
-              <X className="h-5 w-5 text-gray-600" />
-            </button>
-          </div>
-          <nav className="space-y-2">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={`mobile-${item.id}`}
-                  to={item.to}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={({ isActive }) => (
-                    `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-all ${isActive ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md' : 'text-gray-600 hover:bg-red-50'}`
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </NavLink>
-              );
-            })}
-          </nav>
         </div>
       </div>
       {/* Modals */}

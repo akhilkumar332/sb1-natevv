@@ -610,3 +610,190 @@
     background-color: rgba(15, 23, 42, 0.75);
   }
 }
+
+@layer components {
+  .mobile-app-shell {
+    position: relative;
+    min-height: calc(100vh - 4rem);
+    min-height: calc(100dvh - 4rem);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+    background:
+      radial-gradient(circle at 8% 8%, rgba(239, 68, 68, 0.16), transparent 34%),
+      radial-gradient(circle at 92% 92%, rgba(251, 191, 36, 0.12), transparent 30%);
+  }
+
+  .mobile-app-content-frame {
+    width: 100%;
+    margin: 0 auto;
+    border-radius: 1.25rem;
+    border: 1px solid rgba(239, 68, 68, 0.14);
+    background: rgba(255, 255, 255, 0.76);
+    backdrop-filter: blur(10px);
+    box-shadow:
+      0 24px 40px rgba(15, 23, 42, 0.18),
+      0 2px 0 rgba(255, 255, 255, 0.7) inset;
+    overflow: hidden;
+  }
+
+  .mobile-app-content-frame-tablet {
+    max-width: 920px;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+
+  .mobile-route-transition {
+    animation: mobileRouteEnter 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform, opacity;
+  }
+
+  .mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 45;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.25rem;
+    border-top: 1px solid rgba(239, 68, 68, 0.2);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(16px);
+    padding: 0.5rem 0.5rem calc(env(safe-area-inset-bottom) + 0.5rem);
+  }
+
+  .mobile-bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    border-radius: 0.75rem;
+    padding: 0.45rem 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #4b5563;
+    transition: all 180ms ease;
+  }
+
+  .mobile-bottom-nav-item-active {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    color: #ffffff;
+    box-shadow: 0 8px 20px rgba(220, 38, 38, 0.28);
+  }
+
+  .mobile-launch-splash {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 20% 20%, #ef4444 0%, #b91c1c 40%, #070b12 100%);
+    padding: 1.5rem;
+  }
+
+  .mobile-launch-content {
+    text-align: center;
+  }
+
+  .mobile-launch-loader {
+    width: 5rem;
+    height: 0.35rem;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.28);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .mobile-launch-loader::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    width: 40%;
+    border-radius: inherit;
+    background: #ffffff;
+    animation: mobileLaunchProgress 850ms ease-in-out infinite;
+  }
+}
+
+@keyframes mobileRouteEnter {
+  0% {
+    opacity: 0;
+    transform: translate3d(18px, 10px, 0) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes mobileLaunchProgress {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+@media (min-width: 1024px) {
+  .mobile-bottom-nav {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .compact-hybrid-dashboard .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 1rem;
+  }
+
+  .compact-hybrid-dashboard .rounded-2xl.p-6 {
+    padding: 1rem;
+  }
+
+  .compact-hybrid-dashboard .rounded-xl.p-5 {
+    padding: 0.9rem;
+  }
+
+  .compact-hybrid-dashboard .text-2xl {
+    font-size: 1.25rem;
+    line-height: 1.5rem;
+  }
+
+  .compact-hybrid-dashboard .text-xl {
+    font-size: 1.05rem;
+    line-height: 1.4rem;
+  }
+}
+
+
+@media (display-mode: standalone) and (max-width: 1023px) {
+  .mobile-app-shell {
+    min-height: calc(100dvh - 4rem - env(safe-area-inset-top));
+  }
+}
+
+.dark .mobile-bottom-nav {
+  border-top-color: rgba(148, 163, 184, 0.3);
+  background: rgba(10, 15, 26, 0.94);
+}
+
+.dark .mobile-bottom-nav-item {
+  color: #dbe5f2;
+}
+
+.dark .mobile-app-shell {
+  background:
+    radial-gradient(circle at 8% 8%, rgba(248, 113, 113, 0.16), transparent 34%),
+    radial-gradient(circle at 92% 92%, rgba(251, 191, 36, 0.12), transparent 30%);
+}
+
+.dark .mobile-app-content-frame {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(10, 15, 26, 0.68);
+  box-shadow:
+    0 24px 40px rgba(2, 6, 23, 0.45),
+    0 1px 0 rgba(226, 232, 240, 0.08) inset;
+}

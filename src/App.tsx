@@ -15,6 +15,10 @@ import { useVersionCheck } from './hooks/useVersionCheck';
 import { setReferralTracking, setReferralReferrerUid } from './utils/referralTracking';
 import { applyPwaBranding } from './utils/pwaManifest';
 import { useTheme } from './contexts/ThemeContext';
+import { useViewport } from './hooks/useViewport';
+import AppLaunchSplash from './components/mobile/AppLaunchSplash';
+import MobileRouteTransition from './components/mobile/MobileRouteTransition';
+import MobileBottomNav from './components/mobile/MobileBottomNav';
 
 function App() {
   useAuthSync();
@@ -22,6 +26,7 @@ function App() {
   useVersionCheck();
   const { user } = useAuth();
   const { isDark } = useTheme();
+  const { isMobileOrTablet, isTablet } = useViewport();
   const { WarningComponent } = useInactivityCheck();
   const location = useLocation();
 
@@ -52,11 +57,24 @@ function App() {
   const hideCompletely = noFooterRoutes.has(location.pathname)
     || noFooterPrefixes.some(prefix => location.pathname.startsWith(prefix));
   const hideOnMobile = mobileOnlyRoutes.has(location.pathname);
+  const appLikePrefixes = ['/donor', '/ngo', '/bloodbank', '/admin'];
+  const dashboardPrefixes = ['/donor/dashboard', '/ngo/dashboard', '/bloodbank/dashboard', '/admin/dashboard'];
+  const isAppLikeRoute = appLikePrefixes.some(prefix => location.pathname.startsWith(prefix));
+  const isDashboardRoute = dashboardPrefixes.some(prefix => location.pathname.startsWith(prefix));
+  const useMobileAppExperience = isMobileOrTablet && isAppLikeRoute;
   const footerWrapperClass = hideCompletely
     ? 'hidden'
     : hideOnMobile
       ? 'hidden md:block'
       : undefined;
+  const mainClassName = `flex-grow ${useMobileAppExperience ? 'mobile-app-shell' : ''} ${
+    isMobileOrTablet && isDashboardRoute ? 'pb-24' : ''
+  } ${
+    isMobileOrTablet && isDashboardRoute ? 'compact-hybrid-dashboard' : ''
+  }`;
+  const appContentFrameClass = useMobileAppExperience
+    ? `mobile-app-content-frame ${isTablet ? 'mobile-app-content-frame-tablet' : ''}`
+    : '';
 
   useEffect(() => {
     if (!location.search) return;
@@ -78,12 +96,18 @@ function App() {
   return (
     <LoadingProvider>
       <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
+        <AppLaunchSplash enabled={useMobileAppExperience} />
         <Navbar />
         <Suspense fallback={<Loading />}>
-          <main className="flex-grow">
-            <AppRoutes />
+          <main className={mainClassName}>
+            <div className={appContentFrameClass}>
+              <MobileRouteTransition enabled={useMobileAppExperience}>
+                <AppRoutes />
+              </MobileRouteTransition>
+            </div>
           </main>
         </Suspense>
+        <MobileBottomNav enabled={isMobileOrTablet && isDashboardRoute} />
         <div className={footerWrapperClass}>
           <Footer />
         </div>

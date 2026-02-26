@@ -114,6 +114,11 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const legacySyncRef = useRef(false);
+  const isOfflineFirestoreError = (error: any) => {
+    const code = error?.code || '';
+    const message = String(error?.message || '').toLowerCase();
+    return code === 'unavailable' || message.includes('client is offline');
+  };
   const cacheKey = useMemo(() => (userId ? `donor_dashboard_cache_${userId}` : ''), [userId]);
   const cacheTTL = 5 * 60 * 1000;
 
@@ -307,7 +312,9 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
         { merge: true }
       );
     } catch (err) {
-      console.error('Error syncing legacy donation history:', err);
+      if (!isOfflineFirestoreError(err)) {
+        console.error('Error syncing legacy donation history:', err);
+      }
     }
   };
 
@@ -617,14 +624,21 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
         badges: userBadges,
       });
     } catch (err) {
-      console.error('Error fetching stats and badges:', err);
-      setError('Failed to load donor stats');
+      if (!isOfflineFirestoreError(err)) {
+        console.error('Error fetching stats and badges:', err);
+        setError('Failed to load donor stats');
+      }
     }
   };
 
   // Initial data fetch
   useEffect(() => {
     if (!userId) return;
+    let isActive = true;
+    let unsubscribeDonations: (() => void) | null = null;
+    let unsubscribeRequests: (() => void) | null = null;
+    let idleTaskId: number | null = null;
+    let timeoutTaskId: ReturnType<typeof setTimeout> | null = null;
 
     const loadData = async () => {
       setError(null);
@@ -674,9 +688,10 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
 
       try {
         // Set up real-time listeners
-        const unsubscribeDonations = await fetchDonationHistory();
-        const unsubscribeRequests = await fetchEmergencyRequests();
+        unsubscribeDonations = await fetchDonationHistory();
+        unsubscribeRequests = await fetchEmergencyRequests();
 
+        if (!isActive) return;
         if (!usedCache) {
           setLoading(false);
         }
@@ -684,30 +699,42 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
         // Fetch camps and stats in background
         const scheduleBackground = (task: () => void) => {
           if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-            (window as any).requestIdleCallback(task);
+            idleTaskId = (window as any).requestIdleCallback(task);
           } else {
-            setTimeout(task, 0);
+            timeoutTaskId = setTimeout(task, 0);
           }
         };
 
         scheduleBackground(() => {
+          if (!isActive) return;
           void fetchBloodCamps();
           void fetchStatsAndBadges();
         });
-
-        // Cleanup listeners on unmount
-        return () => {
-          unsubscribeDonations();
-          unsubscribeRequests();
-        };
       } catch (err) {
+        if (!isActive) return;
         console.error('Error loading donor data:', err);
         setError('Failed to load donor data');
         setLoading(false);
       }
     };
 
-    loadData();
+    void loadData();
+
+    return () => {
+      isActive = false;
+      if (idleTaskId !== null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        (window as any).cancelIdleCallback(idleTaskId);
+      }
+      if (timeoutTaskId !== null) {
+        window.clearTimeout(timeoutTaskId);
+      }
+      if (unsubscribeDonations) {
+        unsubscribeDonations();
+      }
+      if (unsubscribeRequests) {
+        unsubscribeRequests();
+      }
+    };
   }, [userId, bloodType, city]);
 
   // Refresh stats after donation history changes

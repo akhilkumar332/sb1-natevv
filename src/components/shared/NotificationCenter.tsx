@@ -6,8 +6,8 @@
 
 import React, { useState } from 'react';
 import { Bell, Check, X, ExternalLink } from 'lucide-react';
-import { useRealtimeNotifications } from '../../hooks/useRealtimeNotifications';
 import { useAuth } from '../../contexts/AuthContext';
+import { Notification } from '../../types/database.types';
 import { formatRelativeTime } from '../../utils/dataTransform';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -15,6 +15,11 @@ import { db } from '../../firebase';
 interface NotificationCenterProps {
   isOpen: boolean;
   onClose: () => void;
+  notifications: Notification[];
+  unreadCount: number;
+  loading: boolean;
+  reconnecting: boolean;
+  error: string | null;
 }
 
 /**
@@ -23,12 +28,13 @@ interface NotificationCenterProps {
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   isOpen,
   onClose,
+  notifications,
+  unreadCount,
+  loading,
+  reconnecting,
+  error,
 }) => {
   const { user } = useAuth();
-  const { notifications, unreadCount, loading, error } = useRealtimeNotifications({
-    userId: user?.uid || '',
-    limitCount: 20,
-  });
 
   const [markingRead, setMarkingRead] = useState<Set<string>>(new Set());
 
@@ -141,7 +147,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
         {/* Notifications List */}
         <div className="flex-1 overflow-y-auto">
-          {error ? (
+          {reconnecting && notifications.length === 0 ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="text-sm text-gray-500 text-center px-4">
+                Reconnecting notifications...
+              </div>
+            </div>
+          ) : error ? (
             <div className="flex items-center justify-center h-32">
               <div className="text-sm text-red-600 text-center px-4">
                 {error}

@@ -26,7 +26,7 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { unreadCount } = useRealtimeNotifications({
+  const { notifications, unreadCount, loading, reconnecting, error } = useRealtimeNotifications({
     userId: user?.uid || '',
     limitCount: 50,
   });
@@ -67,7 +67,17 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({
       </button>
 
       {/* Notification Center */}
-      <NotificationCenter isOpen={isOpen} onClose={() => setIsOpen(false)} />
+      {isOpen && (
+        <NotificationCenter
+          isOpen={isOpen}
+          onClose={() => setIsOpen(false)}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          loading={loading}
+          reconnecting={reconnecting}
+          error={error}
+        />
+      )}
     </>
   );
 };
