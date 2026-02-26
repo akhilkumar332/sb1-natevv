@@ -22,7 +22,7 @@ function Contact() {
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full public-app-page public-app-contact">
       {/* Hero Section - PhonePe-inspired */}
       <section className="relative py-24 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-red-50 via-white to-pink-50">

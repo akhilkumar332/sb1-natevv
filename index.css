@@ -766,6 +766,159 @@
     font-size: 1.05rem;
     line-height: 1.4rem;
   }
+
+  .compact-hybrid-frontend {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
+  }
+
+  .compact-hybrid-frontend .container {
+    padding-left: 0.9rem;
+    padding-right: 0.9rem;
+  }
+
+  .compact-hybrid-frontend .py-24 {
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+  }
+
+  .compact-hybrid-frontend .py-20 {
+    padding-top: 3.25rem;
+    padding-bottom: 3.25rem;
+  }
+
+  .compact-hybrid-frontend .py-16 {
+    padding-top: 2.75rem;
+    padding-bottom: 2.75rem;
+  }
+
+  .compact-hybrid-frontend .mb-16 {
+    margin-bottom: 2.5rem;
+  }
+
+  .compact-hybrid-frontend .mb-12 {
+    margin-bottom: 2rem;
+  }
+
+  .compact-hybrid-frontend .text-5xl {
+    font-size: 2rem;
+    line-height: 2.3rem;
+  }
+
+  .compact-hybrid-frontend .text-4xl {
+    font-size: 1.7rem;
+    line-height: 2rem;
+  }
+
+  .compact-hybrid-frontend .text-3xl {
+    font-size: 1.45rem;
+    line-height: 1.8rem;
+  }
+
+  .compact-hybrid-frontend .rounded-3xl {
+    border-radius: 1.25rem;
+  }
+
+  .compact-hybrid-frontend .rounded-2xl {
+    border-radius: 1rem;
+  }
+
+  .compact-hybrid-frontend .public-app-page {
+    position: relative;
+    max-width: 76rem;
+    margin: 0 auto;
+    padding: 0.4rem 0.5rem 1rem;
+  }
+
+  .compact-hybrid-frontend .public-app-page::before {
+    content: '';
+    display: block;
+    width: 3rem;
+    height: 0.25rem;
+    margin: 0 auto 0.6rem;
+    border-radius: 9999px;
+    background: rgba(71, 85, 105, 0.26);
+  }
+
+  .compact-hybrid-frontend .public-app-page > section {
+    position: relative;
+    margin-bottom: 0.8rem;
+    border-radius: 1.2rem;
+    overflow: hidden;
+    border: 1px solid rgba(203, 213, 225, 0.9);
+    box-shadow:
+      0 10px 22px rgba(15, 23, 42, 0.08),
+      0 1px 0 rgba(255, 255, 255, 0.72) inset;
+  }
+
+  .compact-hybrid-frontend .public-app-page > section:last-child {
+    margin-bottom: 0;
+  }
+
+  .compact-hybrid-frontend .public-app-page > section > .container {
+    padding-left: 0.95rem;
+    padding-right: 0.95rem;
+  }
+
+  .compact-hybrid-frontend .public-app-page > section:first-child {
+    min-height: auto;
+    padding-top: 2.35rem;
+    padding-bottom: 2.1rem;
+  }
+
+  .compact-hybrid-frontend .public-app-page > section:first-child .max-w-4xl {
+    margin-bottom: 0.4rem;
+  }
+
+  .compact-hybrid-frontend .public-app-page > section:first-child .inline-flex.items-center {
+    margin-bottom: 0.95rem;
+  }
+
+  .compact-hybrid-frontend .public-app-page .grid.md\:grid-cols-3,
+  .compact-hybrid-frontend .public-app-page .grid.md\:grid-cols-2,
+  .compact-hybrid-frontend .public-app-page .grid.lg\:grid-cols-4 {
+    gap: 0.9rem;
+  }
+
+  .compact-hybrid-frontend .public-app-page .p-12 {
+    padding: 1.15rem;
+  }
+
+  .compact-hybrid-frontend .public-app-page .p-10 {
+    padding: 1.05rem;
+  }
+
+  .compact-hybrid-frontend .public-app-page .p-8 {
+    padding: 0.95rem;
+  }
+
+  .compact-hybrid-frontend .public-app-page .p-6 {
+    padding: 0.85rem;
+  }
+
+  .compact-hybrid-frontend .public-app-page .rounded-3xl {
+    border-radius: 1.05rem;
+  }
+
+  .compact-hybrid-frontend .public-app-page .rounded-2xl {
+    border-radius: 0.95rem;
+  }
+
+  .compact-hybrid-frontend .public-app-page .text-6xl,
+  .compact-hybrid-frontend .public-app-page .text-7xl {
+    font-size: 2.15rem;
+    line-height: 2.35rem;
+  }
+
+  .dark .compact-hybrid-frontend .public-app-page::before {
+    background: rgba(148, 163, 184, 0.32);
+  }
+
+  .dark .compact-hybrid-frontend .public-app-page > section {
+    border-color: rgba(71, 85, 105, 0.7);
+    box-shadow:
+      0 12px 24px rgba(2, 6, 23, 0.42),
+      0 1px 0 rgba(148, 163, 184, 0.14) inset;
+  }
 }
 
 

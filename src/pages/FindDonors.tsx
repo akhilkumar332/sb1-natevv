@@ -1038,7 +1038,7 @@ function FindDonors() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="w-full min-h-screen bg-gradient-to-b from-gray-50 to-white public-app-page public-app-find-donors">
       {/* Hero Section */}
       <section className="relative py-20 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-red-50 via-white to-pink-50">

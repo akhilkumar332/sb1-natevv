@@ -117,7 +117,7 @@ function Home() {
   }, [heroSlides.length]);
 
   return (
-    <div className="w-full overflow-hidden">
+    <div className="w-full overflow-hidden public-app-page public-app-home">
       {/* Hero Section - PhonePe-inspired Slider */}
       <section className="relative min-h-[95vh] flex items-center overflow-hidden">
         {/* Sophisticated gradient background */}

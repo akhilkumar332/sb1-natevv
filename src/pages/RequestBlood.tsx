@@ -179,7 +179,7 @@ function RequestBlood() {
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full public-app-page public-app-request-blood">
       {/* Hero Section */}
       <section className="relative py-20 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-red-50 via-white to-red-50">

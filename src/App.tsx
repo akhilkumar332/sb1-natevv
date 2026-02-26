@@ -58,10 +58,18 @@ function App() {
     || noFooterPrefixes.some(prefix => location.pathname.startsWith(prefix));
   const hideOnMobile = mobileOnlyRoutes.has(location.pathname);
   const appLikePrefixes = ['/donor', '/ngo', '/bloodbank', '/admin'];
+  const publicMobileAppRoutes = new Set([
+    '/',
+    '/donors',
+    '/request-blood',
+    '/about',
+    '/contact',
+  ]);
   const dashboardPrefixes = ['/donor/dashboard', '/ngo/dashboard', '/bloodbank/dashboard', '/admin/dashboard'];
   const isAppLikeRoute = appLikePrefixes.some(prefix => location.pathname.startsWith(prefix));
+  const isPublicFrontendRoute = publicMobileAppRoutes.has(location.pathname);
   const isDashboardRoute = dashboardPrefixes.some(prefix => location.pathname.startsWith(prefix));
-  const useMobileAppExperience = isMobileOrTablet && isAppLikeRoute;
+  const useMobileAppExperience = isMobileOrTablet && (isAppLikeRoute || isPublicFrontendRoute);
   const footerWrapperClass = hideCompletely
     ? 'hidden'
     : hideOnMobile
@@ -71,6 +79,8 @@ function App() {
     isMobileOrTablet && isDashboardRoute ? 'pb-24' : ''
   } ${
     isMobileOrTablet && isDashboardRoute ? 'compact-hybrid-dashboard' : ''
+  } ${
+    isMobileOrTablet && isPublicFrontendRoute ? 'compact-hybrid-frontend' : ''
   }`;
   const appContentFrameClass = useMobileAppExperience
     ? `mobile-app-content-frame ${isTablet ? 'mobile-app-content-frame-tablet' : ''}`
