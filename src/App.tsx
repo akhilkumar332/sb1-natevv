@@ -14,12 +14,14 @@ import { useLocation } from 'react-router-dom';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { setReferralTracking, setReferralReferrerUid } from './utils/referralTracking';
 import { applyPwaBranding } from './utils/pwaManifest';
+import { useTheme } from './contexts/ThemeContext';
 
 function App() {
   useAuthSync();
   useActivityTracker();
   useVersionCheck();
   const { user } = useAuth();
+  const { isDark } = useTheme();
   const { WarningComponent } = useInactivityCheck();
   const location = useLocation();
 
@@ -75,7 +77,7 @@ function App() {
 
   return (
     <LoadingProvider>
-      <div className="min-h-screen flex flex-col bg-gray-50">
+      <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-slate-900">
         <Navbar />
         <Suspense fallback={<Loading />}>
           <main className="flex-grow">
@@ -90,12 +92,14 @@ function App() {
           toastOptions={{
             duration: 5000,
             style: {
-              background: '#ffffff',
-              color: '#000000',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1)',
+              background: isDark ? '#334155' : '#ffffff',
+              color: isDark ? '#f3f4f6' : '#000000',
+              boxShadow: isDark
+                ? '0 6px 20px rgba(0, 0, 0, 0.45), 0 0 1px rgba(255, 255, 255, 0.06)'
+                : '0 4px 12px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1)',
               borderRadius: '8px',
               padding: '16px',
-              border: '1px solid rgba(0, 0, 0, 0.05)',
+              border: isDark ? '1px solid rgba(148, 163, 184, 0.55)' : '1px solid rgba(0, 0, 0, 0.05)',
             },
             success: {
               duration: 3000,
@@ -115,9 +119,9 @@ function App() {
             custom: {
               duration: 60000,
               style: {
-                background: '#FEF3C7',
-                color: '#92400E',
-                border: '1px solid #FCD34D',
+                background: isDark ? '#3f2d0d' : '#FEF3C7',
+                color: isDark ? '#fde68a' : '#92400E',
+                border: isDark ? '1px solid #b45309' : '1px solid #FCD34D',
               },
             },
           }}

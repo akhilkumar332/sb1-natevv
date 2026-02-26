@@ -53,7 +53,7 @@ function NgoOverview() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-red-100">
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-red-100 dark:bg-slate-700 dark:border-red-200">
           <div className="flex items-center justify-between mb-3">
             <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center">
               <Target className="w-6 h-6 text-red-600" />
@@ -64,7 +64,7 @@ function NgoOverview() {
           <p className="text-sm text-gray-500 mt-1">Total Campaigns</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-amber-100">
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-amber-100 dark:bg-slate-700 dark:border-amber-200">
           <div className="flex items-center justify-between mb-3">
             <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center">
               <Users className="w-6 h-6 text-amber-600" />
@@ -75,7 +75,7 @@ function NgoOverview() {
           <p className="text-sm text-gray-500 mt-1">Volunteers</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-red-100">
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-red-100 dark:bg-slate-700 dark:border-red-200">
           <div className="flex items-center justify-between mb-3">
             <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center">
               <Handshake className="w-6 h-6 text-red-600" />
@@ -86,7 +86,7 @@ function NgoOverview() {
           <p className="text-sm text-gray-500 mt-1">Partnerships</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-amber-100">
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-amber-100 dark:bg-slate-700 dark:border-amber-200">
           <div className="flex items-center justify-between mb-3">
             <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center">
               <Heart className="w-6 h-6 text-amber-600" />
@@ -99,7 +99,7 @@ function NgoOverview() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="bg-white rounded-2xl shadow-xl p-6">
+        <div className="bg-white rounded-2xl shadow-xl p-6 dark:bg-slate-700">
           <div className="flex items-center justify-between mb-5">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-red-600">Campaign Focus</p>
@@ -141,7 +141,7 @@ function NgoOverview() {
                     ? `${daysToEnd}d left`
                     : 'Ended';
                 return (
-                  <div key={campaign.id} className="rounded-2xl border border-red-100/60 bg-white shadow-sm p-5">
+                  <div key={campaign.id} className="rounded-2xl border border-red-100/60 bg-white shadow-sm p-5 dark:bg-slate-700 dark:border-red-200">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex items-start gap-3">
                         <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center text-red-600">
@@ -241,7 +241,7 @@ function NgoOverview() {
             </Link>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl p-6 border border-amber-100">
+          <div className="bg-white rounded-2xl shadow-xl p-6 border border-amber-100 dark:bg-slate-700 dark:border-amber-200">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-xs uppercase tracking-[0.3em] text-amber-600">Referrals</p>
@@ -271,7 +271,7 @@ function NgoOverview() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="bg-white rounded-2xl shadow-xl p-6">
+        <div className="bg-white rounded-2xl shadow-xl p-6 dark:bg-slate-700">
           <div className="flex items-center justify-between mb-5">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-amber-600">Momentum</p>

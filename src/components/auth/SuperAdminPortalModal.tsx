@@ -35,10 +35,10 @@ const getStatusLabel = (status?: string | null) => {
 };
 
 const getStatusStyle = (status?: string | null) => {
-  if (status === 'suspended') return 'bg-red-100 text-red-700 border-red-200';
-  if (status === 'pending_verification') return 'bg-amber-100 text-amber-800 border-amber-200';
-  if (status === 'inactive') return 'bg-gray-100 text-gray-700 border-gray-200';
-  return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  if (status === 'suspended') return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-100 dark:text-red-700 dark:border-red-200';
+  if (status === 'pending_verification') return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-100 dark:text-amber-800 dark:border-amber-200';
+  if (status === 'inactive') return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-100 dark:text-gray-700 dark:border-gray-200';
+  return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-100 dark:text-emerald-700 dark:border-emerald-200';
 };
 
 const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
@@ -249,7 +249,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/50 backdrop-blur-sm px-3 py-4 sm:px-4 sm:py-6">
-      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl border border-red-100 bg-white shadow-2xl">
+      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl border border-red-100 bg-white shadow-2xl dark:border-red-200 dark:bg-slate-700">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-t-3xl bg-gradient-to-r from-red-600 via-red-700 to-red-800 px-5 sm:px-8 py-5 text-white">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
@@ -269,7 +269,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
         </div>
         <div className="px-5 sm:px-8 py-6 space-y-6">
           {impersonationUser && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-200 dark:bg-amber-50 dark:text-amber-900">
               Acting as{' '}
               <span className="font-semibold">
                 {impersonationUser.displayName || impersonationUser.email || 'User'}
@@ -279,13 +279,13 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
           )}
 
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-5">
+            <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-5 dark:border-gray-200 dark:bg-slate-600/60">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-400">Portal Access</p>
-                  <p className="mt-1 text-sm text-gray-600">Select a portal for this session.</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-400 dark:text-gray-500">Portal Access</p>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-600">Select a portal for this session.</p>
                 </div>
-                <span className="rounded-full border border-red-100 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-red-600">
+                <span className="rounded-full border border-red-100 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-red-600 dark:border-red-200 dark:bg-slate-700 dark:text-red-600">
                   Current: {portalLabels[currentPortal]}
                 </span>
               </div>
@@ -300,7 +300,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                   <button
                     key={role}
                     onClick={() => onSelect(role)}
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-all duration-300 hover:border-red-200 hover:bg-red-50"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-all duration-300 hover:border-red-200 hover:bg-red-50 dark:border-gray-200 dark:bg-slate-700 dark:text-gray-700 dark:hover:border-red-200 dark:hover:bg-red-50"
                   >
                     Go to {portalLabels[role]}
                   </button>
@@ -309,21 +309,21 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
             </div>
 
             {onImpersonate && (
-              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-200 dark:bg-slate-700">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-400">Impersonation</p>
-                    <p className="mt-1 text-sm text-gray-600">
+                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-400 dark:text-gray-500">Impersonation</p>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-600">
                       Full access, 30-minute session limit.
                     </p>
                   </div>
-                  <span className="rounded-full border border-red-100 bg-red-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-red-600">
+                  <span className="rounded-full border border-red-100 bg-red-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-red-600 dark:border-red-200 dark:bg-red-50 dark:text-red-600">
                     Full Access
                   </span>
                 </div>
 
                 <div className="mt-4">
-                  <label className="block text-xs font-semibold text-gray-600">
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-700">
                     Search by name, email, or BH ID
                   </label>
                   <div className="relative mt-2">
@@ -332,14 +332,14 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                       onChange={(event) => setSearchTerm(event.target.value)}
                       placeholder="Type at least 2 characters"
                       disabled={impersonationLoading}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 pr-10 text-sm text-gray-700 transition-all focus:border-red-300 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 pr-10 text-sm text-gray-700 transition-all focus:border-red-300 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-300 dark:bg-slate-700 dark:text-gray-700 dark:focus:border-red-200 dark:disabled:bg-gray-100 dark:disabled:text-gray-500"
                     />
-                    <Search className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+                    <Search className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-gray-400 dark:text-gray-500" />
                   </div>
                 </div>
 
                 <div className="mt-4">
-                  <label className="block text-xs font-semibold text-gray-600">
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-700">
                     Reason (optional)
                   </label>
                   <textarea
@@ -348,7 +348,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                     placeholder="Add context for audit logs"
                     disabled={impersonationLoading}
                     rows={2}
-                    className="mt-2 w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 transition-all focus:border-red-300 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
+                    className="mt-2 w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 transition-all focus:border-red-300 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-300 dark:bg-slate-700 dark:text-gray-700 dark:focus:border-red-200 dark:disabled:bg-gray-100 dark:disabled:text-gray-500"
                   />
                 </div>
 
@@ -360,14 +360,14 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                     </div>
                   )}
                   {!impersonationLoading && (
-                    <p className="text-[11px] text-gray-500">
+                    <p className="text-[11px] text-gray-500 dark:text-gray-600">
                       Suspended or pending verification accounts cannot be impersonated.
                     </p>
                   )}
                   {!impersonationLoading && searchTerm.trim().length < 2 && recentImpersonations.length > 0 && (
                     <>
                       <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
                           Recent impersonations
                         </p>
                         {recentImpersonations.length > 3 && (
@@ -377,7 +377,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                               setShowRecentDrawer(true);
                               setRecentPage(1);
                             }}
-                            className="text-[10px] font-semibold uppercase tracking-widest text-red-600 hover:text-red-700"
+                            className="text-[10px] font-semibold uppercase tracking-widest text-red-600 hover:text-red-700 dark:text-red-600 dark:hover:text-red-700"
                           >
                             View all
                           </button>
@@ -388,20 +388,20 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                           key={`recent-${user.uid}`}
                           onClick={() => handleImpersonateClick(user)}
                           disabled={restrictedStatuses.has(user.status || '')}
-                          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-300 dark:bg-slate-700 dark:hover:border-red-200 dark:hover:bg-red-50"
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div>
-                              <p className="text-sm font-semibold text-gray-900">
+                              <p className="text-sm font-semibold text-gray-900 dark:text-gray-900">
                                 {user.displayName || user.email || 'User'}
                               </p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-gray-500 dark:text-gray-600">
                                 {user.email || 'No email'}
                                 {user.bhId ? ` · ${user.bhId}` : ''}
                               </p>
                             </div>
                             <div className="flex flex-col items-end gap-1 text-right">
-                              <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+                              <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-600">
                                 {user.role}
                               </span>
                               <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest ${getStatusStyle(user.status)}`}>
@@ -414,33 +414,33 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                     </>
                   )}
                   {searchLoading && (
-                    <p className="text-xs text-gray-500">Searching…</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-600">Searching…</p>
                   )}
                   {!searchLoading && searchError && (
-                    <p className="text-xs text-red-600">{searchError}</p>
+                    <p className="text-xs text-red-600 dark:text-red-600">{searchError}</p>
                   )}
                   {!impersonationLoading && !searchLoading && !searchError && searchTerm.trim().length >= 2 && searchResults.length === 0 && (
-                    <p className="text-xs text-gray-500">No users found.</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-600">No users found.</p>
                   )}
                   {searchResults.map((user) => (
                     <button
                       key={user.uid}
                       onClick={() => handleImpersonateClick(user)}
                       disabled={impersonationLoading || restrictedStatuses.has(user.status || '')}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-300 dark:bg-slate-700 dark:hover:border-red-200 dark:hover:bg-red-50"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-900">
                             {user.displayName || user.email || 'User'}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-gray-500 dark:text-gray-600">
                             {user.email || 'No email'}
                             {user.bhId ? ` · ${user.bhId}` : ''}
                           </p>
                         </div>
                         <div className="flex flex-col items-end gap-1 text-right">
-                          <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+                          <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-600">
                             {user.role}
                           </span>
                           <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest ${getStatusStyle(user.status)}`}>
@@ -459,21 +459,21 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
 
       {pendingImpersonation && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl">
-            <h4 className="text-lg font-semibold text-gray-900">Confirm Impersonation</h4>
-            <p className="mt-2 text-sm text-gray-600">
+          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-300 dark:bg-slate-700">
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-900">Confirm Impersonation</h4>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-600">
               You are about to impersonate{' '}
               <span className="font-semibold">
                 {pendingImpersonation.displayName || pendingImpersonation.email || 'User'}
               </span>
               {pendingImpersonation.role ? ` (${pendingImpersonation.role})` : ''}.
             </p>
-            <p className="mt-2 text-xs text-amber-700">
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-800">
               This will switch your session to the selected user until you stop impersonation.
             </p>
             {impersonationReason.trim() && (
-              <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                <span className="font-semibold text-gray-700">Reason:</span>{' '}
+              <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-gray-200 dark:bg-gray-100 dark:text-gray-600">
+                <span className="font-semibold text-gray-700 dark:text-gray-700">Reason:</span>{' '}
                 {impersonationReason.trim()}
               </div>
             )}
@@ -487,7 +487,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
               </button>
               <button
                 onClick={cancelImpersonation}
-                className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-300 dark:text-gray-700 dark:hover:bg-gray-100"
               >
                 Cancel
               </button>
@@ -498,18 +498,18 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
 
       {showRecentDrawer && (
         <div className="fixed inset-0 z-[55] flex items-end sm:items-center justify-center bg-black/50 px-4 py-4">
-          <div className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl max-h-[75vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl max-h-[75vh] overflow-y-auto dark:border-gray-300 dark:bg-slate-700">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-200">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Recent impersonations</p>
-                <p className="text-sm text-gray-600">
+                <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Recent impersonations</p>
+                <p className="text-sm text-gray-600 dark:text-gray-600">
                   Showing {recentStartIndex + 1}-{Math.min(recentStartIndex + RECENT_PAGE_SIZE, recentImpersonations.length)} of {recentImpersonations.length}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowRecentDrawer(false)}
-                className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-300 dark:text-gray-700 dark:hover:bg-gray-100"
               >
                 Close
               </button>
@@ -520,20 +520,20 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                   key={`drawer-${user.uid}`}
                   onClick={() => handleImpersonateClick(user)}
                   disabled={restrictedStatuses.has(user.status || '')}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm transition-all hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-300 dark:bg-slate-700 dark:hover:border-red-200 dark:hover:bg-red-50"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-900">
                         {user.displayName || user.email || 'User'}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 dark:text-gray-600">
                         {user.email || 'No email'}
                         {user.bhId ? ` · ${user.bhId}` : ''}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1 text-right">
-                      <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+                      <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-600">
                         {user.role}
                       </span>
                       <span className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest ${getStatusStyle(user.status)}`}>
@@ -545,23 +545,23 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
               ))}
             </div>
             {recentImpersonations.length > RECENT_PAGE_SIZE && (
-              <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4">
+              <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4 dark:border-gray-200">
                 <button
                   type="button"
                   onClick={() => setRecentPage((prev) => Math.max(1, prev - 1))}
                   disabled={clampedRecentPage === 1}
-                  className="rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-300 dark:text-gray-700 dark:hover:bg-gray-100"
                 >
                   Previous
                 </button>
-                <span className="text-xs font-semibold text-gray-600">
+                <span className="text-xs font-semibold text-gray-600 dark:text-gray-700">
                   Page {clampedRecentPage} of {totalRecentPages}
                 </span>
                 <button
                   type="button"
                   onClick={() => setRecentPage((prev) => Math.min(totalRecentPages, prev + 1))}
                   disabled={clampedRecentPage === totalRecentPages}
-                  className="rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-300 dark:text-gray-700 dark:hover:bg-gray-100"
                 >
                   Next
                 </button>

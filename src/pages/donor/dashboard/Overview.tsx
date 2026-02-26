@@ -176,11 +176,11 @@ const DonorOverview = () => {
     <>
       <div className="mb-6">
         <p className="text-xs uppercase tracking-[0.3em] text-red-600">Snapshot</p>
-        <h2 className="text-xl font-bold text-gray-900">Your Snapshot</h2>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-900">Your Snapshot</h2>
       </div>
       <div className="mb-6">
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-5">
-          <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md">
+          <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md dark:bg-slate-700 dark:border-red-200">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-gray-500">Total Donations</p>
@@ -194,7 +194,7 @@ const DonorOverview = () => {
               {isLoading ? 'Updating...' : 'Your lifesaving journey'}
             </p>
           </div>
-          <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md">
+          <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md dark:bg-slate-700 dark:border-red-200">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-gray-500">Lives Saved</p>
@@ -206,7 +206,7 @@ const DonorOverview = () => {
             </div>
             <p className="mt-2 text-xs text-gray-500">Each donation saves 3 lives</p>
           </div>
-          <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md">
+          <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md dark:bg-slate-700 dark:border-red-200">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-gray-500">Next Eligible In</p>
@@ -224,7 +224,7 @@ const DonorOverview = () => {
                 : `${eligibilityDetail} · ${daysUntilEligible} days remaining`}
             </p>
           </div>
-          <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md">
+          <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md dark:bg-slate-700 dark:border-red-200">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-gray-500">Impact Score</p>
@@ -238,7 +238,7 @@ const DonorOverview = () => {
               {stats?.rank ? `Rank #${stats.rank}` : isLoading ? 'Updating...' : 'Keep donating!'}
             </p>
           </div>
-          <div className="bg-white rounded-xl border border-emerald-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md">
+          <div className="bg-white rounded-xl border border-emerald-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md dark:bg-slate-700 dark:border-emerald-200">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-gray-500">Active Connections</p>
@@ -260,7 +260,7 @@ const DonorOverview = () => {
       </div>
 
       <div className="mb-6 grid gap-6 lg:grid-cols-2 lg:items-stretch">
-        <div className="relative flex flex-col overflow-hidden rounded-2xl border border-red-200 bg-gradient-to-br from-white via-red-50 to-white p-4 shadow-lg transition-transform duration-300 hover:-translate-y-1 animate-fadeIn lg:h-full">
+        <div className="relative flex flex-col overflow-hidden rounded-2xl border border-red-200 bg-gradient-to-br from-white via-red-50 to-white p-4 shadow-lg transition-transform duration-300 hover:-translate-y-1 animate-fadeIn lg:h-full dark:border-red-200">
           <div className="absolute -top-16 -right-16 h-32 w-32 rounded-full bg-red-100/70 blur-2xl"></div>
           <div className="absolute -bottom-16 -left-16 h-36 w-36 rounded-full bg-red-100/60 blur-2xl"></div>
           {isLoading ? (
@@ -282,7 +282,7 @@ const DonorOverview = () => {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="text-[10px] uppercase tracking-[0.25em] text-red-600">BloodHub Donor Card</p>
-                    <h2 className="mt-1 text-xl font-bold text-gray-900">
+                    <h2 className="mt-1 text-xl font-bold text-gray-900 dark:text-gray-900">
                       {user?.displayName || 'Donor'}
                     </h2>
                     <p className="text-xs text-gray-500">{user?.city || 'Location not set'}</p>
@@ -295,7 +295,7 @@ const DonorOverview = () => {
                     >
                       {availabilityEnabled ? 'Available' : 'On Break'}
                     </span>
-                    <span className="rounded-full border border-red-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600">
+                    <span className="rounded-full border border-red-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600 dark:border-red-200 dark:bg-slate-700 dark:text-red-600">
                       Verified Donor
                     </span>
                     <div className="rounded-2xl bg-red-600 px-3 py-2 text-lg font-bold text-white shadow-lg">
@@ -333,7 +333,7 @@ const DonorOverview = () => {
                     </div>
                   )}
                   {shareOptions.showQr && qrCodeDataUrl && (
-                    <div className="flex items-center justify-between rounded-xl border border-red-100 bg-white/80 px-3 py-2 sm:col-span-2">
+                    <div className="flex items-center justify-between rounded-xl border border-red-100 bg-white/80 px-3 py-2 sm:col-span-2 dark:border-red-200 dark:bg-slate-700/80">
                       <div>
                         <p className="text-[11px] uppercase tracking-wide text-gray-500">Share QR</p>
                         <p className="text-xs text-gray-600">Scan to open your donor profile link.</p>
@@ -341,7 +341,7 @@ const DonorOverview = () => {
                       <button
                         type="button"
                         onClick={() => setQrPreviewOpen(true)}
-                        className="rounded-lg border border-red-100 bg-white p-1 transition-transform duration-300 hover:scale-105"
+                        className="rounded-lg border border-red-100 bg-white p-1 transition-transform duration-300 hover:scale-105 dark:border-red-200 dark:bg-slate-700"
                         aria-label="Open QR preview"
                       >
                         <img src={qrCodeDataUrl} alt="BH ID QR" className="h-12 w-12 shrink-0" />
@@ -356,7 +356,7 @@ const DonorOverview = () => {
                   <button
                     type="button"
                     onClick={() => setShareOptionsOpen(true)}
-                    className="flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600 transition-all duration-300 hover:bg-red-50"
+                    className="flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-600 transition-all duration-300 hover:bg-red-50 dark:border-red-200 dark:bg-slate-700 dark:text-red-600 dark:hover:bg-red-50"
                   >
                     <SlidersHorizontal className="h-3 w-3" />
                     Customize

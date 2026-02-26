@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import LogoMark from './LogoMark';
 import NotificationBadge from './shared/NotificationBadge';
 import { gamificationService } from '../services/gamification.service';
+import ThemeToggle from './ThemeToggle';
 
 const TOP_BADGE_TTL_MS = 10 * 60 * 1000;
 
@@ -593,7 +594,7 @@ const Navbar: React.FC = () => {
 
   return (
     <>
-      <nav className="relative bg-white/95 backdrop-blur-xl shadow-lg border-b border-white/50 sticky top-0 z-40">
+      <nav className="relative bg-white/95 backdrop-blur-xl shadow-lg border-b border-white/50 sticky top-0 z-40 dark:bg-slate-700/95 dark:border-slate-500">
         {/* Decorative gradient line */}
         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-red-600 to-transparent opacity-50"></div>
 
@@ -623,7 +624,11 @@ const Navbar: React.FC = () => {
                 </>
               )}
 
-              <div className="ml-4 pl-4 border-l border-gray-200">
+              <div className="ml-4">
+                <ThemeToggle />
+              </div>
+
+              <div className="ml-4 pl-4 border-l border-gray-200 dark:border-gray-700">
                 {authLoading ? (
                   <LoadingFallback />
                 ) : !user ? (
@@ -674,6 +679,7 @@ const Navbar: React.FC = () => {
 
              {/* Mobile Menu Button */}
             <div className="md:hidden flex items-center">
+              <ThemeToggle className="mr-2 px-2.5 py-2" />
               {showNotificationBadge && (
                 <NotificationBadge className="mr-2 rounded-xl border border-red-100 bg-red-50 hover:bg-red-100" />
               )}
@@ -736,7 +742,7 @@ const Navbar: React.FC = () => {
           />
 
           {/* Drawer Menu */}
-          <div className="md:hidden fixed top-0 right-0 bottom-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl animate-slideInRight">
+          <div className="md:hidden fixed top-0 right-0 bottom-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl animate-slideInRight dark:bg-gray-900">
             {/* Decorative gradient background */}
             <div className="absolute inset-0 bg-gradient-to-br from-red-50 via-white to-pink-50">
               <div className="absolute -top-20 -right-20 w-64 h-64 bg-gradient-to-r from-red-400 to-pink-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
@@ -746,7 +752,7 @@ const Navbar: React.FC = () => {
             {/* Content */}
             <div className="relative z-10 h-full flex flex-col">
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center space-x-2">
                   <LogoMark className="w-8 h-8" />
                   <div>
@@ -756,12 +762,15 @@ const Navbar: React.FC = () => {
                     <p className="text-[10px] text-gray-500 -mt-1 tracking-wider">INDIA</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-50 hover:bg-red-100 transition-colors"
-                >
-                  <X className="w-5 h-5 text-red-600" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <ThemeToggle className="px-2.5 py-2" />
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-50 hover:bg-red-100 transition-colors"
+                  >
+                    <X className="w-5 h-5 text-red-600" />
+                  </button>
+                </div>
               </div>
 
               {/* Menu Items with staggered animation */}
@@ -803,7 +812,7 @@ const Navbar: React.FC = () => {
               </div>
 
               {/* Footer */}
-              <div className="p-6 border-t border-gray-200 bg-gradient-to-r from-red-50 to-pink-50">
+              <div className="p-6 border-t border-gray-200 bg-gradient-to-r from-red-50 to-pink-50 dark:border-gray-700 dark:from-gray-900 dark:to-gray-800">
                 <div className="flex items-center text-red-600 font-semibold justify-center">
                   <Heart className="w-4 h-4 mr-2 animate-pulse" />
                   <span className="text-sm">Saving Lives Together</span>

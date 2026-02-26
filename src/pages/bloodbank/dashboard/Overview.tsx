@@ -103,7 +103,7 @@ function BloodBankOverview() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-red-100">
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-red-100 dark:bg-slate-700 dark:border-red-200">
           <div className="flex items-center justify-between mb-3">
             <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center">
               <Package className="w-6 h-6 text-red-600" />
@@ -114,7 +114,7 @@ function BloodBankOverview() {
           <p className="text-sm text-gray-500 mt-1">Blood inventory</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-yellow-100">
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-yellow-100 dark:bg-slate-700 dark:border-amber-200">
           <div className="flex items-center justify-between mb-3">
             <div className="w-12 h-12 rounded-2xl bg-yellow-100 flex items-center justify-center">
               <AlertTriangle className="w-6 h-6 text-yellow-600" />
@@ -125,7 +125,7 @@ function BloodBankOverview() {
           <p className="text-sm text-gray-500 mt-1">Expiring in 7 days</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-red-100">
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-red-100 dark:bg-slate-700 dark:border-red-200">
           <div className="flex items-center justify-between mb-3">
             <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center">
               <Heart className="w-6 h-6 text-red-600" />
@@ -136,7 +136,7 @@ function BloodBankOverview() {
           <p className="text-sm text-gray-500 mt-1">Requests fulfilled</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-yellow-100">
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-yellow-100 dark:bg-slate-700 dark:border-amber-200">
           <div className="flex items-center justify-between mb-3">
             <div className="w-12 h-12 rounded-2xl bg-yellow-100 flex items-center justify-center">
               <Calendar className="w-6 h-6 text-yellow-600" />
@@ -149,7 +149,7 @@ function BloodBankOverview() {
       </div>
 
       {branchSummary.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
+        <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100 dark:bg-slate-700 dark:border-gray-200">
           <div className="flex items-center justify-between mb-5">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-red-600">Branches</p>
@@ -183,7 +183,7 @@ function BloodBankOverview() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="bg-white rounded-2xl shadow-xl p-6">
+        <div className="bg-white rounded-2xl shadow-xl p-6 dark:bg-slate-700">
           <div className="flex items-center justify-between mb-5">
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-red-600">Critical Inventory</p>
@@ -259,7 +259,7 @@ function BloodBankOverview() {
             </Link>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl p-6 border border-yellow-100">
+          <div className="bg-white rounded-2xl shadow-xl p-6 border border-yellow-100 dark:bg-slate-700 dark:border-amber-200">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-xs uppercase tracking-[0.3em] text-yellow-600">Referrals</p>
