@@ -15,13 +15,6 @@ const FALLBACK_THEME: Theme = 'light';
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const getSystemTheme = (): Theme => {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return FALLBACK_THEME;
-  }
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-};
-
 const getInitialTheme = (): Theme => {
   if (typeof window === 'undefined') return FALLBACK_THEME;
   try {
@@ -32,7 +25,7 @@ const getInitialTheme = (): Theme => {
   } catch (error) {
     console.warn('Failed to read theme from localStorage', error);
   }
-  return getSystemTheme();
+  return FALLBACK_THEME;
 };
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

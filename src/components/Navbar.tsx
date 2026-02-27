@@ -752,9 +752,8 @@ const Navbar: React.FC = () => {
               </div>
             </div>
 
-             {/* Mobile Menu Button */}
+            {/* Mobile Menu Button */}
             <div className="md:hidden flex items-center">
-              <ThemeToggle className="mr-2 px-2.5 py-2" />
               {showNotificationBadge && (
                 <NotificationBadge className="mr-2 rounded-xl border border-red-100 bg-red-50 hover:bg-red-100" />
               )}

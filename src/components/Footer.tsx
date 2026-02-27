@@ -1,8 +1,19 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Phone, Mail, MapPin, Facebook, Twitter, Instagram, Linkedin, AlertCircle } from 'lucide-react';
+import { Heart, Phone, Mail, MapPin, Facebook, Twitter, Instagram, Linkedin, AlertCircle, ChevronDown } from 'lucide-react';
 import LogoMark from './LogoMark';
 
 function Footer() {
+  const [openSections, setOpenSections] = useState({
+    quickLinks: true,
+    resources: false,
+    contact: false,
+  });
+
+  const toggleSection = (section: 'quickLinks' | 'resources' | 'contact') => {
+    setOpenSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
   return (
     <footer className="relative bg-gradient-to-br from-gray-50 to-white border-t border-gray-200 overflow-hidden">
       {/* Decorative gradient orbs - PhonePe style */}
@@ -76,158 +87,194 @@ function Footer() {
 
           {/* Quick Links */}
           <div>
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Links</h3>
-            <ul className="space-y-3">
-              <li>
-                <Link
-                  to="/donor/register"
-                  className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                >
-                  <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                  Become a Donor
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/request-blood"
-                  className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                >
-                  <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                  Request Blood
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/donors"
-                  className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                >
-                  <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                  Find Donors
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/about"
-                  className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                >
-                  <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                  About Us
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/contact"
-                  className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                >
-                  <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                  Contact Us
-                </Link>
-              </li>
-            </ul>
+            <button
+              type="button"
+              onClick={() => toggleSection('quickLinks')}
+              className="flex w-full items-center justify-between rounded-xl border border-red-100 bg-white/80 px-4 py-3 text-left lg:hidden"
+              aria-expanded={openSections.quickLinks}
+              aria-controls="footer-quick-links"
+            >
+              <span className="text-lg font-bold text-gray-900">Quick Links</span>
+              <ChevronDown className={`h-5 w-5 text-red-600 transition-transform ${openSections.quickLinks ? 'rotate-180' : ''}`} />
+            </button>
+            <h3 className="hidden text-lg font-bold text-gray-900 mb-4 lg:block">Quick Links</h3>
+            <div id="footer-quick-links" className={`${openSections.quickLinks ? 'block' : 'hidden'} pt-4 lg:block lg:pt-0`}>
+              <ul className="space-y-3">
+                <li>
+                  <Link
+                    to="/donor/register"
+                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Become a Donor
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/request-blood"
+                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Request Blood
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/donors"
+                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Find Donors
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/about"
+                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    About Us
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/contact"
+                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Contact Us
+                  </Link>
+                </li>
+              </ul>
+            </div>
           </div>
 
           {/* Resources */}
           <div>
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Resources</h3>
-            <ul className="space-y-3">
-              <li>
-                <Link
-                  to="/donor/login"
-                  className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                >
-                  <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                  Donor Portal
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/bloodbank/login"
-                  className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                >
-                  <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                  BloodBank Portal
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/ngo/login"
-                  className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                >
-                  <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                  NGO Portal
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/faq"
-                  className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                >
-                  <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                  FAQ
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/blog"
-                  className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                >
-                  <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                  Blog
-                </Link>
-              </li>
-            </ul>
+            <button
+              type="button"
+              onClick={() => toggleSection('resources')}
+              className="flex w-full items-center justify-between rounded-xl border border-red-100 bg-white/80 px-4 py-3 text-left lg:hidden"
+              aria-expanded={openSections.resources}
+              aria-controls="footer-resources"
+            >
+              <span className="text-lg font-bold text-gray-900">Resources</span>
+              <ChevronDown className={`h-5 w-5 text-red-600 transition-transform ${openSections.resources ? 'rotate-180' : ''}`} />
+            </button>
+            <h3 className="hidden text-lg font-bold text-gray-900 mb-4 lg:block">Resources</h3>
+            <div id="footer-resources" className={`${openSections.resources ? 'block' : 'hidden'} pt-4 lg:block lg:pt-0`}>
+              <ul className="space-y-3">
+                <li>
+                  <Link
+                    to="/donor/login"
+                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Donor Portal
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/bloodbank/login"
+                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    BloodBank Portal
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/ngo/login"
+                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    NGO Portal
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/faq"
+                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    FAQ
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/blog"
+                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
+                  >
+                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    Blog
+                  </Link>
+                </li>
+              </ul>
+            </div>
           </div>
 
           {/* Contact & Emergency */}
           <div>
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Get in Touch</h3>
-            <ul className="space-y-3 mb-6">
-              <li className="flex items-start text-gray-600 group">
-                <Phone className="w-5 h-5 mr-3 text-red-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-gray-900">General Inquiries</p>
-                  <a href="tel:+911800123456" className="hover:text-red-600 transition-colors">
-                    +91 1800-123-456
-                  </a>
-                </div>
-              </li>
-              <li className="flex items-start text-gray-600 group">
-                <Mail className="w-5 h-5 mr-3 text-red-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-gray-900">Email Us</p>
-                  <a href="mailto:contact@bloodhub.in" className="hover:text-red-600 transition-colors">
-                    contact@bloodhub.in
-                  </a>
-                </div>
-              </li>
-              <li className="flex items-start text-gray-600">
-                <MapPin className="w-5 h-5 mr-3 text-red-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-gray-900">Head Office</p>
-                  <p className="text-sm">New Delhi, India</p>
-                </div>
-              </li>
-            </ul>
-
-            {/* Emergency Box - PhonePe-inspired glassmorphism */}
-            <div className="group relative bg-white/80 backdrop-blur-xl p-4 rounded-xl border border-red-200 hover:shadow-xl transition-all duration-500 overflow-hidden">
-              {/* Decorative orb */}
-              <div className="absolute -top-8 -right-8 w-24 h-24 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-3xl opacity-20 group-hover:opacity-30 transition-opacity duration-500"></div>
-
-              <div className="relative z-10">
-                <div className="flex items-center mb-2">
-                  <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-r from-red-600 to-red-700 mr-2 shadow-md transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
-                    <AlertCircle className="w-4 h-4 text-white" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+            <button
+              type="button"
+              onClick={() => toggleSection('contact')}
+              className="flex w-full items-center justify-between rounded-xl border border-red-100 bg-white/80 px-4 py-3 text-left lg:hidden"
+              aria-expanded={openSections.contact}
+              aria-controls="footer-contact"
+            >
+              <span className="text-lg font-bold text-gray-900">Get in Touch</span>
+              <ChevronDown className={`h-5 w-5 text-red-600 transition-transform ${openSections.contact ? 'rotate-180' : ''}`} />
+            </button>
+            <h3 className="hidden text-lg font-bold text-gray-900 mb-4 lg:block">Get in Touch</h3>
+            <div id="footer-contact" className={`${openSections.contact ? 'block' : 'hidden'} pt-4 lg:block lg:pt-0`}>
+              <ul className="space-y-3 mb-6">
+                <li className="flex items-start text-gray-600 group">
+                  <Phone className="w-5 h-5 mr-3 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-gray-900">General Inquiries</p>
+                    <a href="tel:+911800123456" className="hover:text-red-600 transition-colors">
+                      +91 1800-123-456
+                    </a>
                   </div>
-                  <p className="text-red-700 font-bold">24/7 Emergency</p>
+                </li>
+                <li className="flex items-start text-gray-600 group">
+                  <Mail className="w-5 h-5 mr-3 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-gray-900">Email Us</p>
+                    <a href="mailto:contact@bloodhub.in" className="hover:text-red-600 transition-colors">
+                      contact@bloodhub.in
+                    </a>
+                  </div>
+                </li>
+                <li className="flex items-start text-gray-600">
+                  <MapPin className="w-5 h-5 mr-3 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-gray-900">Head Office</p>
+                    <p className="text-sm">New Delhi, India</p>
+                  </div>
+                </li>
+              </ul>
+
+              {/* Emergency Box - PhonePe-inspired glassmorphism */}
+              <div className="group relative bg-white/80 backdrop-blur-xl p-4 rounded-xl border border-red-200 hover:shadow-xl transition-all duration-500 overflow-hidden">
+                {/* Decorative orb */}
+                <div className="absolute -top-8 -right-8 w-24 h-24 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-3xl opacity-20 group-hover:opacity-30 transition-opacity duration-500"></div>
+
+                <div className="relative z-10">
+                  <div className="flex items-center mb-2">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-r from-red-600 to-red-700 mr-2 shadow-md transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                      <AlertCircle className="w-4 h-4 text-white" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+                    </div>
+                    <p className="text-red-700 font-bold">24/7 Emergency</p>
+                  </div>
+                  <a
+                    href="tel:+911800999888"
+                    className="text-red-600 font-bold text-lg hover:text-red-700 transition-colors block"
+                  >
+                    +91 1800-999-888
+                  </a>
+                  <p className="text-xs text-gray-600 mt-1">Available round the clock</p>
                 </div>
-                <a
-                  href="tel:+911800999888"
-                  className="text-red-600 font-bold text-lg hover:text-red-700 transition-colors block"
-                >
-                  +91 1800-999-888
-                </a>
-                <p className="text-xs text-gray-600 mt-1">Available round the clock</p>
               </div>
             </div>
           </div>

@@ -1617,27 +1617,27 @@ function FindDonors() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-              <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
+              <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4 dark:border-gray-200 dark:bg-[#101826]/80">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">Send to filtered donors</p>
-                    <p className="text-xs text-gray-500">Use your current filters to build a batch.</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Send to filtered donors</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Use your current filters to build a batch.</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setUseFilteredRecipients((prev) => !prev)}
                     className={`h-9 w-16 rounded-full p-1 transition ${
-                      useFilteredRecipients ? 'bg-emerald-500' : 'bg-gray-200'
+                      useFilteredRecipients ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-gray-700'
                     }`}
                   >
                     <span
-                      className={`block h-7 w-7 rounded-full bg-white shadow transition ${
+                      className={`block h-7 w-7 rounded-full bg-white dark:bg-[#0a0f1a] shadow transition ${
                         useFilteredRecipients ? 'translate-x-7' : 'translate-x-0'
                       }`}
                     />
                   </button>
                 </div>
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   {useFilteredRecipients
                     ? `${filteredAvailableCount} available donors match your filters${filteredAvailableCount > MAX_DONOR_REQUEST_BATCH_TARGETS ? ` (showing first ${MAX_DONOR_REQUEST_BATCH_TARGETS})` : ''}.`
                     : 'Using your tray selection.'}

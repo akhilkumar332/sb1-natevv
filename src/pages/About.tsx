@@ -142,6 +142,39 @@ function About() {
 
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
+  const whyChooseBloodHub = [
+    {
+      icon: <Target size={30} />,
+      title: 'Smart Matching',
+      description: 'Smart matching helps connect the right donors to the right requests quickly.',
+    },
+    {
+      icon: <Zap size={30} />,
+      title: 'Real-time Updates',
+      description: 'Timely alerts and updates help donors and recipients stay informed.',
+    },
+    {
+      icon: <Shield size={30} />,
+      title: 'Safety Focused',
+      description: 'Verification-aware workflows and clear processes support trust and transparency.',
+    },
+    {
+      icon: <Award size={30} />,
+      title: 'Recognition',
+      description: 'Milestones, badges, and gratitude moments celebrate consistent donors.',
+    },
+    {
+      icon: <Activity size={30} />,
+      title: 'Impact Tracking',
+      description: 'Track donation activity and understand your contribution over time.',
+    },
+    {
+      icon: <Users size={30} />,
+      title: 'Community Driven',
+      description: 'A growing donor community working together to make blood access more reliable.',
+    },
+  ];
+
   return (
     <div className="w-full public-app-page public-app-about">
       {/* Hero Section - PhonePe-inspired */}
@@ -359,6 +392,45 @@ function About() {
                     <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-red-600 transition-colors duration-300">{member.name}</h3>
                     <p className="text-red-600 font-semibold mb-3">{member.role}</p>
                     <p className="text-gray-700 text-sm">{member.expertise}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Why People Choose BloodHub */}
+      <section id="why-choose-bloodhub" className="py-24 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-5xl font-bold mb-4">
+              <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
+                Why People Choose BloodHub
+              </span>
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              A deeper look at the product and community experience behind BloodHub.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {whyChooseBloodHub.map((item) => (
+              <div key={item.title} className="group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-3xl blur-xl opacity-15 group-hover:opacity-25 transition-opacity duration-500"></div>
+                <div className="relative min-h-[300px] bg-white/90 backdrop-blur-xl p-10 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-500 border border-white/50 overflow-hidden">
+                  <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-3xl opacity-10 group-hover:opacity-20 transition-opacity duration-500"></div>
+                  <div className="relative z-10">
+                    <div
+                      className="inline-flex p-5 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 shadow-2xl mb-7 transform group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500"
+                      style={{ boxShadow: '0 20px 40px rgba(220, 38, 38, 0.3)' }}
+                    >
+                      <div className="text-white" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))' }}>
+                        {item.icon}
+                      </div>
+                    </div>
+                    <h3 className="text-2xl font-bold mb-4 text-gray-900 group-hover:text-red-600 transition-colors duration-300">{item.title}</h3>
+                    <p className="text-base text-gray-700 leading-relaxed">{item.description}</p>
                   </div>
                 </div>
               </div>

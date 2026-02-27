@@ -220,42 +220,42 @@ export const AdminAnalyticsDashboard: React.FC = () => {
 
       {/* Platform Summary */}
       {stats && (
-        <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="rounded-lg bg-gradient-to-r from-purple-50 to-purple-100 p-6 dark:from-[#0b1220] dark:to-[#101826]">
+          <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
             Platform Summary
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <p className="text-sm text-gray-600">Total Users</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
               <p className="text-2xl font-bold text-purple-600">
                 {stats.totalUsers}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 {((stats.verifiedUsers / stats.totalUsers) * 100).toFixed(1)}% verified
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Donor Engagement</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Donor Engagement</p>
               <p className="text-2xl font-bold text-purple-600">
                 {((stats.activeDonors / stats.totalDonors) * 100).toFixed(1)}%
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 {stats.activeDonors} active of {stats.totalDonors}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Total Donations</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Total Donations</p>
               <p className="text-2xl font-bold text-purple-600">
                 {stats.totalDonations}
               </p>
-              <p className="text-xs text-gray-500">all time donations</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">all time donations</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Healthcare Network</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Healthcare Network</p>
               <p className="text-2xl font-bold text-purple-600">
                 {stats.totalHospitals + stats.totalNGOs}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 {stats.totalHospitals} bloodbanks, {stats.totalNGOs} NGOs
               </p>
             </div>

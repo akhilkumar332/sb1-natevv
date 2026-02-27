@@ -1,45 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Droplet, Users, Building2, ArrowRight, Activity, Calendar, MapPin, Shield, Award, Clock, Target, Zap, TrendingUp, Star, Gift, Bell, CheckCircle } from 'lucide-react';
-
-interface FeatureCardProps {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  gradient: string;
-}
-
-function FeatureCard({ icon, title, description, gradient }: FeatureCardProps) {
-  return (
-    <div className="group relative p-8 bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-500 border border-white/20 overflow-hidden">
-      {/* Floating gradient background */}
-      <div className={`absolute inset-0 ${gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-500`}></div>
-
-      {/* Decorative gradient orb */}
-      <div className={`absolute -top-10 -right-10 w-32 h-32 ${gradient} rounded-full blur-3xl opacity-20 group-hover:opacity-40 transition-opacity duration-500`}></div>
-
-      {/* 3D Icon container with PhonePe-style depth */}
-      <div className="relative mb-6">
-        <div className={`inline-flex p-5 rounded-2xl ${gradient} shadow-2xl transform group-hover:scale-110 group-hover:-translate-y-2 transition-all duration-500`}
-             style={{ boxShadow: '0 20px 40px rgba(220, 38, 38, 0.3)' }}>
-          <div className="text-white transform group-hover:rotate-12 transition-transform duration-500"
-               style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))' }}>
-            {icon}
-          </div>
-        </div>
-      </div>
-
-      <h3 className="text-xl font-bold mb-3 text-gray-900 group-hover:text-red-600 transition-colors duration-300">{title}</h3>
-      <p className="text-gray-600 leading-relaxed">{description}</p>
-
-      {/* Hover arrow indicator */}
-      <div className="mt-4 flex items-center text-red-600 opacity-0 group-hover:opacity-100 transform translate-x-0 group-hover:translate-x-2 transition-all duration-300">
-        <span className="text-sm font-semibold mr-1">Learn more</span>
-        <ArrowRight className="w-4 h-4" />
-      </div>
-    </div>
-  );
-}
+import { Heart, Droplet, Users, Building2, ArrowRight, MapPin, Shield, Award, Clock, Zap, TrendingUp, Star, Gift, Bell, CheckCircle } from 'lucide-react';
 
 function StatCard({ icon, value, label, gradient }: { icon: React.ReactNode; value: string; label: string; gradient: string }) {
   return (
@@ -48,23 +9,23 @@ function StatCard({ icon, value, label, gradient }: { icon: React.ReactNode; val
       <div className={`absolute inset-0 ${gradient} rounded-3xl blur-2xl opacity-40 group-hover:opacity-60 transition-opacity duration-500`}></div>
 
       {/* Glassmorphic card */}
-      <div className="relative bg-white/90 backdrop-blur-xl p-8 rounded-3xl shadow-2xl text-center transform group-hover:scale-105 group-hover:-translate-y-2 transition-all duration-500 border border-white/50">
+      <div className="relative flex h-full min-h-[220px] flex-col items-center justify-between bg-white/90 backdrop-blur-xl p-7 rounded-3xl shadow-2xl text-center transform group-hover:scale-105 group-hover:-translate-y-2 transition-all duration-500 border border-white/50">
         {/* Floating orb decoration */}
         <div className={`absolute -top-6 -right-6 w-24 h-24 ${gradient} rounded-full blur-2xl opacity-30`}></div>
 
         {/* 3D Icon with depth */}
-        <div className="relative mb-4">
-          <div className={`inline-flex p-5 rounded-2xl ${gradient} shadow-2xl transform group-hover:scale-110 group-hover:rotate-12 transition-all duration-500`}
+        <div className="relative mb-3">
+          <div className={`inline-flex p-4 rounded-2xl ${gradient} shadow-2xl transform group-hover:scale-110 group-hover:rotate-12 transition-all duration-500`}
                style={{ boxShadow: '0 25px 50px rgba(220, 38, 38, 0.4)' }}>
             <div className="text-white" style={{ filter: 'drop-shadow(0 6px 12px rgba(0,0,0,0.4))' }}>{icon}</div>
           </div>
         </div>
 
         {/* Animated counter */}
-        <div className="text-5xl font-extrabold mb-2 bg-gradient-to-br from-red-600 via-red-700 to-red-900 bg-clip-text text-transparent transform group-hover:scale-110 transition-transform duration-300">
+        <div className="mb-2 flex min-h-[3rem] items-center justify-center text-4xl font-extrabold bg-gradient-to-br from-red-600 via-red-700 to-red-900 bg-clip-text text-transparent transform group-hover:scale-110 transition-transform duration-300">
           {value}
         </div>
-        <div className="text-gray-700 font-semibold text-lg">{label}</div>
+        <div className="flex min-h-[2.5rem] items-center justify-center text-gray-700 font-semibold text-base">{label}</div>
 
         {/* Subtle bottom accent */}
         <div className={`absolute bottom-0 left-0 right-0 h-1 ${gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-b-3xl`}></div>
@@ -229,7 +190,7 @@ function Home() {
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">Making a difference together, one donor at a time</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="mx-auto grid max-w-5xl grid-cols-2 gap-4 sm:gap-6 md:gap-8">
             <StatCard
               icon={<Heart size={32} />}
               value="Growing"
@@ -266,58 +227,55 @@ function Home() {
             <h2 className="text-5xl font-bold mb-4">
               <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">Why People Choose BloodHub</span>
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">A thoughtful experience designed to support donors and recipients</p>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">A quick look at what makes the experience reliable and helpful.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <FeatureCard
-              icon={<Target size={32} />}
-              title="Smart Matching"
-              description="Smart matching helps connect the right donors to the right requests as quickly as possible."
-              gradient="bg-gradient-to-r from-red-500 to-pink-500"
-            />
-            <FeatureCard
-              icon={<Clock size={32} />}
-              title="Real-time Updates"
-              description="Stay informed with timely alerts for nearby requests."
-              gradient="bg-gradient-to-r from-red-600 to-red-700"
-            />
-            <FeatureCard
-              icon={<Shield size={32} />}
-              title="Safety Focused"
-              description="Verified partners and clear processes help promote safety and transparency."
-              gradient="bg-gradient-to-r from-red-700 to-red-800"
-            />
-            <FeatureCard
-              icon={<Award size={32} />}
-              title="Earn Rewards"
-              description="We aim to recognize donors with milestones, badges, and gratitude."
-              gradient="bg-gradient-to-r from-red-800 to-red-900"
-            />
-            <FeatureCard
-              icon={<Activity size={32} />}
-              title="Track Impact"
-              description="Track your donation journey and the community impact you support."
-              gradient="bg-gradient-to-r from-pink-600 to-red-600"
-            />
-            <FeatureCard
-              icon={<Users size={32} />}
-              title="Community Driven"
-              description="Join a community of donors committed to helping others."
-              gradient="bg-gradient-to-r from-red-600 to-red-700"
-            />
-            <FeatureCard
-              icon={<Calendar size={32} />}
-              title="Blood Camps"
-              description="Discover donation camps and community drives near you."
-              gradient="bg-gradient-to-r from-red-700 to-red-800"
-            />
-            <FeatureCard
-              icon={<MapPin size={32} />}
-              title="Find Nearby"
-              description="Find nearby blood banks and donation centers with a simple map."
-              gradient="bg-gradient-to-r from-red-800 to-red-900"
-            />
+          <div className="relative mx-auto max-w-5xl">
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-gray-50 to-transparent lg:hidden" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-14 bg-gradient-to-l from-gray-50 to-transparent lg:hidden" />
+            <div className="pointer-events-none absolute right-2 top-2 z-20 rounded-full border border-red-100 bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-red-600 shadow-sm lg:hidden">
+              Swipe →
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory sm:gap-6 md:gap-7 lg:grid lg:grid-cols-3 lg:overflow-visible lg:pb-0">
+              {[
+                {
+                  icon: <Zap className="w-6 h-6 text-white" />,
+                  title: 'Smarter Matching',
+                  description: 'Connect the right donors to the right requests faster.',
+                },
+                {
+                  icon: <Shield className="w-6 h-6 text-white" />,
+                  title: 'Safety Focus',
+                  description: 'Verification-aware workflows to promote trust and clarity.',
+                },
+                {
+                  icon: <TrendingUp className="w-6 h-6 text-white" />,
+                  title: 'Track Impact',
+                  description: 'See your donation journey and community contribution over time.',
+                },
+              ].map((item) => (
+                <div key={item.title} className="group relative min-h-[250px] min-w-[260px] flex-shrink-0 snap-start overflow-hidden rounded-2xl border border-white/50 bg-white/90 p-8 shadow-lg backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:min-w-[300px] md:min-w-[340px] lg:min-w-0 lg:flex-shrink">
+                  <div className="absolute -top-10 -right-10 h-28 w-28 rounded-full bg-gradient-to-r from-red-500 to-pink-500 opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-20" />
+                  <div className="relative z-10">
+                    <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-r from-red-600 to-red-700 shadow-lg">
+                      {item.icon}
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">{item.title}</h3>
+                    <p className="mt-3 text-base leading-relaxed text-gray-600">{item.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-10 text-center">
+            <Link
+              to="/about#why-choose-bloodhub"
+              className="inline-flex items-center rounded-full border-2 border-red-600 px-6 py-3 font-semibold text-red-600 transition-all duration-300 hover:bg-red-600 hover:text-white"
+            >
+              Learn why people choose BloodHub
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
           </div>
         </div>
       </section>
