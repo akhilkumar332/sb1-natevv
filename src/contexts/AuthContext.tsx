@@ -1413,6 +1413,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           setProfileResolved(true);
         } else {
+          if (firestoreNetworkDisabledRef.current && (typeof navigator === 'undefined' || navigator.onLine)) {
+            try {
+              await enableNetwork(db);
+              firestoreNetworkDisabledRef.current = false;
+            } catch (error) {
+              reportAuthContextError(error, 'auth.firestore.network_reenable_signed_out');
+            }
+          }
           setUser(null);
           setProfileResolved(true);
         }
