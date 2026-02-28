@@ -7,6 +7,7 @@ import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { applyReferralTrackingForUser, resolveReferralContext } from '../services/referral.service';
+import { captureHandledError } from '../services/errorLog.service';
 
 interface RegisterFormData {
   identifier: string;
@@ -75,6 +76,7 @@ export const useNgoRegister = () => {
       startResendTimer();
     } catch (error: any) {
       console.error('Phone registration error:', error);
+      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.ngo.phone.submit' } });
       toast.error('Failed to send OTP. Please try again.');
     }
   };
@@ -138,6 +140,7 @@ export const useNgoRegister = () => {
       navigate('/ngo/onboarding');
     } catch (error: any) {
       console.error('OTP verification error:', error);
+      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.ngo.otp.verify' } });
 
       // Clean up reCAPTCHA on error
       const container = document.getElementById('recaptcha-container');
@@ -170,6 +173,7 @@ export const useNgoRegister = () => {
       toast.success('OTP resent successfully!');
       startResendTimer();
     } catch (error) {
+      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.ngo.otp.resend' } });
       toast.error('Failed to resend OTP. Please try again.');
     }
   };
@@ -255,6 +259,7 @@ export const useNgoRegister = () => {
       navigate('/ngo/onboarding');
     } catch (error: any) {
       console.error('🔴 Google registration error:', error);
+      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.ngo.google' } });
       if (error instanceof Error) {
         toast.error(error.message);
       } else {

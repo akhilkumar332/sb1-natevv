@@ -7,6 +7,7 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import { collection, query, where, limit, onSnapshot, getDocs, documentId, writeBatch, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getServerTimestamp } from '../utils/firestore.utils';
+import { captureHandledError } from '../services/errorLog.service';
 
 export interface Campaign {
   id: string;
@@ -133,6 +134,13 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
   const cacheKey = useMemo(() => (ngoId ? `ngo_dashboard_cache_${ngoId}` : ''), [ngoId]);
   const cacheTTL = 5 * 60 * 1000;
   const participantsCacheTTL = 5 * 60 * 1000;
+  const reportNgoDataError = (err: unknown, kind: string) => {
+    void captureHandledError(err, {
+      source: 'frontend',
+      scope: 'ngo',
+      metadata: { kind, hook: 'useNgoData' },
+    });
+  };
 
   const serializeCampaigns = (items: Campaign[]) =>
     items.map((campaign) => ({
@@ -243,6 +251,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       return unsubscribe;
     } catch (err) {
       console.error('Error fetching campaigns:', err);
+      reportNgoDataError(err, 'fetch_campaigns_realtime');
       setError('Failed to load campaigns');
       return () => {};
     }
@@ -301,6 +310,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       setCampaigns(sorted);
     } catch (err) {
       console.error('Error fetching campaigns:', err);
+      reportNgoDataError(err, 'fetch_campaigns_once');
     }
   };
 
@@ -334,6 +344,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       setVolunteers(sorted);
     } catch (err) {
       console.error('Error fetching volunteers:', err);
+      reportNgoDataError(err, 'fetch_volunteers');
     }
   };
 
@@ -367,6 +378,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       setPartnerships(sorted);
     } catch (err) {
       console.error('Error fetching partnerships:', err);
+      reportNgoDataError(err, 'fetch_partnerships');
     }
   };
 
@@ -407,6 +419,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       });
     } catch (err) {
       console.error('Error fetching donor community:', err);
+      reportNgoDataError(err, 'fetch_donor_community');
     }
   };
 
@@ -543,6 +556,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
         } catch (err) {
           if (!isActive) return;
           console.error('Error loading NGO data:', err);
+          reportNgoDataError(err, 'load_ngo_data');
           setError('Failed to load NGO data');
           setLoading(false);
         }
@@ -716,6 +730,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       });
     } catch (error) {
       console.error('Failed to load participant donors', error);
+      reportNgoDataError(error, 'load_participant_donors');
     }
 
     const ordered = normalized

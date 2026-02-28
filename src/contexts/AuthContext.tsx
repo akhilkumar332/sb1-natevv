@@ -40,6 +40,7 @@ import { auth, db, googleProvider } from '../firebase';
 import { getMessaging } from 'firebase/messaging';
 import { initializeFCM, saveFCMDeviceToken, saveFCMToken } from '../services/notification.service';
 import { requestImpersonation, requestImpersonationResume } from '../services/impersonation.service';
+import { flushQueuedErrorLogs } from '../services/errorLog.service';
 import { generateBhId } from '../utils/bhId';
 import { getDeviceId, getDeviceInfo } from '../utils/device';
 import { normalizePhoneNumber } from '../utils/phone';
@@ -2378,6 +2379,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw error; // Re-throw the error so the caller can handle it
     }
   };
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    void flushQueuedErrorLogs();
+  }, [user?.uid]);
 
   const isSuperAdmin = user?.role === 'superadmin';
   const isImpersonating = Boolean(

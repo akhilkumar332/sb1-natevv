@@ -218,6 +218,19 @@ const fetchAuditLogs = async (limitCount: number): Promise<AdminEntity[]> => {
   });
 };
 
+const fetchErrorLogs = async (limitCount: number): Promise<AdminEntity[]> => {
+  const snapshot = await getDocs(query(collection(db, 'errorLogs'), orderBy('createdAt', 'desc'), limit(limitCount)));
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data() as Record<string, any>;
+    return {
+      ...data,
+      id: docSnap.id,
+      createdAt: toDate(data.createdAt),
+      updatedAt: toDate(data.updatedAt),
+    };
+  });
+};
+
 export const useAdminUsers = (role: AdminUserRoleFilter = 'all', limitCount: number = 800) =>
   useCachedAdminQuery<User[]>(
     adminQueryKeys.users(role, limitCount),
@@ -379,6 +392,20 @@ export const useAdminAuditLogs = (limitCount: number = 1000) =>
     2 * 60 * 1000,
     ['createdAt', 'updatedAt'],
     () => fetchAuditLogs(limitCount),
+    {
+      staleTime: 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchInterval: 60 * 1000,
+      refetchIntervalInBackground: true,
+    },
+  );
+
+export const useAdminErrorLogs = (limitCount: number = 1000) =>
+  useCachedAdminQuery<AdminEntity[]>(
+    adminQueryKeys.errorLogs(limitCount),
+    2 * 60 * 1000,
+    ['createdAt', 'updatedAt'],
+    () => fetchErrorLogs(limitCount),
     {
       staleTime: 60 * 1000,
       gcTime: 10 * 60 * 1000,

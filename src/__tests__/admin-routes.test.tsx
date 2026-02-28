@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AdminPortal from '../pages/admin/AdminPortal';
 import ImpersonationAudit from '../pages/admin/ImpersonationAudit';
+import ErrorLogsPage from '../pages/admin/dashboard/ErrorLogs';
 
 const useAuthMock = vi.fn();
 
@@ -76,5 +77,26 @@ describe('admin route access', () => {
     );
 
     expect(await screen.findByText('Restricted Access')).toBeInTheDocument();
+  });
+
+  it('allows admin to view error logs page', async () => {
+    useAuthMock.mockReturnValue({
+      user: { bhId: 'BH-0003' },
+      isSuperAdmin: false,
+    });
+
+    render(
+      <QueryClientProvider client={createClient()}>
+        <MemoryRouter initialEntries={['/admin/dashboard/error-logs']}>
+          <Routes>
+            <Route path="/admin/dashboard" element={<AdminPortal />}>
+              <Route path="error-logs" element={<ErrorLogsPage />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Error Logs' })).toBeInTheDocument();
   });
 });

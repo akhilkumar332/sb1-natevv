@@ -149,21 +149,11 @@ const adminDashboardLinks = (isSuperAdmin: boolean) => [
   { label: 'Appointments', path: '/admin/dashboard/appointments-donations' },
   { label: 'Analytics', path: '/admin/dashboard/analytics-reports' },
   { label: 'Audit & Security', path: '/admin/dashboard/audit-security' },
+  { label: 'Error Logs', path: '/admin/dashboard/error-logs' },
   ...(isSuperAdmin ? [{ label: 'Impersonation Audit', path: '/admin/dashboard/impersonation-audit' }] : []),
   { label: 'Notifications', path: '/admin/dashboard/notifications' },
   { label: 'Settings', path: '/admin/dashboard/settings' },
 ];
-
-const IMPERSONATION_TTL_MS = 30 * 60 * 1000;
-
-const formatImpersonationRemaining = (ms: number) => {
-  const safeMs = Math.max(ms, 0);
-  const totalMinutes = Math.ceil(safeMs / 60000);
-  if (totalMinutes < 60) return `${totalMinutes}m`;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-};
 
 function DesktopNavLink({ to, children }: NavLinkProps) {
   const location = useLocation();
@@ -570,7 +560,6 @@ function MobileUserMenu({
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [pendingPortal, setPendingPortal] = useState<PortalRole | null>(null);
-  const [impersonationRemaining, setImpersonationRemaining] = useState<string | null>(null);
   const {
     user,
     authLoading,
@@ -610,21 +599,6 @@ const Navbar: React.FC = () => {
     ?? (portalOptions.some(option => option.role === user?.role)
       ? (user?.role as PortalRole)
       : null);
-
-  useEffect(() => {
-    if (!impersonationSession) {
-      setImpersonationRemaining(null);
-      return;
-    }
-    const expiresAt = impersonationSession.expiresAt
-      ?? (impersonationSession.startedAt + IMPERSONATION_TTL_MS);
-    const updateRemaining = () => {
-      setImpersonationRemaining(formatImpersonationRemaining(expiresAt - Date.now()));
-    };
-    updateRemaining();
-    const intervalId = window.setInterval(updateRemaining, 30_000);
-    return () => window.clearInterval(intervalId);
-  }, [impersonationSession]);
 
   const handlePortalSelect = (role: PortalRole) => {
     if (!isSuperAdmin) return;
@@ -784,7 +758,7 @@ const Navbar: React.FC = () => {
                 {impersonationSession.targetRole ? ` (${impersonationSession.targetRole})` : '.'}
               </span>
               <span className="text-[11px] text-amber-800">
-                Reason: {impersonationSession.reason || 'Not provided'} · Time remaining: {impersonationRemaining || '—'}
+                Reason: {impersonationSession.reason || 'Not provided'}
               </span>
             </div>
             <button

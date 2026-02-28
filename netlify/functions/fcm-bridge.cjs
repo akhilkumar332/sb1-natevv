@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const { logNetlifyError } = require('./error-log.cjs');
 
 const VALID_TYPES = new Set([
   'emergency_request',
@@ -120,6 +121,18 @@ exports.handler = async (event) => {
     const ref = await db.collection('notifications').add(docData);
     return { statusCode: 200, body: JSON.stringify({ ok: true, id: ref.id }) };
   } catch (error) {
+    await logNetlifyError({
+      admin,
+      event,
+      error,
+      route: '/.netlify/functions/fcm-bridge',
+      scope: 'unknown',
+      actorUid: userId || null,
+      actorRole: userRole || null,
+      metadata: {
+        functionName: 'fcm-bridge',
+      },
+    });
     return { statusCode: 500, body: JSON.stringify({ ok: false, error: error.message }) };
   }
 };

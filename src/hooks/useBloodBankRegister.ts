@@ -6,6 +6,7 @@ import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { applyReferralTrackingForUser, resolveReferralContext } from '../services/referral.service';
+import { captureHandledError } from '../services/errorLog.service';
 
 export const useBloodBankRegister = () => {
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -94,6 +95,7 @@ export const useBloodBankRegister = () => {
       navigate('/bloodbank/onboarding');
     } catch (error: any) {
       console.error('🔴 Google registration error:', error);
+      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.bloodbank.google' } });
       if (error instanceof Error) {
         toast.error(error.message);
       } else {

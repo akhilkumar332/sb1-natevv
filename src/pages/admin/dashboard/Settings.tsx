@@ -85,6 +85,9 @@ function SettingsPage() {
           <Link to="/admin/dashboard/audit-security" className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
             Open Audit & Security
           </Link>
+          <Link to="/admin/dashboard/error-logs" className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
+            Open Error Logs
+          </Link>
           {isSuperAdmin && (
             <Link to="/admin/dashboard/impersonation-audit" className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
               Open Impersonation Audit

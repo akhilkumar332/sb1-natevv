@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, orderBy, limit, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { captureHandledError } from '../services/errorLog.service';
 
 export interface UserRecord {
   id: string;
@@ -165,6 +166,13 @@ export const useAdminData = (): UseAdminDataReturn => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const reportAdminDataError = (err: unknown, kind: string) => {
+    void captureHandledError(err, {
+      source: 'frontend',
+      scope: 'admin',
+      metadata: { kind, hook: 'useAdminData' },
+    });
+  };
 
   // Fetch recent users
   const fetchUsers = async () => {
@@ -192,6 +200,7 @@ export const useAdminData = (): UseAdminDataReturn => {
       setUsers(usersList);
     } catch (err) {
       console.error('Error fetching users:', err);
+      reportAdminDataError(err, 'fetch_users');
     }
   };
 
@@ -228,6 +237,7 @@ export const useAdminData = (): UseAdminDataReturn => {
       return unsubscribe;
     } catch (err) {
       console.error('Error fetching verification requests:', err);
+      reportAdminDataError(err, 'fetch_verification_requests');
       return () => {};
     }
   };
@@ -268,6 +278,7 @@ export const useAdminData = (): UseAdminDataReturn => {
       return unsubscribe;
     } catch (err) {
       console.error('Error fetching emergency requests:', err);
+      reportAdminDataError(err, 'fetch_emergency_requests');
       return () => {};
     }
   };
@@ -315,6 +326,7 @@ export const useAdminData = (): UseAdminDataReturn => {
       setSystemAlerts(alertsList);
     } catch (err) {
       console.error('Error fetching system alerts:', err);
+      reportAdminDataError(err, 'fetch_system_alerts');
     }
   };
 
@@ -380,6 +392,7 @@ export const useAdminData = (): UseAdminDataReturn => {
       setRecentActivity({ donations, requests, campaigns });
     } catch (err) {
       console.error('Error fetching recent activity:', err);
+      reportAdminDataError(err, 'fetch_recent_activity');
     }
   };
 
@@ -443,6 +456,7 @@ export const useAdminData = (): UseAdminDataReturn => {
       });
     } catch (err) {
       console.error('Error calculating stats:', err);
+      reportAdminDataError(err, 'calculate_stats');
     }
   };
 
@@ -472,6 +486,7 @@ export const useAdminData = (): UseAdminDataReturn => {
       } catch (err) {
         if (!isActive) return;
         console.error('Error loading admin data:', err);
+        reportAdminDataError(err, 'load_admin_data');
         setError('Failed to load admin data');
         setLoading(false);
       }

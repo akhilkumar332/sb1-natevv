@@ -5,10 +5,33 @@
  */
 
 import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { captureHandledError } from '../services/errorLog.service';
 
 // Create a client
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      void captureHandledError(error, {
+        source: 'frontend',
+        metadata: {
+          kind: 'react_query.query',
+          queryKey: query.queryKey,
+        },
+      });
+    },
+  }),
+  mutationCache: new MutationCache({
+    onError: (error, _variables, _context, mutation) => {
+      void captureHandledError(error, {
+        source: 'frontend',
+        metadata: {
+          kind: 'react_query.mutation',
+          mutationKey: mutation.options.mutationKey || null,
+        },
+      });
+    },
+  }),
   defaultOptions: {
     queries: {
       // Cache data for 5 minutes

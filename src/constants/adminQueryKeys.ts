@@ -40,4 +40,9 @@ export const adminQueryKeys = {
   notifications: (limit: number = 1000) => ['admin', 'notifications', { limit }] as const,
   auditRoot: ['admin', 'auditLogs'] as const,
   auditLogs: (limit: number = 1000) => ['admin', 'auditLogs', { limit }] as const,
+  errorRoot: ['admin', 'errorLogs'] as const,
+  errorLogs: (
+    limit: number = 1000,
+    filters?: { source?: string; scope?: string; level?: string; impersonating?: string }
+  ) => ['admin', 'errorLogs', { limit, ...(filters || {}) }] as const,
 };

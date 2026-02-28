@@ -9,10 +9,12 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import * as serviceWorkerRegistration from './utils/serviceWorkerRegistration';
 import { initPerformanceMonitoring } from './utils/performanceMonitoring';
+import { initGlobalErrorLogging } from './utils/errorLoggingBootstrap';
 import '../index.css';
 
 // Initialize performance monitoring
 initPerformanceMonitoring();
+initGlobalErrorLogging();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

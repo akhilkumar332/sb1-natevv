@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Bell,
   Building2,
@@ -50,6 +51,7 @@ function AdminPortal() {
     { id: 'appointments', label: 'Appointments & Donations', to: 'appointments-donations', icon: Calendar },
     { id: 'analytics', label: 'Analytics', to: 'analytics-reports', icon: BarChart3 },
     { id: 'audit', label: 'Audit & Security', to: 'audit-security', icon: Shield },
+    { id: 'errors', label: 'Error Logs', to: 'error-logs', icon: AlertTriangle },
     { id: 'impersonation', label: 'Impersonation Audit', to: 'impersonation-audit', icon: Shield, superAdminOnly: true },
     { id: 'notifications', label: 'Notifications', to: 'notifications', icon: Bell },
     { id: 'settings', label: 'Settings', to: 'settings', icon: Settings },

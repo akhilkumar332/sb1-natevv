@@ -10,6 +10,7 @@ import { authStorage } from '../utils/authStorage';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
 import { applyReferralTrackingForUser, resolveReferralContext } from '../services/referral.service';
+import { captureHandledError } from '../services/errorLog.service';
 
 interface RegisterFormData {
   identifier: string;
@@ -72,6 +73,7 @@ export const useRegister = () => {
       startResendTimer();
     } catch (error: any) {
       console.error('Phone registration error:', error);
+      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.phone.submit' } });
       toast.error('Failed to send OTP. Please try again.');
     }
   };
@@ -159,6 +161,7 @@ export const useRegister = () => {
       navigate('/donor/onboarding');
     } catch (error: any) {
       console.error('OTP verification error:', error);
+      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.otp.verify' } });
 
       // Clean up reCAPTCHA on error
       const container = document.getElementById('recaptcha-container');
@@ -191,6 +194,7 @@ export const useRegister = () => {
       toast.success('OTP resent successfully!');
       startResendTimer();
     } catch (error) {
+      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.otp.resend' } });
       toast.error('Failed to resend OTP. Please try again.');
     }
   };
@@ -279,6 +283,7 @@ export const useRegister = () => {
       navigate('/donor/onboarding');
     } catch (error: any) {
       console.error('🔴 Google registration error:', error);
+      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.google' } });
       if (error instanceof Error) {
         toast.error(error.message);
       } else {

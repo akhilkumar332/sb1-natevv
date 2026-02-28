@@ -2,6 +2,7 @@
 import { lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
+import { captureHandledError } from './services/errorLog.service';
 
 const LAZY_RELOAD_KEY = 'bh_lazy_reload_attempted';
 
@@ -35,6 +36,12 @@ const tryAutoReload = (error: unknown) => {
 const lazyLoad = (importPromise: Promise<any>) => {
   return importPromise.catch(error => {
     console.error("Error loading component:", error);
+    void captureHandledError(error, {
+      source: 'frontend',
+      metadata: {
+        kind: 'route.lazy_load',
+      },
+    });
     const reloading = tryAutoReload(error);
     if (reloading) {
       return { default: () => <div>Reloading...</div> };
@@ -105,6 +112,7 @@ const AdminVolunteersPartnerships = lazy(() => lazyLoad(import('./pages/admin/da
 const AdminAppointmentsDonations = lazy(() => lazyLoad(import('./pages/admin/dashboard/AppointmentsDonations')));
 const AdminAnalyticsReports = lazy(() => lazyLoad(import('./pages/admin/dashboard/AnalyticsReports')));
 const AdminAuditSecurity = lazy(() => lazyLoad(import('./pages/admin/dashboard/AuditSecurity')));
+const AdminErrorLogs = lazy(() => lazyLoad(import('./pages/admin/dashboard/ErrorLogs')));
 const AdminNotifications = lazy(() => lazyLoad(import('./pages/admin/dashboard/Notifications')));
 const AdminSettings = lazy(() => lazyLoad(import('./pages/admin/dashboard/Settings')));
 const FindDonors = lazy(() => lazyLoad(import('./pages/FindDonors')));
@@ -198,6 +206,7 @@ const AppRoutes = () => {
           <Route path="analytics-reports" element={<AdminAnalyticsReports />} />
           <Route path="reports" element={<Navigate to="/admin/dashboard/analytics-reports" replace />} />
           <Route path="audit-security" element={<AdminAuditSecurity />} />
+          <Route path="error-logs" element={<AdminErrorLogs />} />
           <Route path="impersonation-audit" element={<ImpersonationAudit />} />
           <Route path="notifications" element={<AdminNotifications />} />
           <Route path="settings" element={<AdminSettings />} />

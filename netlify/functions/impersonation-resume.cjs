@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const { logNetlifyError } = require('./error-log.cjs');
 
 const initAdmin = () => {
   if (admin.apps.length) return;
@@ -117,6 +118,16 @@ exports.handler = async (event) => {
       body: JSON.stringify({ resumeToken, actorUid }),
     };
   } catch (error) {
+    await logNetlifyError({
+      admin,
+      event,
+      error,
+      route: '/.netlify/functions/impersonation-resume',
+      scope: 'admin',
+      metadata: {
+        functionName: 'impersonation-resume',
+      },
+    });
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message || 'Resume token refresh failed' }),

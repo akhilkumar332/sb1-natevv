@@ -154,6 +154,29 @@ export interface ImpersonationEvent {
 }
 
 // ============================================================================
+// COLLECTION: errorLogs
+// ============================================================================
+
+export interface ErrorLog {
+  id?: string;
+  source: 'frontend' | 'functions' | 'netlify' | 'unknown';
+  scope: 'auth' | 'donor' | 'ngo' | 'bloodbank' | 'admin' | 'unknown';
+  level: 'error' | 'warning';
+  message: string;
+  code?: string | null;
+  route?: string | null;
+  stack?: string | null;
+  userUid?: string | null;
+  userRole?: UserRole | string | null;
+  isImpersonating?: boolean;
+  impersonationActorUid?: string | null;
+  fingerprint?: string | null;
+  sessionId?: string | null;
+  metadata?: Record<string, any> | null;
+  createdAt: Timestamp;
+}
+
+// ============================================================================
 // COLLECTION: donations
 // ============================================================================
 

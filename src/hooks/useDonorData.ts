@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { gamificationService } from '../services/gamification.service';
+import { captureHandledError } from '../services/errorLog.service';
 
 export interface DonationHistory {
   id: string;
@@ -121,6 +122,13 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
   };
   const cacheKey = useMemo(() => (userId ? `donor_dashboard_cache_${userId}` : ''), [userId]);
   const cacheTTL = 5 * 60 * 1000;
+  const reportDonorDataError = (err: unknown, kind: string) => {
+    void captureHandledError(err, {
+      source: 'frontend',
+      scope: 'donor',
+      metadata: { kind, hook: 'useDonorData' },
+    });
+  };
 
   const serializeDonationHistory = (items: DonationHistory[]) =>
     items.map((entry) => ({
@@ -314,6 +322,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     } catch (err) {
       if (!isOfflineFirestoreError(err)) {
         console.error('Error syncing legacy donation history:', err);
+        reportDonorDataError(err, 'sync_legacy_donation_history');
       }
     }
   };
@@ -392,6 +401,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       return unsubscribe;
     } catch (err) {
       console.error('Error fetching donation history:', err);
+      reportDonorDataError(err, 'fetch_donation_history');
       setError('Failed to load donation history');
       return () => {};
     }
@@ -427,6 +437,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       setFirstDonationDate(oldestDonation);
     } catch (err) {
       console.error('Error fetching donation history (once):', err);
+      reportDonorDataError(err, 'fetch_donation_history_once');
     }
   };
 
@@ -481,6 +492,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       return unsubscribe;
     } catch (err) {
       console.error('Error fetching emergency requests:', err);
+      reportDonorDataError(err, 'fetch_emergency_requests');
       setError('Failed to load emergency requests');
       return () => {};
     }
@@ -525,6 +537,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       setEmergencyRequests(activeRequests);
     } catch (err) {
       console.error('Error fetching emergency requests (once):', err);
+      reportDonorDataError(err, 'fetch_emergency_requests_once');
     }
   };
   // Fetch nearby blood camps
@@ -574,6 +587,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       setBloodCamps(activeCamps);
     } catch (err) {
       console.error('Error fetching blood camps:', err);
+      reportDonorDataError(err, 'fetch_blood_camps');
     }
   };
 
@@ -626,6 +640,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     } catch (err) {
       if (!isOfflineFirestoreError(err)) {
         console.error('Error fetching stats and badges:', err);
+        reportDonorDataError(err, 'fetch_stats_and_badges');
         setError('Failed to load donor stats');
       }
     }
@@ -713,6 +728,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       } catch (err) {
         if (!isActive) return;
         console.error('Error loading donor data:', err);
+        reportDonorDataError(err, 'load_donor_data');
         setError('Failed to load donor data');
         setLoading(false);
       }

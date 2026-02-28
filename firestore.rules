@@ -326,6 +326,49 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // COLLECTION: errorLogs
+    // ========================================================================
+
+    match /errorLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.keys().hasOnly([
+          'source',
+          'scope',
+          'level',
+          'message',
+          'code',
+          'route',
+          'stack',
+          'userUid',
+          'userRole',
+          'isImpersonating',
+          'impersonationActorUid',
+          'fingerprint',
+          'sessionId',
+          'metadata',
+          'createdAt'
+        ])
+        && request.resource.data.source is string
+        && request.resource.data.scope is string
+        && request.resource.data.level is string
+        && request.resource.data.message is string
+        && request.resource.data.message.size() <= 800
+        && (!('code' in request.resource.data) || request.resource.data.code == null || (request.resource.data.code is string && request.resource.data.code.size() <= 120))
+        && (!('route' in request.resource.data) || request.resource.data.route == null || (request.resource.data.route is string && request.resource.data.route.size() <= 400))
+        && (!('stack' in request.resource.data) || request.resource.data.stack is string || request.resource.data.stack == null)
+        && (!('stack' in request.resource.data) || request.resource.data.stack == null || (request.resource.data.stack is string && request.resource.data.stack.size() <= 5000))
+        && (!('userRole' in request.resource.data) || request.resource.data.userRole == null || request.resource.data.userRole is string)
+        && (!('isImpersonating' in request.resource.data) || request.resource.data.isImpersonating is bool)
+        && (!('impersonationActorUid' in request.resource.data) || request.resource.data.impersonationActorUid == null || request.resource.data.impersonationActorUid is string)
+        && (!('fingerprint' in request.resource.data) || request.resource.data.fingerprint == null || request.resource.data.fingerprint is string)
+        && (!('sessionId' in request.resource.data) || request.resource.data.sessionId == null || request.resource.data.sessionId is string)
+        && (!('userUid' in request.resource.data) || request.resource.data.userUid == null || request.resource.data.userUid == request.auth.uid)
+        && (!('metadata' in request.resource.data) || request.resource.data.metadata is map || request.resource.data.metadata == null);
+      allow update, delete: if false;
+    }
+
+    // ========================================================================
     // COLLECTION: impersonationEvents
     // ========================================================================
 

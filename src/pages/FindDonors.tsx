@@ -25,6 +25,7 @@ import {
   type PendingDonorRequestPayload,
 } from '../services/donorRequest.service';
 import toast from 'react-hot-toast';
+import { captureHandledError } from '../services/errorLog.service';
 
 interface Donor {
   id: string;
@@ -101,6 +102,13 @@ function FindDonors() {
   const sliderTrackRef = useRef<HTMLDivElement | null>(null);
   const sliderValueRef = useRef(0);
   const REQUEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+  const reportFindDonorsError = (err: unknown, kind: string) => {
+    void captureHandledError(err, {
+      source: 'frontend',
+      scope: 'donor',
+      metadata: { kind, page: 'FindDonors' },
+    });
+  };
 
   const requestLocation = () => {
     if (!navigator?.geolocation) {
@@ -533,6 +541,7 @@ function FindDonors() {
       }
     } catch (error) {
       console.error('Failed to load donors:', error);
+      reportFindDonorsError(error, 'load_donors');
       if (!rawDonorsRef.current || rawDonorsRef.current.length === 0) {
         setBaseDonors([]);
         setDonorError('Unable to load donors right now.');
@@ -693,6 +702,7 @@ function FindDonors() {
         toast.success('Request submitted successfully.');
       } catch (error) {
         console.error('Failed to submit pending donor request:', error);
+        reportFindDonorsError(error, 'submit_pending_donor_request');
         toast.error('Failed to submit your request.');
         pendingRequestProcessedRef.current = null;
       } finally {
@@ -702,6 +712,7 @@ function FindDonors() {
 
     submitPending().catch((error) => {
       console.error('Pending donor request submission failed:', error);
+      reportFindDonorsError(error, 'submit_pending_donor_request_uncaught');
     });
   }, [user, requestSubmitting, location.search, navigate]);
 
@@ -922,6 +933,7 @@ function FindDonors() {
       setShowRequestStudio(false);
     } catch (error) {
       console.error('Failed to submit donor request batch:', error);
+      reportFindDonorsError(error, 'submit_donor_request_batch');
       toast.error('Failed to send requests.');
     } finally {
       setRequestSubmitting(false);
@@ -945,6 +957,7 @@ function FindDonors() {
       toast.success('Default request template saved.');
     } catch (error) {
       console.error('Failed to save donor request template:', error);
+      reportFindDonorsError(error, 'save_donor_request_template');
       toast.error('Failed to save template.');
     } finally {
       setTemplateSaving(false);
@@ -992,6 +1005,7 @@ function FindDonors() {
       toast.success('Request batch undone.');
     } catch (error) {
       console.error('Failed to undo donor request batch:', error);
+      reportFindDonorsError(error, 'undo_donor_request_batch');
       toast.error('Unable to undo requests. Please try again.');
     } finally {
       setUndoingBatchId(null);

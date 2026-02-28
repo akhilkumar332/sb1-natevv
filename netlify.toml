@@ -3,6 +3,12 @@
   publish = "dist"
   node_version = "20"
 
+[functions]
+  directory = "netlify/functions"
+
+[functions."error-log-retention"]
+  schedule = "30 2 * * *"
+
 [[redirects]]
   from = "/api/v1/api-docs/*"
   to = "/api/v1/api-docs/:splat"

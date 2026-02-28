@@ -41,6 +41,7 @@ import {
   type PendingDonorRequestPayload,
 } from '../../services/donorRequest.service';
 import type { ConfirmationResult } from 'firebase/auth';
+import { captureHandledError } from '../../services/errorLog.service';
 
 type ShareOptions = {
   showPhone: boolean;
@@ -131,6 +132,13 @@ function DonorDashboard() {
   const locationBackfillRef = useRef(false);
   const pendingRequestProcessedRef = useRef<string | null>(null);
   const allowPendingAutoSubmitRef = useRef(false);
+  const reportDonorDashboardError = (err: unknown, kind: string) => {
+    void captureHandledError(err, {
+      source: 'frontend',
+      scope: 'donor',
+      metadata: { kind, page: 'DonorDashboard' },
+    });
+  };
   const [eligibilityChecklist, setEligibilityChecklist] = useState({
     hydrated: false,
     weightOk: false,
@@ -1114,6 +1122,7 @@ function DonorDashboard() {
       } catch (error) {
         if (!isOfflineFirestoreError(error)) {
           console.error('Pending donor request submission failed:', error);
+          reportDonorDashboardError(error, 'submit_pending_donor_request');
         }
         await clearPendingDonorRequestDoc(user.uid).catch(() => null);
         pendingRequestProcessedRef.current = pendingBatchKey;
@@ -1126,6 +1135,7 @@ function DonorDashboard() {
       .catch((error) => {
         if (!isOfflineFirestoreError(error)) {
           console.error('Pending donor request submission failed:', error);
+          reportDonorDashboardError(error, 'submit_pending_donor_request_uncaught');
         }
         pendingRequestProcessedRef.current = null;
         allowPendingAutoSubmitRef.current = false;
@@ -1181,6 +1191,7 @@ function DonorDashboard() {
       toast.success('Google account linked successfully!');
     } catch (error: any) {
       console.error('Google link error:', error);
+      reportDonorDashboardError(error, 'google_link');
       toast.error(error?.message || 'Failed to link Google account.');
     } finally {
       setLinkGoogleLoading(false);
@@ -1201,6 +1212,7 @@ function DonorDashboard() {
       toast.success('Google login unlinked.');
     } catch (error: any) {
       console.error('Google unlink error:', error);
+      reportDonorDashboardError(error, 'google_unlink');
       toast.error(error?.message || 'Failed to unlink Google login.');
     } finally {
       setUnlinkGoogleLoading(false);
@@ -1221,6 +1233,7 @@ function DonorDashboard() {
       toast.success('OTP sent successfully!');
     } catch (error: any) {
       console.error('Phone link error:', error);
+      reportDonorDashboardError(error, 'phone_link_start');
       toast.error(error?.message || 'Failed to send OTP. Please try again.');
     } finally {
       setLinkPhoneLoading(false);
@@ -1251,6 +1264,7 @@ function DonorDashboard() {
       toast.success('Phone number linked successfully!');
     } catch (error: any) {
       console.error('Phone link confirm error:', error);
+      reportDonorDashboardError(error, 'phone_link_confirm');
       toast.error(error?.message || 'Failed to link phone number.');
     } finally {
       setLinkPhoneLoading(false);
@@ -1275,6 +1289,7 @@ function DonorDashboard() {
       toast.success('Phone login unlinked.');
     } catch (error: any) {
       console.error('Phone unlink error:', error);
+      reportDonorDashboardError(error, 'phone_unlink');
       toast.error(error?.message || 'Failed to unlink phone login.');
     } finally {
       setUnlinkPhoneLoading(false);
@@ -1375,6 +1390,7 @@ function DonorDashboard() {
       await updateDoc(requestRef, updatePayload);
     } catch (error) {
       console.error('Failed to update donor request:', error);
+      reportDonorDashboardError(error, 'update_donor_request');
       toast.error('Unable to update request. Please try again.');
       return;
     } finally {
@@ -1465,6 +1481,7 @@ function DonorDashboard() {
       toast.success('Request deleted.');
     } catch (error) {
       console.error('Failed to delete donor request:', error);
+      reportDonorDashboardError(error, 'delete_donor_request');
       toast.error('Unable to delete request. Please try again.');
     } finally {
       setDonorRequestDeleteId(null);
@@ -1621,6 +1638,7 @@ function DonorDashboard() {
       toast.success('Last donation date saved.');
     } catch (error: any) {
       console.error('Last donation update error:', error);
+      reportDonorDashboardError(error, 'last_donation_update');
       toast.error(error?.message || 'Failed to save last donation date.');
     } finally {
       setLastDonationSaving(false);
@@ -1797,6 +1815,7 @@ function DonorDashboard() {
       setEditingDonationId(null);
     } catch (error: any) {
       console.error('Donation update error:', error);
+      reportDonorDashboardError(error, 'donation_update');
       toast.error(error?.message || 'Failed to update donation.');
     } finally {
       setDonationEditSaving(false);
@@ -1847,6 +1866,7 @@ function DonorDashboard() {
       toast.success('Donation restored.');
     } catch (error: any) {
       console.error('Donation restore error:', error);
+      reportDonorDashboardError(error, 'donation_restore');
       toast.error(error?.message || 'Failed to restore donation.');
     }
   };
@@ -1916,6 +1936,7 @@ function DonorDashboard() {
       ), { duration: 5000 });
     } catch (error: any) {
       console.error('Donation delete error:', error);
+      reportDonorDashboardError(error, 'donation_delete');
       toast.error(error?.message || 'Failed to delete donation.');
     } finally {
       setDonationDeleteId(null);
@@ -2009,6 +2030,7 @@ function DonorDashboard() {
       toast.success('Donor card downloaded.');
     } catch (error: any) {
       console.error('Donor card share error:', error);
+      reportDonorDashboardError(error, 'donor_card_share');
       toast.error(error?.message || 'Unable to share donor card.');
     } finally {
       setShareCardLoading(false);
@@ -2032,6 +2054,7 @@ function DonorDashboard() {
       toast.success(nextValue ? 'Emergency alerts enabled.' : 'Emergency alerts paused.');
     } catch (error: any) {
       console.error('Emergency alerts update error:', error);
+      reportDonorDashboardError(error, 'emergency_alerts_update');
       setEmergencyAlertsEnabled(!nextValue);
       toast.error(error?.message || 'Failed to update alert preference.');
     } finally {
@@ -2069,6 +2092,7 @@ function DonorDashboard() {
       toast.success(nextValue ? 'You are now available for requests.' : 'You are on break.');
     } catch (error: any) {
       console.error('Availability update error:', error);
+      reportDonorDashboardError(error, 'availability_update');
       setAvailabilityEnabled(previousAvailability);
       setEmergencyAlertsEnabled(previousAlerts);
       toast.error(error?.message || 'Failed to update availability.');
@@ -2135,6 +2159,7 @@ function DonorDashboard() {
       }
     } catch (error: any) {
       console.error('Available today update error:', error);
+      reportDonorDashboardError(error, 'available_today_update');
       toast.error(error?.message || 'Failed to update break status.');
     } finally {
       setAvailableTodayLoading(false);
@@ -2157,6 +2182,7 @@ function DonorDashboard() {
       });
     } catch (error: any) {
       console.error('Checklist update error:', error);
+      reportDonorDashboardError(error, 'checklist_update');
       toast.error(error?.message || 'Failed to update checklist.');
     } finally {
       setChecklistSaving(false);
@@ -2182,6 +2208,7 @@ function DonorDashboard() {
       });
     } catch (error: any) {
       console.error('Checklist reset error:', error);
+      reportDonorDashboardError(error, 'checklist_reset');
       toast.error(error?.message || 'Failed to reset checklist.');
     } finally {
       setChecklistSaving(false);
@@ -2266,6 +2293,7 @@ function DonorDashboard() {
       setFeedbackOpenId(null);
     } catch (error: any) {
       console.error('Feedback save error:', error);
+      reportDonorDashboardError(error, 'feedback_save');
       toast.error(error?.message || 'Failed to save feedback.');
     } finally {
       setFeedbackSaving(false);

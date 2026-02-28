@@ -3,6 +3,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Home } from 'lucide-react';
+import { captureFatalError } from '../services/errorLog.service';
 
 interface Props {
   children: React.ReactNode;
@@ -24,6 +25,13 @@ class ErrorBoundary extends React.Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
+    void captureFatalError(error, {
+      source: 'frontend',
+      metadata: {
+        kind: 'react.error_boundary',
+        componentStack: errorInfo.componentStack,
+      },
+    });
 
     // Log to monitoring service in production
     if (import.meta.env.PROD) {

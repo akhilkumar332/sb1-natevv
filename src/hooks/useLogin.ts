@@ -8,6 +8,7 @@ import { FirebaseError } from 'firebase/app';
 import { authStorage } from '../utils/authStorage';
 import { auth } from '../firebase';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../utils/phone';
+import { captureHandledError } from '../services/errorLog.service';
 
 interface LoginFormData {
   identifier: string;
@@ -69,6 +70,7 @@ export const useLogin = () => {
       toast.success('OTP sent successfully!');
       startResendTimer();
     } catch (error) {
+      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.phone.submit' } });
       toast.error('Failed to send OTP. Please try again.');
     }
   };
@@ -112,6 +114,7 @@ export const useLogin = () => {
       toast.success('Login successful!');
     } catch (error) {
       console.error('OTP verification error:', error);
+      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.otp.verify' } });
 
       if (error instanceof PhoneAuthError) {
         if (error.code === 'not_registered') {
@@ -160,6 +163,7 @@ export const useLogin = () => {
       toast.success('OTP resent successfully!');
       startResendTimer();
     } catch (error) {
+      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.otp.resend' } });
       toast.error('Failed to resend OTP. Please try again.');
     }
   };
@@ -214,6 +218,7 @@ export const useLogin = () => {
       }
     } catch (error) {
       console.error('Failed to sign in with Google. Please try again.');
+      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.google' } });
     } finally {
       setGoogleLoading(false);
     }

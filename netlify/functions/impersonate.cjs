@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const { logNetlifyError } = require('./error-log.cjs');
 
 const initAdmin = () => {
   if (admin.apps.length) return;
@@ -264,6 +265,19 @@ exports.handler = async (event) => {
     } catch {
       // ignore logging failures
     }
+    await logNetlifyError({
+      admin,
+      event,
+      error,
+      route: '/.netlify/functions/impersonate',
+      scope: 'admin',
+      actorUid,
+      actorRole: actorRole || 'superadmin',
+      metadata: {
+        functionName: 'impersonate',
+        targetUid,
+      },
+    });
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message || 'Impersonation failed' }),
