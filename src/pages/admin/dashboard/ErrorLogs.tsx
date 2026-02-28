@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, RefreshCw, Shield } from 'lucide-react';
+import { AlertTriangle, Shield } from 'lucide-react';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { useAdminErrorLogs } from '../../../hooks/admin/useAdminQueries';
 
 type ErrorLogRow = {
@@ -122,14 +123,11 @@ function ErrorLogsPage() {
             <h2 className="text-2xl font-bold text-gray-900">Error Logs</h2>
             <p className="text-sm text-gray-600">Monitor frontend and backend errors across all portal flows.</p>
           </div>
-          <button
-            type="button"
+          <AdminRefreshButton
             onClick={() => void query.refetch()}
-            className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </button>
+            isRefreshing={query.isFetching}
+            label="Refresh error logs"
+          />
         </div>
       </div>
 

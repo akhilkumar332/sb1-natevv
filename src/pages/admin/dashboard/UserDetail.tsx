@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -31,6 +31,7 @@ import UserReferralFilters from '../../../components/admin/UserReferralFilters';
 import UserReferralGraph from '../../../components/admin/UserReferralGraph';
 import UserReferralTable from '../../../components/admin/UserReferralTable';
 import UserDetailTabSkeleton from '../../../components/admin/UserDetailTabSkeleton';
+import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 
 type DetailTab = 'profile' | 'security' | 'kpis' | 'referrals' | 'timeline';
 type PendingActionType = 'verify' | 'active' | 'suspended' | 'inactive' | 'revokeToken' | 'revokeAllTokens';
@@ -335,6 +336,11 @@ function UserDetailPage() {
   };
 
   const loadingBanner = userQuery.isLoading || userQuery.isFetching;
+  const isRefreshingAny = userQuery.isFetching
+    || securityQuery.isFetching
+    || kpiQuery.isFetching
+    || referralsQuery.isFetching
+    || timelineQuery.isFetching;
 
   return (
     <div className="space-y-4">
@@ -348,14 +354,11 @@ function UserDetailPage() {
             <ArrowLeft className="h-4 w-4" />
             Back
           </button>
-          <button
-            type="button"
+          <AdminRefreshButton
             onClick={refreshAll}
-            className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Refresh All
-          </button>
+            isRefreshing={isRefreshingAny}
+            label="Refresh user detail"
+          />
         </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2">

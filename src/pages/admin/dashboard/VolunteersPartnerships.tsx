@@ -6,6 +6,7 @@ import { db } from '../../../firebase';
 import { getServerTimestamp, timestampToDate } from '../../../utils/firestore.utils';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { useAdminPartnerships, useAdminVolunteers } from '../../../hooks/admin/useAdminQueries';
 import { adminQueryKeys } from '../../../constants/adminQueryKeys';
 
@@ -150,16 +151,14 @@ function VolunteersPartnershipsPage() {
             <h2 className="text-2xl font-bold text-gray-900">Volunteers & Partnerships</h2>
             <p className="text-sm text-gray-600">Manage volunteer workforce and NGO partnership lifecycle.</p>
           </div>
-          <button
-            type="button"
+          <AdminRefreshButton
             onClick={() => {
               void volunteersQuery.refetch();
               void partnershipsQuery.refetch();
             }}
-            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
-          >
-            Refresh
-          </button>
+            isRefreshing={volunteersQuery.isFetching || partnershipsQuery.isFetching}
+            label="Refresh volunteers and partnerships"
+          />
         </div>
       </div>
 

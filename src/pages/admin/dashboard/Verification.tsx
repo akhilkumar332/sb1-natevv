@@ -12,6 +12,7 @@ import VerificationCard from '../../../components/admin/VerificationCard';
 import DocumentViewer from '../../../components/admin/DocumentViewer';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { useAdminVerificationRequests } from '../../../hooks/admin/useAdminQueries';
 import { adminQueryKeys } from '../../../constants/adminQueryKeys';
 
@@ -130,13 +131,11 @@ function VerificationPage() {
             <h2 className="text-2xl font-bold text-gray-900">Verification Queue</h2>
             <p className="text-sm text-gray-600">Review and process BloodBank/NGO verification requests.</p>
           </div>
-          <button
-            type="button"
+          <AdminRefreshButton
             onClick={() => void requestsQuery.refetch()}
-            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
-          >
-            Refresh
-          </button>
+            isRefreshing={requestsQuery.isFetching}
+            label="Refresh verification queue"
+          />
         </div>
       </div>
 

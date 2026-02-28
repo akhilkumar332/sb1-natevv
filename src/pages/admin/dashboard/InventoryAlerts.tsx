@@ -4,6 +4,7 @@ import type { BloodInventory } from '../../../types/database.types';
 import { timestampToDate } from '../../../utils/firestore.utils';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { useAdminInventoryAlerts } from '../../../hooks/admin/useAdminQueries';
 
 type StatusFilter = 'all' | 'critical' | 'low' | 'adequate' | 'surplus';
@@ -86,13 +87,11 @@ function InventoryAlertsPage() {
             <h2 className="text-2xl font-bold text-gray-900">Inventory Alerts</h2>
             <p className="text-sm text-gray-600">Monitor low and critical stock across all blood banks and branches.</p>
           </div>
-          <button
-            type="button"
+          <AdminRefreshButton
             onClick={() => void inventoryQuery.refetch()}
-            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
-          >
-            Refresh
-          </button>
+            isRefreshing={inventoryQuery.isFetching}
+            label="Refresh inventory alerts"
+          />
         </div>
       </div>
 

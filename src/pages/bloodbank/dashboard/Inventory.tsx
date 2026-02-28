@@ -8,7 +8,6 @@ import {
   Package,
   Plus,
   QrCode,
-  RefreshCw,
   ScanLine,
   Send,
   X,
@@ -30,6 +29,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import type { BloodBankDashboardContext } from '../BloodBankDashboard';
+import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -1607,14 +1607,11 @@ function BloodBankInventory() {
             <CalendarClock className="w-4 h-4" />
             Cleanup expired
           </button>
-          <button
-            type="button"
-            onClick={refreshData}
-            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
+          <AdminRefreshButton
+            onClick={() => void refreshData()}
+            label="Refresh inventory"
+            className="border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+          />
         </div>
       </div>
 

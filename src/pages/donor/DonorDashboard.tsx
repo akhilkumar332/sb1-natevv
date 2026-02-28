@@ -12,7 +12,6 @@ import {
   CheckCircle,
   MapPinned,
   Trophy,
-  RefreshCw,
   X,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -42,6 +41,7 @@ import {
 } from '../../services/donorRequest.service';
 import type { ConfirmationResult } from 'firebase/auth';
 import { captureHandledError } from '../../services/errorLog.service';
+import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
 
 type ShareOptions = {
   showPhone: boolean;
@@ -2531,13 +2531,12 @@ function DonorDashboard() {
           <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
           <p className="text-gray-800 text-lg font-semibold mb-2">Error Loading Dashboard</p>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={() => refreshData()}
-            className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all duration-300 flex items-center space-x-2 mx-auto"
-          >
-            <RefreshCw className="w-5 h-5" />
-            <span>Retry</span>
-          </button>
+          <AdminRefreshButton
+            onClick={() => void refreshData()}
+            isRefreshing={loading}
+            label="Retry loading donor dashboard"
+            className="h-12 w-12 mx-auto border-red-600 bg-red-600 text-white hover:bg-red-700"
+          />
         </div>
       </div>
     );

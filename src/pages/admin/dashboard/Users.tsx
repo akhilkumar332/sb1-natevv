@@ -6,6 +6,7 @@ import { timestampToDate } from '../../../utils/firestore.utils';
 import { normalizeUserStatus } from '../../../utils/adminUserStatus';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { useAdminUsers } from '../../../hooks/admin/useAdminQueries';
 
 type RoleFilter = 'all' | 'donor' | 'ngo' | 'bloodbank';
@@ -137,13 +138,11 @@ export function AdminUsersPage({
             <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
             <p className="text-sm text-gray-600">{description}</p>
           </div>
-          <button
-            type="button"
+          <AdminRefreshButton
             onClick={() => void usersQuery.refetch()}
-            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
-          >
-            Refresh
-          </button>
+            isRefreshing={usersQuery.isFetching}
+            label="Refresh users"
+          />
         </div>
       </div>
 

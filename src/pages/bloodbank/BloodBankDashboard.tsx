@@ -12,11 +12,11 @@ import {
   Heart,
   Loader2,
   Package,
-  RefreshCw,
   Share2,
   Settings,
   Users,
 } from 'lucide-react';
+import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
 
 export type BloodBankDashboardContext = {
   user: any;
@@ -170,13 +170,12 @@ function BloodBankDashboard() {
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Data</h2>
           <p className="text-gray-600 mb-6">{error}</p>
-          <button
-            onClick={refreshData}
-            className="bg-gradient-to-r from-red-600 to-yellow-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-red-700 hover:to-yellow-700 transition-all shadow-lg flex items-center gap-2 mx-auto"
-          >
-            <RefreshCw className="w-5 h-5" />
-            Retry
-          </button>
+          <AdminRefreshButton
+            onClick={() => void refreshData()}
+            isRefreshing={loading}
+            label="Retry loading bloodbank dashboard"
+            className="h-12 w-12 mx-auto border-red-600 bg-gradient-to-r from-red-600 to-yellow-600 text-white hover:from-red-700 hover:to-yellow-700"
+          />
         </div>
       </div>
     );

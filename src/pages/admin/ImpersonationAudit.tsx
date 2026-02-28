@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Shield,
   Search,
-  RefreshCw,
   AlertCircle,
   Clock,
   UserCheck,
@@ -23,6 +22,7 @@ import {
 import { db } from '../../firebase';
 import { timestampToDate } from '../../utils/firestore.utils';
 import { useAuth } from '../../contexts/AuthContext';
+import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
 
 export type ImpersonationEvent = {
   id: string;
@@ -238,13 +238,12 @@ const ImpersonationAudit = () => {
             <p className="text-gray-600">Review impersonation events across the platform.</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button
+            <AdminRefreshButton
               onClick={refreshCurrentPage}
-              className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all font-semibold flex items-center gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
+              isRefreshing={loading}
+              label="Refresh impersonation audit"
+              className="border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            />
           </div>
         </div>
 

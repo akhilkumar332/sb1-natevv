@@ -5,6 +5,7 @@ import { timestampToDate } from '../../../utils/firestore.utils';
 import { useAuth } from '../../../contexts/AuthContext';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { useAdminAuditLogs } from '../../../hooks/admin/useAdminQueries';
 
 type AuditRow = {
@@ -74,13 +75,11 @@ function AuditSecurityPage() {
             <p className="text-sm text-gray-600">Review admin security actions and audit events.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
+            <AdminRefreshButton
               onClick={() => void auditQuery.refetch()}
-              className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
-            >
-              Refresh
-            </button>
+              isRefreshing={auditQuery.isFetching}
+              label="Refresh audit logs"
+            />
             <Link
               to="/admin/dashboard/impersonation-audit"
               className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
