@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { useQueryClient } from '@tanstack/react-query';
 import type { VerificationRequest } from '../../../types/database.types';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -13,8 +13,9 @@ import DocumentViewer from '../../../components/admin/DocumentViewer';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
+import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminVerificationRequests } from '../../../hooks/admin/useAdminQueries';
-import { adminQueryKeys } from '../../../constants/adminQueryKeys';
+import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 
 type StatusFilter = 'all' | 'pending' | 'under_review' | 'approved' | 'rejected';
 type TypeFilter = 'all' | 'bloodbank' | 'hospital' | 'ngo';
@@ -69,7 +70,7 @@ function VerificationPage() {
 
   const withAdminGuard = (action: () => Promise<void>) => {
     if (!user?.uid) {
-      toast.error('Admin session unavailable.');
+      notify.error('Admin session unavailable.');
       return;
     }
     void action();
@@ -79,15 +80,10 @@ function VerificationPage() {
     withAdminGuard(async () => {
       try {
         await approveVerificationRequest(requestId, user!.uid, notes);
-        toast.success('Verification approved');
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: adminQueryKeys.verificationRoot }),
-          queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot }),
-          queryClient.invalidateQueries({ queryKey: adminQueryKeys.overviewRoot }),
-          queryClient.invalidateQueries({ queryKey: adminQueryKeys.platformStatsRoot }),
-        ]);
+        notify.success('Verification approved');
+        await invalidateAdminRecipe(queryClient, 'verificationApproved');
       } catch (approveError: any) {
-        toast.error(approveError?.message || 'Failed to approve request.');
+        notify.error(approveError?.message || 'Failed to approve request.');
       }
     });
   };
@@ -96,14 +92,10 @@ function VerificationPage() {
     withAdminGuard(async () => {
       try {
         await rejectVerificationRequest(requestId, user!.uid, reason);
-        toast.success('Verification rejected');
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: adminQueryKeys.verificationRoot }),
-          queryClient.invalidateQueries({ queryKey: adminQueryKeys.overviewRoot }),
-          queryClient.invalidateQueries({ queryKey: adminQueryKeys.platformStatsRoot }),
-        ]);
+        notify.success('Verification rejected');
+        await invalidateAdminRecipe(queryClient, 'verificationRejected');
       } catch (rejectError: any) {
-        toast.error(rejectError?.message || 'Failed to reject request.');
+        notify.error(rejectError?.message || 'Failed to reject request.');
       }
     });
   };
@@ -112,13 +104,10 @@ function VerificationPage() {
     withAdminGuard(async () => {
       try {
         await markVerificationUnderReview(requestId, user!.uid);
-        toast.success('Request moved to under review');
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: adminQueryKeys.verificationRoot }),
-          queryClient.invalidateQueries({ queryKey: adminQueryKeys.overviewRoot }),
-        ]);
+        notify.success('Request moved to under review');
+        await invalidateAdminRecipe(queryClient, 'verificationUnderReview');
       } catch (reviewError: any) {
-        toast.error(reviewError?.message || 'Failed to update request status.');
+        notify.error(reviewError?.message || 'Failed to update request status.');
       }
     });
   };
@@ -171,19 +160,11 @@ function VerificationPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">{filtered.length} requests</span>}
       />
 
-      {loading && (
-        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
-          Refreshing verification queue...
-        </div>
-      )}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
-      )}
+      <AdminRefreshingBanner show={loading} message="Refreshing verification queue..." />
+      <AdminErrorCard message={error} onRetry={() => void requestsQuery.refetch()} />
 
       {paged.length === 0 ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">
-          No verification requests found for selected filters.
-        </div>
+        <AdminEmptyStateCard message="No verification requests found for selected filters." />
       ) : (
         <div className="space-y-3">
           {paged.map((request) => (

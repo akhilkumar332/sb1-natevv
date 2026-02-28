@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Loading from './Loading';
-import { toast } from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 
 const ProtectedRoute = () => {
   const { user, authLoading, loading, portalRole, effectiveRole, isSuperAdmin, isImpersonating } = useAuth();
@@ -57,7 +57,7 @@ const ProtectedRoute = () => {
           const toastId = `role-mismatch-${role}`;
           const deniedKey = `${toastId}:${location.pathname}`;
           if (lastDeniedRef.current !== deniedKey) {
-            toast.error(`You're not a ${role.charAt(0).toUpperCase() + role.slice(1)}`, { id: toastId });
+            notify.error(`You're not a ${role.charAt(0).toUpperCase() + role.slice(1)}`, { id: toastId });
             lastDeniedRef.current = deniedKey;
           }
         }

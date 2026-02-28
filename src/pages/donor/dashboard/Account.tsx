@@ -7,7 +7,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 're
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { deleteUser } from 'firebase/auth';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { auth, db } from '../../../firebase';
 import { useAuth } from '../../../contexts/AuthContext';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../../../utils/phone';
@@ -15,6 +15,7 @@ import { isValidEmail } from '../../../utils/validation';
 import { countries, getStatesByCountry, getCitiesByState } from '../../../data/locations';
 import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { usePushNotifications } from '../../../hooks/usePushNotifications';
+import { getCurrentCoordinates, reverseGeocode } from '../../../utils/geolocation.utils';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -394,106 +395,19 @@ const DonorAccount = () => {
   };
 
   const getCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser');
-      return;
-    }
-
-    setLocationLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        setMapPosition([latitude, longitude]);
-        setBasicInfoForm(prev => ({ ...prev, latitude, longitude }));
-
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-          );
-          const data = await response.json();
-
-          if (data && data.address) {
-            const address = data.address;
-            setBasicInfoForm(prev => ({
-              ...prev,
-              address: data.display_name || prev.address,
-              postalCode: address.postcode || prev.postalCode,
-            }));
-            if (basicInfoErrors.address || basicInfoErrors.postalCode) {
-              setBasicInfoErrors(prev => {
-                const next = { ...prev };
-                delete next.address;
-                delete next.postalCode;
-                return next;
-              });
-            }
-
-            if (address.state) {
-              const matchedState = availableStates.find(s =>
-                s.name.toLowerCase() === address.state.toLowerCase()
-              );
-              if (matchedState) {
-                setBasicInfoForm(prev => ({ ...prev, state: matchedState.name }));
-                if (basicInfoErrors.state) {
-                  setBasicInfoErrors(prev => {
-                    const next = { ...prev };
-                    delete next.state;
-                    return next;
-                  });
-                }
-                const stateCities = getCitiesByState(basicInfoForm.country || 'IN', matchedState.name);
-                const matchedCity = stateCities.find(c =>
-                  c.toLowerCase() === (address.city || address.town || address.village || '').toLowerCase()
-                );
-                if (matchedCity) {
-                  setBasicInfoForm(prev => ({ ...prev, city: matchedCity }));
-                  if (basicInfoErrors.city) {
-                    setBasicInfoErrors(prev => {
-                      const next = { ...prev };
-                      delete next.city;
-                      return next;
-                    });
-                  }
-                }
-              }
-            }
-
-            toast.success('Location detected successfully!');
-          }
-        } catch (error) {
-          console.error('Reverse geocoding error:', error);
-          toast.error('Could not fetch address details');
-        }
-
+    void (async () => {
+      setLocationLoading(true);
+      const coords = await getCurrentCoordinates({ scope: 'donor' });
+      if (!coords) {
         setLocationLoading(false);
-      },
-      (error) => {
-        console.error('Geolocation error:', error);
-        toast.error('Unable to retrieve your location. Please enable location services.');
-        setLocationLoading(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
+        return;
       }
-    );
-  };
 
-  const handleMapPositionChange = async (newPosition: [number, number]) => {
-    setMapPosition(newPosition);
-    setBasicInfoForm(prev => ({
-      ...prev,
-      latitude: newPosition[0],
-      longitude: newPosition[1]
-    }));
+      const [latitude, longitude] = coords;
+      setMapPosition([latitude, longitude]);
+      setBasicInfoForm(prev => ({ ...prev, latitude, longitude }));
 
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${newPosition[0]}&lon=${newPosition[1]}`
-      );
-      const data = await response.json();
-
+      const data = await reverseGeocode(latitude, longitude, { scope: 'donor' });
       if (data && data.address) {
         const address = data.address;
         setBasicInfoForm(prev => ({
@@ -512,7 +426,7 @@ const DonorAccount = () => {
 
         if (address.state) {
           const matchedState = availableStates.find(s =>
-            s.name.toLowerCase() === address.state.toLowerCase()
+            s.name.toLowerCase() === String(address.state).toLowerCase()
           );
           if (matchedState) {
             setBasicInfoForm(prev => ({ ...prev, state: matchedState.name }));
@@ -525,7 +439,7 @@ const DonorAccount = () => {
             }
             const stateCities = getCitiesByState(basicInfoForm.country || 'IN', matchedState.name);
             const matchedCity = stateCities.find(c =>
-              c.toLowerCase() === (address.city || address.town || address.village || '').toLowerCase()
+              c.toLowerCase() === String(address.city || address.town || address.village || '').toLowerCase()
             );
             if (matchedCity) {
               setBasicInfoForm(prev => ({ ...prev, city: matchedCity }));
@@ -539,10 +453,72 @@ const DonorAccount = () => {
             }
           }
         }
+
+        notify.success('Location detected successfully!');
       }
-    } catch (error) {
-      console.error('Reverse geocoding error:', error);
-      toast.error('Could not fetch address for this location');
+
+      setLocationLoading(false);
+    })();
+  };
+
+  const handleMapPositionChange = async (newPosition: [number, number]) => {
+    setMapPosition(newPosition);
+    setBasicInfoForm(prev => ({
+      ...prev,
+      latitude: newPosition[0],
+      longitude: newPosition[1]
+    }));
+
+    const data = await reverseGeocode(newPosition[0], newPosition[1], {
+      errorMessage: 'Could not fetch address for this location',
+      scope: 'donor',
+    });
+
+    if (data && data.address) {
+      const address = data.address;
+      setBasicInfoForm(prev => ({
+        ...prev,
+        address: data.display_name || prev.address,
+        postalCode: address.postcode || prev.postalCode,
+      }));
+      if (basicInfoErrors.address || basicInfoErrors.postalCode) {
+        setBasicInfoErrors(prev => {
+          const next = { ...prev };
+          delete next.address;
+          delete next.postalCode;
+          return next;
+        });
+      }
+
+      if (address.state) {
+        const matchedState = availableStates.find(s =>
+          s.name.toLowerCase() === String(address.state).toLowerCase()
+        );
+        if (matchedState) {
+          setBasicInfoForm(prev => ({ ...prev, state: matchedState.name }));
+          if (basicInfoErrors.state) {
+            setBasicInfoErrors(prev => {
+              const next = { ...prev };
+              delete next.state;
+              return next;
+            });
+          }
+          const stateCities = getCitiesByState(basicInfoForm.country || 'IN', matchedState.name);
+          const matchedCity = stateCities.find(c =>
+            c.toLowerCase() === String(address.city || address.town || address.village || '').toLowerCase()
+          );
+          if (matchedCity) {
+            setBasicInfoForm(prev => ({ ...prev, city: matchedCity }));
+            if (basicInfoErrors.city) {
+              setBasicInfoErrors(prev => {
+                const next = { ...prev };
+                delete next.city;
+                return next;
+              });
+            }
+          }
+        }
+      }
     }
   };
 
@@ -582,7 +558,7 @@ const DonorAccount = () => {
   const handleBasicInfoSave = async () => {
     try {
       if (!validateBasicInfo()) {
-        toast.error('Please fix the highlighted fields.');
+        notify.error('Please fix the highlighted fields.');
         return;
       }
       setBasicInfoSaving(true);
@@ -605,11 +581,11 @@ const DonorAccount = () => {
         payload.dateOfBirth = undefined;
       }
       await updateUserProfile(payload);
-      toast.success('Profile updated successfully.');
+      notify.success('Profile updated successfully.');
       setIsEditingBasicInfo(false);
     } catch (error: any) {
       console.error('Failed to update basic info:', error);
-      toast.error(error?.message || 'Failed to update profile.');
+      notify.error(error?.message || 'Failed to update profile.');
     } finally {
       setBasicInfoSaving(false);
     }
@@ -618,12 +594,12 @@ const DonorAccount = () => {
   const handleEmailSave = async () => {
     const nextEmail = emailInput.trim().toLowerCase();
     if (!nextEmail) {
-      toast.error('Email is required.');
+      notify.error('Email is required.');
       setEmailError('Required');
       return;
     }
     if (!isValidEmail(nextEmail)) {
-      toast.error('Please enter a valid email address.');
+      notify.error('Please enter a valid email address.');
       setEmailError('Invalid email');
       return;
     }
@@ -635,14 +611,14 @@ const DonorAccount = () => {
     try {
       setEmailSaving(true);
       await updateEmailAddress(nextEmail);
-      toast.success('Email updated. Please verify via the email sent.');
+      notify.success('Email updated. Please verify via the email sent.');
       setIsEditingEmail(false);
     } catch (error: any) {
       console.error('Email update error:', error);
       if (error?.code === 'auth/requires-recent-login') {
-        toast.error('Please re-login and try again to update your email.');
+        notify.error('Please re-login and try again to update your email.');
       } else {
-        toast.error(error?.message || 'Failed to update email.');
+        notify.error(error?.message || 'Failed to update email.');
       }
     } finally {
       setEmailSaving(false);
@@ -652,7 +628,7 @@ const DonorAccount = () => {
   const handlePhoneUpdateStart = async () => {
     const normalized = normalizePhoneNumber(phoneUpdateNumber);
     if (!isValidPhoneNumber(normalized)) {
-      toast.error('Please enter a valid phone number.');
+      notify.error('Please enter a valid phone number.');
       setPhoneUpdateError('Invalid phone number');
       return;
     }
@@ -662,10 +638,10 @@ const DonorAccount = () => {
       const confirmation = await startPhoneUpdate(normalized);
       setPhoneUpdateConfirmation(confirmation);
       setPhoneUpdateLockedNumber(normalized);
-      toast.success('OTP sent successfully!');
+      notify.success('OTP sent successfully!');
     } catch (error: any) {
       console.error('Phone update error:', error);
-      toast.error(error?.message || 'Failed to send OTP.');
+      notify.error(error?.message || 'Failed to send OTP.');
     } finally {
       setPhoneUpdateLoading(false);
     }
@@ -673,17 +649,17 @@ const DonorAccount = () => {
 
   const handlePhoneUpdateConfirm = async () => {
     if (!phoneUpdateConfirmation) {
-      toast.error('Please request an OTP before verifying.');
+      notify.error('Please request an OTP before verifying.');
       return;
     }
     const sanitizedOtp = phoneUpdateOtp.replace(/\D/g, '').trim();
     if (!sanitizedOtp) {
-      toast.error('Please enter the OTP.');
+      notify.error('Please enter the OTP.');
       setPhoneUpdateError('OTP required');
       return;
     }
     if (sanitizedOtp.length !== 6) {
-      toast.error('Invalid OTP length. Please enter the 6-digit code.');
+      notify.error('Invalid OTP length. Please enter the 6-digit code.');
       setPhoneUpdateError('Invalid OTP');
       return;
     }
@@ -696,13 +672,13 @@ const DonorAccount = () => {
       setPhoneUpdateOtp('');
       setPhoneUpdateLockedNumber('');
       setIsEditingPhone(false);
-      toast.success('Phone number updated successfully!');
+      notify.success('Phone number updated successfully!');
     } catch (error: any) {
       console.error('Phone update confirm error:', error);
       if (error?.code === 'auth/requires-recent-login') {
-        toast.error('Please re-login and try again to update your phone.');
+        notify.error('Please re-login and try again to update your phone.');
       } else {
-        toast.error(error?.message || 'Failed to update phone number.');
+        notify.error(error?.message || 'Failed to update phone number.');
       }
     } finally {
       setPhoneUpdateLoading(false);
@@ -711,11 +687,11 @@ const DonorAccount = () => {
 
   const handleDeleteAccount = async () => {
     if (!canConfirmDelete) {
-      toast.error('Please enter your registered email or phone number.');
+      notify.error('Please enter your registered email or phone number.');
       return;
     }
     if (!auth.currentUser) {
-      toast.error('No active session found. Please log in again.');
+      notify.error('No active session found. Please log in again.');
       return;
     }
     setDeleteLoading(true);
@@ -728,12 +704,12 @@ const DonorAccount = () => {
       });
       await deleteUser(auth.currentUser);
       await logout(navigate, { redirectTo: '/donor/login', showToast: false });
-      toast.success('Account deleted successfully.');
+      notify.success('Account deleted successfully.');
     } catch (error: any) {
       if (error?.code === 'auth/requires-recent-login') {
-        toast.error('Please re-login and try again to delete your account.');
+        notify.error('Please re-login and try again to delete your account.');
       } else {
-        toast.error('Failed to delete account. Please try again.');
+        notify.error('Failed to delete account. Please try again.');
       }
     } finally {
       setDeleteLoading(false);

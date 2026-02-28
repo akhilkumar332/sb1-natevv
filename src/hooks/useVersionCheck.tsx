@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 
 const VERSION_URL = '/version.json';
 const POLL_INTERVAL_MS = 60_000;
@@ -76,7 +76,7 @@ export const useVersionCheck = () => {
 
     const showUpdateToast = (nextVersion: string) => {
       const toastId = 'version-update';
-      toast.custom(
+      notify.custom(
         (t) => (
           <div className={`pointer-events-auto w-full max-w-sm rounded-xl border border-amber-200 bg-amber-50 shadow-xl dark:border-amber-200 dark:bg-[#0b1220] ${t.visible ? 'animate-fadeIn' : ''}`}>
             <div className="p-4">

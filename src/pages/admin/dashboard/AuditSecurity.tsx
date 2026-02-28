@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, UserCog } from 'lucide-react';
-import { timestampToDate } from '../../../utils/firestore.utils';
+import { toDateValue } from '../../../utils/dateValue';
 import { useAuth } from '../../../contexts/AuthContext';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
+import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminAuditLogs } from '../../../hooks/admin/useAdminQueries';
 
 type AuditRow = {
@@ -15,14 +16,6 @@ type AuditRow = {
   action: string;
   targetUid?: string;
   createdAt?: Date;
-};
-
-const toDate = (value: any): Date | undefined => {
-  if (!value) return undefined;
-  if (value instanceof Date) return value;
-  if (typeof value?.toDate === 'function') return value.toDate();
-  if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
-  return timestampToDate(value as any);
 };
 
 function AuditSecurityPage() {
@@ -42,7 +35,7 @@ function AuditSecurityPage() {
       actorRole: entry.actorRole,
       action: entry.action || 'unknown',
       targetUid: entry.targetUid,
-      createdAt: toDate(entry.createdAt),
+      createdAt: toDateValue(entry.createdAt),
     })) as AuditRow[];
     setEvents(rows.filter((entry) => Boolean(entry.id)));
   }, [auditQuery.data]);
@@ -104,17 +97,11 @@ function AuditSecurityPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">{filtered.length} events</span>}
       />
 
-      {loading && (
-        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
-          Refreshing audit logs...
-        </div>
-      )}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
-      )}
+      <AdminRefreshingBanner show={loading} message="Refreshing audit logs..." />
+      <AdminErrorCard message={error} onRetry={() => void auditQuery.refetch()} />
 
       {paged.length === 0 ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No audit events found.</div>
+        <AdminEmptyStateCard message="No audit events found." />
       ) : (
         <>
           <div className="space-y-3 lg:hidden">

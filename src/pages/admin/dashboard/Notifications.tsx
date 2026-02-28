@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { BellRing, MailCheck } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
-import { getServerTimestamp, timestampToDate } from '../../../utils/firestore.utils';
+import { getServerTimestamp } from '../../../utils/firestore.utils';
+import { toDateValue } from '../../../utils/dateValue';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
+import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminNotifications } from '../../../hooks/admin/useAdminQueries';
-import { adminQueryKeys } from '../../../constants/adminQueryKeys';
+import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 
 type NotificationRow = {
   id: string;
@@ -24,14 +26,6 @@ type NotificationRow = {
 };
 
 type PriorityFilter = 'all' | 'low' | 'medium' | 'high';
-
-const toDate = (value: any): Date | undefined => {
-  if (!value) return undefined;
-  if (value instanceof Date) return value;
-  if (typeof value?.toDate === 'function') return value.toDate();
-  if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
-  return timestampToDate(value as any);
-};
 
 function NotificationsPage() {
   const queryClient = useQueryClient();
@@ -56,7 +50,7 @@ function NotificationsPage() {
       message: entry.message || '',
       priority: entry.priority || 'medium',
       read: Boolean(entry.read),
-      createdAt: toDate(entry.createdAt),
+      createdAt: toDateValue(entry.createdAt),
     })) as NotificationRow[];
     setNotifications(rows.filter((entry) => Boolean(entry.id)));
   }, [notificationsQuery.data]);
@@ -93,10 +87,10 @@ function NotificationsPage() {
         read,
         updatedAt: getServerTimestamp(),
       });
-      toast.success(read ? 'Marked as read' : 'Marked as unread');
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.notificationsRoot });
+      notify.success(read ? 'Marked as read' : 'Marked as unread');
+      await invalidateAdminRecipe(queryClient, 'notificationUpdated');
     } catch (updateError: any) {
-      toast.error(updateError?.message || 'Failed to update notification.');
+      notify.error(updateError?.message || 'Failed to update notification.');
     } finally {
       setProcessingId(null);
     }
@@ -147,17 +141,11 @@ function NotificationsPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">{filtered.length} notifications</span>}
       />
 
-      {loading && (
-        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
-          Refreshing notifications...
-        </div>
-      )}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
-      )}
+      <AdminRefreshingBanner show={loading} message="Refreshing notifications..." />
+      <AdminErrorCard message={error} onRetry={() => void notificationsQuery.refetch()} />
 
       {paged.length === 0 ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No notifications found.</div>
+        <AdminEmptyStateCard message="No notifications found." />
       ) : (
         <>
           <div className="space-y-3 lg:hidden">

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { Save } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 
@@ -17,7 +17,7 @@ function SettingsPage() {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('bh_admin_settings', JSON.stringify(values));
     }
-    toast.success('Admin settings saved locally.');
+    notify.success('Admin settings saved locally.');
   };
 
   return (

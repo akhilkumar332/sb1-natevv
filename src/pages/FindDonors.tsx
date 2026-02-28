@@ -24,7 +24,7 @@ import {
   type PendingDonorRequestBatch,
   type PendingDonorRequestPayload,
 } from '../services/donorRequest.service';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { captureHandledError } from '../services/errorLog.service';
 
 interface Donor {
@@ -683,7 +683,7 @@ function FindDonors() {
         const selfKey = `self:${payload.createdAt}`;
         if (selfRequestToastRef.current !== selfKey) {
           selfRequestToastRef.current = selfKey;
-          toast.error('You cannot request yourself.', { id: 'self-request' });
+          notify.error('You cannot request yourself.', { id: 'self-request' });
         }
         await clearPendingDonorRequestDoc(user.uid);
         return;
@@ -699,11 +699,11 @@ function FindDonors() {
         await clearPendingDonorRequestDoc(user.uid);
         pendingRequestProcessedRef.current = pendingBatchKey;
         setRequestResult({ sent: result.sentCount, skipped: result.skippedCount });
-        toast.success('Request submitted successfully.');
+        notify.success('Request submitted successfully.');
       } catch (error) {
         console.error('Failed to submit pending donor request:', error);
         reportFindDonorsError(error, 'submit_pending_donor_request');
-        toast.error('Failed to submit your request.');
+        notify.error('Failed to submit your request.');
         pendingRequestProcessedRef.current = null;
       } finally {
         setRequestSubmitting(false);
@@ -735,14 +735,14 @@ function FindDonors() {
   const addToTray = (donor: Donor) => {
     setTrayDonors((prev) => {
       if (user?.uid && donor.id === user.uid) {
-        toast.error('You cannot request yourself.');
+        notify.error('You cannot request yourself.');
         return prev;
       }
       if (prev.find((item) => item.id === donor.id)) {
         return prev;
       }
       if (prev.length >= MAX_DONOR_REQUEST_BATCH_TARGETS) {
-        toast.error(`You can select up to ${MAX_DONOR_REQUEST_BATCH_TARGETS} donors at once.`);
+        notify.error(`You can select up to ${MAX_DONOR_REQUEST_BATCH_TARGETS} donors at once.`);
         return prev;
       }
       return [...prev, donor];
@@ -758,14 +758,14 @@ function FindDonors() {
       removeFromTray(donor.id);
     } else {
       if (connectedDonorIds.has(donor.id)) {
-        toast.error('You already have an active connection with this donor.');
+        notify.error('You already have an active connection with this donor.');
         return;
       }
       if (pendingRequestTargets.has(donor.id)) {
         const expiresAt = pendingRequestExpiryMap[donor.id];
         const diffMs = expiresAt ? expiresAt - Date.now() : 0;
         const diffHours = diffMs > 0 ? Math.ceil(diffMs / (1000 * 60 * 60)) : 24;
-        toast.error(`Already requested. Try again in ${diffHours}h.`);
+        notify.error(`Already requested. Try again in ${diffHours}h.`);
         return;
       }
       addToTray(donor);
@@ -858,23 +858,23 @@ function FindDonors() {
 
   const handleSendRequests = async (recipients: Donor[]) => {
     if (recipients.length === 0) {
-      toast.error('Add at least one donor to send a request.');
+      notify.error('Add at least one donor to send a request.');
       return;
     }
     let safeRecipients = recipients;
     if (user?.uid) {
       const filtered = recipients.filter((donor) => donor.id !== user.uid);
       if (filtered.length !== recipients.length) {
-        toast.error('You cannot request yourself.');
+        notify.error('You cannot request yourself.');
       }
       safeRecipients = filtered;
     }
     if (safeRecipients.length === 0) {
-      toast.error('Select at least one other donor.');
+      notify.error('Select at least one other donor.');
       return;
     }
     if (safeRecipients.length > MAX_DONOR_REQUEST_BATCH_TARGETS) {
-      toast.error(`Select up to ${MAX_DONOR_REQUEST_BATCH_TARGETS} donors at once.`);
+      notify.error(`Select up to ${MAX_DONOR_REQUEST_BATCH_TARGETS} donors at once.`);
       return;
     }
 
@@ -898,7 +898,7 @@ function FindDonors() {
     };
 
     if (!user || user.role !== 'donor') {
-      toast.error('Please login as a donor to send a request.');
+      notify.error('Please login as a donor to send a request.');
       const pendingKey = savePendingDonorRequestToSession(payload as PendingDonorRequestPayload);
       if (pendingKey) {
         navigate(`/donor/login?returnTo=${encodeURIComponent('/donor/dashboard/requests')}&pendingRequestKey=${encodeURIComponent(pendingKey)}`);
@@ -925,7 +925,7 @@ function FindDonors() {
       const result = await submitDonorRequestBatch(user, payload);
       setRequestResult({ sent: result.sentCount, skipped: result.skippedCount });
       showUndoToast(result.batchId, result.sentCount);
-      toast.success('Requests sent successfully.');
+      notify.success('Requests sent successfully.');
       if (!useFilteredRecipients) {
         clearTray();
       }
@@ -934,7 +934,7 @@ function FindDonors() {
     } catch (error) {
       console.error('Failed to submit donor request batch:', error);
       reportFindDonorsError(error, 'submit_donor_request_batch');
-      toast.error('Failed to send requests.');
+      notify.error('Failed to send requests.');
     } finally {
       setRequestSubmitting(false);
       setSendSliderValue(0);
@@ -943,7 +943,7 @@ function FindDonors() {
 
   const handleSaveTemplate = async () => {
     if (!user?.uid) {
-      toast.error('Please login to save a template.');
+      notify.error('Please login to save a template.');
       return;
     }
     setTemplateSaving(true);
@@ -954,11 +954,11 @@ function FindDonors() {
           message: requestMessage.trim(),
         },
       });
-      toast.success('Default request template saved.');
+      notify.success('Default request template saved.');
     } catch (error) {
       console.error('Failed to save donor request template:', error);
       reportFindDonorsError(error, 'save_donor_request_template');
-      toast.error('Failed to save template.');
+      notify.error('Failed to save template.');
     } finally {
       setTemplateSaving(false);
     }
@@ -966,7 +966,7 @@ function FindDonors() {
 
   const undoBatchRequests = async (batchId: string) => {
     if (!user?.uid) {
-      toast.error('Please login to undo.');
+      notify.error('Please login to undo.');
       return;
     }
     if (undoingBatchId) return;
@@ -978,7 +978,7 @@ function FindDonors() {
       );
       const snapshot = await getDocs(requestsQuery);
       if (snapshot.empty) {
-        toast.error('No requests found to undo.');
+        notify.error('No requests found to undo.');
         return;
       }
       const deleteBatch = writeBatch(db);
@@ -1002,18 +1002,18 @@ function FindDonors() {
           updatedAt: serverTimestamp(),
         });
       });
-      toast.success('Request batch undone.');
+      notify.success('Request batch undone.');
     } catch (error) {
       console.error('Failed to undo donor request batch:', error);
       reportFindDonorsError(error, 'undo_donor_request_batch');
-      toast.error('Unable to undo requests. Please try again.');
+      notify.error('Unable to undo requests. Please try again.');
     } finally {
       setUndoingBatchId(null);
     }
   };
 
   const showUndoToast = (batchId: string, sentCount: number) => {
-    toast((t) => (
+    notify.custom((t) => (
       <div className="flex items-center gap-3">
         <div>
           <p className="text-sm font-semibold text-gray-900">Sent to {sentCount} donors</p>
@@ -1021,7 +1021,7 @@ function FindDonors() {
         </div>
         <button
           onClick={() => {
-            toast.dismiss(t.id);
+            notify.dismiss(t.id);
             void undoBatchRequests(batchId);
           }}
           className="ml-auto rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"

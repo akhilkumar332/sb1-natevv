@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { Settings, Lock, BarChart3, Shield } from 'lucide-react';
 import LogoMark from '../../components/LogoMark';
 import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
@@ -63,7 +63,7 @@ export function AdminLogin() {
     }
 
     if (user.role !== 'admin') {
-      toast.error("You're not an Admin", { id: 'role-mismatch-admin' });
+      notify.error("You're not an Admin", { id: 'role-mismatch-admin' });
       return;
     }
 
@@ -94,11 +94,11 @@ export function AdminLogin() {
         return;
       }
       if (response.user.role !== 'admin') {
-        toast.error("You're not an Admin", { id: 'role-mismatch-admin' });
+        notify.error("You're not an Admin", { id: 'role-mismatch-admin' });
         await logout(navigate, { redirectTo: '/admin/login', showToast: false });
         return;
       }
-      toast.success('Successfully logged in as Admin!');
+      notify.success('Successfully logged in as Admin!');
 
       if (response.user.onboardingCompleted === true) {
         navigate('/admin/dashboard');
@@ -106,7 +106,7 @@ export function AdminLogin() {
         navigate('/admin/onboarding');
       }
     } catch (error) {
-      toast.error('Failed to sign in with Google. Please try again.');
+      notify.error('Failed to sign in with Google. Please try again.');
     } finally {
       setGoogleLoading(false);
     }

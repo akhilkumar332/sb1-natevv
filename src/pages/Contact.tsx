@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Phone, MapPin, Send, MessageCircle, Clock, Headphones } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 
 function Contact() {
   const [formData, setFormData] = useState({
@@ -13,7 +13,7 @@ function Contact() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Message sent successfully! We\'ll get back to you soon.');
+    notify.success('Message sent successfully! We\'ll get back to you soon.');
     setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
   };
 

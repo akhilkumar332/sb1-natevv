@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { doc, updateDoc, arrayUnion, getDoc, serverTimestamp, collection, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 
 interface RespondToRequestParams {
   requestId: string;
@@ -39,7 +39,7 @@ export const useBloodRequest = () => {
       // Check if donor already responded
       const respondedDonors = requestData.respondedDonors || [];
       if (respondedDonors.some((d: any) => d.donorId === donorId)) {
-        toast.error('You have already responded to this request');
+        notify.error('You have already responded to this request');
         setResponding(false);
         return false;
       }
@@ -81,14 +81,14 @@ export const useBloodRequest = () => {
         }
       }
 
-      toast.success('Response sent! The blood bank will contact you soon.');
+      notify.success('Response sent! The blood bank will contact you soon.');
       setResponding(false);
       return true;
     } catch (err) {
       console.error('Error responding to blood request:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to send response';
       setError(errorMessage);
-      toast.error(errorMessage);
+      notify.error(errorMessage);
       setResponding(false);
       return false;
     }

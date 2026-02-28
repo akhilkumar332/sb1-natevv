@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
-import { getServerTimestamp, timestampToDate } from '../../../utils/firestore.utils';
+import { getServerTimestamp } from '../../../utils/firestore.utils';
+import { toDateValue } from '../../../utils/dateValue';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
+import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminPartnerships, useAdminVolunteers } from '../../../hooks/admin/useAdminQueries';
-import { adminQueryKeys } from '../../../constants/adminQueryKeys';
+import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 
 type VolunteerRow = {
   id: string;
@@ -29,14 +31,6 @@ type PartnershipRow = {
   type: string;
   status: string;
   since?: Date;
-};
-
-const toDate = (value: any): Date | undefined => {
-  if (!value) return undefined;
-  if (value instanceof Date) return value;
-  if (typeof value?.toDate === 'function') return value.toDate();
-  if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
-  return timestampToDate(value as any);
 };
 
 function VolunteersPartnershipsPage() {
@@ -65,7 +59,7 @@ function VolunteersPartnershipsPage() {
       role: entry.role || 'Volunteer',
       status: entry.status || 'active',
       hours: Number(entry.hoursContributed || 0),
-      joinedAt: toDate((entry as any).joinDate || (entry as any).joinedAt || entry.createdAt),
+      joinedAt: toDateValue((entry as any).joinDate || (entry as any).joinedAt || entry.createdAt),
     })) as VolunteerRow[];
     setVolunteers(volunteerRows.filter((entry) => Boolean(entry.id)));
   }, [volunteersQuery.data]);
@@ -78,7 +72,7 @@ function VolunteersPartnershipsPage() {
       organization: (entry as any).partnerName || entry.organization || (entry as any).name || 'Partner',
       type: (entry as any).partnerType || entry.type || 'community',
       status: entry.status || 'active',
-      since: toDate((entry as any).startDate || entry.since || entry.createdAt),
+      since: toDateValue((entry as any).startDate || entry.since || entry.createdAt),
     })) as PartnershipRow[];
     setPartnerships(partnershipRows.filter((entry) => Boolean(entry.id)));
   }, [partnershipsQuery.data]);
@@ -121,10 +115,10 @@ function VolunteersPartnershipsPage() {
     setProcessingId(id);
     try {
       await updateDoc(doc(db, 'volunteers', id), { status, updatedAt: getServerTimestamp() });
-      toast.success(`Volunteer marked ${status}`);
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.volunteersRoot });
+      notify.success(`Volunteer marked ${status}`);
+      await invalidateAdminRecipe(queryClient, 'volunteerUpdated');
     } catch (updateError: any) {
-      toast.error(updateError?.message || 'Failed to update volunteer status.');
+      notify.error(updateError?.message || 'Failed to update volunteer status.');
     } finally {
       setProcessingId(null);
     }
@@ -134,10 +128,10 @@ function VolunteersPartnershipsPage() {
     setProcessingId(id);
     try {
       await updateDoc(doc(db, 'partnerships', id), { status, updatedAt: getServerTimestamp() });
-      toast.success(`Partnership marked ${status}`);
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.partnershipsRoot });
+      notify.success(`Partnership marked ${status}`);
+      await invalidateAdminRecipe(queryClient, 'partnershipUpdated');
     } catch (updateError: any) {
-      toast.error(updateError?.message || 'Failed to update partnership status.');
+      notify.error(updateError?.message || 'Failed to update partnership status.');
     } finally {
       setProcessingId(null);
     }
@@ -169,20 +163,20 @@ function VolunteersPartnershipsPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">Volunteers {volunteerFiltered.length} • Partnerships {partnershipFiltered.length}</span>}
       />
 
-      {loading && (
-        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
-          Refreshing volunteers and partnerships...
-        </div>
-      )}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
-      )}
+      <AdminRefreshingBanner show={loading} message="Refreshing volunteers and partnerships..." />
+      <AdminErrorCard
+        message={error}
+        onRetry={() => {
+          void volunteersQuery.refetch();
+          void partnershipsQuery.refetch();
+        }}
+      />
 
       <>
           <section className="space-y-3">
             <h3 className="text-lg font-bold text-gray-900">Volunteers</h3>
             {volunteerPaged.length === 0 ? (
-              <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No volunteers found.</div>
+              <AdminEmptyStateCard message="No volunteers found." />
             ) : (
               <>
                 <div className="space-y-3 lg:hidden">
@@ -292,7 +286,7 @@ function VolunteersPartnershipsPage() {
           <section className="space-y-3">
             <h3 className="text-lg font-bold text-gray-900">Partnerships</h3>
             {partnershipPaged.length === 0 ? (
-              <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No partnerships found.</div>
+              <AdminEmptyStateCard message="No partnerships found." />
             ) : (
               <>
                 <div className="space-y-3 lg:hidden">

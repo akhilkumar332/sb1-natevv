@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { MapContainer, Marker, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { registerDonorForCampaign } from '../../../services/ngo.service';
 
 // Fix Leaflet default marker icon issue
@@ -126,28 +126,28 @@ const DonorBloodDrives = () => {
 
   const handleParticipate = async (campaign: any) => {
     if (!user?.uid) {
-      toast.error('Please log in to participate.');
+      notify.error('Please log in to participate.');
       return;
     }
     if (isParticipationClosed(campaign)) {
-      toast.error('Participation is closed for this campaign.');
+      notify.error('Participation is closed for this campaign.');
       return;
     }
     if (hasParticipated(campaign)) {
-      toast.success('You already participated.');
+      notify.success('You already participated.');
       return;
     }
     try {
       setParticipatingId(campaign.id);
       await registerDonorForCampaign(campaign.id, user.uid);
-      toast.success('Participation confirmed.');
+      notify.success('Participation confirmed.');
     } catch (error: any) {
       const message = error?.message || '';
       if (message.toLowerCase().includes('already registered')) {
-        toast.success('You already participated.');
+        notify.success('You already participated.');
         return;
       }
-      toast.error(message || 'Unable to participate. Please try again.');
+      notify.error(message || 'Unable to participate. Please try again.');
     } finally {
       setParticipatingId(null);
     }

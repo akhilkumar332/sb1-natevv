@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
-import { getServerTimestamp, timestampToDate } from '../../../utils/firestore.utils';
+import { getServerTimestamp } from '../../../utils/firestore.utils';
+import { toDateValue } from '../../../utils/dateValue';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
+import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminAppointments, useAdminDonations } from '../../../hooks/admin/useAdminQueries';
-import { adminQueryKeys } from '../../../constants/adminQueryKeys';
+import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 
 type AppointmentRow = {
   id: string;
@@ -29,14 +31,6 @@ type DonationRow = {
   units: number;
   status: string;
   donationDate?: Date;
-};
-
-const toDate = (value: any): Date | undefined => {
-  if (!value) return undefined;
-  if (value instanceof Date) return value;
-  if (typeof value?.toDate === 'function') return value.toDate();
-  if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
-  return timestampToDate(value as any);
 };
 
 function AppointmentsDonationsPage() {
@@ -63,7 +57,7 @@ function AppointmentsDonationsPage() {
       hospitalId: entry.hospitalId || '-',
       bloodType: entry.bloodType || '-',
       status: entry.status || 'scheduled',
-      scheduledDate: toDate(entry.scheduledDate),
+      scheduledDate: toDateValue(entry.scheduledDate),
     })) as AppointmentRow[];
     setAppointments(appointmentRows.filter((entry) => Boolean(entry.id)));
   }, [appointmentsQuery.data]);
@@ -77,7 +71,7 @@ function AppointmentsDonationsPage() {
       bloodType: entry.bloodType || '-',
       units: Number(entry.units || 0),
       status: entry.status || 'pending',
-      donationDate: toDate(entry.donationDate),
+      donationDate: toDateValue(entry.donationDate),
     })) as DonationRow[];
     setDonations(donationRows.filter((entry) => Boolean(entry.id)));
   }, [donationsQuery.data]);
@@ -120,13 +114,10 @@ function AppointmentsDonationsPage() {
     setProcessingId(id);
     try {
       await updateDoc(doc(db, 'appointments', id), { status, updatedAt: getServerTimestamp() });
-      toast.success(`Appointment marked ${status}`);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.appointmentsRoot }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.recentActivityRoot }),
-      ]);
+      notify.success(`Appointment marked ${status}`);
+      await invalidateAdminRecipe(queryClient, 'appointmentStatusUpdated');
     } catch (updateError: any) {
-      toast.error(updateError?.message || 'Failed to update appointment status.');
+      notify.error(updateError?.message || 'Failed to update appointment status.');
     } finally {
       setProcessingId(null);
     }
@@ -136,14 +127,10 @@ function AppointmentsDonationsPage() {
     setProcessingId(id);
     try {
       await updateDoc(doc(db, 'donations', id), { status, updatedAt: getServerTimestamp() });
-      toast.success(`Donation marked ${status}`);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.donationsRoot }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.recentActivityRoot }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.platformStatsRoot }),
-      ]);
+      notify.success(`Donation marked ${status}`);
+      await invalidateAdminRecipe(queryClient, 'donationStatusUpdated');
     } catch (updateError: any) {
-      toast.error(updateError?.message || 'Failed to update donation status.');
+      notify.error(updateError?.message || 'Failed to update donation status.');
     } finally {
       setProcessingId(null);
     }
@@ -175,20 +162,20 @@ function AppointmentsDonationsPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">Appointments {appointmentFiltered.length} • Donations {donationFiltered.length}</span>}
       />
 
-      {loading && (
-        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
-          Refreshing appointments and donations...
-        </div>
-      )}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
-      )}
+      <AdminRefreshingBanner show={loading} message="Refreshing appointments and donations..." />
+      <AdminErrorCard
+        message={error}
+        onRetry={() => {
+          void appointmentsQuery.refetch();
+          void donationsQuery.refetch();
+        }}
+      />
 
       <>
           <section className="space-y-3">
             <h3 className="text-lg font-bold text-gray-900">Appointments</h3>
             {appointmentPaged.length === 0 ? (
-              <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No appointments found.</div>
+              <AdminEmptyStateCard message="No appointments found." />
             ) : (
               <>
                 <div className="space-y-3 lg:hidden">
@@ -311,7 +298,7 @@ function AppointmentsDonationsPage() {
           <section className="space-y-3">
             <h3 className="text-lg font-bold text-gray-900">Donations</h3>
             {donationPaged.length === 0 ? (
-              <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No donations found.</div>
+              <AdminEmptyStateCard message="No donations found." />
             ) : (
               <>
                 <div className="space-y-3 lg:hidden">

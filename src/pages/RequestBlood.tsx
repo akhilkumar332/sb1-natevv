@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Droplet, AlertCircle, User, Calendar, Phone, Mail, Hospital, FileText, Heart, Clock, CheckCircle } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { Link } from 'react-router-dom';
 
 // Define the interface for blood request form data
@@ -167,13 +167,13 @@ function RequestBlood() {
           contactEmail: '',
           reason: '',
         });
-        toast.success('Blood request submitted successfully! We will connect you with donors soon.');
+        notify.success('Blood request submitted successfully! We will connect you with donors soon.');
       } catch (error) {
-        toast.error('Failed to submit blood request. Please try again.');
+        notify.error('Failed to submit blood request. Please try again.');
         console.error('Submission error:', error);
       }
     } else {
-      toast.error('Please correct the errors in the form.');
+      notify.error('Please correct the errors in the form.');
     }
     setIsSubmitting(false);
   };

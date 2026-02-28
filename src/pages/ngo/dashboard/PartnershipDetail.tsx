@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useOutletContext, useParams } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import {
   ArrowLeft,
   Archive,
@@ -60,10 +60,10 @@ function NgoPartnershipDetail() {
   const handleArchive = async () => {
     try {
       await archivePartnership(partnership.id);
-      toast.success('Partnership archived.');
+      notify.success('Partnership archived.');
       await refreshData();
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to archive partnership.');
+      notify.error(error?.message || 'Failed to archive partnership.');
     }
   };
 
@@ -71,10 +71,10 @@ function NgoPartnershipDetail() {
     setDeleting(true);
     try {
       await deletePartnership(partnership.id);
-      toast.success('Partnership deleted.');
+      notify.success('Partnership deleted.');
       await refreshData();
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to delete partnership.');
+      notify.error(error?.message || 'Failed to delete partnership.');
     } finally {
       setDeleting(false);
       setDeleteOpen(false);
@@ -110,7 +110,7 @@ function NgoPartnershipDetail() {
   const handleUpdate = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.partnerName || !form.startDate) {
-      toast.error('Please fill out the required fields.');
+      notify.error('Please fill out the required fields.');
       return;
     }
 
@@ -133,11 +133,11 @@ function NgoPartnershipDetail() {
       }
 
       await updatePartnership(partnership.id, payload);
-      toast.success('Partnership updated successfully.');
+      notify.success('Partnership updated successfully.');
       await refreshData();
       closeEdit();
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to update partnership.');
+      notify.error(error?.message || 'Failed to update partnership.');
     } finally {
       setSaving(false);
     }

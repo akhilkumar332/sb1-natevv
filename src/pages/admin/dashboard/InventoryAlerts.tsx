@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PackageOpen } from 'lucide-react';
 import type { BloodInventory } from '../../../types/database.types';
-import { timestampToDate } from '../../../utils/firestore.utils';
+import { toDateValue } from '../../../utils/dateValue';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
+import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminInventoryAlerts } from '../../../hooks/admin/useAdminQueries';
 
 type StatusFilter = 'all' | 'critical' | 'low' | 'adequate' | 'surplus';
@@ -19,14 +20,6 @@ type InventoryRow = {
   criticalLevel: number;
   lowLevel: number;
   updatedAt?: Date;
-};
-
-const toDate = (value: any): Date | undefined => {
-  if (!value) return undefined;
-  if (value instanceof Date) return value;
-  if (typeof value?.toDate === 'function') return value.toDate();
-  if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
-  return timestampToDate(value as any);
 };
 
 function InventoryAlertsPage() {
@@ -50,7 +43,7 @@ function InventoryAlertsPage() {
       status: entry.status || 'adequate',
       criticalLevel: entry.criticalLevel || 0,
       lowLevel: entry.lowLevel || 0,
-      updatedAt: toDate(entry.updatedAt),
+      updatedAt: toDateValue(entry.updatedAt),
     }));
     setItems(mapped.filter((entry) => Boolean(entry.id)));
   }, [inventoryQuery.data]);
@@ -115,17 +108,11 @@ function InventoryAlertsPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">{filtered.length} alerts</span>}
       />
 
-      {loading && (
-        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
-          Refreshing inventory alerts...
-        </div>
-      )}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
-      )}
+      <AdminRefreshingBanner show={loading} message="Refreshing inventory alerts..." />
+      <AdminErrorCard message={error} onRetry={() => void inventoryQuery.refetch()} />
 
       {paged.length === 0 ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No inventory alerts found.</div>
+        <AdminEmptyStateCard message="No inventory alerts found." />
       ) : (
         <>
           <div className="space-y-3 lg:hidden">

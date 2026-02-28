@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { UserPlus, Users, X } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import type { NgoDashboardContext } from '../NgoDashboard';
@@ -96,10 +96,10 @@ function NgoVolunteers() {
   const handleArchive = async (volunteerId: string) => {
     try {
       await archiveVolunteer(volunteerId);
-      toast.success('Volunteer archived.');
+      notify.success('Volunteer archived.');
       await refreshData();
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to archive volunteer.');
+      notify.error(error?.message || 'Failed to archive volunteer.');
     }
   };
 
@@ -107,11 +107,11 @@ function NgoVolunteers() {
     setDeletingId(volunteerId);
     try {
       await deleteVolunteer(volunteerId);
-      toast.success('Volunteer deleted.');
+      notify.success('Volunteer deleted.');
       await refreshData();
       setDeleteCandidate(null);
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to delete volunteer.');
+      notify.error(error?.message || 'Failed to delete volunteer.');
     } finally {
       setDeletingId(null);
     }
@@ -120,12 +120,12 @@ function NgoVolunteers() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user) {
-      toast.error('You must be logged in to manage volunteers.');
+      notify.error('You must be logged in to manage volunteers.');
       return;
     }
 
     if (!form.name || !form.email) {
-      toast.error('Please enter volunteer name and email.');
+      notify.error('Please enter volunteer name and email.');
       return;
     }
 
@@ -157,17 +157,17 @@ function NgoVolunteers() {
       if (editingVolunteerId) {
         const { hoursContributed, campaignsParticipated, eventsOrganized, ...updatePayload } = payload;
         await updateVolunteer(editingVolunteerId, updatePayload);
-        toast.success('Volunteer updated successfully.');
+        notify.success('Volunteer updated successfully.');
         await refreshData();
       } else {
         await addVolunteer(payload);
-        toast.success('Volunteer added successfully.');
+        notify.success('Volunteer added successfully.');
         await refreshData();
       }
 
       closeModal();
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to save volunteer.');
+      notify.error(error?.message || 'Failed to save volunteer.');
     } finally {
       setSaving(false);
     }

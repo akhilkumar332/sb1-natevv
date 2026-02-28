@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
-import { getServerTimestamp, timestampToDate } from '../../../utils/firestore.utils';
+import { getServerTimestamp } from '../../../utils/firestore.utils';
+import { toDateValue } from '../../../utils/dateValue';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
+import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminCampaigns } from '../../../hooks/admin/useAdminQueries';
-import { adminQueryKeys } from '../../../constants/adminQueryKeys';
+import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 
 type CampaignRow = {
   id: string;
@@ -26,14 +28,6 @@ type CampaignRow = {
 };
 
 type StatusFilter = 'all' | 'draft' | 'upcoming' | 'active' | 'completed' | 'cancelled';
-
-const toDate = (value: any): Date | undefined => {
-  if (!value) return undefined;
-  if (value instanceof Date) return value;
-  if (typeof value?.toDate === 'function') return value.toDate();
-  if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
-  return timestampToDate(value as any);
-};
 
 function CampaignsPage() {
   const queryClient = useQueryClient();
@@ -58,8 +52,8 @@ function CampaignsPage() {
       achieved: Number(entry.achieved || 0),
       city: entry.city || (entry.location as any)?.city,
       state: entry.state || (entry.location as any)?.state,
-      startDate: toDate(entry.startDate),
-      endDate: toDate(entry.endDate),
+      startDate: toDateValue(entry.startDate),
+      endDate: toDateValue(entry.endDate),
     })) as CampaignRow[];
     setCampaigns(rows.filter((entry) => Boolean(entry.id)));
   }, [campaignsQuery.data]);
@@ -102,14 +96,10 @@ function CampaignsPage() {
         status: nextStatus,
         updatedAt: getServerTimestamp(),
       });
-      toast.success(`Campaign marked ${nextStatus}`);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.campaignsRoot }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.recentActivityRoot }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.platformStatsRoot }),
-      ]);
+      notify.success(`Campaign marked ${nextStatus}`);
+      await invalidateAdminRecipe(queryClient, 'campaignStatusUpdated');
     } catch (updateError: any) {
-      toast.error(updateError?.message || 'Failed to update campaign status.');
+      notify.error(updateError?.message || 'Failed to update campaign status.');
     } finally {
       setProcessingId(null);
     }
@@ -152,17 +142,11 @@ function CampaignsPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">{filtered.length} campaigns</span>}
       />
 
-      {loading && (
-        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
-          Refreshing campaigns...
-        </div>
-      )}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
-      )}
+      <AdminRefreshingBanner show={loading} message="Refreshing campaigns..." />
+      <AdminErrorCard message={error} onRetry={() => void campaignsQuery.refetch()} />
 
       {paged.length === 0 ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No campaigns found.</div>
+        <AdminEmptyStateCard message="No campaigns found." />
       ) : (
         <>
           <div className="space-y-3 lg:hidden">

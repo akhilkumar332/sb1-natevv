@@ -65,6 +65,11 @@ export default defineConfig(({ command, mode }) => {
         return acc;
       }, {}),
     },
+    resolve: {
+      alias: {
+        services: resolve(__dirname, 'src/services'),
+      },
+    },
     base: '/',
     build: {
       outDir: 'dist',

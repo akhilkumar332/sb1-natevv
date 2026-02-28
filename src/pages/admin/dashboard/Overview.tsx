@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Activity, AlertTriangle, Bell, Droplet, Shield, Users } from 'lucide-react';
 import { useAdminOverviewData } from '../../../hooks/admin/useAdminQueries';
+import { AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 
 function AdminOverviewPage() {
   const {
@@ -17,25 +18,8 @@ function AdminOverviewPage() {
 
   return (
     <div className="space-y-6">
-      {loading && (
-        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
-          Refreshing overview data...
-        </div>
-      )}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span>{error}</span>
-            <button
-              type="button"
-              onClick={refreshData}
-              className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      )}
+      <AdminRefreshingBanner show={loading} message="Refreshing overview data..." />
+      <AdminErrorCard message={error} onRetry={refreshData} />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">

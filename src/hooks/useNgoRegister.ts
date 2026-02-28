@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
@@ -61,7 +61,7 @@ export const useNgoRegister = () => {
       (digitsOnly.startsWith('91') && digitsOnly.length === 12);
 
     if (!isValid10Digits) {
-      toast.error('Please enter a valid 10-digit phone number.');
+      notify.error('Please enter a valid 10-digit phone number.');
       return;
     }
 
@@ -72,18 +72,18 @@ export const useNgoRegister = () => {
 
       const confirmation = await loginWithPhone(phoneNumber);
       setConfirmationResult(confirmation);
-      toast.success('OTP sent successfully!');
+      notify.success('OTP sent successfully!');
       startResendTimer();
     } catch (error: any) {
       console.error('Phone registration error:', error);
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.ngo.phone.submit' } });
-      toast.error('Failed to send OTP. Please try again.');
+      notify.error('Failed to send OTP. Please try again.');
     }
   };
 
   const handleOTPSubmit = async () => {
     if (!formData.otp) {
-      toast.error('Please enter the OTP.');
+      notify.error('Please enter the OTP.');
       return;
     }
     try {
@@ -111,7 +111,7 @@ export const useNgoRegister = () => {
       if (userDoc.exists()) {
         // User already exists - sign them out and redirect to login
         await signOut(auth);
-        toast.error('Phone number already registered. Please use the login page.');
+        notify.error('Phone number already registered. Please use the login page.');
         navigate('/ngo/login');
         return;
       }
@@ -136,7 +136,7 @@ export const useNgoRegister = () => {
 
       await applyReferralTrackingForUser(userCredential.user.uid);
 
-      toast.success('Registration successful!');
+      notify.success('Registration successful!');
       navigate('/ngo/onboarding');
     } catch (error: any) {
       console.error('OTP verification error:', error);
@@ -157,9 +157,9 @@ export const useNgoRegister = () => {
       }
 
       if (error.code === 'auth/invalid-verification-code') {
-        toast.error('Invalid OTP. Please try again.');
+        notify.error('Invalid OTP. Please try again.');
       } else {
-        toast.error('Verification failed. Please try again.');
+        notify.error('Verification failed. Please try again.');
       }
     } finally {
       setOtpLoading(false);
@@ -170,11 +170,11 @@ export const useNgoRegister = () => {
     try {
       const confirmation = await loginWithPhone(formData.identifier);
       setConfirmationResult(confirmation);
-      toast.success('OTP resent successfully!');
+      notify.success('OTP resent successfully!');
       startResendTimer();
     } catch (error) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.ngo.otp.resend' } });
-      toast.error('Failed to resend OTP. Please try again.');
+      notify.error('Failed to resend OTP. Please try again.');
     }
   };
 
@@ -221,7 +221,7 @@ export const useNgoRegister = () => {
       if (userDoc.exists()) {
         console.log('🟡 User already exists, redirecting to login');
         await signOut(auth);
-        toast.error('Email already registered. Please use the login page.');
+        notify.error('Email already registered. Please use the login page.');
         setGoogleLoading(false);
         navigate('/ngo/login');
         return;
@@ -255,15 +255,15 @@ export const useNgoRegister = () => {
       await applyReferralTrackingForUser(result.user.uid);
 
       console.log('✅ User document created, navigating to onboarding');
-      toast.success('Registration successful!');
+      notify.success('Registration successful!');
       navigate('/ngo/onboarding');
     } catch (error: any) {
       console.error('🔴 Google registration error:', error);
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.ngo.google' } });
       if (error instanceof Error) {
-        toast.error(error.message);
+        notify.error(error.message);
       } else {
-        toast.error('Registration failed. Please try again.');
+        notify.error('Registration failed. Please try again.');
       }
     } finally {
       console.log('🔵 Setting loading to false');

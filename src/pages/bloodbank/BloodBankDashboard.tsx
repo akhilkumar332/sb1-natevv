@@ -2,8 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBloodBankData, BloodInventoryItem, BloodRequest, Appointment, Donation, BloodBankStats } from '../../hooks/useBloodBankData';
 import { useReferrals } from '../../hooks/useReferrals';
-import { useFcmNotificationBridge } from '../../hooks/useFcmNotificationBridge';
-import NotificationPermissionPrompt from '../../components/shared/NotificationPermissionPrompt';
+import PortalNotificationBridge from '../../components/shared/PortalNotificationBridge';
 import {
   Activity,
   AlertCircle,
@@ -48,8 +47,6 @@ export type BloodBankDashboardContext = {
 function BloodBankDashboard() {
   const { user } = useAuth();
   const baseHospitalId = user?.parentHospitalId || user?.uid || '';
-
-  useFcmNotificationBridge();
 
   const {
     inventory,
@@ -210,11 +207,7 @@ function BloodBankDashboard() {
           </aside>
 
           <main className="min-w-0 flex-1">
-            {user?.notificationPreferences?.push !== false && (
-              <div className="mb-4">
-                <NotificationPermissionPrompt />
-              </div>
-            )}
+            <PortalNotificationBridge disabled={user?.notificationPreferences?.push === false} />
             <Outlet context={dashboardContext} />
           </main>
         </div>

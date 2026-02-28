@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { ImpersonationUser } from '../../services/admin.service';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { Building2, Users, Activity, Shield } from 'lucide-react';
 import LogoMark from '../../components/LogoMark';
 import PwaInstallCta from '../../components/PwaInstallCta';
@@ -64,7 +64,7 @@ export function BloodBankLogin() {
     }
 
     if (user.role !== 'bloodbank' && user.role !== 'hospital') {
-      toast.error("You're not a BloodBank Admin", { id: 'role-mismatch-bloodbank' });
+      notify.error("You're not a BloodBank Admin", { id: 'role-mismatch-bloodbank' });
       return;
     }
 
@@ -95,11 +95,11 @@ export function BloodBankLogin() {
         return;
       }
       if (response.user.role !== 'bloodbank' && response.user.role !== 'hospital') {
-        toast.error("You're not a BloodBank Admin", { id: 'role-mismatch-bloodbank' });
+        notify.error("You're not a BloodBank Admin", { id: 'role-mismatch-bloodbank' });
         await logout(navigate, { redirectTo: '/bloodbank/login', showToast: false });
         return;
       }
-      toast.success('Successfully logged in as BloodBank!');
+      notify.success('Successfully logged in as BloodBank!');
 
       if (response.user.onboardingCompleted === true) {
         navigate('/bloodbank/dashboard');
@@ -107,7 +107,7 @@ export function BloodBankLogin() {
         navigate('/bloodbank/onboarding');
       }
     } catch (error) {
-      toast.error('Failed to sign in with Google. Please try again.');
+      notify.error('Failed to sign in with Google. Please try again.');
     } finally {
       setGoogleLoading(false);
     }

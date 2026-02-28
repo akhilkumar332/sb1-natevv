@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { PhoneAuthError } from '../errors/PhoneAuthError';
 import { useLocation, useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { FirebaseError } from 'firebase/app';
 import { authStorage } from '../utils/authStorage';
 import { auth } from '../firebase';
@@ -60,43 +60,43 @@ export const useLogin = () => {
   const handlePhoneNumberSubmit = async () => {
     const formattedNumber = normalizePhoneNumber(formData.identifier);
     if (!isValidPhoneNumber(formattedNumber)) {
-      toast.error('Please enter a valid phone number.');
+      notify.error('Please enter a valid phone number.');
       return;
     }
 
     try {
       const confirmation = await loginWithPhone(formattedNumber);
       setConfirmationResult(confirmation);
-      toast.success('OTP sent successfully!');
+      notify.success('OTP sent successfully!');
       startResendTimer();
     } catch (error) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.phone.submit' } });
-      toast.error('Failed to send OTP. Please try again.');
+      notify.error('Failed to send OTP. Please try again.');
     }
   };
 
   const handleOTPSubmit = async () => {
     if (!confirmationResult) {
-      toast.error('Please request an OTP before verifying.');
+      notify.error('Please request an OTP before verifying.');
       return;
     }
 
     const sanitizedOtp = formData.otp.replace(/\D/g, '').trim();
 
     if (!sanitizedOtp) {
-      toast.error('Please enter the OTP.');
+      notify.error('Please enter the OTP.');
       return;
     }
 
     if (sanitizedOtp.length !== 6) {
-      toast.error('Invalid OTP length. Please enter the 6-digit code.');
+      notify.error('Invalid OTP length. Please enter the 6-digit code.');
       return;
     }
     try {
       setOtpLoading(true);
       const verifiedUser = await verifyOTP(confirmationResult, sanitizedOtp);
       if (verifiedUser.role !== 'donor') {
-        toast.error(
+        notify.error(
           verifiedUser.role === 'superadmin'
             ? 'Superadmin can only sign in with Google.'
             : "You're not a Donor",
@@ -111,45 +111,45 @@ export const useLogin = () => {
         handleLoginSuccess(token);
       }
 
-      toast.success('Login successful!');
+      notify.success('Login successful!');
     } catch (error) {
       console.error('OTP verification error:', error);
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.otp.verify' } });
 
       if (error instanceof PhoneAuthError) {
         if (error.code === 'not_registered') {
-          toast.error('Mobile Number not registered. Please sign up.');
+          notify.error('Mobile Number not registered. Please sign up.');
           navigate('/donor/register');
           return;
         }
         if (error.code === 'multiple_accounts') {
-          toast.error('Mobile Number is linked to Multiple account, Contact Support');
+          notify.error('Mobile Number is linked to Multiple account, Contact Support');
           return;
         }
         if (error.code === 'role_mismatch') {
-          toast.error("You're not a Donor", { id: 'role-mismatch-donor' });
+          notify.error("You're not a Donor", { id: 'role-mismatch-donor' });
           return;
         }
         if (error.code === 'superadmin_google_only') {
-          toast.error('Superadmin can only sign in with Google.');
+          notify.error('Superadmin can only sign in with Google.');
           return;
         }
         if (error.code === 'link_required') {
-          toast.error('Phone number already registered. Please sign in with Google to link.');
+          notify.error('Phone number already registered. Please sign in with Google to link.');
           return;
         }
       }
 
       if (error instanceof FirebaseError) {
         if (error.code === 'auth/invalid-verification-code') {
-          toast.error('Invalid OTP. Please try again.');
+          notify.error('Invalid OTP. Please try again.');
         } else if (error.code === 'auth/code-expired') {
-          toast.error('OTP expired. Please request a new code.');
+          notify.error('OTP expired. Please request a new code.');
         } else {
-          toast.error('Failed to verify OTP. Please try again.');
+          notify.error('Failed to verify OTP. Please try again.');
         }
       } else {
-        toast.error('Failed to verify OTP. Please try again.');
+        notify.error('Failed to verify OTP. Please try again.');
       }
     } finally {
       setOtpLoading(false);
@@ -160,11 +160,11 @@ export const useLogin = () => {
     try {
       const confirmation = await loginWithPhone(normalizePhoneNumber(formData.identifier));
       setConfirmationResult(confirmation);
-      toast.success('OTP resent successfully!');
+      notify.success('OTP resent successfully!');
       startResendTimer();
     } catch (error) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.otp.resend' } });
-      toast.error('Failed to resend OTP. Please try again.');
+      notify.error('Failed to resend OTP. Please try again.');
     }
   };
 
@@ -177,7 +177,7 @@ export const useLogin = () => {
       setGoogleLoading(true);
       const result = await loginWithGoogle();
       if (result.user.role !== 'donor' && result.user.role !== 'superadmin') {
-        toast.error("You're not a Donor", { id: 'role-mismatch-donor' });
+        notify.error("You're not a Donor", { id: 'role-mismatch-donor' });
         await logout(navigate, { redirectTo: '/donor/login', showToast: false });
         return;
       }
@@ -185,12 +185,12 @@ export const useLogin = () => {
         if (result?.token) {
           handleLoginSuccess(result.token);
         }
-        toast.success('Select a portal to continue.');
+        notify.success('Select a portal to continue.');
         return;
       }
       if (result?.token && result?.user) {
         handleLoginSuccess(result.token);
-        toast.success('Successfully logged in with Google!');
+        notify.success('Successfully logged in with Google!');
 
         // Navigate based on onboarding status - if not explicitly true, go to onboarding
         const pendingParams = new URLSearchParams(location.search);

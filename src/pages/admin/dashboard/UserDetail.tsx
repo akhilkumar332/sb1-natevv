@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -9,7 +9,7 @@ import {
   updateUserStatus,
   verifyUserAccount,
 } from '../../../services/admin.service';
-import { adminQueryKeys, type AdminKpiRange } from '../../../constants/adminQueryKeys';
+import { type AdminKpiRange } from '../../../constants/adminQueryKeys';
 import {
   useAdminUserDetail,
   useAdminUserKpis,
@@ -32,6 +32,7 @@ import UserReferralGraph from '../../../components/admin/UserReferralGraph';
 import UserReferralTable from '../../../components/admin/UserReferralTable';
 import UserDetailTabSkeleton from '../../../components/admin/UserDetailTabSkeleton';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
+import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 
 type DetailTab = 'profile' | 'security' | 'kpis' | 'referrals' | 'timeline';
 type PendingActionType = 'verify' | 'active' | 'suspended' | 'inactive' | 'revokeToken' | 'revokeAllTokens';
@@ -312,13 +313,7 @@ function UserDetailPage() {
         await revokeAllUserFcmTokens(user.uid, authUser.uid, reason);
       }
 
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetailRoot }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.verificationRoot }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.overviewRoot }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.platformStatsRoot }),
-      ]);
+      await invalidateAdminRecipe(queryClient, 'userDetailActionUpdated');
 
       monitoringService.trackPerformance({
         name: `admin_user_action_${pendingAction.type}`,
@@ -326,10 +321,10 @@ function UserDetailPage() {
         unit: 'ms',
       } as any);
 
-      toast.success(`${actionConfig[pendingAction.type].label} completed`);
+      notify.success(`${actionConfig[pendingAction.type].label} completed`);
       setPendingAction(null);
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to perform action');
+      notify.error(error?.message || 'Failed to perform action');
     } finally {
       setExecutingAction(false);
     }

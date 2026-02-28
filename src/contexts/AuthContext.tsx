@@ -1,7 +1,7 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { NavigateFunction } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import {
   signInWithPopup,
   signOut,
@@ -727,7 +727,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const actor = userRef.current;
     setImpersonationTransition('starting');
     if (!actor || actor.role !== 'superadmin') {
-      toast.error('Only superadmins can impersonate users.');
+      notify.error('Only superadmins can impersonate users.');
       trackImpersonationEvent('impersonation_denied', {
         reason: 'not_superadmin',
       });
@@ -737,7 +737,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const targetUid = target?.uid;
     if (!targetUid) {
-      toast.error('Unable to resolve the selected user.');
+      notify.error('Unable to resolve the selected user.');
       trackImpersonationEvent('impersonation_denied', {
         reason: 'missing_target_uid',
       });
@@ -751,7 +751,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const targetUser = response?.targetUser;
       if (!response?.targetToken || !targetUser?.uid) {
-        toast.error('Impersonation failed. Please try again.');
+        notify.error('Impersonation failed. Please try again.');
         trackImpersonationEvent('impersonation_failed', {
           reason: 'missing_token',
           targetUid,
@@ -798,7 +798,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return targetUser;
     } catch (error: any) {
       console.error('Failed to start impersonation:', error);
-      toast.error(error?.message || 'Failed to start impersonation.');
+      notify.error(error?.message || 'Failed to start impersonation.');
       updateImpersonationSession(null);
       setImpersonationTransition(null);
       trackImpersonationEvent('impersonation_failed', {
@@ -842,7 +842,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await attemptResume(refreshed.resumeToken);
     } catch (error) {
       console.error('Failed to resume admin session:', error);
-      toast.error('Failed to resume admin session.');
+      notify.error('Failed to resume admin session.');
       trackImpersonationEvent('impersonation_failed', {
         reason: 'resume_failed',
         actorUid: session.actorUid,
@@ -1523,7 +1523,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('reCAPTCHA solved');
         },
         'expired-callback': () => {
-          toast.error('reCAPTCHA expired. Please try again.');
+          notify.error('reCAPTCHA expired. Please try again.');
         }
       });
 
@@ -1730,7 +1730,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('reCAPTCHA solved');
       },
       'expired-callback': () => {
-        toast.error('reCAPTCHA expired. Please try again.');
+        notify.error('reCAPTCHA expired. Please try again.');
       }
     });
 
@@ -1810,7 +1810,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('reCAPTCHA solved');
       },
       'expired-callback': () => {
-        toast.error('reCAPTCHA expired. Please try again.');
+        notify.error('reCAPTCHA expired. Please try again.');
       }
     });
 
@@ -1996,7 +1996,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errorMessage = error.message;
       }
 
-      toast.error(errorMessage);
+      notify.error(errorMessage);
       throw new Error(errorMessage);
     } finally {
       setLoginLoading(false);
@@ -2021,7 +2021,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Send email verification
       await sendEmailVerification(result.user);
 
-      toast.success('Registration successful! Please check your email for verification.');
+      notify.success('Registration successful! Please check your email for verification.');
 
       return result.user;
     } catch (error: any) {
@@ -2039,7 +2039,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errorMessage = error.message;
       }
 
-      toast.error(errorMessage);
+      notify.error(errorMessage);
       throw new Error(errorMessage);
     } finally {
       setAuthLoading(false);
@@ -2049,7 +2049,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const resetPassword = async (email: string): Promise<void> => {
     try {
       await sendPasswordResetEmail(auth, email);
-      toast.success('Password reset email sent! Please check your inbox.');
+      notify.success('Password reset email sent! Please check your inbox.');
     } catch (error: any) {
       console.error('Password reset error:', error);
 
@@ -2062,7 +2062,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errorMessage = error.message;
       }
 
-      toast.error(errorMessage);
+      notify.error(errorMessage);
       throw new Error(errorMessage);
     }
   };
@@ -2180,7 +2180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Google login error:', error);
       if (error instanceof Error) {
-        toast.error(error.message);
+        notify.error(error.message);
       }
       throw error;
     }
@@ -2271,9 +2271,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (showToast) {
       if (hadError) {
-        toast.error('Failed to log out. Please try again.');
+        notify.error('Failed to log out. Please try again.');
       } else {
-        toast.success('Successfully logged out!');
+        notify.success('Successfully logged out!');
       }
     }
 

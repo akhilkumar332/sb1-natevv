@@ -3,6 +3,7 @@ import { AlertTriangle, Shield } from 'lucide-react';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
+import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminErrorLogs } from '../../../hooks/admin/useAdminQueries';
 
 type ErrorLogRow = {
@@ -197,18 +198,11 @@ function ErrorLogsPage() {
         </div>
       </div>
 
-      {loading && (
-        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
-          Refreshing error logs...
-        </div>
-      )}
-
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
-      )}
+      <AdminRefreshingBanner show={loading} message="Refreshing error logs..." />
+      <AdminErrorCard message={error} onRetry={() => void query.refetch()} />
 
       {paged.length === 0 ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No error logs found.</div>
+        <AdminEmptyStateCard message="No error logs found." />
       ) : (
         <>
           <div className="space-y-3 lg:hidden">

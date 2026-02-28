@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { collection, doc, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where, documentId } from 'firebase/firestore';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { db } from '../firebase';
 import { REFERRAL_RULES, computeReferralStatus } from '../utils/referralRules';
 import { ensureReferralNotificationsForReferrer } from '../services/referral.service';
@@ -95,26 +95,26 @@ export const useReferrals = (user: any): UseReferralsResult => {
   const copyInviteLink = async () => {
     const inviteLink = buildInviteLink();
     if (!inviteLink) {
-      toast.error('Unable to generate referral link.');
+      notify.error('Unable to generate referral link.');
       return;
     }
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(inviteLink);
-        toast.success('Invite link copied to clipboard!');
+        notify.success('Invite link copied to clipboard!');
         return;
       }
       throw new Error('Clipboard not available');
     } catch (error) {
       console.warn('Clipboard copy failed:', error);
-      toast.error('Unable to copy link. Please try again.');
+      notify.error('Unable to copy link. Please try again.');
     }
   };
 
   const shareInviteLink = async () => {
     const inviteLink = buildInviteLink();
     if (!inviteLink) {
-      toast.error('Unable to generate referral link.');
+      notify.error('Unable to generate referral link.');
       return;
     }
     const message = 'Join BloodHub and save lives. Use my referral link to get started.';
@@ -136,7 +136,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
   const openWhatsAppInvite = () => {
     const inviteLink = buildInviteLink();
     if (!inviteLink) {
-      toast.error('Unable to generate referral link.');
+      notify.error('Unable to generate referral link.');
       return;
     }
     const text = `Join BloodHub and save lives. Use my referral link to get started: ${inviteLink}`;
@@ -164,7 +164,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
       setReferralQrDataUrl(dataUrl);
     } catch (error) {
       console.warn('Referral QR generation failed', error);
-      toast.error('Unable to generate QR code.');
+      notify.error('Unable to generate QR code.');
     } finally {
       setReferralQrLoading(false);
     }

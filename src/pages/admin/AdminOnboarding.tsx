@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { User, Calendar, MapPin, Droplet, Briefcase, Globe, Heart } from 'lucide-react';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -83,31 +83,31 @@ export function AdminOnboarding() {
     switch (currentStep) {
       case 0: // Personal Info
         if (!formData.name || !formData.gender || !formData.dateOfBirth) {
-          toast.error('Please fill in all required personal information');
+          notify.error('Please fill in all required personal information');
           return false;
         }
         break;
       case 1: // Contact Info
         if (!formData.email || !formData.phone || !formData.address || !formData.city || !formData.state || !formData.postalCode ) {
-          toast.error('Please fill in all required contact information');
+          notify.error('Please fill in all required contact information');
           return false;
         }
         break;
       case 2: // Medical Info
         if (!formData.bloodType) {
-          toast.error('Please select your blood type');
+          notify.error('Please select your blood type');
           return false;
         }
         break;
       case 3: // Additional Info
         if (!formData.occupation || !formData.preferredLanguage) {
-          toast.error('Please fill in additional information');
+          notify.error('Please fill in additional information');
           return false;
         }
         break;
       case 4: // Consent
         if (!formData.privacyPolicyAgreed || !formData.termsOfServiceAgreed) {
-          toast.error('Please agree to privacy policy and terms of service');
+          notify.error('Please agree to privacy policy and terms of service');
           return false;
         }
         break;
@@ -153,10 +153,10 @@ export function AdminOnboarding() {
           interestedInVolunteering: formData.interestedInVolunteering,
           onboardingCompleted: true
         });
-        toast.success('Onboarding completed successfully!');
+        notify.success('Onboarding completed successfully!');
         navigate('/admin/dashboard');
       } catch (error) {
-        toast.error('Failed to complete onboarding');
+        notify.error('Failed to complete onboarding');
       } finally {
         setIsLoading(false);
       }

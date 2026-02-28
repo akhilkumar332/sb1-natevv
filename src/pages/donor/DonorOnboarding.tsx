@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
@@ -26,6 +26,7 @@ import {
 import { countries, getStatesByCountry, getCitiesByState } from '../../data/locations';
 import { db } from '../../firebase';
 import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../../services/referral.service';
+import { getCurrentCoordinates, reverseGeocode } from '../../utils/geolocation.utils';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -252,72 +253,48 @@ export function DonorOnboarding() {
   };
 
   const getCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser');
-      return;
-    }
+    void (async () => {
+      setLocationLoading(true);
+      const coords = await getCurrentCoordinates({ scope: 'donor' });
+      if (!coords) {
+        setLocationLoading(false);
+        return;
+      }
 
-    setLocationLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        setMapPosition([latitude, longitude]);
-        setFormData(prev => ({ ...prev, latitude, longitude }));
+      const [latitude, longitude] = coords;
+      setMapPosition([latitude, longitude]);
+      setFormData(prev => ({ ...prev, latitude, longitude }));
 
-        // Reverse geocode to get address
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+      const data = await reverseGeocode(latitude, longitude, { scope: 'donor' });
+      if (data && data.address) {
+        const address = data.address;
+        setFormData(prev => ({
+          ...prev,
+          address: data.display_name || '',
+          postalCode: address.postcode || prev.postalCode,
+        }));
+
+        if (address.state) {
+          const matchedState = availableStates.find(s =>
+            s.name.toLowerCase() === String(address.state).toLowerCase()
           );
-          const data = await response.json();
-
-          if (data && data.address) {
-            const address = data.address;
-            setFormData(prev => ({
-              ...prev,
-              address: data.display_name || '',
-              postalCode: address.postcode || prev.postalCode,
-            }));
-
-            // Try to match state and city
-            if (address.state) {
-              const matchedState = availableStates.find(s =>
-                s.name.toLowerCase() === address.state.toLowerCase()
-              );
-              if (matchedState) {
-                setFormData(prev => ({ ...prev, state: matchedState.name }));
-
-                // Try to match city
-                const stateCities = getCitiesByState(formData.country, matchedState.name);
-                const matchedCity = stateCities.find(c =>
-                  c.toLowerCase() === (address.city || address.town || address.village || '').toLowerCase()
-                );
-                if (matchedCity) {
-                  setFormData(prev => ({ ...prev, city: matchedCity }));
-                }
-              }
+          if (matchedState) {
+            setFormData(prev => ({ ...prev, state: matchedState.name }));
+            const stateCities = getCitiesByState(formData.country, matchedState.name);
+            const matchedCity = stateCities.find(c =>
+              c.toLowerCase() === String(address.city || address.town || address.village || '').toLowerCase()
+            );
+            if (matchedCity) {
+              setFormData(prev => ({ ...prev, city: matchedCity }));
             }
-
-            toast.success('Location detected successfully!');
           }
-        } catch (error) {
-          console.error('Reverse geocoding error:', error);
-          toast.error('Could not fetch address details');
         }
 
-        setLocationLoading(false);
-      },
-      (error) => {
-        console.error('Geolocation error:', error);
-        toast.error('Unable to retrieve your location. Please enable location services.');
-        setLocationLoading(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
+        notify.success('Location detected successfully!');
       }
-    );
+
+      setLocationLoading(false);
+    })();
   };
 
   const handleMapPositionChange = async (newPosition: [number, number]) => {
@@ -328,45 +305,36 @@ export function DonorOnboarding() {
       longitude: newPosition[1]
     }));
 
-    // Reverse geocode to get address from coordinates
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${newPosition[0]}&lon=${newPosition[1]}`
-      );
-      const data = await response.json();
+    const data = await reverseGeocode(newPosition[0], newPosition[1], {
+      errorMessage: 'Could not fetch address for this location',
+      scope: 'donor',
+    });
 
-      if (data && data.address) {
-        const address = data.address;
-        setFormData(prev => ({
-          ...prev,
-          address: data.display_name || '',
-          postalCode: address.postcode || prev.postalCode,
-        }));
+    if (data && data.address) {
+      const address = data.address;
+      setFormData(prev => ({
+        ...prev,
+        address: data.display_name || '',
+        postalCode: address.postcode || prev.postalCode,
+      }));
 
-        // Try to match state and city from location data
-        if (address.state) {
-          const matchedState = availableStates.find(s =>
-            s.name.toLowerCase() === address.state.toLowerCase()
+      if (address.state) {
+        const matchedState = availableStates.find(s =>
+          s.name.toLowerCase() === String(address.state).toLowerCase()
+        );
+        if (matchedState) {
+          setFormData(prev => ({ ...prev, state: matchedState.name }));
+          const stateCities = getCitiesByState(formData.country, matchedState.name);
+          const matchedCity = stateCities.find(c =>
+            c.toLowerCase() === String(address.city || address.town || address.village || '').toLowerCase()
           );
-          if (matchedState) {
-            setFormData(prev => ({ ...prev, state: matchedState.name }));
-
-            // Try to match city
-            const stateCities = getCitiesByState(formData.country, matchedState.name);
-            const matchedCity = stateCities.find(c =>
-              c.toLowerCase() === (address.city || address.town || address.village || '').toLowerCase()
-            );
-            if (matchedCity) {
-              setFormData(prev => ({ ...prev, city: matchedCity }));
-            }
+          if (matchedCity) {
+            setFormData(prev => ({ ...prev, city: matchedCity }));
           }
         }
-
-        toast.success('Address updated from map location');
       }
-    } catch (error) {
-      console.error('Reverse geocoding error:', error);
-      toast.error('Could not fetch address for this location');
+
+      notify.success('Address updated from map location');
     }
   };
 
@@ -374,31 +342,31 @@ export function DonorOnboarding() {
     switch (currentStep) {
       case 0:
         if (!formData.name || !formData.gender || !formData.dateOfBirth) {
-          toast.error('Please fill in all required personal information');
+          notify.error('Please fill in all required personal information');
           return false;
         }
         break;
       case 1:
         if (!formData.email || !formData.phone || !formData.address || !formData.country || !formData.state || !formData.city || !formData.postalCode) {
-          toast.error('Please fill in all required contact information');
+          notify.error('Please fill in all required contact information');
           return false;
         }
         break;
       case 2:
         if (!formData.bloodType) {
-          toast.error('Please select your blood type');
+          notify.error('Please select your blood type');
           return false;
         }
         break;
       case 3:
         if (!formData.occupation || !formData.preferredLanguage || !formData.howHeardAboutUs) {
-          toast.error('Please fill in additional information');
+          notify.error('Please fill in additional information');
           return false;
         }
         break;
       case 4:
         if (!formData.privacyPolicyAgreed || !formData.termsOfServiceAgreed) {
-          toast.error('Please agree to privacy policy and terms of service');
+          notify.error('Please agree to privacy policy and terms of service');
           return false;
         }
         break;
@@ -513,7 +481,7 @@ export function DonorOnboarding() {
         }
 
         setShowConfetti(true);
-        toast.success('Welcome to the BloodHub family! 🎉');
+        notify.success('Welcome to the BloodHub family! 🎉');
 
         setTimeout(() => {
           const params = new URLSearchParams(location.search);
@@ -529,7 +497,7 @@ export function DonorOnboarding() {
         }, 2000);
       } catch (error: any) {
         console.error('Onboarding submission error:', error);
-        toast.error(error?.message || 'Failed to complete onboarding. Please try again.');
+        notify.error(error?.message || 'Failed to complete onboarding. Please try again.');
         setIsLoading(false);
       }
     }

@@ -10,8 +10,7 @@ import {
   NgoStats,
 } from '../../hooks/useNgoData';
 import { useReferrals } from '../../hooks/useReferrals';
-import { useFcmNotificationBridge } from '../../hooks/useFcmNotificationBridge';
-import NotificationPermissionPrompt from '../../components/shared/NotificationPermissionPrompt';
+import PortalNotificationBridge from '../../components/shared/PortalNotificationBridge';
 import {
   Activity,
   AlertCircle,
@@ -57,8 +56,6 @@ export type NgoDashboardContext = {
 
 function NgoDashboard() {
   const { user } = useAuth();
-
-  useFcmNotificationBridge();
 
   const {
     campaigns,
@@ -267,11 +264,7 @@ function NgoDashboard() {
           </aside>
 
           <main className="min-w-0 flex-1">
-            {user?.notificationPreferences?.push !== false && (
-              <div className="mb-4">
-                <NotificationPermissionPrompt />
-              </div>
-            )}
+            <PortalNotificationBridge disabled={user?.notificationPreferences?.push === false} />
             <Outlet context={dashboardContext} />
           </main>
         </div>

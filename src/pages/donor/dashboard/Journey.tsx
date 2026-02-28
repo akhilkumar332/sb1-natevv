@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -18,6 +18,7 @@ import {
   TrendingUp,
   XCircle,
 } from 'lucide-react';
+import { getCurrentCoordinates, reverseGeocode } from '../../../utils/geolocation.utils';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -120,62 +121,35 @@ function LocationPicker({
   };
 
   const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser');
-      return;
-    }
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        if (!mountedRef.current) return;
-        onPositionChange([latitude, longitude]);
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-          );
-          const data = await response.json();
-          if (!mountedRef.current) return;
-          if (data?.display_name) {
-            onChange(data.display_name);
-          }
-        } catch (error) {
-          console.error('Reverse geocoding error:', error);
-          toast.error('Could not fetch address details');
-        }
-        if (mountedRef.current) {
-          setIsLocating(false);
-        }
-      },
-      (error) => {
-        console.error('Geolocation error:', error);
-        toast.error('Unable to retrieve your location. Please enable location services.');
-        if (mountedRef.current) {
-          setIsLocating(false);
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+    void (async () => {
+      setIsLocating(true);
+      const coords = await getCurrentCoordinates({ scope: 'donor' });
+      if (!coords) {
+        if (mountedRef.current) setIsLocating(false);
+        return;
       }
-    );
-  };
-
-  const handleMapPositionChange = async (pos: MapPosition) => {
-    onPositionChange(pos);
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos[0]}&lon=${pos[1]}`
-      );
-      const data = await response.json();
+      if (!mountedRef.current) return;
+      onPositionChange(coords);
+      const data = await reverseGeocode(coords[0], coords[1], { scope: 'donor' });
       if (!mountedRef.current) return;
       if (data?.display_name) {
         onChange(data.display_name);
       }
-    } catch (error) {
-      console.error('Reverse geocoding error:', error);
-      toast.error('Could not fetch address for this location');
+      if (mountedRef.current) {
+        setIsLocating(false);
+      }
+    })();
+  };
+
+  const handleMapPositionChange = async (pos: MapPosition) => {
+    onPositionChange(pos);
+    const data = await reverseGeocode(pos[0], pos[1], {
+      errorMessage: 'Could not fetch address for this location',
+      scope: 'donor',
+    });
+    if (!mountedRef.current) return;
+    if (data?.display_name) {
+      onChange(data.display_name);
     }
   };
 
@@ -435,26 +409,26 @@ const DonorJourney = () => {
 
   const handleLogDonationSubmit = async () => {
     if (!logDonationForm.date) {
-      toast.error('Please select a donation date.');
+      notify.error('Please select a donation date.');
       return;
     }
     const parsedDate = new Date(logDonationForm.date);
     if (Number.isNaN(parsedDate.getTime())) {
-      toast.error('Please select a valid date.');
+      notify.error('Please select a valid date.');
       return;
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (parsedDate.getTime() > today.getTime()) {
-      toast.error('Donation date cannot be in the future.');
+      notify.error('Donation date cannot be in the future.');
       return;
     }
     if (!logDonationForm.donationType) {
-      toast.error('Please select a donation type.');
+      notify.error('Please select a donation type.');
       return;
     }
     if (!logDonationForm.units || logDonationForm.units < 1) {
-      toast.error('Please enter a valid units value.');
+      notify.error('Please enter a valid units value.');
       return;
     }
     try {
@@ -472,7 +446,7 @@ const DonorJourney = () => {
       });
       setLogDonationOpen(false);
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to log donation.');
+      notify.error(error?.message || 'Failed to log donation.');
     } finally {
       setLogDonationSaving(false);
     }

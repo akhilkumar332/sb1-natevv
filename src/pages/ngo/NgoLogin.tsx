@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { ImpersonationUser } from '../../services/admin.service';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { Heart, Users, Calendar, TrendingUp, Shield } from 'lucide-react';
 import LogoMark from '../../components/LogoMark';
 import PwaInstallCta from '../../components/PwaInstallCta';
@@ -64,7 +64,7 @@ export function NgoLogin() {
     }
 
     if (user.role !== 'ngo') {
-      toast.error("You're not an NGO", { id: 'role-mismatch-ngo' });
+      notify.error("You're not an NGO", { id: 'role-mismatch-ngo' });
       return;
     }
 
@@ -95,7 +95,7 @@ export function NgoLogin() {
         return;
       }
       if (response.user.role !== 'ngo') {
-        toast.error("You're not an NGO", { id: 'role-mismatch-ngo' });
+        notify.error("You're not an NGO", { id: 'role-mismatch-ngo' });
         await logout(navigate, { redirectTo: '/ngo/login', showToast: false });
         return;
       }
@@ -103,7 +103,7 @@ export function NgoLogin() {
       if (token) {
         authStorage.setAuthToken(token);
       }
-      toast.success('Successfully logged in as NGO!');
+      notify.success('Successfully logged in as NGO!');
 
       if (response.user.onboardingCompleted === true) {
         navigate('/ngo/dashboard');
@@ -111,7 +111,7 @@ export function NgoLogin() {
         navigate('/ngo/onboarding');
       }
     } catch (error) {
-      toast.error('Failed to sign in with Google. Please try again.');
+      notify.error('Failed to sign in with Google. Please try again.');
     } finally {
       setGoogleLoading(false);
     }

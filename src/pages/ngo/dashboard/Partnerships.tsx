@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { Handshake, Plus, X } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import type { NgoDashboardContext } from '../NgoDashboard';
@@ -103,10 +103,10 @@ function NgoPartnerships() {
   const handleArchive = async (partnershipId: string) => {
     try {
       await archivePartnership(partnershipId);
-      toast.success('Partnership archived.');
+      notify.success('Partnership archived.');
       await refreshData();
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to archive partnership.');
+      notify.error(error?.message || 'Failed to archive partnership.');
     }
   };
 
@@ -114,11 +114,11 @@ function NgoPartnerships() {
     setDeletingId(partnershipId);
     try {
       await deletePartnership(partnershipId);
-      toast.success('Partnership deleted.');
+      notify.success('Partnership deleted.');
       await refreshData();
       setDeleteCandidate(null);
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to delete partnership.');
+      notify.error(error?.message || 'Failed to delete partnership.');
     } finally {
       setDeletingId(null);
     }
@@ -127,12 +127,12 @@ function NgoPartnerships() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user) {
-      toast.error('You must be logged in to manage partnerships.');
+      notify.error('You must be logged in to manage partnerships.');
       return;
     }
 
     if (!form.partnerName || !form.startDate) {
-      toast.error('Please fill out the required fields.');
+      notify.error('Please fill out the required fields.');
       return;
     }
 
@@ -163,17 +163,17 @@ function NgoPartnerships() {
           updatePayload.ngoName = user.organizationName || user.displayName || 'NGO';
         }
         await updatePartnership(editingPartnershipId, updatePayload);
-        toast.success('Partnership updated successfully.');
+        notify.success('Partnership updated successfully.');
         await refreshData();
       } else {
         await createPartnership(payload);
-        toast.success('Partnership created successfully.');
+        notify.success('Partnership created successfully.');
         await refreshData();
       }
 
       closeModal();
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to save partnership.');
+      notify.error(error?.message || 'Failed to save partnership.');
     } finally {
       setSaving(false);
     }

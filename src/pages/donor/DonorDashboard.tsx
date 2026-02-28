@@ -18,13 +18,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useDonorData } from '../../hooks/useDonorData';
 import { useBloodRequest } from '../../hooks/useBloodRequest';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, runTransaction, serverTimestamp, Timestamp, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
 import { useReferrals } from '../../hooks/useReferrals';
-import { useFcmNotificationBridge } from '../../hooks/useFcmNotificationBridge';
-import NotificationPermissionPrompt from '../../components/shared/NotificationPermissionPrompt';
+import PortalNotificationBridge from '../../components/shared/PortalNotificationBridge';
 import {
   clearPendingDonorRequestDoc,
   decodePendingDonorRequest,
@@ -200,8 +199,6 @@ function DonorDashboard() {
   } = useReferrals(user);
 
   const { respondToRequest, responding } = useBloodRequest();
-
-  useFcmNotificationBridge();
 
   const formatDate = (date?: Date | string) => {
     if (!date) return 'N/A';
@@ -1104,7 +1101,7 @@ function DonorDashboard() {
         const selfKey = `self:${payload.createdAt}`;
         if (pendingRequestProcessedRef.current !== selfKey) {
           pendingRequestProcessedRef.current = selfKey;
-          toast.error('You cannot request yourself.', { id: 'self-request' });
+          notify.error('You cannot request yourself.', { id: 'self-request' });
         }
         await clearPendingDonorRequestDoc(user.uid);
         return;
@@ -1118,7 +1115,7 @@ function DonorDashboard() {
         });
         await clearPendingDonorRequestDoc(user.uid);
         allowPendingAutoSubmitRef.current = false;
-        toast.success('Your donor request has been submitted.', { id: PENDING_REQUEST_SUCCESS_TOAST_ID });
+        notify.success('Your donor request has been submitted.', { id: PENDING_REQUEST_SUCCESS_TOAST_ID });
       } catch (error) {
         if (!isOfflineFirestoreError(error)) {
           console.error('Pending donor request submission failed:', error);
@@ -1188,11 +1185,11 @@ function DonorDashboard() {
     try {
       setLinkGoogleLoading(true);
       await linkGoogleProvider();
-      toast.success('Google account linked successfully!');
+      notify.success('Google account linked successfully!');
     } catch (error: any) {
       console.error('Google link error:', error);
       reportDonorDashboardError(error, 'google_link');
-      toast.error(error?.message || 'Failed to link Google account.');
+      notify.error(error?.message || 'Failed to link Google account.');
     } finally {
       setLinkGoogleLoading(false);
     }
@@ -1200,7 +1197,7 @@ function DonorDashboard() {
 
   const handleGoogleUnlink = async () => {
     if (!canUnlinkGoogle) {
-      toast.error('At least one login method must remain linked.');
+      notify.error('At least one login method must remain linked.');
       return;
     }
     if (!window.confirm('Unlink Google login from your account?')) {
@@ -1209,11 +1206,11 @@ function DonorDashboard() {
     try {
       setUnlinkGoogleLoading(true);
       await unlinkGoogleProvider();
-      toast.success('Google login unlinked.');
+      notify.success('Google login unlinked.');
     } catch (error: any) {
       console.error('Google unlink error:', error);
       reportDonorDashboardError(error, 'google_unlink');
-      toast.error(error?.message || 'Failed to unlink Google login.');
+      notify.error(error?.message || 'Failed to unlink Google login.');
     } finally {
       setUnlinkGoogleLoading(false);
     }
@@ -1222,7 +1219,7 @@ function DonorDashboard() {
   const handlePhoneLinkStart = async () => {
     const normalized = normalizePhoneNumber(linkPhoneNumber);
     if (!isValidPhoneNumber(normalized)) {
-      toast.error('Please enter a valid phone number.');
+      notify.error('Please enter a valid phone number.');
       return;
     }
 
@@ -1230,11 +1227,11 @@ function DonorDashboard() {
       setLinkPhoneLoading(true);
       const confirmation = await startPhoneLink(normalized);
       setLinkConfirmation(confirmation);
-      toast.success('OTP sent successfully!');
+      notify.success('OTP sent successfully!');
     } catch (error: any) {
       console.error('Phone link error:', error);
       reportDonorDashboardError(error, 'phone_link_start');
-      toast.error(error?.message || 'Failed to send OTP. Please try again.');
+      notify.error(error?.message || 'Failed to send OTP. Please try again.');
     } finally {
       setLinkPhoneLoading(false);
     }
@@ -1242,17 +1239,17 @@ function DonorDashboard() {
 
   const handlePhoneLinkConfirm = async () => {
     if (!linkConfirmation) {
-      toast.error('Please request an OTP before verifying.');
+      notify.error('Please request an OTP before verifying.');
       return;
     }
 
     const sanitizedOtp = linkOtp.replace(/\D/g, '').trim();
     if (!sanitizedOtp) {
-      toast.error('Please enter the OTP.');
+      notify.error('Please enter the OTP.');
       return;
     }
     if (sanitizedOtp.length !== 6) {
-      toast.error('Invalid OTP length. Please enter the 6-digit code.');
+      notify.error('Invalid OTP length. Please enter the 6-digit code.');
       return;
     }
 
@@ -1261,11 +1258,11 @@ function DonorDashboard() {
       await confirmPhoneLink(linkConfirmation, sanitizedOtp);
       setLinkConfirmation(null);
       setLinkOtp('');
-      toast.success('Phone number linked successfully!');
+      notify.success('Phone number linked successfully!');
     } catch (error: any) {
       console.error('Phone link confirm error:', error);
       reportDonorDashboardError(error, 'phone_link_confirm');
-      toast.error(error?.message || 'Failed to link phone number.');
+      notify.error(error?.message || 'Failed to link phone number.');
     } finally {
       setLinkPhoneLoading(false);
     }
@@ -1277,7 +1274,7 @@ function DonorDashboard() {
 
   const handlePhoneUnlink = async () => {
     if (!canUnlinkPhone) {
-      toast.error('At least one login method must remain linked.');
+      notify.error('At least one login method must remain linked.');
       return;
     }
     if (!window.confirm('Unlink phone login from your account?')) {
@@ -1286,11 +1283,11 @@ function DonorDashboard() {
     try {
       setUnlinkPhoneLoading(true);
       await unlinkPhoneProvider();
-      toast.success('Phone login unlinked.');
+      notify.success('Phone login unlinked.');
     } catch (error: any) {
       console.error('Phone unlink error:', error);
       reportDonorDashboardError(error, 'phone_unlink');
-      toast.error(error?.message || 'Failed to unlink phone login.');
+      notify.error(error?.message || 'Failed to unlink phone login.');
     } finally {
       setUnlinkPhoneLoading(false);
     }
@@ -1329,7 +1326,7 @@ function DonorDashboard() {
 
   const handleRespondToRequest = async (requestId: string) => {
     if (!user) {
-      toast.error('Please log in to respond');
+      notify.error('Please log in to respond');
       return;
     }
 
@@ -1348,7 +1345,7 @@ function DonorDashboard() {
 
   const handleDonorRequestDecision = async (requestId: string, decision: 'accepted' | 'rejected') => {
     if (!user?.uid) {
-      toast.error('Please log in to respond.');
+      notify.error('Please log in to respond.');
       return;
     }
     if (donorRequestActionId) {
@@ -1360,16 +1357,16 @@ function DonorDashboard() {
     try {
       const requestSnap = await getDoc(requestRef);
       if (!requestSnap.exists()) {
-        toast.error('Request not found.');
+        notify.error('Request not found.');
         return;
       }
       requestData = requestSnap.data() as any;
       if (requestData.targetDonorUid !== user.uid) {
-        toast.error('You are not allowed to update this request.');
+        notify.error('You are not allowed to update this request.');
         return;
       }
       if (requestData.status !== 'pending') {
-        toast.error('This request has already been handled.');
+        notify.error('This request has already been handled.');
         return;
       }
 
@@ -1391,7 +1388,7 @@ function DonorDashboard() {
     } catch (error) {
       console.error('Failed to update donor request:', error);
       reportDonorDashboardError(error, 'update_donor_request');
-      toast.error('Unable to update request. Please try again.');
+      notify.error('Unable to update request. Please try again.');
       return;
     } finally {
       setDonorRequestActionId(null);
@@ -1438,7 +1435,7 @@ function DonorDashboard() {
 
   const handleDeleteDonorRequest = async (requestId: string) => {
     if (!user?.uid) {
-      toast.error('Please log in to delete.');
+      notify.error('Please log in to delete.');
       return;
     }
     if (donorRequestActionId || donorRequestDeleteId) {
@@ -1449,13 +1446,13 @@ function DonorDashboard() {
       const requestRef = doc(db, 'donorRequests', requestId);
       const requestSnap = await getDoc(requestRef);
       if (!requestSnap.exists()) {
-        toast.error('Request not found.');
+        notify.error('Request not found.');
         return;
       }
       const requestData = requestSnap.data() as any;
       const isParticipant = requestData.requesterUid === user.uid || requestData.targetDonorUid === user.uid;
       if (!isParticipant) {
-        toast.error('You are not allowed to delete this request.');
+        notify.error('You are not allowed to delete this request.');
         return;
       }
       const batchId = requestData.requestBatchId as string | undefined;
@@ -1478,11 +1475,11 @@ function DonorDashboard() {
         });
       }
       await deleteDoc(requestRef);
-      toast.success('Request deleted.');
+      notify.success('Request deleted.');
     } catch (error) {
       console.error('Failed to delete donor request:', error);
       reportDonorDashboardError(error, 'delete_donor_request');
-      toast.error('Unable to delete request. Please try again.');
+      notify.error('Unable to delete request. Please try again.');
     } finally {
       setDonorRequestDeleteId(null);
     }
@@ -1572,7 +1569,7 @@ function DonorDashboard() {
   const handleSaveLastDonation = async () => {
     const parsedDate = parseDateInput(lastDonationInput);
     if (!parsedDate) {
-      toast.error('Please select a valid date.');
+      notify.error('Please select a valid date.');
       return;
     }
 
@@ -1635,11 +1632,11 @@ function DonorDashboard() {
       await updateUserProfile({ lastDonation: parsedDate });
       setLastDonationSaved(true);
       setTimeout(() => setLastDonationSaved(false), 2500);
-      toast.success('Last donation date saved.');
+      notify.success('Last donation date saved.');
     } catch (error: any) {
       console.error('Last donation update error:', error);
       reportDonorDashboardError(error, 'last_donation_update');
-      toast.error(error?.message || 'Failed to save last donation date.');
+      notify.error(error?.message || 'Failed to save last donation date.');
     } finally {
       setLastDonationSaving(false);
     }
@@ -1723,15 +1720,15 @@ function DonorDashboard() {
     if (latestDonationDate) {
       await updateUserProfile({ lastDonation: latestDonationDate });
     }
-    toast.success('Donation logged successfully.');
+    notify.success('Donation logged successfully.');
   };
 
   const handleDownloadCertificate = (certificateUrl: string) => {
     if (certificateUrl) {
       window.open(certificateUrl, '_blank');
-      toast.success('Opening certificate...');
+      notify.success('Opening certificate...');
     } else {
-      toast.error('Certificate not available');
+      notify.error('Certificate not available');
     }
   };
 
@@ -1759,7 +1756,7 @@ function DonorDashboard() {
     if (!editingDonationId || !user?.uid) return;
     const unitsValue = Number(editingDonationData.units);
     if (!Number.isFinite(unitsValue) || unitsValue <= 0) {
-      toast.error('Please enter valid units.');
+      notify.error('Please enter valid units.');
       return;
     }
 
@@ -1811,12 +1808,12 @@ function DonorDashboard() {
         { merge: true }
       );
 
-      toast.success('Donation updated.');
+      notify.success('Donation updated.');
       setEditingDonationId(null);
     } catch (error: any) {
       console.error('Donation update error:', error);
       reportDonorDashboardError(error, 'donation_update');
-      toast.error(error?.message || 'Failed to update donation.');
+      notify.error(error?.message || 'Failed to update donation.');
     } finally {
       setDonationEditSaving(false);
     }
@@ -1839,7 +1836,7 @@ function DonorDashboard() {
         return entryId ? currentId === entryId : item === entry;
       });
       if (alreadyExists) {
-        toast.success('Donation already restored.');
+        notify.success('Donation already restored.');
         return;
       }
       const nextDonations = [...existingDonations, entry];
@@ -1863,11 +1860,11 @@ function DonorDashboard() {
       );
 
       await updateUserProfile({ lastDonation: latestDonationDate || null });
-      toast.success('Donation restored.');
+      notify.success('Donation restored.');
     } catch (error: any) {
       console.error('Donation restore error:', error);
       reportDonorDashboardError(error, 'donation_restore');
-      toast.error(error?.message || 'Failed to restore donation.');
+      notify.error(error?.message || 'Failed to restore donation.');
     }
   };
 
@@ -1919,13 +1916,13 @@ function DonorDashboard() {
       );
 
       await updateUserProfile({ lastDonation: latestDonationDate || null });
-      toast.custom((toastInstance) => (
+      notify.custom((toastInstance) => (
         <div className="rounded-xl border border-red-100 bg-white px-4 py-3 shadow-lg flex items-center gap-3">
           <span className="text-sm text-gray-700">Donation deleted.</span>
           <button
             type="button"
             onClick={() => {
-              toast.dismiss(toastInstance.id);
+              notify.dismiss(toastInstance.id);
               void handleUndoDonationDelete(removedEntry);
             }}
             className="text-sm font-semibold text-red-600 hover:text-red-700"
@@ -1937,7 +1934,7 @@ function DonorDashboard() {
     } catch (error: any) {
       console.error('Donation delete error:', error);
       reportDonorDashboardError(error, 'donation_delete');
-      toast.error(error?.message || 'Failed to delete donation.');
+      notify.error(error?.message || 'Failed to delete donation.');
     } finally {
       setDonationDeleteId(null);
     }
@@ -1956,7 +1953,7 @@ function DonorDashboard() {
   };
 
   const handleLearnMore = () => {
-    toast('Health tips and guidelines', { icon: 'ℹ️' });
+    notify.info('Health tips and guidelines', { icon: 'ℹ️' });
     // Could open a modal or navigate to a help page
   };
 
@@ -2015,7 +2012,7 @@ function DonorDashboard() {
           text: 'My BloodHub donor card',
           files: [file],
         });
-        toast.success('Donor card shared!');
+        notify.success('Donor card shared!');
         return;
       }
 
@@ -2027,11 +2024,11 @@ function DonorDashboard() {
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(downloadUrl);
-      toast.success('Donor card downloaded.');
+      notify.success('Donor card downloaded.');
     } catch (error: any) {
       console.error('Donor card share error:', error);
       reportDonorDashboardError(error, 'donor_card_share');
-      toast.error(error?.message || 'Unable to share donor card.');
+      notify.error(error?.message || 'Unable to share donor card.');
     } finally {
       setShareCardLoading(false);
     }
@@ -2039,7 +2036,7 @@ function DonorDashboard() {
 
   const handleEmergencyAlertsToggle = async () => {
     if (!availabilityEnabled) {
-      toast.error('Set your availability to enable emergency alerts.');
+      notify.error('Set your availability to enable emergency alerts.');
       return;
     }
     const nextValue = !emergencyAlertsEnabled;
@@ -2051,12 +2048,12 @@ function DonorDashboard() {
           emergencyAlerts: nextValue,
         },
       });
-      toast.success(nextValue ? 'Emergency alerts enabled.' : 'Emergency alerts paused.');
+      notify.success(nextValue ? 'Emergency alerts enabled.' : 'Emergency alerts paused.');
     } catch (error: any) {
       console.error('Emergency alerts update error:', error);
       reportDonorDashboardError(error, 'emergency_alerts_update');
       setEmergencyAlertsEnabled(!nextValue);
-      toast.error(error?.message || 'Failed to update alert preference.');
+      notify.error(error?.message || 'Failed to update alert preference.');
     } finally {
       setEmergencyAlertsSaving(false);
     }
@@ -2089,13 +2086,13 @@ function DonorDashboard() {
           { merge: true }
         );
       }
-      toast.success(nextValue ? 'You are now available for requests.' : 'You are on break.');
+      notify.success(nextValue ? 'You are now available for requests.' : 'You are on break.');
     } catch (error: any) {
       console.error('Availability update error:', error);
       reportDonorDashboardError(error, 'availability_update');
       setAvailabilityEnabled(previousAvailability);
       setEmergencyAlertsEnabled(previousAlerts);
-      toast.error(error?.message || 'Failed to update availability.');
+      notify.error(error?.message || 'Failed to update availability.');
     } finally {
       setAvailabilitySaving(false);
     }
@@ -2134,7 +2131,7 @@ function DonorDashboard() {
           },
           { merge: true }
         );
-        toast.success('You are now available.');
+        notify.success('You are now available.');
       } else {
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
         setAvailabilityEnabled(false);
@@ -2155,12 +2152,12 @@ function DonorDashboard() {
           },
           { merge: true }
         );
-        toast.success('You are on break for the next 24 hours.');
+        notify.success('You are on break for the next 24 hours.');
       }
     } catch (error: any) {
       console.error('Available today update error:', error);
       reportDonorDashboardError(error, 'available_today_update');
-      toast.error(error?.message || 'Failed to update break status.');
+      notify.error(error?.message || 'Failed to update break status.');
     } finally {
       setAvailableTodayLoading(false);
     }
@@ -2183,7 +2180,7 @@ function DonorDashboard() {
     } catch (error: any) {
       console.error('Checklist update error:', error);
       reportDonorDashboardError(error, 'checklist_update');
-      toast.error(error?.message || 'Failed to update checklist.');
+      notify.error(error?.message || 'Failed to update checklist.');
     } finally {
       setChecklistSaving(false);
     }
@@ -2209,7 +2206,7 @@ function DonorDashboard() {
     } catch (error: any) {
       console.error('Checklist reset error:', error);
       reportDonorDashboardError(error, 'checklist_reset');
-      toast.error(error?.message || 'Failed to reset checklist.');
+      notify.error(error?.message || 'Failed to reset checklist.');
     } finally {
       setChecklistSaving(false);
     }
@@ -2233,7 +2230,7 @@ function DonorDashboard() {
   const handleSaveFeedback = async (donationId: string) => {
     if (!user?.uid) return;
     if (!feedbackForm.rating) {
-      toast.error('Please add a rating.');
+      notify.error('Please add a rating.');
       return;
     }
     try {
@@ -2289,12 +2286,12 @@ function DonorDashboard() {
         );
       }
 
-      toast.success('Feedback saved.');
+      notify.success('Feedback saved.');
       setFeedbackOpenId(null);
     } catch (error: any) {
       console.error('Feedback save error:', error);
       reportDonorDashboardError(error, 'feedback_save');
-      toast.error(error?.message || 'Failed to save feedback.');
+      notify.error(error?.message || 'Failed to save feedback.');
     } finally {
       setFeedbackSaving(false);
     }
@@ -2566,11 +2563,7 @@ function DonorDashboard() {
             </div>
           </aside>
           <main className="min-w-0 flex-1">
-            {user?.notificationPreferences?.push !== false && (
-              <div className="mb-4">
-                <NotificationPermissionPrompt />
-              </div>
-            )}
+            <PortalNotificationBridge disabled={user?.notificationPreferences?.push === false} />
             <Outlet context={dashboardContext} />
           </main>
         </div>

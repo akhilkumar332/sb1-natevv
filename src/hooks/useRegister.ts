@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
@@ -62,30 +62,30 @@ export const useRegister = () => {
   const handlePhoneNumberSubmit = async () => {
     const normalizedPhone = normalizePhoneNumber(formData.identifier);
     if (!isValidPhoneNumber(normalizedPhone)) {
-      toast.error('Please enter a valid phone number.');
+      notify.error('Please enter a valid phone number.');
       return;
     }
 
     try {
       const confirmation = await loginWithPhone(normalizedPhone);
       setConfirmationResult(confirmation);
-      toast.success('OTP sent successfully!');
+      notify.success('OTP sent successfully!');
       startResendTimer();
     } catch (error: any) {
       console.error('Phone registration error:', error);
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.phone.submit' } });
-      toast.error('Failed to send OTP. Please try again.');
+      notify.error('Failed to send OTP. Please try again.');
     }
   };
 
   const handleOTPSubmit = async () => {
     if (!confirmationResult) {
-      toast.error('Please request an OTP before verifying.');
+      notify.error('Please request an OTP before verifying.');
       return;
     }
 
     if (!formData.otp) {
-      toast.error('Please enter the OTP.');
+      notify.error('Please enter the OTP.');
       return;
     }
     try {
@@ -115,7 +115,7 @@ export const useRegister = () => {
       if (userDoc.exists()) {
         // User already exists - sign them out and redirect to login
         await signOut(auth);
-        toast.error('Mobile Number already registered');
+        notify.error('Mobile Number already registered');
         navigate('/donor/login');
         return;
       }
@@ -128,7 +128,7 @@ export const useRegister = () => {
 
       if (otherMatch) {
         await signOut(auth);
-        toast.error('Mobile Number already registered');
+        notify.error('Mobile Number already registered');
         navigate('/donor/login');
         return;
       }
@@ -157,7 +157,7 @@ export const useRegister = () => {
       const token = await userCredential.user.getIdToken();
       authStorage.setAuthToken(token);
 
-      toast.success('Registration successful!');
+      notify.success('Registration successful!');
       navigate('/donor/onboarding');
     } catch (error: any) {
       console.error('OTP verification error:', error);
@@ -178,9 +178,9 @@ export const useRegister = () => {
       }
 
       if (error.code === 'auth/invalid-verification-code') {
-        toast.error('Invalid OTP. Please try again.');
+        notify.error('Invalid OTP. Please try again.');
       } else {
-        toast.error('Verification failed. Please try again.');
+        notify.error('Verification failed. Please try again.');
       }
     } finally {
       setOtpLoading(false);
@@ -191,11 +191,11 @@ export const useRegister = () => {
     try {
       const confirmation = await loginWithPhone(normalizePhoneNumber(formData.identifier));
       setConfirmationResult(confirmation);
-      toast.success('OTP resent successfully!');
+      notify.success('OTP resent successfully!');
       startResendTimer();
     } catch (error) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.otp.resend' } });
-      toast.error('Failed to resend OTP. Please try again.');
+      notify.error('Failed to resend OTP. Please try again.');
     }
   };
 
@@ -242,7 +242,7 @@ export const useRegister = () => {
       if (userDoc.exists()) {
         console.log('🟡 User already exists, redirecting to login');
         await signOut(auth);
-        toast.error('Email already registered. Please use the login page.');
+        notify.error('Email already registered. Please use the login page.');
         setGoogleLoading(false);
         navigate('/donor/login');
         return;
@@ -279,15 +279,15 @@ export const useRegister = () => {
       authStorage.setAuthToken(token);
 
       console.log('✅ User document created, navigating to onboarding');
-      toast.success('Registration successful!');
+      notify.success('Registration successful!');
       navigate('/donor/onboarding');
     } catch (error: any) {
       console.error('🔴 Google registration error:', error);
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.google' } });
       if (error instanceof Error) {
-        toast.error(error.message);
+        notify.error(error.message);
       } else {
-        toast.error('Registration failed. Please try again.');
+        notify.error('Registration failed. Please try again.');
       }
     } finally {
       console.log('🔵 Setting loading to false');

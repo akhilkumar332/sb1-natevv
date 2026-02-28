@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { FileDown, Gauge } from 'lucide-react';
 import { AdminAnalyticsDashboard } from '../../../components/analytics/AdminAnalyticsDashboard';
 import { generateDailyAnalytics, getSystemHealthReport } from '../../../services/admin.service';
@@ -12,9 +12,9 @@ function AnalyticsReportsPage() {
     setGenerating(true);
     try {
       const analyticsId = await generateDailyAnalytics();
-      toast.success(`Analytics snapshot generated (${analyticsId})`);
+      notify.success(`Analytics snapshot generated (${analyticsId})`);
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to generate analytics snapshot.');
+      notify.error(error?.message || 'Failed to generate analytics snapshot.');
     } finally {
       setGenerating(false);
     }
@@ -24,9 +24,9 @@ function AnalyticsReportsPage() {
     setCheckingHealth(true);
     try {
       const report = await getSystemHealthReport();
-      toast.success(`System ${report.status}: ${report.alerts.inventoryAlerts} inventory alerts, ${report.alerts.pendingVerifications} pending verifications`);
+      notify.success(`System ${report.status}: ${report.alerts.inventoryAlerts} inventory alerts, ${report.alerts.pendingVerifications} pending verifications`);
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to get system health report.');
+      notify.error(error?.message || 'Failed to get system health report.');
     } finally {
       setCheckingHealth(false);
     }

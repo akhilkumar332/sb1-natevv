@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { doc, updateDoc } from 'firebase/firestore';
 import type { BloodRequest } from '../../../types/database.types';
 import { db } from '../../../firebase';
-import { getServerTimestamp, timestampToDate } from '../../../utils/firestore.utils';
+import { getServerTimestamp } from '../../../utils/firestore.utils';
+import { toDateValue } from '../../../utils/dateValue';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
+import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminEmergencyRequests } from '../../../hooks/admin/useAdminQueries';
-import { adminQueryKeys } from '../../../constants/adminQueryKeys';
+import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 
 type UrgencyFilter = 'all' | 'critical' | 'high' | 'medium' | 'low';
 type StatusFilter = 'all' | 'active' | 'partially_fulfilled' | 'fulfilled' | 'expired' | 'cancelled';
@@ -26,14 +28,6 @@ type RequestRow = {
   state?: string;
   requestedAt?: Date;
   neededBy?: Date;
-};
-
-const toDate = (value: any): Date | undefined => {
-  if (!value) return undefined;
-  if (value instanceof Date) return value;
-  if (typeof value?.toDate === 'function') return value.toDate();
-  if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
-  return timestampToDate(value as any);
 };
 
 function EmergencyRequestsPage() {
@@ -60,8 +54,8 @@ function EmergencyRequestsPage() {
       status: entry.status || 'active',
       city: entry.location?.city,
       state: entry.location?.state,
-      requestedAt: toDate(entry.requestedAt),
-      neededBy: toDate(entry.neededBy),
+      requestedAt: toDateValue(entry.requestedAt),
+      neededBy: toDateValue(entry.neededBy),
     }));
     setRequests(mapped.filter((entry) => Boolean(entry.id)));
   }, [emergencyQuery.data]);
@@ -106,14 +100,10 @@ function EmergencyRequestsPage() {
         updatedAt: getServerTimestamp(),
         ...(nextStatus === 'fulfilled' ? { fulfilledAt: getServerTimestamp() } : {}),
       });
-      toast.success(`Request marked as ${nextStatus}`);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.emergencyRoot }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.recentActivityRoot }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.overviewRoot }),
-      ]);
+      notify.success(`Request marked as ${nextStatus}`);
+      await invalidateAdminRecipe(queryClient, 'emergencyStatusUpdated');
     } catch (updateError: any) {
-      toast.error(updateError?.message || 'Failed to update request.');
+      notify.error(updateError?.message || 'Failed to update request.');
     } finally {
       setProcessingId(null);
     }
@@ -169,17 +159,11 @@ function EmergencyRequestsPage() {
         rightContent={<span className="text-xs font-semibold text-gray-500">{filtered.length} requests</span>}
       />
 
-      {loading && (
-        <div className="rounded-xl border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-gray-600 shadow-sm">
-          Refreshing emergency requests...
-        </div>
-      )}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div>
-      )}
+      <AdminRefreshingBanner show={loading} message="Refreshing emergency requests..." />
+      <AdminErrorCard message={error} onRetry={() => void emergencyQuery.refetch()} />
 
       {paged.length === 0 ? (
-        <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-500 shadow-sm">No requests found.</div>
+        <AdminEmptyStateCard message="No requests found." />
       ) : (
         <>
           <div className="space-y-3 lg:hidden">

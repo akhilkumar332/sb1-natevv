@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useOutletContext, useParams } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import {
   ArrowLeft,
   Archive,
@@ -60,10 +60,10 @@ function NgoVolunteerDetail() {
   const handleArchive = async () => {
     try {
       await archiveVolunteer(volunteer.id);
-      toast.success('Volunteer archived.');
+      notify.success('Volunteer archived.');
       await refreshData();
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to archive volunteer.');
+      notify.error(error?.message || 'Failed to archive volunteer.');
     }
   };
 
@@ -71,10 +71,10 @@ function NgoVolunteerDetail() {
     setDeleting(true);
     try {
       await deleteVolunteer(volunteer.id);
-      toast.success('Volunteer deleted.');
+      notify.success('Volunteer deleted.');
       await refreshData();
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to delete volunteer.');
+      notify.error(error?.message || 'Failed to delete volunteer.');
     } finally {
       setDeleting(false);
       setDeleteOpen(false);
@@ -109,7 +109,7 @@ function NgoVolunteerDetail() {
   const handleUpdate = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.name || !form.email) {
-      toast.error('Please enter volunteer name and email.');
+      notify.error('Please enter volunteer name and email.');
       return;
     }
 
@@ -133,11 +133,11 @@ function NgoVolunteerDetail() {
       };
 
       await updateVolunteer(volunteer.id, payload);
-      toast.success('Volunteer updated successfully.');
+      notify.success('Volunteer updated successfully.');
       await refreshData();
       closeEdit();
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to update volunteer.');
+      notify.error(error?.message || 'Failed to update volunteer.');
     } finally {
       setSaving(false);
     }

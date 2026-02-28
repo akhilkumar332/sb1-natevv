@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import {
   Calendar,
   MapPin,
@@ -242,13 +242,13 @@ function NgoCampaigns() {
         }));
       }
     } catch (error) {
-      toast.error('Could not fetch address for this location');
+      notify.error('Could not fetch address for this location');
     }
   };
 
   const handleUseCurrentLocation = () => {
     if (!navigator.geolocation) {
-      toast.error('Geolocation not supported in this browser.');
+      notify.error('Geolocation not supported in this browser.');
       return;
     }
     setLocating(true);
@@ -260,7 +260,7 @@ function NgoCampaigns() {
         setLocating(false);
       },
       () => {
-        toast.error('Unable to fetch your location.');
+        notify.error('Unable to fetch your location.');
         setLocating(false);
       }
     );
@@ -317,9 +317,9 @@ function NgoCampaigns() {
   const handleArchive = async (campaignId: string) => {
     try {
       await archiveCampaign(campaignId);
-      toast.success('Campaign archived.');
+      notify.success('Campaign archived.');
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to archive campaign.');
+      notify.error(error?.message || 'Failed to archive campaign.');
     }
   };
 
@@ -327,10 +327,10 @@ function NgoCampaigns() {
     setDeletingId(campaignId);
     try {
       await deleteCampaign(campaignId);
-      toast.success('Campaign deleted.');
+      notify.success('Campaign deleted.');
       setDeleteCandidate(null);
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to delete campaign.');
+      notify.error(error?.message || 'Failed to delete campaign.');
     } finally {
       setDeletingId(null);
     }
@@ -344,12 +344,12 @@ function NgoCampaigns() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user) {
-      toast.error('You must be logged in to manage campaigns.');
+      notify.error('You must be logged in to manage campaigns.');
       return;
     }
 
     if (!form.title || !form.startDate || !form.endDate || !form.city || !form.state) {
-      toast.error('Please fill out the required fields.');
+      notify.error('Please fill out the required fields.');
       return;
     }
 
@@ -359,20 +359,20 @@ function NgoCampaigns() {
     const endDate = parseLocalDate(form.endDate);
 
     if (!startDate || !endDate) {
-      toast.error('Please enter valid dates.');
+      notify.error('Please enter valid dates.');
       return;
     }
 
     if (startDate < today) {
-      toast.error('Start date cannot be in the past.');
+      notify.error('Start date cannot be in the past.');
       return;
     }
     if (endDate < today) {
-      toast.error('End date cannot be in the past.');
+      notify.error('End date cannot be in the past.');
       return;
     }
     if (endDate <= startDate) {
-      toast.error('End date must be after start date.');
+      notify.error('End date must be after start date.');
       return;
     }
 
@@ -404,14 +404,14 @@ function NgoCampaigns() {
       if (editingCampaignId) {
         const { achieved, createdBy, ...updatePayload } = payload;
         await updateCampaign(editingCampaignId, updatePayload);
-        toast.success('Campaign updated successfully.');
+        notify.success('Campaign updated successfully.');
       } else {
         await createCampaign(payload);
-        toast.success('Campaign created successfully.');
+        notify.success('Campaign created successfully.');
       }
       closeModal();
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to save campaign.');
+      notify.error(error?.message || 'Failed to save campaign.');
     } finally {
       setSaving(false);
     }

@@ -1,7 +1,7 @@
 // src/hooks/useBloodBankRegister.ts
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { notify } from 'services/notify.service';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
@@ -56,7 +56,7 @@ export const useBloodBankRegister = () => {
       if (userDoc.exists()) {
         console.log('🟡 User already exists, redirecting to login');
         await signOut(auth);
-        toast.error('Email already registered. Please use the login page.');
+        notify.error('Email already registered. Please use the login page.');
         setGoogleLoading(false);
         navigate('/bloodbank/login');
         return;
@@ -91,15 +91,15 @@ export const useBloodBankRegister = () => {
       await applyReferralTrackingForUser(result.user.uid);
 
       console.log('✅ User document created, navigating to onboarding');
-      toast.success('Registration successful!');
+      notify.success('Registration successful!');
       navigate('/bloodbank/onboarding');
     } catch (error: any) {
       console.error('🔴 Google registration error:', error);
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.bloodbank.google' } });
       if (error instanceof Error) {
-        toast.error(error.message);
+        notify.error(error.message);
       } else {
-        toast.error('Registration failed. Please try again.');
+        notify.error('Registration failed. Please try again.');
       }
     } finally {
       console.log('🔵 Setting loading to false');
