@@ -8,6 +8,7 @@ import {
   setReferralTracking,
 } from '../utils/referralTracking';
 import { REFERRAL_RULES, computeReferralStatus, normalizeReferralDate } from '../utils/referralRules';
+import { captureHandledError } from './errorLog.service';
 
 type ReferralApplyResult = {
   referrerUid: string;
@@ -25,6 +26,18 @@ type ReferralStatusUpdate = {
   status: 'registered' | 'onboarded' | 'eligible' | 'deleted';
   statusLabel: string;
   isEligible: boolean;
+};
+
+const reportReferralServiceError = (error: unknown, kind: string, metadata?: Record<string, unknown>) => {
+  void captureHandledError(error, {
+    source: 'frontend',
+    scope: 'donor',
+    metadata: {
+      kind,
+      service: 'referral.service',
+      ...(metadata || {}),
+    },
+  });
 };
 
 const stripUndefined = <T extends Record<string, any>>(payload: T): T =>
@@ -96,7 +109,7 @@ export const resolveReferralContext = async (newUserUid: string): Promise<Referr
         }
       }
     } catch (error) {
-      console.warn('Failed to resolve referrer by UID, proceeding with UID fallback:', error);
+      reportReferralServiceError(error, 'referral.resolve_by_uid', { newUserUid });
     }
   } else if (referralBhId) {
     const bhIdLookup = await resolveReferrerByBhId(referralBhId);
@@ -174,10 +187,10 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
     ]);
 
     if (referralResult.status === 'rejected') {
-      console.warn('Failed to write referral tracking doc:', referralResult.reason);
+      reportReferralServiceError(referralResult.reason, 'referral.tracking_doc.write', { referralDocId });
     }
     if (userResult.status === 'rejected') {
-      console.warn('Failed to update referred-by fields:', userResult.reason);
+      reportReferralServiceError(userResult.reason, 'referral.referred_by.update', { newUserUid });
     }
 
     const referralWritten = referralResult.status === 'fulfilled';
@@ -190,7 +203,7 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
       return { referrerUid, referrerBhId };
     }
   } catch (error) {
-    console.warn('Failed to apply referral tracking:', error);
+    reportReferralServiceError(error, 'referral.apply', { newUserUid });
   }
 
   return null;
@@ -275,7 +288,7 @@ const sendReferralNotification = async (
     return true;
   } catch (error: any) {
     if (error?.code !== 'permission-denied') {
-      console.warn('Failed to create referral notification:', error);
+      reportReferralServiceError(error, 'referral.notification.create', { referrerUid, referredUid, status });
     }
   }
   return false;
@@ -291,7 +304,7 @@ export const ensureReferralTrackingForExistingReferral = async (user: any): Prom
       referrerRole = referrerDoc.data()?.role;
     }
   } catch (error) {
-    console.warn('Failed to resolve referrer role:', error);
+    reportReferralServiceError(error, 'referral.resolve_referrer_role', { referrerUid });
   }
 
   const referralDocId = `${referrerUid}_${user.uid}`;
@@ -349,7 +362,7 @@ export const ensureReferralNotificationsForReferrer = async (
       referrerRole = referrerDoc.data()?.role;
     }
   } catch (error) {
-    console.warn('Failed to resolve referrer role for notifications:', error);
+    reportReferralServiceError(error, 'referral.resolve_referrer_role_for_notifications', { referrerUid });
   }
   const notifyStatuses: ReferralStatusUpdate['status'][] = ['onboarded', 'eligible'];
   await Promise.all(referrals.map(async (entry) => {

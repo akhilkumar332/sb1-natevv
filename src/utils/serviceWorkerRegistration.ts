@@ -3,6 +3,7 @@
  *
  * Registers and manages service worker for PWA support
  */
+import { captureHandledError } from '../services/errorLog.service';
 
 const isLocalhost = Boolean(
   window.location.hostname === 'localhost' ||
@@ -73,7 +74,11 @@ function registerValidSW(swUrl: string, config?: Config) {
       };
     })
     .catch((error) => {
-      console.error('Error during service worker registration:', error);
+      void captureHandledError(error, {
+        source: 'frontend',
+        scope: 'unknown',
+        metadata: { kind: 'service_worker.register' },
+      });
     });
 }
 
@@ -108,7 +113,11 @@ export function unregister() {
         registration.unregister();
       })
       .catch((error) => {
-        console.error(error.message);
+        void captureHandledError(error, {
+          source: 'frontend',
+          scope: 'unknown',
+          metadata: { kind: 'service_worker.unregister' },
+        });
       });
   }
 }

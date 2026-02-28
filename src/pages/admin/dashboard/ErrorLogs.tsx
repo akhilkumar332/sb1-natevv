@@ -6,6 +6,7 @@ import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminErrorLogs } from '../../../hooks/admin/useAdminQueries';
 import { refetchQuery } from '../../../utils/queryRefetch';
+import { toDateValue } from '../../../utils/dateValue';
 
 type ErrorLogRow = {
   id: string;
@@ -27,19 +28,7 @@ type ErrorLogRow = {
 };
 
 const toDate = (value: unknown): Date | undefined => {
-  if (!value) return undefined;
-  if (value instanceof Date) return value;
-  if (typeof value === 'object' && value !== null && 'toDate' in value) {
-    const candidate = value as { toDate?: () => Date };
-    return typeof candidate.toDate === 'function' ? candidate.toDate() : undefined;
-  }
-  if (typeof value === 'object' && value !== null && 'seconds' in value) {
-    const timestamp = value as { seconds?: number };
-    if (typeof timestamp.seconds === 'number') {
-      return new Date(timestamp.seconds * 1000);
-    }
-  }
-  return undefined;
+  return toDateValue(value);
 };
 
 function ErrorLogsPage() {

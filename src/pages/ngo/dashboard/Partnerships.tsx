@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
-import { notify } from 'services/notify.service';
+import { createScopedErrorNotifier, notify } from 'services/notify.service';
 import { Handshake, Plus, X } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import type { NgoDashboardContext } from '../NgoDashboard';
 import { createPartnership, updatePartnership, archivePartnership, deletePartnership } from '../../../services/ngo.service';
+import { StatusTabs } from '../../../components/shared/StatusTabs';
+import { DeleteConfirmModal } from '../../../components/shared/DeleteConfirmModal';
+import { EmptyStateCard } from '../../../components/shared/EmptyStateCard';
+import { ModalShell } from '../../../components/shared/ModalShell';
 
 const emptyForm = {
   partnerName: '',
@@ -34,21 +38,7 @@ function NgoPartnerships() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusTab, setStatusTab] = useState<'active' | 'archived' | 'all'>('active');
 
-  const notifyNgoPartnershipsError = (
-    error: unknown,
-    fallbackMessage: string,
-    toastId: string,
-    kind: string
-  ) => notify.fromError(
-    error,
-    fallbackMessage,
-    { id: toastId },
-    {
-      source: 'frontend',
-      scope: 'ngo',
-      metadata: { page: 'NgoPartnerships', kind },
-    }
-  );
+  const notifyNgoPartnershipsError = createScopedErrorNotifier({ scope: 'ngo', page: 'NgoPartnerships' });
 
   const activeCount = useMemo(
     () => partnerships.filter((partner) => partner.status !== 'inactive').length,
@@ -125,7 +115,7 @@ function NgoPartnerships() {
       notifyNgoPartnershipsError(
         error,
         'Failed to archive partnership.',
-        'ngo-partnership-archive-error',
+        { id: 'ngo-partnership-archive-error' },
         'ngo.partnerships.archive'
       );
     }
@@ -142,7 +132,7 @@ function NgoPartnerships() {
       notifyNgoPartnershipsError(
         error,
         'Failed to delete partnership.',
-        'ngo-partnership-delete-error',
+        { id: 'ngo-partnership-delete-error' },
         'ngo.partnerships.delete'
       );
     } finally {
@@ -202,7 +192,7 @@ function NgoPartnerships() {
       notifyNgoPartnershipsError(
         error,
         'Failed to save partnership.',
-        'ngo-partnership-save-error',
+        { id: 'ngo-partnership-save-error' },
         editingPartnershipId ? 'ngo.partnerships.update' : 'ngo.partnerships.create'
       );
     } finally {
@@ -232,33 +222,24 @@ function NgoPartnerships() {
 
       <div className="bg-white rounded-2xl shadow-xl p-6">
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          {[
-            { id: 'active', label: `Active (${activeCount})` },
-            { id: 'archived', label: `Archived (${archivedCount})` },
-            { id: 'all', label: `All (${partnerships.length})` },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setStatusTab(tab.id as 'active' | 'archived' | 'all')}
-              className={`rounded-full px-4 py-1.5 text-xs font-semibold border ${
-                statusTab === tab.id
-                  ? 'bg-red-600 text-white border-red-600'
-                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          <StatusTabs
+            value={statusTab}
+            onChange={setStatusTab}
+            options={[
+              { id: 'active', label: `Active (${activeCount})` },
+              { id: 'archived', label: `Archived (${archivedCount})` },
+              { id: 'all', label: `All (${partnerships.length})` },
+            ]}
+          />
         </div>
       </div>
 
       {filteredPartnerships.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-xl p-10 text-center">
-          <Handshake className="w-12 h-12 text-red-200 mx-auto mb-3" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No partners found</h3>
-          <p className="text-gray-600">Try a different filter or add a new partner.</p>
-        </div>
+        <EmptyStateCard
+          icon={<Handshake className="w-12 h-12 text-red-200 mx-auto mb-3" />}
+          title="No partners found"
+          description="Try a different filter or add a new partner."
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filteredPartnerships.map((partner) => (
@@ -327,8 +308,7 @@ function NgoPartnerships() {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl">
+        <ModalShell containerClassName="bg-white w-full max-w-2xl rounded-2xl shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
               <h3 className="text-lg font-bold text-gray-900">
                 {editingPartnershipId ? 'Edit Partnership' : 'Add Partnership'}
@@ -469,38 +449,21 @@ function NgoPartnerships() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ModalShell>
       )}
       </div>
 
-      {deleteCandidate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-gray-900">Delete partnership?</h3>
-            <p className="mt-2 text-sm text-gray-600">
-              This will permanently remove the partnership record.
-            </p>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => handleDelete(deleteCandidate!)}
-                disabled={deletingId === deleteCandidate}
-                className="flex-1 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-              >
-                {deletingId === deleteCandidate ? 'Deleting...' : 'Delete'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeleteCandidate(null)}
-                className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        open={Boolean(deleteCandidate)}
+        title="Delete partnership?"
+        message="This will permanently remove the partnership record."
+        onConfirm={() => {
+          if (!deleteCandidate) return;
+          void handleDelete(deleteCandidate);
+        }}
+        onCancel={() => setDeleteCandidate(null)}
+        isConfirming={deletingId === deleteCandidate}
+      />
     </>
   );
 }

@@ -4,7 +4,7 @@
  * Real-time campaign monitoring using Firebase onSnapshot
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   collection,
   query,
@@ -16,6 +16,8 @@ import {
 import { db } from '../firebase';
 import { Campaign } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
+import { failRealtimeLoad, reportRealtimeError } from '../utils/realtimeError';
+import { readCacheWithTtl, writeCache } from '../utils/cacheLifecycle';
 
 interface UseRealtimeCampaignsOptions {
   ngoId?: string;
@@ -45,11 +47,21 @@ export const useRealtimeCampaigns = ({
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const campaignsRef = useRef<Campaign[]>([]);
+  const onNewCampaignRef = useRef<typeof onNewCampaign>(onNewCampaign);
   const cacheKey = useMemo(() => {
     const key = [ngoId || 'all', status || 'all', city || 'all', limitCount].join('|');
     return `campaigns_cache_${encodeURIComponent(key)}`;
   }, [ngoId, status, city, limitCount]);
   const cacheTTL = 5 * 60 * 1000;
+
+  useEffect(() => {
+    campaignsRef.current = campaigns;
+  }, [campaigns]);
+
+  useEffect(() => {
+    onNewCampaignRef.current = onNewCampaign;
+  }, [onNewCampaign]);
 
   const serializeCampaigns = (items: Campaign[]) =>
     items.map((item) => ({
@@ -73,20 +85,24 @@ export const useRealtimeCampaigns = ({
     setLoading(true);
     setError(null);
     let usedCache = false;
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      const cachedRaw = window.sessionStorage.getItem(cacheKey);
-      if (cachedRaw) {
-        try {
-          const cached = JSON.parse(cachedRaw);
-          if (cached.timestamp && Date.now() - cached.timestamp < cacheTTL) {
-            setCampaigns(hydrateCampaigns(cached.campaigns || []));
-            setLoading(false);
-            usedCache = true;
-          }
-        } catch (err) {
-          console.warn('Failed to hydrate campaigns cache', err);
-        }
-      }
+    const cachedCampaigns = readCacheWithTtl<{ campaigns: any[] }, Campaign[]>({
+      storage: 'session',
+      key: cacheKey,
+      ttlMs: cacheTTL,
+      kindPrefix: 'campaigns.cache',
+      onError: (err) => {
+        reportRealtimeError(
+          { scope: 'unknown', hook: 'useRealtimeCampaigns' },
+          err,
+          'campaigns.cache.hydrate'
+        );
+      },
+      hydrate: (payload) => hydrateCampaigns(payload?.campaigns || []),
+    });
+    if (cachedCampaigns) {
+      setCampaigns(cachedCampaigns);
+      setLoading(false);
+      usedCache = true;
     }
 
     // Build query constraints
@@ -122,12 +138,13 @@ export const useRealtimeCampaigns = ({
           ]);
 
           // Detect new campaigns
-          if (campaigns.length > 0 && campaignData.length > 0) {
+          const previousCampaigns = campaignsRef.current;
+          if (previousCampaigns.length > 0 && campaignData.length > 0) {
             const latestCampaign = campaignData[0];
-            const wasNew = !campaigns.find(c => c.id === latestCampaign.id);
+            const wasNew = !previousCampaigns.find(c => c.id === latestCampaign.id);
 
-            if (wasNew && onNewCampaign) {
-              onNewCampaign(latestCampaign);
+            if (wasNew && onNewCampaignRef.current) {
+              onNewCampaignRef.current(latestCampaign);
             }
           }
 
@@ -135,34 +152,50 @@ export const useRealtimeCampaigns = ({
           if (!usedCache) {
             setLoading(false);
           }
-          if (typeof window !== 'undefined' && window.sessionStorage) {
-            try {
-              window.sessionStorage.setItem(
-                cacheKey,
-                JSON.stringify({
-                  timestamp: Date.now(),
-                  campaigns: serializeCampaigns(campaignData),
-                })
+          writeCache({
+            storage: 'session',
+            key: cacheKey,
+            data: {
+              campaigns: serializeCampaigns(campaignData),
+            },
+            kindPrefix: 'campaigns.cache',
+            onError: (err) => {
+              reportRealtimeError(
+                { scope: 'unknown', hook: 'useRealtimeCampaigns' },
+                err,
+                'campaigns.cache.write'
               );
-            } catch (err) {
-              console.warn('Failed to write campaigns cache', err);
-            }
-          }
+            },
+          });
         } catch (err) {
-          console.error('Error processing campaigns:', err);
-          setError('Failed to load campaigns');
-          setLoading(false);
+          failRealtimeLoad(
+            { scope: 'unknown', hook: 'useRealtimeCampaigns' },
+            {
+              error: err,
+              kind: 'campaigns.process',
+              fallbackMessage: 'Failed to load campaigns',
+              setError,
+              setLoading,
+            }
+          );
         }
       },
       (err) => {
-        console.error('Error listening to campaigns:', err);
-        setError('Failed to listen to campaigns');
-        setLoading(false);
+        failRealtimeLoad(
+          { scope: 'unknown', hook: 'useRealtimeCampaigns' },
+          {
+            error: err,
+            kind: 'campaigns.listen',
+            fallbackMessage: 'Failed to listen to campaigns',
+            setError,
+            setLoading,
+          }
+        );
       }
     );
 
     return () => unsubscribe();
-  }, [ngoId, status, city, limitCount]);
+  }, [ngoId, status, city, limitCount, cacheKey]);
 
   return {
     campaigns,
@@ -232,15 +265,29 @@ export const useRealtimeCampaign = (campaignId: string): {
           setCampaign(campaigns.length > 0 ? campaigns[0] : null);
           setLoading(false);
         } catch (err) {
-          console.error('Error processing campaign:', err);
-          setError('Failed to load campaign');
-          setLoading(false);
+          failRealtimeLoad(
+            { scope: 'unknown', hook: 'useRealtimeCampaign' },
+            {
+              error: err,
+              kind: 'campaign.process',
+              fallbackMessage: 'Failed to load campaign',
+              setError,
+              setLoading,
+            }
+          );
         }
       },
       (err) => {
-        console.error('Error listening to campaign:', err);
-        setError('Failed to listen to campaign');
-        setLoading(false);
+        failRealtimeLoad(
+          { scope: 'unknown', hook: 'useRealtimeCampaign' },
+          {
+            error: err,
+            kind: 'campaign.listen',
+            fallbackMessage: 'Failed to listen to campaign',
+            setError,
+            setLoading,
+          }
+        );
       }
     );
 
@@ -308,9 +355,20 @@ export const useActiveCampaignCount = (ngoId?: string): number => {
 
     const q = query(collection(db, 'campaigns'), ...constraints);
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setCount(snapshot.size);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setCount(snapshot.size);
+      },
+      (err) => {
+        reportRealtimeError(
+          { scope: ngoId ? 'ngo' : 'unknown', hook: 'useActiveCampaignCount' },
+          err,
+          'campaigns.active_count.listen',
+          { ngoId: ngoId || null }
+        );
+      }
+    );
 
     return () => unsubscribe();
   }, [ngoId]);

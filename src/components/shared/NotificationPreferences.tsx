@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
+import { captureHandledError } from '../../services/errorLog.service';
 
 interface NotificationPreferencesProps {
   onSave?: () => void;
@@ -106,7 +107,11 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
       // Reset saved state after 3 seconds
       setTimeout(() => setSaved(false), 3000);
     } catch (error) {
-      console.error('Error saving preferences:', error);
+      void captureHandledError(error, {
+        source: 'frontend',
+        scope: 'unknown',
+        metadata: { kind: 'notification_preferences.save', component: 'NotificationPreferences' },
+      });
     } finally {
       setSaving(false);
     }

@@ -16,6 +16,7 @@ import {
 import { auth, db } from '../firebase';
 import { Notification } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
+import { failRealtimeLoad, reportRealtimeError } from '../utils/realtimeError';
 
 interface UseRealtimeNotificationsOptions {
   userId: string;
@@ -149,14 +150,25 @@ export const useRealtimeNotifications = ({
           setError(null);
           setLoading(false);
         } catch (err) {
-          console.error('Error processing notifications:', err);
-          setError('Failed to load notifications');
-          setLoading(false);
+          failRealtimeLoad(
+            { scope: 'unknown', hook: 'useRealtimeNotifications' },
+            {
+              error: err,
+              kind: 'notifications.process',
+              fallbackMessage: 'Failed to load notifications',
+              setError,
+              setLoading,
+            }
+          );
         }
       },
       (err) => {
         if (!useFallback && isIndexError(err)) {
-          console.warn('Notifications query missing index; falling back to client-side sort.');
+          reportRealtimeError(
+            { scope: 'unknown', hook: 'useRealtimeNotifications' },
+            err,
+            'notifications.index_fallback'
+          );
           setUseFallback(true);
           return;
         }
@@ -173,10 +185,18 @@ export const useRealtimeNotifications = ({
           return;
         }
 
-        console.error('Error listening to notifications:', err);
         setReconnecting(false);
-        setError('Failed to listen to notifications');
-        setLoading(false);
+        failRealtimeLoad(
+          { scope: 'unknown', hook: 'useRealtimeNotifications' },
+          {
+            error: err,
+            kind: 'notifications.listen',
+            fallbackMessage: 'Failed to listen to notifications',
+            setError,
+            setLoading,
+            metadata: { useFallback },
+          }
+        );
       }
     );
 
@@ -226,10 +246,18 @@ export const useUnreadNotificationCount = (userId: string): number => {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        if (retryCount > 0) {
-          setRetryCount(0);
+        try {
+          if (retryCount > 0) {
+            setRetryCount(0);
+          }
+          setUnreadCount(snapshot.size);
+        } catch (err) {
+          reportRealtimeError(
+            { scope: 'unknown', hook: 'useUnreadNotificationCount' },
+            err,
+            'notifications.unread.process'
+          );
         }
-        setUnreadCount(snapshot.size);
       },
       (err) => {
         const isTransient = ['already-exists', 'unavailable', 'deadline-exceeded', 'aborted', 'internal', 'cancelled'].includes(err?.code);
@@ -242,7 +270,11 @@ export const useUnreadNotificationCount = (userId: string): number => {
           }, 1000);
           return;
         }
-        console.warn('Unread notifications listener failed:', err);
+        reportRealtimeError(
+          { scope: 'unknown', hook: 'useUnreadNotificationCount' },
+          err,
+          'notifications.unread.listen'
+        );
       }
     );
 
@@ -287,15 +319,23 @@ export const useEmergencyNotifications = (userId: string): Notification[] => {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        if (retryCount > 0) {
-          setRetryCount(0);
+        try {
+          if (retryCount > 0) {
+            setRetryCount(0);
+          }
+          const notifications = extractQueryData<Notification>(snapshot, [
+            'createdAt',
+            'readAt',
+            'expiresAt',
+          ]);
+          setEmergencyNotifications(notifications);
+        } catch (err) {
+          reportRealtimeError(
+            { scope: 'unknown', hook: 'useEmergencyNotifications' },
+            err,
+            'notifications.emergency.process'
+          );
         }
-        const notifications = extractQueryData<Notification>(snapshot, [
-          'createdAt',
-          'readAt',
-          'expiresAt',
-        ]);
-        setEmergencyNotifications(notifications);
       },
       (err) => {
         const isTransient = ['already-exists', 'unavailable', 'deadline-exceeded', 'aborted', 'internal', 'cancelled'].includes(err?.code);
@@ -308,7 +348,11 @@ export const useEmergencyNotifications = (userId: string): Notification[] => {
           }, 1000);
           return;
         }
-        console.warn('Emergency notifications listener failed:', err);
+        reportRealtimeError(
+          { scope: 'unknown', hook: 'useEmergencyNotifications' },
+          err,
+          'notifications.emergency.listen'
+        );
       }
     );
 

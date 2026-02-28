@@ -21,6 +21,7 @@ import {
   type TrendData,
   type BloodTypeDistribution,
 } from '../../services/analytics.service';
+import { captureHandledError } from '../../services/errorLog.service';
 
 interface DonorAnalyticsDashboardProps {
   donorId: string;
@@ -67,7 +68,11 @@ export const DonorAnalyticsDashboard: React.FC<DonorAnalyticsDashboardProps> = (
         const bloodTypes = await getBloodTypeDistribution();
         setBloodTypeData(bloodTypes);
       } catch (error) {
-        console.error('Error loading analytics:', error);
+        void captureHandledError(error, {
+          source: 'frontend',
+          scope: 'donor',
+          metadata: { kind: 'analytics.load', component: 'DonorAnalyticsDashboard' },
+        });
       } finally {
         setLoading(false);
       }

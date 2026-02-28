@@ -4,7 +4,7 @@
  * Real-time blood inventory monitoring using Firebase onSnapshot
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   collection,
   query,
@@ -14,6 +14,7 @@ import {
 import { db } from '../firebase';
 import { BloodInventory } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
+import { failRealtimeLoad, reportRealtimeError } from '../utils/realtimeError';
 
 interface UseRealtimeInventoryOptions {
   hospitalId: string;
@@ -45,6 +46,31 @@ export const useRealtimeInventory = ({
   const [lowStockItems, setLowStockItems] = useState<BloodInventory[]>([]);
   const [criticalStockItems, setCriticalStockItems] = useState<BloodInventory[]>([]);
   const [totalUnits, setTotalUnits] = useState(0);
+  const inventoryRef = useRef<BloodInventory[]>([]);
+  const lowStockItemsRef = useRef<BloodInventory[]>([]);
+  const criticalStockItemsRef = useRef<BloodInventory[]>([]);
+  const onLowStockRef = useRef<typeof onLowStock>(onLowStock);
+  const onCriticalStockRef = useRef<typeof onCriticalStock>(onCriticalStock);
+
+  useEffect(() => {
+    inventoryRef.current = inventory;
+  }, [inventory]);
+
+  useEffect(() => {
+    lowStockItemsRef.current = lowStockItems;
+  }, [lowStockItems]);
+
+  useEffect(() => {
+    criticalStockItemsRef.current = criticalStockItems;
+  }, [criticalStockItems]);
+
+  useEffect(() => {
+    onLowStockRef.current = onLowStock;
+  }, [onLowStock]);
+
+  useEffect(() => {
+    onCriticalStockRef.current = onCriticalStock;
+  }, [onCriticalStock]);
 
   useEffect(() => {
     if (!hospitalId) {
@@ -75,21 +101,24 @@ export const useRealtimeInventory = ({
           const criticalStock = inventoryData.filter(item => item.status === 'critical');
 
           // Detect new low/critical stock items
-          if (inventory.length > 0) {
+          const previousInventory = inventoryRef.current;
+          const previousLowStock = lowStockItemsRef.current;
+          const previousCriticalStock = criticalStockItemsRef.current;
+          if (previousInventory.length > 0) {
             // Check for newly critical items
             criticalStock.forEach(item => {
-              const wasCritical = criticalStockItems.find(i => i.id === item.id);
-              if (!wasCritical && onCriticalStock) {
-                onCriticalStock(item);
+              const wasCritical = previousCriticalStock.find(i => i.id === item.id);
+              if (!wasCritical && onCriticalStockRef.current) {
+                onCriticalStockRef.current(item);
               }
             });
 
             // Check for newly low stock items
             lowStock.forEach(item => {
-              const wasLow = lowStockItems.find(i => i.id === item.id);
-              const wasCritical = criticalStockItems.find(i => i.id === item.id);
-              if (!wasLow && !wasCritical && onLowStock) {
-                onLowStock(item);
+              const wasLow = previousLowStock.find(i => i.id === item.id);
+              const wasCritical = previousCriticalStock.find(i => i.id === item.id);
+              if (!wasLow && !wasCritical && onLowStockRef.current) {
+                onLowStockRef.current(item);
               }
             });
           }
@@ -100,15 +129,29 @@ export const useRealtimeInventory = ({
           setTotalUnits(inventoryData.reduce((sum, item) => sum + item.units, 0));
           setLoading(false);
         } catch (err) {
-          console.error('Error processing inventory:', err);
-          setError('Failed to load inventory');
-          setLoading(false);
+          failRealtimeLoad(
+            { scope: 'bloodbank', hook: 'useRealtimeInventory' },
+            {
+              error: err,
+              kind: 'inventory.process',
+              fallbackMessage: 'Failed to load inventory',
+              setError,
+              setLoading,
+            }
+          );
         }
       },
       (err) => {
-        console.error('Error listening to inventory:', err);
-        setError('Failed to listen to inventory');
-        setLoading(false);
+        failRealtimeLoad(
+          { scope: 'bloodbank', hook: 'useRealtimeInventory' },
+          {
+            error: err,
+            kind: 'inventory.listen',
+            fallbackMessage: 'Failed to listen to inventory',
+            setError,
+            setLoading,
+          }
+        );
       }
     );
 
@@ -143,13 +186,27 @@ export const useRealtimeBloodTypeInventory = (
       where('bloodType', '==', bloodType)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const items = extractQueryData<BloodInventory>(snapshot, [
-        'lastRestocked',
-        'updatedAt',
-      ]);
-      setInventoryItem(items.length > 0 ? items[0] : null);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const items = extractQueryData<BloodInventory>(snapshot, [
+          'lastRestocked',
+          'updatedAt',
+        ]);
+        setInventoryItem(items.length > 0 ? items[0] : null);
+      },
+      (err) => {
+        reportRealtimeError(
+          { scope: 'bloodbank', hook: 'useRealtimeBloodTypeInventory' },
+          err,
+          'inventory.blood_type.listen',
+          {
+            hospitalId,
+            bloodType,
+          }
+        );
+      }
+    );
 
     return () => unsubscribe();
   }, [hospitalId, bloodType]);
@@ -173,14 +230,25 @@ export const useRealtimeLowInventoryAlerts = (): {
       where('status', 'in', ['low', 'critical'])
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const alertData = extractQueryData<BloodInventory>(snapshot, [
-        'lastRestocked',
-        'updatedAt',
-      ]);
-      setAlerts(alertData);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const alertData = extractQueryData<BloodInventory>(snapshot, [
+          'lastRestocked',
+          'updatedAt',
+        ]);
+        setAlerts(alertData);
+        setLoading(false);
+      },
+      (err) => {
+        setLoading(false);
+        reportRealtimeError(
+          { scope: 'admin', hook: 'useRealtimeLowInventoryAlerts' },
+          err,
+          'inventory.low_alerts.listen'
+        );
+      }
+    );
 
     return () => unsubscribe();
   }, []);
@@ -216,20 +284,31 @@ export const useRealtimeInventoryStats = (
       where('hospitalId', '==', hospitalId)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const inventory = extractQueryData<BloodInventory>(snapshot, [
-        'lastRestocked',
-        'updatedAt',
-      ]);
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const inventory = extractQueryData<BloodInventory>(snapshot, [
+          'lastRestocked',
+          'updatedAt',
+        ]);
 
-      setStats({
-        totalUnits: inventory.reduce((sum, item) => sum + item.units, 0),
-        adequateCount: inventory.filter(item => item.status === 'adequate').length,
-        lowCount: inventory.filter(item => item.status === 'low').length,
-        criticalCount: inventory.filter(item => item.status === 'critical').length,
-        surplusCount: inventory.filter(item => item.status === 'surplus').length,
-      });
-    });
+        setStats({
+          totalUnits: inventory.reduce((sum, item) => sum + item.units, 0),
+          adequateCount: inventory.filter(item => item.status === 'adequate').length,
+          lowCount: inventory.filter(item => item.status === 'low').length,
+          criticalCount: inventory.filter(item => item.status === 'critical').length,
+          surplusCount: inventory.filter(item => item.status === 'surplus').length,
+        });
+      },
+      (err) => {
+        reportRealtimeError(
+          { scope: 'bloodbank', hook: 'useRealtimeInventoryStats' },
+          err,
+          'inventory.stats.listen',
+          { hospitalId }
+        );
+      }
+    );
 
     return () => unsubscribe();
   }, [hospitalId]);

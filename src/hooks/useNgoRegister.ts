@@ -4,10 +4,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { notify } from 'services/notify.service';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db, googleProvider } from '../firebase';
-import { signInWithPopup, signOut } from 'firebase/auth';
+import { auth, db } from '../firebase';
+import { signOut } from 'firebase/auth';
 import { applyReferralTrackingForUser, resolveReferralContext } from '../services/referral.service';
 import { captureHandledError } from '../services/errorLog.service';
+import { authFlowMessages, authInputMessages, getOtpValidationError, sanitizeOtp, validateIndiaPhoneInput } from '../utils/authInputValidation';
+import { useOtpResendTimer } from './useOtpResendTimer';
+import { clearRecaptchaVerifier } from '../utils/recaptcha';
+import { registerWithGoogleRole } from '../utils/googleRegister';
+import { requireValue } from '../utils/validationFeedback';
 
 interface RegisterFormData {
   identifier: string;
@@ -21,7 +26,7 @@ export const useNgoRegister = () => {
     identifier: '',
     otp: ''
   });
-  const [otpResendTimer, setOtpResendTimer] = useState(0);
+  const { otpResendTimer, startResendTimer } = useOtpResendTimer();
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
 
   const navigate = useNavigate();
@@ -42,67 +47,38 @@ export const useNgoRegister = () => {
     }));
   };
 
-  const startResendTimer = () => {
-    setOtpResendTimer(30);
-    const timer = setInterval(() => {
-      setOtpResendTimer((prevTime) => {
-        if (prevTime <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prevTime - 1;
-      });
-    }, 1000);
-  };
-
   const handlePhoneNumberSubmit = async () => {
-    const digitsOnly = formData.identifier.replace(/\D/g, '');
-    const isValid10Digits = digitsOnly.length === 10 ||
-      (digitsOnly.startsWith('91') && digitsOnly.length === 12);
-
-    if (!isValid10Digits) {
-      notify.error('Please enter a valid 10-digit phone number.');
+    const { error, phoneNumber } = validateIndiaPhoneInput(formData.identifier);
+    if (!requireValue(!error && Boolean(phoneNumber), error || authInputMessages.invalidIndiaPhone)) {
       return;
     }
+    const safePhoneNumber = phoneNumber as string;
 
     try {
-      const phoneNumber = formData.identifier.startsWith('+')
-        ? formData.identifier
-        : `+${formData.identifier}`;
-
-      const confirmation = await loginWithPhone(phoneNumber);
+      const confirmation = await loginWithPhone(safePhoneNumber);
       setConfirmationResult(confirmation);
-      notify.success('OTP sent successfully!');
+      notify.success(authFlowMessages.otpSent);
       startResendTimer();
     } catch (error: any) {
-      console.error('Phone registration error:', error);
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.ngo.phone.submit' } });
-      notify.error('Failed to send OTP. Please try again.');
+      notify.error(authFlowMessages.otpSendFailed);
     }
   };
 
   const handleOTPSubmit = async () => {
-    if (!formData.otp) {
-      notify.error('Please enter the OTP.');
+    if (!requireValue(Boolean(confirmationResult), authInputMessages.requestOtpFirst)) {
       return;
     }
+    const otpError = getOtpValidationError(formData.otp);
+    if (!requireValue(!otpError, otpError || authFlowMessages.otpInvalid)) {
+      return;
+    }
+    const sanitizedOtp = sanitizeOtp(formData.otp);
     try {
       setOtpLoading(true);
-      const userCredential = await confirmationResult.confirm(formData.otp);
+      const userCredential = await confirmationResult.confirm(sanitizedOtp);
 
-      // Clean up reCAPTCHA after successful verification
-      const container = document.getElementById('recaptcha-container');
-      if (container) {
-        container.remove();
-      }
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-        } catch (e) {
-          console.warn('Error clearing recaptcha:', e);
-        }
-        window.recaptchaVerifier = undefined;
-      }
+      clearRecaptchaVerifier();
 
       // Check if user already registered
       const userRef = doc(db, 'users', userCredential.user.uid);
@@ -139,27 +115,14 @@ export const useNgoRegister = () => {
       notify.success('Registration successful!');
       navigate('/ngo/onboarding');
     } catch (error: any) {
-      console.error('OTP verification error:', error);
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.ngo.otp.verify' } });
 
-      // Clean up reCAPTCHA on error
-      const container = document.getElementById('recaptcha-container');
-      if (container) {
-        container.remove();
-      }
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-        } catch (e) {
-          console.warn('Error clearing recaptcha on error:', e);
-        }
-        window.recaptchaVerifier = undefined;
-      }
+      clearRecaptchaVerifier();
 
       if (error.code === 'auth/invalid-verification-code') {
-        notify.error('Invalid OTP. Please try again.');
+        notify.error(authFlowMessages.otpInvalid);
       } else {
-        notify.error('Verification failed. Please try again.');
+        notify.error(authFlowMessages.verificationFailed);
       }
     } finally {
       setOtpLoading(false);
@@ -167,106 +130,34 @@ export const useNgoRegister = () => {
   };
 
   const handleResendOTP = async () => {
+    const { error, phoneNumber } = validateIndiaPhoneInput(formData.identifier);
+    if (!requireValue(!error && Boolean(phoneNumber), error || authInputMessages.invalidIndiaPhone)) {
+      return;
+    }
+    const safePhoneNumber = phoneNumber as string;
     try {
-      const confirmation = await loginWithPhone(formData.identifier);
+      const confirmation = await loginWithPhone(safePhoneNumber);
       setConfirmationResult(confirmation);
-      notify.success('OTP resent successfully!');
+      notify.success(authFlowMessages.otpResent);
       startResendTimer();
     } catch (error) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.ngo.otp.resend' } });
-      notify.error('Failed to resend OTP. Please try again.');
+      notify.error(authFlowMessages.otpResendFailed);
     }
   };
 
   const handleGoogleRegister = async () => {
-    console.log('🔵 NGO Registration started');
     try {
       setGoogleLoading(true);
-
-      // Authenticate with Google using popup
-      console.log('🔵 Opening Google popup...');
-      const result = await signInWithPopup(auth, googleProvider)
-        .catch((error) => {
-          console.error('🔴 Popup error:', error);
-          if (error.code === 'auth/popup-closed-by-user') {
-            throw new Error('Sign-in popup was closed before completing the sign-in process.');
-          }
-          if (error.code === 'auth/popup-blocked') {
-            throw new Error('Sign-in popup was blocked by the browser. Please allow popups for this site.');
-          }
-          if (error.code === 'auth/cancelled-popup-request') {
-            // Silently handle multiple popup requests
-            return null;
-          }
-          throw error;
-        });
-
-      if (!result) {
-        console.log('🟡 Popup cancelled, exiting');
-        setGoogleLoading(false);
-        return;
-      }
-
-      console.log('✅ Google auth successful:', result.user.email);
-
-      // Check if user already registered
-      const userRef = doc(db, 'users', result.user.uid);
-      console.log('🔵 Checking if user exists...');
-
-      const userDoc = await getDoc(userRef).catch((error) => {
-        console.error('🔴 Error checking user existence:', error);
-        throw new Error(`Failed to check user: ${error.message}`);
-      });
-
-      if (userDoc.exists()) {
-        console.log('🟡 User already exists, redirecting to login');
-        await signOut(auth);
-        notify.error('Email already registered. Please use the login page.');
-        setGoogleLoading(false);
-        navigate('/ngo/login');
-        return;
-      }
-
-      console.log('🔵 Creating new user document...');
-
-      // Create new user document with NGO role
-      const referralContext = await resolveReferralContext(result.user.uid);
-      await setDoc(userRef, {
-        uid: result.user.uid,
-        email: result.user.email,
-        displayName: result.user.displayName,
-        photoURL: result.user.photoURL,
+      await registerWithGoogleRole({
         role: 'ngo',
-        onboardingCompleted: false,
-        createdAt: serverTimestamp(),
-        lastLoginAt: serverTimestamp(),
-        ...(referralContext
-          ? {
-              referredByUid: referralContext.referrerUid,
-              referredByBhId: referralContext.referrerBhId,
-              referralCapturedAt: serverTimestamp(),
-            }
-          : {}),
-      }).catch((error) => {
-        console.error('🔴 Error creating user document:', error);
-        throw new Error(`Failed to create user: ${error.message}`);
+        loginPath: '/ngo/login',
+        onboardingPath: '/ngo/onboarding',
+        scope: 'auth',
+        kind: 'auth.register.ngo.google',
+        navigate,
       });
-
-      await applyReferralTrackingForUser(result.user.uid);
-
-      console.log('✅ User document created, navigating to onboarding');
-      notify.success('Registration successful!');
-      navigate('/ngo/onboarding');
-    } catch (error: any) {
-      console.error('🔴 Google registration error:', error);
-      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.ngo.google' } });
-      if (error instanceof Error) {
-        notify.error(error.message);
-      } else {
-        notify.error('Registration failed. Please try again.');
-      }
     } finally {
-      console.log('🔵 Setting loading to false');
       setGoogleLoading(false);
     }
   };

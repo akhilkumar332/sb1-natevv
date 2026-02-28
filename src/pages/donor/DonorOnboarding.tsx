@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { notify } from 'services/notify.service';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { Timestamp, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -26,8 +26,12 @@ import {
 import { countries, getStatesByCountry, getCitiesByState } from '../../data/locations';
 import { db } from '../../firebase';
 import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../../services/referral.service';
-import { getCurrentCoordinates, reverseGeocode } from '../../utils/geolocation.utils';
+import { captureHandledError } from '../../services/errorLog.service';
 import { validateOnboardingStep, type OnboardingValidationRule } from '../../utils/onboardingValidation';
+import { LeafletClickMarker, LeafletMapUpdater } from '../../components/shared/leaflet/LocationMapPrimitives';
+import { useAddressAutocomplete } from '../../hooks/useAddressAutocomplete';
+import { mapNominatimAddress } from '../../utils/addressMapping';
+import { useLocationResolver } from '../../hooks/useLocationResolver';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -90,30 +94,6 @@ const steps = [
   { icon: CheckCircle, title: 'Consent', subtitle: 'Agreement', color: 'red' },
 ];
 
-// Map click handler component
-function LocationMarker({ position, setPosition }: { position: [number, number], setPosition: (pos: [number, number]) => void }) {
-  useMapEvents({
-    click(e: L.LeafletMouseEvent) {
-      setPosition([e.latlng.lat, e.latlng.lng]);
-    },
-  });
-
-  return position ? (
-    <Marker position={position}>
-      <Popup>Your selected location</Popup>
-    </Marker>
-  ) : null;
-}
-
-// Map auto-centering component
-function MapUpdater({ center }: { center: [number, number] }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center, 13);
-  }, [center, map]);
-  return null;
-}
-
 export function DonorOnboarding() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -150,9 +130,23 @@ export function DonorOnboarding() {
   const [mapPosition, setMapPosition] = useState<[number, number]>([20.5937, 78.9629]);
   const [availableStates, setAvailableStates] = useState(getStatesByCountry('IN'));
   const [availableCities, setAvailableCities] = useState<string[]>([]);
-  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
-  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const reportOnboardingError = (error: unknown, kind: string) => {
+    void captureHandledError(error, {
+      source: 'frontend',
+      scope: 'donor',
+      metadata: { kind, page: 'DonorOnboarding' },
+    });
+  };
+  const {
+    suggestions: addressSuggestions,
+    showSuggestions: showAddressSuggestions,
+    searchSuggestions,
+    clearSuggestions,
+  } = useAddressAutocomplete({
+    scope: 'donor',
+    page: 'DonorOnboarding',
+  });
+  const { resolveCurrentLocation, resolveFromCoordinates } = useLocationResolver('donor');
 
   useEffect(() => {
     if (user) {
@@ -193,34 +187,7 @@ export function DonorOnboarding() {
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setFormData(prev => ({ ...prev, address: value }));
-
-    // Clear previous timeout
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-    }
-
-    // If input is empty, hide suggestions
-    if (!value.trim()) {
-      setShowAddressSuggestions(false);
-      setAddressSuggestions([]);
-      return;
-    }
-
-    // Debounce search - wait 500ms after user stops typing
-    const timeout = setTimeout(async () => {
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(value)}&limit=5&addressdetails=1`
-        );
-        const data = await response.json();
-        setAddressSuggestions(data);
-        setShowAddressSuggestions(data.length > 0);
-      } catch (error) {
-        console.error('Address search error:', error);
-      }
-    }, 500);
-
-    setSearchTimeout(timeout);
+    searchSuggestions(value);
   };
 
   const handleAddressSelect = (suggestion: any) => {
@@ -231,78 +198,63 @@ export function DonorOnboarding() {
       longitude: parseFloat(suggestion.lon)
     }));
     setMapPosition([parseFloat(suggestion.lat), parseFloat(suggestion.lon)]);
-    setShowAddressSuggestions(false);
-    setAddressSuggestions([]);
+    clearSuggestions();
 
     // Try to extract and match state/city from address
     if (suggestion.address) {
-      const addr = suggestion.address;
-
-      if (addr.state) {
-        const matchedState = availableStates.find(s =>
-          s.name.toLowerCase() === addr.state.toLowerCase()
-        );
-        if (matchedState) {
-          setFormData(prev => ({ ...prev, state: matchedState.name }));
-
-          const stateCities = getCitiesByState(formData.country, matchedState.name);
-          const matchedCity = stateCities.find(c =>
-            c.toLowerCase() === (addr.city || addr.town || addr.village || '').toLowerCase()
-          );
-          if (matchedCity) {
-            setFormData(prev => ({ ...prev, city: matchedCity }));
-          }
-        }
+      const mapped = mapNominatimAddress({
+        address: suggestion.address,
+        availableStates,
+        countryCode: formData.country,
+      });
+      if (mapped.state) {
+        setFormData(prev => ({ ...prev, state: mapped.state }));
       }
-
-      if (addr.postcode) {
-        setFormData(prev => ({ ...prev, postalCode: addr.postcode }));
+      if (mapped.city) {
+        setFormData(prev => ({ ...prev, city: mapped.city }));
+      }
+      if (mapped.postalCode) {
+        setFormData(prev => ({ ...prev, postalCode: mapped.postalCode }));
       }
     }
   };
 
   const getCurrentLocation = () => {
     void (async () => {
-      setLocationLoading(true);
-      const coords = await getCurrentCoordinates({ scope: 'donor' });
-      if (!coords) {
-        setLocationLoading(false);
-        return;
-      }
-
-      const [latitude, longitude] = coords;
-      setMapPosition([latitude, longitude]);
-      setFormData(prev => ({ ...prev, latitude, longitude }));
-
-      const data = await reverseGeocode(latitude, longitude, { scope: 'donor' });
-      if (data && data.address) {
-        const address = data.address;
-        setFormData(prev => ({
-          ...prev,
-          address: data.display_name || '',
-          postalCode: address.postcode || prev.postalCode,
-        }));
-
-        if (address.state) {
-          const matchedState = availableStates.find(s =>
-            s.name.toLowerCase() === String(address.state).toLowerCase()
-          );
-          if (matchedState) {
-            setFormData(prev => ({ ...prev, state: matchedState.name }));
-            const stateCities = getCitiesByState(formData.country, matchedState.name);
-            const matchedCity = stateCities.find(c =>
-              c.toLowerCase() === String(address.city || address.town || address.village || '').toLowerCase()
-            );
-            if (matchedCity) {
-              setFormData(prev => ({ ...prev, city: matchedCity }));
-            }
-          }
+      try {
+        setLocationLoading(true);
+        const result = await resolveCurrentLocation();
+        if (!result) {
+          return;
         }
 
-        notify.success('Location detected successfully!');
-      }
+        const [latitude, longitude] = result.coords;
+        setMapPosition([latitude, longitude]);
+        setFormData(prev => ({ ...prev, latitude, longitude }));
 
-      setLocationLoading(false);
+        const data = result.geocode;
+        if (data && data.address) {
+          const address = data.address;
+          const mapped = mapNominatimAddress({
+            address,
+            availableStates,
+            countryCode: formData.country,
+          });
+          setFormData(prev => ({
+            ...prev,
+            address: data.display_name || '',
+            postalCode: mapped.postalCode || prev.postalCode,
+            state: mapped.state || prev.state,
+            city: mapped.city || prev.city,
+          }));
+
+          notify.success('Location detected successfully!');
+        }
+      } catch (error) {
+        reportOnboardingError(error, 'donor.onboarding.detect_location');
+      } finally {
+        setLocationLoading(false);
+      }
     })();
   };
 
@@ -314,34 +266,25 @@ export function DonorOnboarding() {
       longitude: newPosition[1]
     }));
 
-    const data = await reverseGeocode(newPosition[0], newPosition[1], {
+    const result = await resolveFromCoordinates(newPosition, {
       errorMessage: 'Could not fetch address for this location',
-      scope: 'donor',
     });
+    const data = result.geocode;
 
     if (data && data.address) {
       const address = data.address;
+      const mapped = mapNominatimAddress({
+        address,
+        availableStates,
+        countryCode: formData.country,
+      });
       setFormData(prev => ({
         ...prev,
         address: data.display_name || '',
-        postalCode: address.postcode || prev.postalCode,
+        postalCode: mapped.postalCode || prev.postalCode,
+        state: mapped.state || prev.state,
+        city: mapped.city || prev.city,
       }));
-
-      if (address.state) {
-        const matchedState = availableStates.find(s =>
-          s.name.toLowerCase() === String(address.state).toLowerCase()
-        );
-        if (matchedState) {
-          setFormData(prev => ({ ...prev, state: matchedState.name }));
-          const stateCities = getCitiesByState(formData.country, matchedState.name);
-          const matchedCity = stateCities.find(c =>
-            c.toLowerCase() === String(address.city || address.town || address.village || '').toLowerCase()
-          );
-          if (matchedCity) {
-            setFormData(prev => ({ ...prev, city: matchedCity }));
-          }
-        }
-      }
 
       notify.success('Address updated from map location');
     }
@@ -478,7 +421,7 @@ export function DonorOnboarding() {
           navigate(target);
         }, 2000);
       } catch (error: any) {
-        console.error('Onboarding submission error:', error);
+        reportOnboardingError(error, 'donor.onboarding.submit');
         notify.error(error?.message || 'Failed to complete onboarding. Please try again.');
         setIsLoading(false);
       }
@@ -633,8 +576,12 @@ export function DonorOnboarding() {
                       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
-                    <LocationMarker position={mapPosition} setPosition={handleMapPositionChange} />
-                    <MapUpdater center={mapPosition} />
+                    <LeafletClickMarker
+                      position={mapPosition}
+                      onPositionChange={handleMapPositionChange}
+                      popupText="Your selected location"
+                    />
+                    <LeafletMapUpdater center={mapPosition} zoom={13} />
                   </MapContainer>
                 </div>
 

@@ -4,13 +4,17 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { notify } from 'services/notify.service';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db, googleProvider } from '../firebase';
-import { signInWithPopup, signOut } from 'firebase/auth';
+import { auth, db } from '../firebase';
+import { signOut } from 'firebase/auth';
 import { authStorage } from '../utils/authStorage';
-import { normalizePhoneNumber, isValidPhoneNumber } from '../utils/phone';
 import { findUsersByPhone } from '../utils/userLookup';
 import { applyReferralTrackingForUser, resolveReferralContext } from '../services/referral.service';
 import { captureHandledError } from '../services/errorLog.service';
+import { authFlowMessages, authInputMessages, getOtpValidationError, sanitizeOtp, validateGeneralPhoneInput } from '../utils/authInputValidation';
+import { useOtpResendTimer } from './useOtpResendTimer';
+import { clearRecaptchaVerifier } from '../utils/recaptcha';
+import { registerWithGoogleRole } from '../utils/googleRegister';
+import { requireValue } from '../utils/validationFeedback';
 
 interface RegisterFormData {
   identifier: string;
@@ -24,7 +28,7 @@ export const useRegister = () => {
     identifier: '',
     otp: ''
   });
-  const [otpResendTimer, setOtpResendTimer] = useState(0);
+  const { otpResendTimer, startResendTimer } = useOtpResendTimer();
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
 
   const navigate = useNavigate();
@@ -46,67 +50,40 @@ export const useRegister = () => {
     }));
   };
 
-  const startResendTimer = () => {
-    setOtpResendTimer(30);
-    const timer = setInterval(() => {
-      setOtpResendTimer((prevTime) => {
-        if (prevTime <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prevTime - 1;
-      });
-    }, 1000);
-  };
-
   const handlePhoneNumberSubmit = async () => {
-    const normalizedPhone = normalizePhoneNumber(formData.identifier);
-    if (!isValidPhoneNumber(normalizedPhone)) {
-      notify.error('Please enter a valid phone number.');
+    const { normalized: normalizedPhone, error } = validateGeneralPhoneInput(formData.identifier);
+    if (!requireValue(!error, error || authInputMessages.invalidIndiaPhone)) {
       return;
     }
 
     try {
       const confirmation = await loginWithPhone(normalizedPhone);
       setConfirmationResult(confirmation);
-      notify.success('OTP sent successfully!');
+      notify.success(authFlowMessages.otpSent);
       startResendTimer();
     } catch (error: any) {
-      console.error('Phone registration error:', error);
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.phone.submit' } });
-      notify.error('Failed to send OTP. Please try again.');
+      notify.error(authFlowMessages.otpSendFailed);
     }
   };
 
   const handleOTPSubmit = async () => {
-    if (!confirmationResult) {
-      notify.error('Please request an OTP before verifying.');
+    if (!requireValue(Boolean(confirmationResult), authInputMessages.requestOtpFirst)) {
       return;
     }
 
-    if (!formData.otp) {
-      notify.error('Please enter the OTP.');
+    const otpError = getOtpValidationError(formData.otp);
+    if (!requireValue(!otpError, otpError || authFlowMessages.otpInvalid)) {
       return;
     }
+    const sanitizedOtp = sanitizeOtp(formData.otp);
     try {
       setOtpLoading(true);
-      const userCredential = await confirmationResult.confirm(formData.otp);
+      const userCredential = await confirmationResult.confirm(sanitizedOtp);
 
-      // Clean up reCAPTCHA after successful verification
-      const container = document.getElementById('recaptcha-container');
-      if (container) {
-        container.remove();
-      }
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-        } catch (e) {
-          console.warn('Error clearing recaptcha:', e);
-        }
-        window.recaptchaVerifier = undefined;
-      }
+      clearRecaptchaVerifier();
 
-      const normalizedPhone = normalizePhoneNumber(formData.identifier);
+      const { normalized: normalizedPhone } = validateGeneralPhoneInput(formData.identifier);
 
       // Check if user already registered by uid as a fallback
       const userRef = doc(db, 'users', userCredential.user.uid);
@@ -155,32 +132,22 @@ export const useRegister = () => {
       await applyReferralTrackingForUser(userCredential.user.uid);
 
       const token = await userCredential.user.getIdToken();
+      if (!token) {
+        throw new Error('No token received');
+      }
       authStorage.setAuthToken(token);
 
       notify.success('Registration successful!');
       navigate('/donor/onboarding');
     } catch (error: any) {
-      console.error('OTP verification error:', error);
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.otp.verify' } });
 
-      // Clean up reCAPTCHA on error
-      const container = document.getElementById('recaptcha-container');
-      if (container) {
-        container.remove();
-      }
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-        } catch (e) {
-          console.warn('Error clearing recaptcha on error:', e);
-        }
-        window.recaptchaVerifier = undefined;
-      }
+      clearRecaptchaVerifier();
 
       if (error.code === 'auth/invalid-verification-code') {
-        notify.error('Invalid OTP. Please try again.');
+        notify.error(authFlowMessages.otpInvalid);
       } else {
-        notify.error('Verification failed. Please try again.');
+        notify.error(authFlowMessages.verificationFailed);
       }
     } finally {
       setOtpLoading(false);
@@ -188,109 +155,34 @@ export const useRegister = () => {
   };
 
   const handleResendOTP = async () => {
+    const { normalized, error } = validateGeneralPhoneInput(formData.identifier);
+    if (!requireValue(!error, error || authInputMessages.invalidIndiaPhone)) {
+      return;
+    }
     try {
-      const confirmation = await loginWithPhone(normalizePhoneNumber(formData.identifier));
+      const confirmation = await loginWithPhone(normalized);
       setConfirmationResult(confirmation);
-      notify.success('OTP resent successfully!');
+      notify.success(authFlowMessages.otpResent);
       startResendTimer();
     } catch (error) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.otp.resend' } });
-      notify.error('Failed to resend OTP. Please try again.');
+      notify.error(authFlowMessages.otpResendFailed);
     }
   };
 
   const handleGoogleRegister = async () => {
-    console.log('🔵 Donor Registration started');
     try {
       setGoogleLoading(true);
-
-      // Authenticate with Google using popup
-      console.log('🔵 Opening Google popup...');
-      const result = await signInWithPopup(auth, googleProvider)
-        .catch((error) => {
-          console.error('🔴 Popup error:', error);
-          if (error.code === 'auth/popup-closed-by-user') {
-            throw new Error('Sign-in popup was closed before completing the sign-in process.');
-          }
-          if (error.code === 'auth/popup-blocked') {
-            throw new Error('Sign-in popup was blocked by the browser. Please allow popups for this site.');
-          }
-          if (error.code === 'auth/cancelled-popup-request') {
-            // Silently handle multiple popup requests
-            return null;
-          }
-          throw error;
-        });
-
-      if (!result) {
-        console.log('🟡 Popup cancelled, exiting');
-        setGoogleLoading(false);
-        return;
-      }
-
-      console.log('✅ Google auth successful:', result.user.email);
-
-      // Check if user already registered
-      const userRef = doc(db, 'users', result.user.uid);
-      console.log('🔵 Checking if user exists...');
-
-      const userDoc = await getDoc(userRef).catch((error) => {
-        console.error('🔴 Error checking user existence:', error);
-        throw new Error(`Failed to check user: ${error.message}`);
-      });
-
-      if (userDoc.exists()) {
-        console.log('🟡 User already exists, redirecting to login');
-        await signOut(auth);
-        notify.error('Email already registered. Please use the login page.');
-        setGoogleLoading(false);
-        navigate('/donor/login');
-        return;
-      }
-
-      console.log('🔵 Creating new user document...');
-
-      // Create new user document with Donor role
-      const referralContext = await resolveReferralContext(result.user.uid);
-      await setDoc(userRef, {
-        uid: result.user.uid,
-        email: result.user.email,
-        displayName: result.user.displayName,
-        photoURL: result.user.photoURL,
+      await registerWithGoogleRole({
         role: 'donor',
-        onboardingCompleted: false,
-        createdAt: serverTimestamp(),
-        lastLoginAt: serverTimestamp(),
-        ...(referralContext
-          ? {
-              referredByUid: referralContext.referrerUid,
-              referredByBhId: referralContext.referrerBhId,
-              referralCapturedAt: serverTimestamp(),
-            }
-          : {}),
-      }).catch((error) => {
-        console.error('🔴 Error creating user document:', error);
-        throw new Error(`Failed to create user: ${error.message}`);
+        loginPath: '/donor/login',
+        onboardingPath: '/donor/onboarding',
+        scope: 'auth',
+        kind: 'auth.register.google',
+        navigate,
+        persistToken: true,
       });
-
-      await applyReferralTrackingForUser(result.user.uid);
-
-      const token = await result.user.getIdToken();
-      authStorage.setAuthToken(token);
-
-      console.log('✅ User document created, navigating to onboarding');
-      notify.success('Registration successful!');
-      navigate('/donor/onboarding');
-    } catch (error: any) {
-      console.error('🔴 Google registration error:', error);
-      void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.google' } });
-      if (error instanceof Error) {
-        notify.error(error.message);
-      } else {
-        notify.error('Registration failed. Please try again.');
-      }
     } finally {
-      console.log('🔵 Setting loading to false');
       setGoogleLoading(false);
     }
   };

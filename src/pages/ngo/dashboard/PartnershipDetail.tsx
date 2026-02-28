@@ -1,19 +1,20 @@
 import { useMemo, useState } from 'react';
 import { Link, useOutletContext, useParams } from 'react-router-dom';
-import { notify } from 'services/notify.service';
+import { createScopedErrorNotifier, notify } from 'services/notify.service';
 import {
   ArrowLeft,
-  Archive,
   Edit3,
   Handshake,
   Mail,
   Phone,
-  Trash2,
   X,
 } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import type { NgoDashboardContext } from '../NgoDashboard';
 import { archivePartnership, deletePartnership, updatePartnership } from '../../../services/ngo.service';
+import { ArchiveDeleteActions } from '../../../components/shared/ArchiveDeleteActions';
+import { DeleteConfirmModal } from '../../../components/shared/DeleteConfirmModal';
+import { ModalShell } from '../../../components/shared/ModalShell';
 
 const emptyForm = {
   partnerName: '',
@@ -36,21 +37,7 @@ function NgoPartnershipDetail() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
 
-  const notifyNgoPartnershipDetailError = (
-    error: unknown,
-    fallbackMessage: string,
-    toastId: string,
-    kind: string
-  ) => notify.fromError(
-    error,
-    fallbackMessage,
-    { id: toastId },
-    {
-      source: 'frontend',
-      scope: 'ngo',
-      metadata: { page: 'NgoPartnershipDetail', kind },
-    }
-  );
+  const notifyNgoPartnershipDetailError = createScopedErrorNotifier({ scope: 'ngo', page: 'NgoPartnershipDetail' });
 
   const partnership = useMemo(
     () => partnerships.find((item) => item.id === partnershipId),
@@ -82,7 +69,7 @@ function NgoPartnershipDetail() {
       notifyNgoPartnershipDetailError(
         error,
         'Failed to archive partnership.',
-        'ngo-partnership-detail-archive-error',
+        { id: 'ngo-partnership-detail-archive-error' },
         'ngo.partnershipDetail.archive'
       );
     }
@@ -98,7 +85,7 @@ function NgoPartnershipDetail() {
       notifyNgoPartnershipDetailError(
         error,
         'Failed to delete partnership.',
-        'ngo-partnership-detail-delete-error',
+        { id: 'ngo-partnership-detail-delete-error' },
         'ngo.partnershipDetail.delete'
       );
     } finally {
@@ -166,7 +153,7 @@ function NgoPartnershipDetail() {
       notifyNgoPartnershipDetailError(
         error,
         'Failed to update partnership.',
-        'ngo-partnership-detail-update-error',
+        { id: 'ngo-partnership-detail-update-error' },
         'ngo.partnershipDetail.update'
       );
     } finally {
@@ -201,29 +188,11 @@ function NgoPartnershipDetail() {
               <Edit3 className="w-4 h-4" />
               Edit
             </button>
-            {partnership.status === 'inactive' ? (
-              <span className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-400">
-                <Archive className="w-4 h-4" />
-                Archived
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={handleArchive}
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-              >
-                <Archive className="w-4 h-4" />
-                Archive
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setDeleteOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
+            <ArchiveDeleteActions
+              isArchived={partnership.status === 'inactive'}
+              onArchive={handleArchive}
+              onDelete={() => setDeleteOpen(true)}
+            />
           </div>
         </div>
       </div>
@@ -270,37 +239,19 @@ function NgoPartnershipDetail() {
         </div>
       </div>
 
-      {deleteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-gray-900">Delete partnership?</h3>
-            <p className="mt-2 text-sm text-gray-600">
-              This will permanently remove the partnership record.
-            </p>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-1 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-              >
-                {deleting ? 'Deleting...' : 'Delete'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeleteOpen(false)}
-                className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        open={deleteOpen}
+        title="Delete partnership?"
+        message="This will permanently remove the partnership record."
+        onConfirm={() => {
+          void handleDelete();
+        }}
+        onCancel={() => setDeleteOpen(false)}
+        isConfirming={deleting}
+      />
 
       {isEditOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <ModalShell containerClassName="bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-white">
               <h3 className="text-lg font-bold text-gray-900">Edit Partnership</h3>
               <button
@@ -439,8 +390,7 @@ function NgoPartnershipDetail() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   );

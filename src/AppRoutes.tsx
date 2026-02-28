@@ -35,9 +35,9 @@ const tryAutoReload = (error: unknown) => {
 // Helper function for lazy loading with retry
 const lazyLoad = (importPromise: Promise<any>) => {
   return importPromise.catch(error => {
-    console.error("Error loading component:", error);
     void captureHandledError(error, {
       source: 'frontend',
+      scope: 'unknown',
       metadata: {
         kind: 'route.lazy_load',
       },

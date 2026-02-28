@@ -4,6 +4,7 @@ import { notify } from 'services/notify.service';
 import { db } from '../firebase';
 import { REFERRAL_RULES, computeReferralStatus } from '../utils/referralRules';
 import { ensureReferralNotificationsForReferrer } from '../services/referral.service';
+import { useScopedErrorReporter } from './useScopedErrorReporter';
 
 type ReferralEntry = {
   id: string;
@@ -62,6 +63,10 @@ export const useReferrals = (user: any): UseReferralsResult => {
   const fallbackReferralAppliedRef = useRef(false);
   const referralNotificationSyncRef = useRef<Set<string>>(new Set());
   const referralStatusSyncRef = useRef<Set<string>>(new Set());
+  const reportReferralsError = useScopedErrorReporter({
+    scope: 'donor',
+    metadata: { hook: 'useReferrals' },
+  });
 
   useEffect(() => {
     fallbackReferralAppliedRef.current = false;
@@ -106,7 +111,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
       }
       throw new Error('Clipboard not available');
     } catch (error) {
-      console.warn('Clipboard copy failed:', error);
+      reportReferralsError(error, 'copy_invite_link');
       notify.error('Unable to copy link. Please try again.');
     }
   };
@@ -127,7 +132,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
         });
         return;
       } catch (error) {
-        console.warn('Share canceled or failed:', error);
+        reportReferralsError(error, 'share_invite_link', { expected: true });
       }
     }
     await copyInviteLink();
@@ -163,7 +168,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
       });
       setReferralQrDataUrl(dataUrl);
     } catch (error) {
-      console.warn('Referral QR generation failed', error);
+      reportReferralsError(error, 'generate_referral_qr');
       notify.error('Unable to generate QR code.');
     } finally {
       setReferralQrLoading(false);
@@ -206,7 +211,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
       setReferralCount(nextEntries.length);
       setReferralLoading(false);
     }, (error) => {
-      console.warn('Failed to load referrals:', error);
+      reportReferralsError(error, 'referrals.listen');
       setReferralLoading(false);
     });
     return () => unsubscribe();
@@ -252,7 +257,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
           setReferralCount(fallbackEntries.length);
         }
       } catch (error) {
-        console.warn('Failed to load referral fallback data:', error);
+        reportReferralsError(error, 'referrals.fallback.fetch');
       } finally {
         if (isActive) {
           fallbackReferralAppliedRef.current = true;
@@ -295,7 +300,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
         const merged = results.reduce((acc, current) => ({ ...acc, ...current }), {} as Record<string, any>);
         setReferralUsers(merged);
       } catch (error) {
-        console.warn('Failed to load referred users:', error);
+        reportReferralsError(error, 'referrals.users.fetch');
       } finally {
         if (isActive) {
           setReferralUsersLoading(false);

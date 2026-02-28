@@ -7,9 +7,12 @@ import { notify } from 'services/notify.service';
 import { FirebaseError } from 'firebase/app';
 import { authStorage } from '../utils/authStorage';
 import { auth } from '../firebase';
-import { normalizePhoneNumber, isValidPhoneNumber } from '../utils/phone';
 import { captureHandledError } from '../services/errorLog.service';
 import { authMessages } from '../constants/messages';
+import { authFlowMessages, authInputMessages, getOtpValidationError, sanitizeOtp, validateGeneralPhoneInput } from '../utils/authInputValidation';
+import { useOtpResendTimer } from './useOtpResendTimer';
+import { requireValue } from '../utils/validationFeedback';
+import { notifyGoogleSignInFailure, notifyRoleMismatch } from '../utils/authNotifications';
 
 interface LoginFormData {
   identifier: string;
@@ -23,7 +26,7 @@ export const useLogin = () => {
     identifier: '',
     otp: ''
   });
-  const [otpResendTimer, setOtpResendTimer] = useState(0);
+  const { otpResendTimer, startResendTimer } = useOtpResendTimer();
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
 
   const navigate = useNavigate();
@@ -45,54 +48,33 @@ export const useLogin = () => {
     }));
   };
 
-  const startResendTimer = () => {
-    setOtpResendTimer(30);
-    const timer = setInterval(() => {
-      setOtpResendTimer((prevTime) => {
-        if (prevTime <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prevTime - 1;
-      });
-    }, 1000);
-  };
-
   const handlePhoneNumberSubmit = async () => {
-    const formattedNumber = normalizePhoneNumber(formData.identifier);
-    if (!isValidPhoneNumber(formattedNumber)) {
-      notify.error('Please enter a valid phone number.');
+    const { normalized: formattedNumber, error } = validateGeneralPhoneInput(formData.identifier);
+    if (!requireValue(!error, error || authInputMessages.invalidIndiaPhone)) {
       return;
     }
 
     try {
       const confirmation = await loginWithPhone(formattedNumber);
       setConfirmationResult(confirmation);
-      notify.success('OTP sent successfully!');
+      notify.success(authFlowMessages.otpSent);
       startResendTimer();
     } catch (error) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.phone.submit' } });
-      notify.error('Failed to send OTP. Please try again.');
+      notify.error(authFlowMessages.otpSendFailed);
     }
   };
 
   const handleOTPSubmit = async () => {
-    if (!confirmationResult) {
-      notify.error('Please request an OTP before verifying.');
+    if (!requireValue(Boolean(confirmationResult), authInputMessages.requestOtpFirst)) {
       return;
     }
 
-    const sanitizedOtp = formData.otp.replace(/\D/g, '').trim();
-
-    if (!sanitizedOtp) {
-      notify.error('Please enter the OTP.');
+    const otpError = getOtpValidationError(formData.otp);
+    if (!requireValue(!otpError, otpError || authFlowMessages.otpInvalid)) {
       return;
     }
-
-    if (sanitizedOtp.length !== 6) {
-      notify.error('Invalid OTP length. Please enter the 6-digit code.');
-      return;
-    }
+    const sanitizedOtp = sanitizeOtp(formData.otp);
     try {
       setOtpLoading(true);
       const verifiedUser = await verifyOTP(confirmationResult, sanitizedOtp);
@@ -110,11 +92,12 @@ export const useLogin = () => {
       const token = await auth.currentUser?.getIdToken();
       if (token) {
         handleLoginSuccess(token);
+      } else {
+        throw new Error('No token received');
       }
 
       notify.success('Login successful!');
     } catch (error) {
-      console.error('OTP verification error:', error);
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.otp.verify' } });
 
       if (error instanceof PhoneAuthError) {
@@ -128,7 +111,7 @@ export const useLogin = () => {
           return;
         }
         if (error.code === 'role_mismatch') {
-          notify.error(authMessages.roleMismatch.donor, { id: 'role-mismatch-donor' });
+          notifyRoleMismatch('donor');
           return;
         }
         if (error.code === 'superadmin_google_only') {
@@ -143,14 +126,14 @@ export const useLogin = () => {
 
       if (error instanceof FirebaseError) {
         if (error.code === 'auth/invalid-verification-code') {
-          notify.error('Invalid OTP. Please try again.');
+          notify.error(authFlowMessages.otpInvalid);
         } else if (error.code === 'auth/code-expired') {
-          notify.error('OTP expired. Please request a new code.');
+          notify.error(authFlowMessages.otpExpired);
         } else {
-          notify.error('Failed to verify OTP. Please try again.');
+          notify.error(authFlowMessages.otpVerifyFailed);
         }
       } else {
-        notify.error('Failed to verify OTP. Please try again.');
+        notify.error(authFlowMessages.otpVerifyFailed);
       }
     } finally {
       setOtpLoading(false);
@@ -158,14 +141,18 @@ export const useLogin = () => {
   };
 
   const handleResendOTP = async () => {
+    const { normalized, error } = validateGeneralPhoneInput(formData.identifier);
+    if (!requireValue(!error, error || authInputMessages.invalidIndiaPhone)) {
+      return;
+    }
     try {
-      const confirmation = await loginWithPhone(normalizePhoneNumber(formData.identifier));
+      const confirmation = await loginWithPhone(normalized);
       setConfirmationResult(confirmation);
-      notify.success('OTP resent successfully!');
+      notify.success(authFlowMessages.otpResent);
       startResendTimer();
     } catch (error) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.otp.resend' } });
-      notify.error('Failed to resend OTP. Please try again.');
+      notify.error(authFlowMessages.otpResendFailed);
     }
   };
 
@@ -178,7 +165,7 @@ export const useLogin = () => {
       setGoogleLoading(true);
       const result = await loginWithGoogle();
       if (result.user.role !== 'donor' && result.user.role !== 'superadmin') {
-        notify.error(authMessages.roleMismatch.donor, { id: 'role-mismatch-donor' });
+        notifyRoleMismatch('donor');
         await logout(navigate, { redirectTo: '/donor/login', showToast: false });
         return;
       }
@@ -201,14 +188,12 @@ export const useLogin = () => {
         const pendingSearch = pendingParams.toString();
         const hasPendingRequest = pendingParams.has('pendingRequest') || pendingParams.has('pendingRequestKey');
         if (result.user.onboardingCompleted === true) {
-          console.log('Navigating to dashboard');
           const destination = returnTo || (hasPendingRequest ? '/donor/dashboard/requests' : '/donor/dashboard');
           const target = pendingSearch
             ? `${destination}${destination.includes('?') ? '&' : '?'}${pendingSearch}`
             : destination;
           navigate(target);
         } else {
-          console.log('Navigating to onboarding');
           const onboardingTarget = pendingSearch
             ? `/donor/onboarding?${pendingSearch}`
             : '/donor/onboarding';
@@ -218,8 +203,8 @@ export const useLogin = () => {
         throw new Error('No token received');
       }
     } catch (error) {
-      console.error('Failed to sign in with Google. Please try again.');
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.google' } });
+      notifyGoogleSignInFailure();
     } finally {
       setGoogleLoading(false);
     }

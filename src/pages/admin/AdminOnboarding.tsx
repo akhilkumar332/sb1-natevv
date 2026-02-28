@@ -185,7 +185,6 @@ export function AdminOnboarding() {
   );
 
   const renderStep = () => {
-    console.log('Current Step:', currentStep); 
     switch (currentStep) {
       case 0:
         return (

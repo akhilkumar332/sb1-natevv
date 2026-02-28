@@ -199,7 +199,6 @@ export const useAdminData = (): UseAdminDataReturn => {
       });
       setUsers(usersList);
     } catch (err) {
-      console.error('Error fetching users:', err);
       reportAdminDataError(err, 'fetch_users');
     }
   };
@@ -210,33 +209,38 @@ export const useAdminData = (): UseAdminDataReturn => {
       const verificationsRef = collection(db, 'verificationRequests');
       const q = query(verificationsRef, orderBy('submittedAt', 'desc'), limit(50));
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const verificationsList: VerificationRequest[] = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            userId: data.userId || '',
-            organizationType: data.organizationType || 'bloodbank',
-            organizationName: data.organizationName || data.name || '',
-            registrationNumber: data.registrationNumber,
-            address: data.address,
-            city: data.city,
-            state: data.state,
-            contactPerson: data.contactPerson,
-            documents: data.documents || [],
-            status: data.status || 'pending',
-            submittedAt: data.submittedAt?.toDate() || data.createdAt?.toDate() || new Date(),
-            reviewedAt: data.reviewedAt?.toDate(),
-            reviewedBy: data.reviewedBy,
-            rejectionReason: data.rejectionReason,
-          };
-        });
-        setVerificationRequests(verificationsList);
-      });
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const verificationsList: VerificationRequest[] = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              userId: data.userId || '',
+              organizationType: data.organizationType || 'bloodbank',
+              organizationName: data.organizationName || data.name || '',
+              registrationNumber: data.registrationNumber,
+              address: data.address,
+              city: data.city,
+              state: data.state,
+              contactPerson: data.contactPerson,
+              documents: data.documents || [],
+              status: data.status || 'pending',
+              submittedAt: data.submittedAt?.toDate() || data.createdAt?.toDate() || new Date(),
+              reviewedAt: data.reviewedAt?.toDate(),
+              reviewedBy: data.reviewedBy,
+              rejectionReason: data.rejectionReason,
+            };
+          });
+          setVerificationRequests(verificationsList);
+        },
+        (err) => {
+          reportAdminDataError(err, 'fetch_verification_requests.listen');
+        }
+      );
 
       return unsubscribe;
     } catch (err) {
-      console.error('Error fetching verification requests:', err);
       reportAdminDataError(err, 'fetch_verification_requests');
       return () => {};
     }
@@ -253,31 +257,36 @@ export const useAdminData = (): UseAdminDataReturn => {
         limit(20)
       );
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const requestsList: EmergencyRequest[] = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            hospitalId: data.hospitalId || data.requesterId || '',
-            hospitalName: data.hospitalName || '',
-            bloodType: data.bloodType || '',
-            units: data.units || 0,
-            unitsReceived: data.unitsReceived || 0,
-            urgency: data.urgency || 'medium',
-            isEmergency: data.isEmergency || false,
-            status: data.status || 'active',
-            requestedAt: data.requestedAt?.toDate() || data.createdAt?.toDate() || new Date(),
-            neededBy: data.neededBy?.toDate() || new Date(),
-            location: data.location || { city: '', state: '' },
-            respondedDonors: data.respondedDonors?.length || 0,
-          };
-        });
-        setEmergencyRequests(requestsList);
-      });
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const requestsList: EmergencyRequest[] = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              hospitalId: data.hospitalId || data.requesterId || '',
+              hospitalName: data.hospitalName || '',
+              bloodType: data.bloodType || '',
+              units: data.units || 0,
+              unitsReceived: data.unitsReceived || 0,
+              urgency: data.urgency || 'medium',
+              isEmergency: data.isEmergency || false,
+              status: data.status || 'active',
+              requestedAt: data.requestedAt?.toDate() || data.createdAt?.toDate() || new Date(),
+              neededBy: data.neededBy?.toDate() || new Date(),
+              location: data.location || { city: '', state: '' },
+              respondedDonors: data.respondedDonors?.length || 0,
+            };
+          });
+          setEmergencyRequests(requestsList);
+        },
+        (err) => {
+          reportAdminDataError(err, 'fetch_emergency_requests.listen');
+        }
+      );
 
       return unsubscribe;
     } catch (err) {
-      console.error('Error fetching emergency requests:', err);
       reportAdminDataError(err, 'fetch_emergency_requests');
       return () => {};
     }
@@ -325,7 +334,6 @@ export const useAdminData = (): UseAdminDataReturn => {
 
       setSystemAlerts(alertsList);
     } catch (err) {
-      console.error('Error fetching system alerts:', err);
       reportAdminDataError(err, 'fetch_system_alerts');
     }
   };
@@ -391,7 +399,6 @@ export const useAdminData = (): UseAdminDataReturn => {
 
       setRecentActivity({ donations, requests, campaigns });
     } catch (err) {
-      console.error('Error fetching recent activity:', err);
       reportAdminDataError(err, 'fetch_recent_activity');
     }
   };
@@ -455,7 +462,6 @@ export const useAdminData = (): UseAdminDataReturn => {
         rejectedVerificationRequests,
       });
     } catch (err) {
-      console.error('Error calculating stats:', err);
       reportAdminDataError(err, 'calculate_stats');
     }
   };
@@ -485,7 +491,6 @@ export const useAdminData = (): UseAdminDataReturn => {
         setLoading(false);
       } catch (err) {
         if (!isActive) return;
-        console.error('Error loading admin data:', err);
         reportAdminDataError(err, 'load_admin_data');
         setError('Failed to load admin data');
         setLoading(false);

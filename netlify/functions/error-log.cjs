@@ -4,6 +4,18 @@ const sanitizeText = (input) => String(input || '')
   .replace(/\b\+?\d[\d\s()-]{8,}\d\b/g, '[REDACTED_PHONE]')
   .replace(/(token|idToken|accessToken|refreshToken|authorization|password)=([^&\s]+)/gi, '$1=[REDACTED]');
 
+const sensitiveRouteParamPatterns = [
+  'token',
+  'idtoken',
+  'accesstoken',
+  'refreshtoken',
+  'authorization',
+  'password',
+  'otp',
+  'pendingrequest',
+  'pendingrequestkey',
+];
+
 const DEDUPE_WINDOW_MS = 30 * 1000;
 const THROTTLE_WINDOW_MS = 60 * 1000;
 const THROTTLE_LIMIT_PER_KEY = 15;
@@ -22,6 +34,26 @@ const getHeader = (headers, name) => {
 const truncate = (value, max) => {
   if (!value || value.length <= max) return value || null;
   return `${value.slice(0, max)}...[truncated]`;
+};
+
+const sanitizeRoute = (rawRoute) => {
+  if (!rawRoute) return null;
+  try {
+    const parsed = new URL(String(rawRoute), 'https://localhost');
+    const params = new URLSearchParams();
+    let count = 0;
+    parsed.searchParams.forEach((value, key) => {
+      if (count >= 12) return;
+      const keyLower = String(key).toLowerCase();
+      const isSensitive = sensitiveRouteParamPatterns.some((pattern) => keyLower.includes(pattern));
+      params.set(key, isSensitive ? '[REDACTED]' : truncate(sanitizeText(value), 80));
+      count += 1;
+    });
+    const suffix = params.toString();
+    return truncate(`${parsed.pathname}${suffix ? `?${suffix}` : ''}`, 320);
+  } catch {
+    return truncate(sanitizeText(String(rawRoute)), 320);
+  }
 };
 
 const inferScope = (route) => {
@@ -189,7 +221,7 @@ const logNetlifyError = async ({ admin, event, error, route, scope, actorUid, ac
     const message = truncate(sanitizeText(error?.message || String(error || 'Netlify function error')), 600);
     const stack = truncate(sanitizeText(error?.stack || ''), 4000);
     const code = typeof error?.code === 'string' ? error.code : null;
-    const resolvedRoute = route || event?.path || null;
+    const resolvedRoute = sanitizeRoute(route || event?.path || null);
     const resolvedMethod = event?.httpMethod || null;
     const fingerprint = buildFingerprint({
       route: resolvedRoute,

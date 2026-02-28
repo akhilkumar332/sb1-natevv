@@ -1,3 +1,5 @@
+import { captureHandledError } from '../services/errorLog.service';
+
 const referralCookieName = 'bh_referrer';
 const referralStorageKey = 'bh_referrer_meta';
 const referralUidStorageKey = 'bh_referrer_uid';
@@ -96,7 +98,11 @@ export const getReferralTracking = () => {
           return meta.bhId;
         }
       } catch (error) {
-        console.warn('Failed to parse referral metadata:', error);
+        void captureHandledError(error, {
+          source: 'frontend',
+          scope: 'unknown',
+          metadata: { kind: 'referral_tracking.parse_meta' },
+        });
       }
     }
   }

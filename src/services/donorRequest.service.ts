@@ -16,6 +16,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { captureHandledError } from './errorLog.service';
 
 export type DonationComponent = 'whole' | 'plasma' | 'platelets';
 
@@ -56,6 +57,18 @@ export const MAX_DONOR_REQUEST_BATCH_TARGETS = 200;
 export const MAX_DONOR_REQUEST_MESSAGE_LENGTH = 280;
 const RECENT_CACHE_PREFIX = 'recentDonorRequests:';
 const RECENT_CACHE_TTL_MS = 3 * 60 * 1000;
+
+const reportDonorRequestServiceError = (error: unknown, kind: string, metadata?: Record<string, unknown>) => {
+  void captureHandledError(error, {
+    source: 'frontend',
+    scope: 'donor',
+    metadata: {
+      kind,
+      service: 'donorRequest.service',
+      ...(metadata || {}),
+    },
+  });
+};
 
 export type RequesterProfile = {
   uid: string;
@@ -139,7 +152,7 @@ const markRequestExpired = async (docRef: any) => {
       updatedAt: serverTimestamp(),
     });
   } catch (error) {
-    console.warn('Failed to expire donor request', error);
+    reportDonorRequestServiceError(error, 'donor_request.mark_expired');
   }
 };
 
@@ -324,7 +337,7 @@ export const primeRecentDonorRequestCache = async (uid: string) => {
     }).filter((item) => item.targetDonorUid);
     saveRecentRequestCache(uid, items);
   } catch (error) {
-    console.warn('Failed to prime recent donor requests cache', error);
+    reportDonorRequestServiceError(error, 'donor_request.cache.prime', { uid });
   }
 };
 
@@ -376,7 +389,7 @@ export const submitDonorRequest = async (requester: RequesterProfile, payload: P
     if (error?.message === 'already_requested') {
       throw error;
     }
-    console.warn('Failed to verify existing donor request. Continuing.', error);
+    reportDonorRequestServiceError(error, 'donor_request.verify_existing');
   }
   return await addDoc(collection(db, 'donorRequests'), {
     requesterUid: requester.uid,
@@ -453,7 +466,7 @@ export const submitDonorRequestBatch = async (
       });
       saveRecentRequestCache(requester.uid, items);
     } catch (error) {
-      console.warn('Failed to load recent donor requests for dedupe. Continuing without dedupe.', error);
+      reportDonorRequestServiceError(error, 'donor_request.batch.dedupe_recent_load', { requesterUid: requester.uid });
     }
   }
 
@@ -468,7 +481,7 @@ export const submitDonorRequestBatch = async (
       payload.targets.map((target) => target.id)
     );
   } catch (error) {
-    console.warn('Failed to check active donor connections. Continuing without connection guard.', error);
+    reportDonorRequestServiceError(error, 'donor_request.batch.active_connections', { requesterUid: requester.uid });
   }
   try {
     const uniqueTargets = Array.from(new Set(payload.targets.map((target) => target.id).filter(Boolean)));
@@ -502,7 +515,7 @@ export const submitDonorRequestBatch = async (
       });
     }
   } catch (error) {
-    console.warn('Failed to load existing donor requests for dedupe. Falling back to recent cache.', error);
+    reportDonorRequestServiceError(error, 'donor_request.batch.existing_load_fallback', { requesterUid: requester.uid });
     existingRequestMap = new Map();
   }
   const normalizedMessage = typeof payload.message === 'string'

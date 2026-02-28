@@ -1,20 +1,21 @@
 import { useMemo, useState } from 'react';
 import { Link, useOutletContext, useParams } from 'react-router-dom';
-import { notify } from 'services/notify.service';
+import { createScopedErrorNotifier, notify } from 'services/notify.service';
 import {
   ArrowLeft,
-  Archive,
   Edit3,
   Mail,
   Phone,
   Shield,
-  Trash2,
   User,
   X,
 } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import type { NgoDashboardContext } from '../NgoDashboard';
 import { archiveVolunteer, deleteVolunteer, updateVolunteer } from '../../../services/ngo.service';
+import { ArchiveDeleteActions } from '../../../components/shared/ArchiveDeleteActions';
+import { DeleteConfirmModal } from '../../../components/shared/DeleteConfirmModal';
+import { ModalShell } from '../../../components/shared/ModalShell';
 
 const emptyForm = {
   name: '',
@@ -36,21 +37,7 @@ function NgoVolunteerDetail() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
 
-  const notifyNgoVolunteerDetailError = (
-    error: unknown,
-    fallbackMessage: string,
-    toastId: string,
-    kind: string
-  ) => notify.fromError(
-    error,
-    fallbackMessage,
-    { id: toastId },
-    {
-      source: 'frontend',
-      scope: 'ngo',
-      metadata: { page: 'NgoVolunteerDetail', kind },
-    }
-  );
+  const notifyNgoVolunteerDetailError = createScopedErrorNotifier({ scope: 'ngo', page: 'NgoVolunteerDetail' });
 
   const volunteer = useMemo(
     () => volunteers.find((item) => item.id === volunteerId),
@@ -82,7 +69,7 @@ function NgoVolunteerDetail() {
       notifyNgoVolunteerDetailError(
         error,
         'Failed to archive volunteer.',
-        'ngo-volunteer-detail-archive-error',
+        { id: 'ngo-volunteer-detail-archive-error' },
         'ngo.volunteerDetail.archive'
       );
     }
@@ -98,7 +85,7 @@ function NgoVolunteerDetail() {
       notifyNgoVolunteerDetailError(
         error,
         'Failed to delete volunteer.',
-        'ngo-volunteer-detail-delete-error',
+        { id: 'ngo-volunteer-detail-delete-error' },
         'ngo.volunteerDetail.delete'
       );
     } finally {
@@ -166,7 +153,7 @@ function NgoVolunteerDetail() {
       notifyNgoVolunteerDetailError(
         error,
         'Failed to update volunteer.',
-        'ngo-volunteer-detail-update-error',
+        { id: 'ngo-volunteer-detail-update-error' },
         'ngo.volunteerDetail.update'
       );
     } finally {
@@ -201,29 +188,11 @@ function NgoVolunteerDetail() {
               <Edit3 className="w-4 h-4" />
               Edit
             </button>
-            {volunteer.status === 'inactive' ? (
-              <span className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-400">
-                <Archive className="w-4 h-4" />
-                Archived
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={handleArchive}
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-              >
-                <Archive className="w-4 h-4" />
-                Archive
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setDeleteOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
+            <ArchiveDeleteActions
+              isArchived={volunteer.status === 'inactive'}
+              onArchive={handleArchive}
+              onDelete={() => setDeleteOpen(true)}
+            />
           </div>
         </div>
       </div>
@@ -277,37 +246,19 @@ function NgoVolunteerDetail() {
         </div>
       </div>
 
-      {deleteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-gray-900">Delete volunteer?</h3>
-            <p className="mt-2 text-sm text-gray-600">
-              This will permanently remove the volunteer record.
-            </p>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-1 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-              >
-                {deleting ? 'Deleting...' : 'Delete'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeleteOpen(false)}
-                className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        open={deleteOpen}
+        title="Delete volunteer?"
+        message="This will permanently remove the volunteer record."
+        onConfirm={() => {
+          void handleDelete();
+        }}
+        onCancel={() => setDeleteOpen(false)}
+        isConfirming={deleting}
+      />
 
       {isEditOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <ModalShell containerClassName="bg-white w-full max-w-xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-white">
               <h3 className="text-lg font-bold text-gray-900">Edit Volunteer</h3>
               <button
@@ -435,8 +386,7 @@ function NgoVolunteerDetail() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   );

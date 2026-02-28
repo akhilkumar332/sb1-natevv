@@ -11,6 +11,8 @@ import 'react-phone-number-input/style.css';
 import LogoMark from '../../components/LogoMark';
 import PwaInstallCta from '../../components/PwaInstallCta';
 import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
+import AuthStatusScreen from '../../components/auth/AuthStatusScreen';
+import { navigateToPortalDashboard, resolveImpersonationRole, resolvePortalRole } from '../../utils/portalNavigation';
 
 export function DonorLogin() {
   const navigate = useNavigate();
@@ -43,15 +45,6 @@ export function DonorLogin() {
     handleGoogleLogin
   } = useLogin();
 
-  const resolvePortalRole = (role?: string | null) => {
-    if (!role) return null;
-    if (role === 'hospital') return 'bloodbank';
-    if (role === 'bloodbank' || role === 'ngo' || role === 'admin' || role === 'donor') {
-      return role;
-    }
-    return 'donor';
-  };
-
   useEffect(() => {
     if (!user || hasNavigated.current) {
       return;
@@ -62,13 +55,11 @@ export function DonorLogin() {
     }
 
     if (isImpersonating) {
-      const role = resolvePortalRole(impersonationSession?.targetRole ?? user.role ?? null);
-      if (role) {
-        hasNavigated.current = true;
-        setShowPortalModal(false);
-        navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
-        return;
-      }
+      const role = resolvePortalRole(impersonationSession?.targetRole ?? user.role ?? null, 'donor');
+      hasNavigated.current = true;
+      setShowPortalModal(false);
+      navigateToPortalDashboard(navigate, role);
+      return;
     }
 
     if (isSuperAdmin) {
@@ -104,49 +95,26 @@ export function DonorLogin() {
   ]);
 
   if (user && !profileResolved) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex items-center gap-3 text-gray-600">
-          <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-medium">Checking account…</span>
-        </div>
-      </div>
-    );
+    return <AuthStatusScreen message="Checking account…" />;
   }
 
   if (user && user.role === 'donor' && !isSuperAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex items-center gap-3 text-gray-600">
-          <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-medium">Signing you in…</span>
-        </div>
-      </div>
-    );
+    return <AuthStatusScreen message="Signing you in…" />;
   }
 
   const handlePortalSelect = (role: 'donor' | 'ngo' | 'bloodbank' | 'admin') => {
     setPortalRole(role);
     hasNavigated.current = true;
-    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+    navigateToPortalDashboard(navigate, role);
   };
 
   const handleImpersonate = async (target: ImpersonationUser, reason?: string) => {
     const resolved = await startImpersonation(target, { ...(reason ? { reason } : {}) });
     if (!resolved) return;
-    const role =
-      resolved.role === 'hospital'
-        ? 'bloodbank'
-        : resolved.role === 'ngo'
-          ? 'ngo'
-          : resolved.role === 'bloodbank'
-            ? 'bloodbank'
-            : resolved.role === 'admin'
-              ? 'admin'
-              : 'donor';
+    const role = resolveImpersonationRole(resolved.role);
     hasNavigated.current = true;
     setShowPortalModal(false);
-    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+    navigateToPortalDashboard(navigate, role);
   };
 
   const renderInitialForm = () => (

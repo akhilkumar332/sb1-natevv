@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
-import { notify } from 'services/notify.service';
+import { createScopedErrorNotifier, notify } from 'services/notify.service';
 import { UserPlus, Users, X } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import type { NgoDashboardContext } from '../NgoDashboard';
 import { addVolunteer, updateVolunteer, archiveVolunteer, deleteVolunteer } from '../../../services/ngo.service';
+import { StatusTabs } from '../../../components/shared/StatusTabs';
+import { DeleteConfirmModal } from '../../../components/shared/DeleteConfirmModal';
+import { EmptyStateCard } from '../../../components/shared/EmptyStateCard';
+import { ModalShell } from '../../../components/shared/ModalShell';
 
 const emptyForm = {
   name: '',
@@ -28,21 +32,7 @@ function NgoVolunteers() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusTab, setStatusTab] = useState<'active' | 'archived' | 'all'>('active');
 
-  const notifyNgoVolunteersError = (
-    error: unknown,
-    fallbackMessage: string,
-    toastId: string,
-    kind: string
-  ) => notify.fromError(
-    error,
-    fallbackMessage,
-    { id: toastId },
-    {
-      source: 'frontend',
-      scope: 'ngo',
-      metadata: { page: 'NgoVolunteers', kind },
-    }
-  );
+  const notifyNgoVolunteersError = createScopedErrorNotifier({ scope: 'ngo', page: 'NgoVolunteers' });
 
   const activeCount = useMemo(
     () => volunteers.filter((volunteer) => volunteer.status === 'active').length,
@@ -118,7 +108,7 @@ function NgoVolunteers() {
       notifyNgoVolunteersError(
         error,
         'Failed to archive volunteer.',
-        'ngo-volunteer-archive-error',
+        { id: 'ngo-volunteer-archive-error' },
         'ngo.volunteers.archive'
       );
     }
@@ -135,7 +125,7 @@ function NgoVolunteers() {
       notifyNgoVolunteersError(
         error,
         'Failed to delete volunteer.',
-        'ngo-volunteer-delete-error',
+        { id: 'ngo-volunteer-delete-error' },
         'ngo.volunteers.delete'
       );
     } finally {
@@ -196,7 +186,7 @@ function NgoVolunteers() {
       notifyNgoVolunteersError(
         error,
         'Failed to save volunteer.',
-        'ngo-volunteer-save-error',
+        { id: 'ngo-volunteer-save-error' },
         editingVolunteerId ? 'ngo.volunteers.update' : 'ngo.volunteers.create'
       );
     } finally {
@@ -226,31 +216,23 @@ function NgoVolunteers() {
 
       <div className="bg-white rounded-2xl shadow-xl p-6">
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          {[
-            { id: 'active', label: `Active (${activeCount})` },
-            { id: 'archived', label: `Archived (${archivedCount})` },
-            { id: 'all', label: `All (${volunteers.length})` },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setStatusTab(tab.id as 'active' | 'archived' | 'all')}
-              className={`rounded-full px-4 py-1.5 text-xs font-semibold border ${
-                statusTab === tab.id
-                  ? 'bg-red-600 text-white border-red-600'
-                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          <StatusTabs
+            value={statusTab}
+            onChange={setStatusTab}
+            options={[
+              { id: 'active', label: `Active (${activeCount})` },
+              { id: 'archived', label: `Archived (${archivedCount})` },
+              { id: 'all', label: `All (${volunteers.length})` },
+            ]}
+          />
         </div>
         {filteredVolunteers.length === 0 ? (
-          <div className="text-center py-10">
-            <Users className="w-12 h-12 text-amber-200 mx-auto mb-3" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No volunteers found</h3>
-            <p className="text-gray-600">Try a different filter or add new volunteers.</p>
-          </div>
+          <EmptyStateCard
+            className="text-center py-10"
+            icon={<Users className="w-12 h-12 text-amber-200 mx-auto mb-3" />}
+            title="No volunteers found"
+            description="Try a different filter or add new volunteers."
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -327,8 +309,7 @@ function NgoVolunteers() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl">
+        <ModalShell containerClassName="bg-white w-full max-w-xl rounded-2xl shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
               <h3 className="text-lg font-bold text-gray-900">
                 {editingVolunteerId ? 'Edit Volunteer' : 'Add Volunteer'}
@@ -458,38 +439,21 @@ function NgoVolunteers() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ModalShell>
       )}
       </div>
 
-      {deleteCandidate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-gray-900">Delete volunteer?</h3>
-            <p className="mt-2 text-sm text-gray-600">
-              This will permanently remove the volunteer record.
-            </p>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => handleDelete(deleteCandidate!)}
-                disabled={deletingId === deleteCandidate}
-                className="flex-1 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-              >
-                {deletingId === deleteCandidate ? 'Deleting...' : 'Delete'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeleteCandidate(null)}
-                className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        open={Boolean(deleteCandidate)}
+        title="Delete volunteer?"
+        message="This will permanently remove the volunteer record."
+        onConfirm={() => {
+          if (!deleteCandidate) return;
+          void handleDelete(deleteCandidate);
+        }}
+        onCancel={() => setDeleteCandidate(null)}
+        isConfirming={deletingId === deleteCandidate}
+      />
     </>
   );
 }

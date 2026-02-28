@@ -17,12 +17,9 @@ export interface PerformanceMetrics {
  * Report performance metric to analytics
  */
 const reportMetric = (metric: { name: string; value: number; rating?: string }) => {
-  // In production, send to analytics service
-  if (import.meta.env.PROD) {
-    console.log('Performance Metric:', metric);
-    // Example: Send to analytics
-    // sendToAnalytics(metric);
-  } else {
+  // Keep console output in development only.
+  // In production, wire this to a telemetry sink if needed.
+  if (import.meta.env.DEV) {
     console.log('[Performance]', metric);
   }
 };
@@ -164,7 +161,7 @@ export const measureResourceTiming = () => {
         size: resource.transferSize,
       }));
 
-    if (slowResources.length > 0) {
+    if (import.meta.env.DEV && slowResources.length > 0) {
       console.warn('[Slow Resources]', slowResources);
     }
     return slowResources;
@@ -229,7 +226,7 @@ export const measureComponentRender = (componentName: string, startTime: number)
   const endTime = performance.now();
   const duration = endTime - startTime;
 
-  if (duration > 16) {
+  if (import.meta.env.DEV && duration > 16) {
     // Slower than 60fps
     console.warn(`[Slow Render] ${componentName}: ${duration.toFixed(2)}ms`);
   }
@@ -253,7 +250,9 @@ export const performanceMeasure = (name: string, startMark: string, endMark: str
   if ('performance' in window && 'measure' in performance) {
     performance.measure(name, startMark, endMark);
     const measure = performance.getEntriesByName(name)[0];
-    console.log(`[Performance Measure] ${name}: ${measure.duration.toFixed(2)}ms`);
+    if (import.meta.env.DEV) {
+      console.log(`[Performance Measure] ${name}: ${measure.duration.toFixed(2)}ms`);
+    }
     return measure.duration;
   }
 };

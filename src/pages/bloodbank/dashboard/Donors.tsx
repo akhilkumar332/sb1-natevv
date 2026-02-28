@@ -1,13 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Users, TrendingUp, ChevronRight, Search, MapPin } from 'lucide-react';
-import { MapContainer, TileLayer, Popup, useMap, useMapEvents, CircleMarker } from 'react-leaflet';
+import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { collection, documentId, endBefore, getDocs, limit, limitToLast, orderBy, query, startAfter, where, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../../firebase';
-import { captureHandledError } from '../../../services/errorLog.service';
 import notify from '../../../services/notify.service';
+import { donorCsvHeaders, donorCsvObjects } from '../../../utils/donorDirectory';
+import { downloadCSV } from '../../../utils/export.utils';
+import { LeafletMapUpdater } from '../../../components/shared/leaflet/LocationMapPrimitives';
+import { DonorClusterLayer } from '../../../components/shared/leaflet/DonorClusterLayer';
+import { EmptyStateCard } from '../../../components/shared/EmptyStateCard';
+import { DonorPaginationFooter } from '../../../components/shared/DonorPaginationFooter';
+import { useScopedErrorReporter } from '../../../hooks/useScopedErrorReporter';
+import { useDonorDirectory } from '../../../hooks/useDonorDirectory';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -17,177 +24,98 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-function MapUpdater({ center }: { center: [number, number] }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center);
-  }, [center, map]);
-  return null;
-}
-
-type DonorSummary = {
-  id: string;
-  name: string;
-  email?: string | null;
-  phone?: string | null;
-  bloodType?: string;
-  city?: string;
-  state?: string;
-  latitude?: number;
-  longitude?: number;
-  isAvailable?: boolean;
-  lastDonation?: Date;
-  totalDonations?: number;
-  createdAt?: Date;
-};
-
-type DonorMapPoint = DonorSummary & { id: string };
-
-type DonorCluster = {
-  id: string;
-  latitude: number;
-  longitude: number;
-  count: number;
-  donors: DonorMapPoint[];
-};
-
-const getGridSize = (zoom: number) => {
-  if (zoom >= 10) return 0.08;
-  if (zoom >= 8) return 0.2;
-  if (zoom >= 6) return 0.5;
-  if (zoom >= 4) return 1;
-  return 2;
-};
-
-const buildClusters = (donors: DonorMapPoint[], zoom: number): DonorCluster[] => {
-  const gridSize = getGridSize(zoom);
-  const buckets = new Map<string, DonorCluster>();
-
-  donors.forEach((donor) => {
-    const lat = donor.latitude as number;
-    const lng = donor.longitude as number;
-    const key = `${Math.round(lat / gridSize)}:${Math.round(lng / gridSize)}`;
-    const existing = buckets.get(key);
-    if (existing) {
-      existing.count += 1;
-      existing.donors.push(donor);
-      existing.latitude = (existing.latitude * (existing.count - 1) + lat) / existing.count;
-      existing.longitude = (existing.longitude * (existing.count - 1) + lng) / existing.count;
-    } else {
-      buckets.set(key, {
-        id: key,
-        latitude: lat,
-        longitude: lng,
-        count: 1,
-        donors: [donor],
-      });
-    }
-  });
-
-  return Array.from(buckets.values());
-};
-
-function DonorMapLayer({ donors }: { donors: DonorMapPoint[] }) {
-  const map = useMap();
-  const [zoom, setZoom] = useState(map.getZoom());
-  const [bounds, setBounds] = useState(() => map.getBounds());
-
-  useMapEvents({
-    zoomend: () => {
-      setZoom(map.getZoom());
-      setBounds(map.getBounds());
-    },
-    moveend: () => {
-      setBounds(map.getBounds());
-    },
-  });
-
-  useEffect(() => {
-    setZoom(map.getZoom());
-    setBounds(map.getBounds());
-  }, [map]);
-
-  const visibleDonors = useMemo(() => {
-    if (!bounds) return donors;
-    return donors.filter((donor) =>
-      typeof donor.latitude === 'number'
-        && typeof donor.longitude === 'number'
-        && bounds.contains([donor.latitude, donor.longitude])
-    );
-  }, [donors, bounds]);
-
-  const clusters = useMemo(() => buildClusters(visibleDonors, zoom), [visibleDonors, zoom]);
-
-  return (
-    <>
-      {clusters.map((cluster) => {
-        const isSingle = cluster.count === 1;
-        const radius = isSingle ? 6 : Math.min(28, 8 + cluster.count * 1.2);
-        return (
-          <CircleMarker
-            key={cluster.id}
-            center={[cluster.latitude, cluster.longitude]}
-            radius={radius}
-            pathOptions={{
-              color: isSingle ? '#f43f5e' : '#be123c',
-              weight: 1,
-              fillColor: isSingle ? '#facc15' : '#eab308',
-              fillOpacity: 0.85,
-            }}
-          >
-            <Popup>
-              {isSingle ? (
-                <>
-                  <div className="text-sm font-semibold text-gray-900">{cluster.donors[0].name}</div>
-                  <div className="text-xs text-gray-600">
-                    {cluster.donors[0].bloodType || 'Blood type'} • {cluster.donors[0].city || 'City'}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="text-sm font-semibold text-gray-900">{cluster.count} donors</div>
-                  <div className="text-xs text-gray-600">Zoom in to see individuals</div>
-                </>
-              )}
-            </Popup>
-          </CircleMarker>
-        );
-      })}
-    </>
-  );
-}
-
 function BloodBankDonors() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [bloodTypeFilter, setBloodTypeFilter] = useState('all');
-  const [availabilityFilter, setAvailabilityFilter] = useState('all');
-  const [cityFilter, setCityFilter] = useState('all');
-  const [donors, setDonors] = useState<DonorSummary[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [loadingDonors, setLoadingDonors] = useState(false);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [firstDoc, setFirstDoc] = useState<QueryDocumentSnapshot | null>(null);
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
-  const [mapDonors, setMapDonors] = useState<DonorSummary[]>([]);
+  const reportBloodBankDonorsError = useScopedErrorReporter({
+    scope: 'bloodbank',
+    metadata: { page: 'BloodBankDonors' },
+  });
+
   const [donorCommunity, setDonorCommunity] = useState({
     totalDonors: 0,
     activeDonors: 0,
     newThisMonth: 0,
     retentionRate: 0,
   });
-  const pageSize = 10;
 
-  const reportBloodBankDonorsError = (error: unknown, kind: string, metadata?: Record<string, unknown>) => {
-    void captureHandledError(error, {
-      source: 'frontend',
-      scope: 'bloodbank',
-      metadata: {
-        page: 'BloodBankDonors',
-        kind,
-        ...(metadata || {}),
-      },
-    });
-  };
+  const {
+    bloodTypes,
+    cityOptions,
+    searchTerm,
+    setSearchTerm,
+    bloodTypeFilter,
+    setBloodTypeFilter,
+    availabilityFilter,
+    setAvailabilityFilter,
+    cityFilter,
+    setCityFilter,
+    filteredDonors,
+    mapFilteredDonors,
+    mapCenter,
+    currentPage,
+    loadingDonors,
+    hasNextPage,
+    onPrevPage,
+    onNextPage,
+  } = useDonorDirectory({
+    scope: 'bloodbank',
+    page: 'BloodBankDonors',
+    cache: {
+      ttlMs: 5 * 60 * 1000,
+      enablePrefetch: false,
+    },
+    onError: reportBloodBankDonorsError,
+    onPageLoadError: (error) => {
+      notify.fromError(error, 'Unable to load donors right now.', { id: 'bloodbank-donors-page-load-error' });
+    },
+  });
+
+  useEffect(() => {
+    const fetchDonorCommunity = async () => {
+      try {
+        const donorsRef = collection(db, 'users');
+        const donorsQuery = query(donorsRef, where('role', '==', 'donor'));
+        const allDonorsSnap = await getDocs(donorsQuery);
+
+        const eligibleDonors = allDonorsSnap.docs
+          .map((doc) => doc.data())
+          .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
+          .filter((data: any) => !data.status || data.status === 'active');
+
+        const totalDonors = eligibleDonors.length;
+
+        const publicSnap = await getDocs(collection(db, 'publicDonors'));
+        const activeDonors = publicSnap.docs
+          .map((doc) => doc.data())
+          .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
+          .filter((data: any) => data.isAvailable === true).length;
+
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+        const newThisMonth = eligibleDonors.filter((data: any) => {
+          const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt ? new Date(data.createdAt) : null;
+          return createdAt && createdAt >= oneMonthAgo;
+        }).length;
+
+        const retentionRate = totalDonors > 0 ? (activeDonors / totalDonors) * 100 : 0;
+
+        setDonorCommunity({
+          totalDonors,
+          activeDonors,
+          newThisMonth,
+          retentionRate: Math.round(retentionRate * 10) / 10,
+        });
+      } catch (error) {
+        reportBloodBankDonorsError(error, 'bloodbank.donors.community.fetch', {
+          bloodTypeFilter,
+          availabilityFilter,
+          cityFilter,
+        });
+      }
+    };
+
+    void fetchDonorCommunity();
+  }, [availabilityFilter, bloodTypeFilter, cityFilter, reportBloodBankDonorsError]);
 
   const activeRate = donorCommunity.totalDonors > 0
     ? Math.round((donorCommunity.activeDonors / donorCommunity.totalDonors) * 100)
@@ -196,295 +124,8 @@ function BloodBankDonors() {
     ? Math.round((donorCommunity.newThisMonth / donorCommunity.totalDonors) * 100)
     : 0;
 
-  const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-  const cityOptions = useMemo(() => {
-    const set = new Set(donors.map((donor) => donor.city).filter(Boolean) as string[]);
-    return Array.from(set).sort();
-  }, [donors]);
-
-  const filteredDonors = useMemo(() => {
-    if (!searchTerm.trim()) return donors;
-    const term = searchTerm.toLowerCase();
-    return donors.filter((donor) =>
-      donor.name.toLowerCase().includes(term) ||
-      donor.email?.toLowerCase().includes(term) ||
-      donor.city?.toLowerCase().includes(term) ||
-      donor.bloodType?.toLowerCase().includes(term)
-    );
-  }, [donors, searchTerm]);
-
-  const mapFilteredDonors = useMemo(() => {
-    let results = mapDonors;
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      results = results.filter((donor) =>
-        donor.name.toLowerCase().includes(term) ||
-        donor.email?.toLowerCase().includes(term) ||
-        donor.city?.toLowerCase().includes(term) ||
-        donor.bloodType?.toLowerCase().includes(term)
-      );
-    }
-    if (bloodTypeFilter !== 'all') {
-      results = results.filter((donor) => donor.bloodType === bloodTypeFilter);
-    }
-    if (availabilityFilter !== 'all') {
-      const shouldBeAvailable = availabilityFilter === 'available';
-      results = results.filter((donor) => Boolean(donor.isAvailable) === shouldBeAvailable);
-    }
-    if (cityFilter !== 'all') {
-      results = results.filter((donor) => donor.city === cityFilter);
-    }
-    return results;
-  }, [mapDonors, searchTerm, bloodTypeFilter, availabilityFilter, cityFilter]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-    setFirstDoc(null);
-    setLastDoc(null);
-    setHasNextPage(false);
-  }, [bloodTypeFilter, availabilityFilter, cityFilter]);
-
-  const fetchDonorCommunity = async () => {
-    try {
-      const donorsRef = collection(db, 'users');
-      const donorsQuery = query(donorsRef, where('role', '==', 'donor'));
-      const allDonorsSnap = await getDocs(donorsQuery);
-
-      const eligibleDonors = allDonorsSnap.docs
-        .map((doc) => doc.data())
-        .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
-        .filter((data: any) => !data.status || data.status === 'active');
-
-      const totalDonors = eligibleDonors.length;
-
-      const publicSnap = await getDocs(collection(db, 'publicDonors'));
-      const activeDonors = publicSnap.docs
-        .map((doc) => doc.data())
-        .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
-        .filter((data: any) => data.isAvailable === true).length;
-
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-
-      const newThisMonth = eligibleDonors.filter((data: any) => {
-        const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt ? new Date(data.createdAt) : null;
-        return createdAt && createdAt >= oneMonthAgo;
-      }).length;
-
-      const retentionRate = totalDonors > 0 ? (activeDonors / totalDonors) * 100 : 0;
-
-      setDonorCommunity({
-        totalDonors,
-        activeDonors,
-        newThisMonth,
-        retentionRate: Math.round(retentionRate * 10) / 10,
-      });
-    } catch (error) {
-      reportBloodBankDonorsError(error, 'bloodbank.donors.community.fetch', {
-        bloodTypeFilter,
-        availabilityFilter,
-        cityFilter,
-      });
-    }
-  };
-
-  const fetchDonorPage = async (direction: 'initial' | 'next' | 'prev' = 'initial') => {
-    setLoadingDonors(true);
-    try {
-      const constraints: any[] = [
-        where('role', '==', 'donor'),
-      ];
-      if (bloodTypeFilter !== 'all') {
-        constraints.push(where('bloodType', '==', bloodTypeFilter));
-      }
-      if (availabilityFilter !== 'all') {
-        constraints.push(where('isAvailable', '==', availabilityFilter === 'available'));
-      }
-      if (cityFilter !== 'all') {
-        constraints.push(where('city', '==', cityFilter));
-      }
-      constraints.push(orderBy(documentId()));
-
-      if (direction === 'next' && lastDoc) {
-        constraints.push(startAfter(lastDoc));
-        constraints.push(limit(pageSize + 1));
-      } else if (direction === 'prev' && firstDoc) {
-        constraints.push(endBefore(firstDoc));
-        constraints.push(limitToLast(pageSize + 1));
-      } else {
-        constraints.push(limit(pageSize + 1));
-      }
-
-      const q = query(collection(db, 'users'), ...constraints);
-      const snapshot = await getDocs(q);
-      let docs = snapshot.docs;
-      const hasExtra = docs.length > pageSize;
-      if (hasExtra) {
-        docs = direction === 'prev' ? docs.slice(docs.length - pageSize) : docs.slice(0, pageSize);
-      }
-      const donorList: DonorSummary[] = docs.map((doc) => {
-        const data = doc.data();
-        const latitude = typeof data.latitude === 'number'
-          ? data.latitude
-          : typeof data.location?.latitude === 'number'
-            ? data.location.latitude
-            : undefined;
-        const longitude = typeof data.longitude === 'number'
-          ? data.longitude
-          : typeof data.location?.longitude === 'number'
-            ? data.location.longitude
-            : undefined;
-        return {
-          id: doc.id,
-          name: data.displayName || data.name || 'Donor',
-          email: data.email,
-          phone: data.phoneNumber,
-          bloodType: data.bloodType,
-          city: data.city,
-          state: data.state,
-          latitude,
-          longitude,
-          isAvailable: data.isAvailable,
-          lastDonation: data.lastDonation?.toDate(),
-          totalDonations: data.totalDonations,
-          createdAt: data.createdAt?.toDate(),
-        };
-      });
-      setDonors(donorList);
-      setFirstDoc(docs[0] || null);
-      setLastDoc(docs[docs.length - 1] || null);
-      if (direction === 'prev') {
-        setHasNextPage(true);
-      } else {
-        setHasNextPage(hasExtra);
-      }
-    } catch (error) {
-      reportBloodBankDonorsError(error, 'bloodbank.donors.page.fetch', {
-        direction,
-        bloodTypeFilter,
-        availabilityFilter,
-        cityFilter,
-      });
-      notify.fromError(error, 'Unable to load donors right now.', { id: 'bloodbank-donors-page-load-error' });
-      setDonors([]);
-      setHasNextPage(false);
-    } finally {
-      setLoadingDonors(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDonorPage('initial');
-    fetchDonorCommunity();
-  }, [bloodTypeFilter, availabilityFilter, cityFilter]);
-
-  useEffect(() => {
-    let isActive = true;
-    const parseLat = (data: any) => (
-      typeof data?.latitude === 'number'
-        ? data.latitude
-        : typeof data?.location?.latitude === 'number'
-          ? data.location.latitude
-          : undefined
-    );
-    const parseLon = (data: any) => (
-      typeof data?.longitude === 'number'
-        ? data.longitude
-        : typeof data?.location?.longitude === 'number'
-          ? data.location.longitude
-          : undefined
-    );
-
-    const mapDoc = (doc: any): DonorSummary => {
-      const data = doc.data ? doc.data() : doc;
-      const latitude = parseLat(data);
-      const longitude = parseLon(data);
-      return {
-        id: doc.id || data.uid || data.id || data.email || `${Math.random()}`,
-        name: data.displayName || data.name || 'Donor',
-        email: data.email,
-        phone: data.phoneNumber || data.phone,
-        bloodType: data.bloodType,
-        city: data.city,
-        state: data.state,
-        latitude,
-        longitude,
-        isAvailable: data.isAvailable,
-        lastDonation: data.lastDonation?.toDate ? data.lastDonation.toDate() : data.lastDonation ? new Date(data.lastDonation) : undefined,
-        totalDonations: data.totalDonations,
-        createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt ? new Date(data.createdAt) : undefined,
-      };
-    };
-
-    const fetchMapDonors = async () => {
-      try {
-        const publicSnap = await getDocs(
-          query(collection(db, 'publicDonors'), orderBy(documentId()), limit(200))
-        );
-        const publicRows = publicSnap.docs
-          .map(mapDoc)
-          .filter((donor) => typeof donor.latitude === 'number' && typeof donor.longitude === 'number');
-        if (isActive) {
-          setMapDonors(publicRows);
-        }
-      } catch (error) {
-        reportBloodBankDonorsError(error, 'bloodbank.donors.map.fetch');
-        if (isActive) {
-          setMapDonors([]);
-        }
-      } finally {
-        // no-op
-      }
-    };
-
-    fetchMapDonors();
-    return () => {
-      isActive = false;
-    };
-  }, []);
-
-  const mapCenter = useMemo<[number, number]>(() => {
-    const first = mapFilteredDonors.find(
-      (donor) => typeof donor.latitude === 'number' && typeof donor.longitude === 'number'
-    );
-    return first ? [first.latitude as number, first.longitude as number] : [20.5937, 78.9629];
-  }, [mapFilteredDonors]);
-
   const handleExportCSV = () => {
-    const headers = [
-      'Name',
-      'Email',
-      'Phone',
-      'Blood Type',
-      'City',
-      'State',
-      'Available',
-      'Last Donation',
-      'Total Donations',
-    ];
-    const rows = filteredDonors.map((donor) => [
-      donor.name,
-      donor.email || '',
-      donor.phone || '',
-      donor.bloodType || '',
-      donor.city || '',
-      donor.state || '',
-      donor.isAvailable ? 'Yes' : 'No',
-      donor.lastDonation ? donor.lastDonation.toLocaleDateString() : '',
-      donor.totalDonations || '',
-    ]);
-    const csv = [headers, ...rows]
-      .map((row) => row.map((item) => `"${String(item).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'donors.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    downloadCSV(donorCsvObjects(filteredDonors), 'donors.csv', donorCsvHeaders);
   };
 
   return (
@@ -658,11 +299,9 @@ function BloodBankDonors() {
         </div>
 
         {loadingDonors ? (
-          <div className="text-center py-10 text-gray-500">Loading donors...</div>
+          <EmptyStateCard className="text-center py-10 text-gray-500" description="Loading donors..." />
         ) : filteredDonors.length === 0 ? (
-          <div className="text-center py-10 text-gray-500">
-            No donors found.
-          </div>
+          <EmptyStateCard className="text-center py-10 text-gray-500" description="No donors found." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -712,37 +351,17 @@ function BloodBankDonors() {
           </div>
         )}
         {filteredDonors.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
-            <span>
-              Page {currentPage}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  if (currentPage === 1 || loadingDonors) return;
-                  await fetchDonorPage('prev');
-                  setCurrentPage((prev) => Math.max(1, prev - 1));
-                }}
-                disabled={currentPage === 1 || loadingDonors}
-                className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!hasNextPage || loadingDonors) return;
-                  await fetchDonorPage('next');
-                  setCurrentPage((prev) => prev + 1);
-                }}
-                disabled={!hasNextPage || loadingDonors}
-                className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <DonorPaginationFooter
+            currentPage={currentPage}
+            loading={loadingDonors}
+            hasNextPage={hasNextPage}
+            onPrev={() => {
+              void onPrevPage();
+            }}
+            onNext={() => {
+              void onNextPage();
+            }}
+          />
         )}
       </div>
 
@@ -755,24 +374,26 @@ function BloodBankDonors() {
           <MapPin className="w-5 h-5 text-yellow-500" />
         </div>
         <div className="h-80 w-full overflow-hidden rounded-xl border border-gray-200">
-            <MapContainer
-              center={mapCenter}
-              zoom={5}
-              scrollWheelZoom={false}
-              className="h-full w-full"
-            >
+          <MapContainer
+            center={mapCenter}
+            zoom={5}
+            scrollWheelZoom={false}
+            className="h-full w-full"
+          >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <MapUpdater center={mapCenter} />
-            <DonorMapLayer
+            <LeafletMapUpdater center={mapCenter} />
+            <DonorClusterLayer
               donors={mapFilteredDonors.filter(
                 (donor) =>
                   donor.isAvailable === true &&
                   typeof donor.latitude === 'number' &&
                   typeof donor.longitude === 'number'
               )}
+              singleFillColor="#facc15"
+              clusterFillColor="#eab308"
             />
           </MapContainer>
         </div>

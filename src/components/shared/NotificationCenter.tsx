@@ -11,6 +11,7 @@ import { Notification } from '../../types/database.types';
 import { formatRelativeTime } from '../../utils/dataTransform';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { useScopedErrorReporter } from '../../hooks/useScopedErrorReporter';
 
 interface NotificationCenterProps {
   isOpen: boolean;
@@ -35,6 +36,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   error,
 }) => {
   const { user } = useAuth();
+  const reportNotificationCenterError = useScopedErrorReporter({
+    scope: 'unknown',
+    metadata: { component: 'NotificationCenter' },
+  });
 
   const [markingRead, setMarkingRead] = useState<Set<string>>(new Set());
 
@@ -51,7 +56,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         readAt: new Date(),
       });
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      reportNotificationCenterError(error, 'notification.center.mark_read');
     } finally {
       setMarkingRead((prev) => {
         const next = new Set(prev);

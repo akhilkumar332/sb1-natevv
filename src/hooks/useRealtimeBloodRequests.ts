@@ -4,7 +4,7 @@
  * Real-time blood request monitoring using Firebase onSnapshot
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   collection,
   query,
@@ -16,6 +16,7 @@ import {
 import { db } from '../firebase';
 import { BloodRequest } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
+import { failRealtimeLoad, reportRealtimeError } from '../utils/realtimeError';
 
 interface UseRealtimeBloodRequestsOptions {
   status?: 'active' | 'fulfilled' | 'partially_fulfilled' | 'expired' | 'cancelled';
@@ -47,6 +48,16 @@ export const useRealtimeBloodRequests = ({
   const [requests, setRequests] = useState<BloodRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestsRef = useRef<BloodRequest[]>([]);
+  const onNewRequestRef = useRef<typeof onNewRequest>(onNewRequest);
+
+  useEffect(() => {
+    requestsRef.current = requests;
+  }, [requests]);
+
+  useEffect(() => {
+    onNewRequestRef.current = onNewRequest;
+  }, [onNewRequest]);
 
   useEffect(() => {
     setLoading(true);
@@ -91,27 +102,42 @@ export const useRealtimeBloodRequests = ({
           ]);
 
           // Detect new requests
-          if (requests.length > 0 && requestData.length > 0) {
+          const previousRequests = requestsRef.current;
+          if (previousRequests.length > 0 && requestData.length > 0) {
             const latestRequest = requestData[0];
-            const wasNew = !requests.find(r => r.id === latestRequest.id);
+            const wasNew = !previousRequests.find(r => r.id === latestRequest.id);
 
-            if (wasNew && onNewRequest) {
-              onNewRequest(latestRequest);
+            if (wasNew && onNewRequestRef.current) {
+              onNewRequestRef.current(latestRequest);
             }
           }
 
           setRequests(requestData);
           setLoading(false);
         } catch (err) {
-          console.error('Error processing blood requests:', err);
-          setError('Failed to load blood requests');
-          setLoading(false);
+          failRealtimeLoad(
+            { scope: 'unknown', hook: 'useRealtimeBloodRequests' },
+            {
+              error: err,
+              kind: 'blood_requests.process',
+              fallbackMessage: 'Failed to load blood requests',
+              setError,
+              setLoading,
+            }
+          );
         }
       },
       (err) => {
-        console.error('Error listening to blood requests:', err);
-        setError('Failed to listen to blood requests');
-        setLoading(false);
+        failRealtimeLoad(
+          { scope: 'unknown', hook: 'useRealtimeBloodRequests' },
+          {
+            error: err,
+            kind: 'blood_requests.listen',
+            fallbackMessage: 'Failed to listen to blood requests',
+            setError,
+            setLoading,
+          }
+        );
       }
     );
 
@@ -183,15 +209,29 @@ export const useBloodBankBloodRequests = (
           setRequests(requestData);
           setLoading(false);
         } catch (err) {
-          console.error('Error processing bloodbank requests:', err);
-          setError('Failed to load requests');
-          setLoading(false);
+          failRealtimeLoad(
+            { scope: 'bloodbank', hook: 'useBloodBankBloodRequests' },
+            {
+              error: err,
+              kind: 'bloodbank_requests.process',
+              fallbackMessage: 'Failed to load requests',
+              setError,
+              setLoading,
+            }
+          );
         }
       },
       (err) => {
-        console.error('Error listening to bloodbank requests:', err);
-        setError('Failed to listen to requests');
-        setLoading(false);
+        failRealtimeLoad(
+          { scope: 'bloodbank', hook: 'useBloodBankBloodRequests' },
+          {
+            error: err,
+            kind: 'bloodbank_requests.listen',
+            fallbackMessage: 'Failed to listen to requests',
+            setError,
+            setLoading,
+          }
+        );
       }
     );
 
@@ -220,9 +260,19 @@ export const useActiveBloodRequestCount = (): number => {
       where('status', '==', 'active')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setCount(snapshot.size);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setCount(snapshot.size);
+      },
+      (err) => {
+        reportRealtimeError(
+          { scope: 'unknown', hook: 'useActiveBloodRequestCount' },
+          err,
+          'blood_requests.active_count.listen'
+        );
+      }
+    );
 
     return () => unsubscribe();
   }, []);

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { captureHandledError } from '../services/errorLog.service';
 
 type Theme = 'light' | 'dark';
 
@@ -23,7 +24,11 @@ const getInitialTheme = (): Theme => {
       return stored;
     }
   } catch (error) {
-    console.warn('Failed to read theme from localStorage', error);
+    void captureHandledError(error, {
+      source: 'frontend',
+      scope: 'unknown',
+      metadata: { kind: 'theme.local_storage.read', context: 'ThemeContext' },
+    });
   }
   return FALLBACK_THEME;
 };
@@ -44,7 +49,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       try {
         window.localStorage.setItem(STORAGE_KEY, nextTheme);
       } catch (error) {
-        console.warn('Failed to persist theme preference', error);
+        void captureHandledError(error, {
+          source: 'frontend',
+          scope: 'unknown',
+          metadata: { kind: 'theme.local_storage.write', context: 'ThemeContext' },
+        });
       }
     }
   };

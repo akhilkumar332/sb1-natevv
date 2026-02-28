@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Droplet, AlertCircle, User, Calendar, Phone, Mail, Hospital, FileText, Heart, Clock, CheckCircle } from 'lucide-react';
 import { notify } from 'services/notify.service';
 import { Link } from 'react-router-dom';
+import { captureHandledError } from '../services/errorLog.service';
 
 // Define the interface for blood request form data
 interface BloodRequestFormData {
@@ -153,7 +154,6 @@ function RequestBlood() {
 
     if (validateForm()) {
       try {
-        console.log('Form submitted:', formData);
         setFormData({
           patientName: '',
           patientAge: '',
@@ -170,7 +170,11 @@ function RequestBlood() {
         notify.success('Blood request submitted successfully! We will connect you with donors soon.');
       } catch (error) {
         notify.error('Failed to submit blood request. Please try again.');
-        console.error('Submission error:', error);
+        void captureHandledError(error, {
+          source: 'frontend',
+          scope: 'unknown',
+          metadata: { kind: 'request_blood.submit', page: 'RequestBlood' },
+        });
       }
     } else {
       notify.error('Please correct the errors in the form.');

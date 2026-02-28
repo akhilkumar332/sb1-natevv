@@ -24,6 +24,7 @@ import {
   Users,
 } from 'lucide-react';
 import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
+import { captureHandledError } from '../../services/errorLog.service';
 
 export type NgoDashboardContext = {
   user: any;
@@ -56,6 +57,13 @@ export type NgoDashboardContext = {
 
 function NgoDashboard() {
   const { user } = useAuth();
+  const reportNgoDashboardError = (err: unknown, kind: string) => {
+    void captureHandledError(err, {
+      source: 'frontend',
+      scope: 'ngo',
+      metadata: { kind, page: 'NgoDashboard' },
+    });
+  };
 
   const {
     campaigns,
@@ -96,7 +104,7 @@ function NgoDashboard() {
     const task = () => {
       refreshData({ silent: true })
         .catch((error) => {
-          console.warn('NGO dashboard prefetch failed', error);
+          reportNgoDashboardError(error, 'dashboard.prefetch');
         })
         .finally(() => {
           window.sessionStorage.setItem(prefetchKey, Date.now().toString());

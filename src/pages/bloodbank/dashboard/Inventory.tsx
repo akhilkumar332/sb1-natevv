@@ -30,6 +30,7 @@ import {
 import { db } from '../../../firebase';
 import type { BloodBankDashboardContext } from '../BloodBankDashboard';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
+import { captureHandledError } from '../../../services/errorLog.service';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -145,6 +146,7 @@ function BloodBankInventory() {
   const scanStreamRef = useRef<MediaStream | null>(null);
   const scanRafRef = useRef<number | null>(null);
   const scanActiveRef = useRef(false);
+  const errorThrottleRef = useRef<Record<string, number>>({});
 
   const [batchForm, setBatchForm] = useState({
     bloodType: '',
@@ -210,6 +212,34 @@ function BloodBankInventory() {
   const [reservations, setReservations] = useState<InventoryReservation[]>([]);
   const [branches, setBranches] = useState<BloodBankBranch[]>([]);
   const [branchFilter, setBranchFilter] = useState<string>('all');
+
+  const reportBloodBankInventoryError = (
+    err: unknown,
+    kind: string,
+    metadata?: Record<string, unknown>
+  ) => {
+    void captureHandledError(err, {
+      source: 'frontend',
+      scope: 'bloodbank',
+      metadata: {
+        kind,
+        page: 'BloodBankInventory',
+        ...(metadata || {}),
+      },
+    });
+  };
+
+  const reportBloodBankInventoryErrorThrottled = (
+    err: unknown,
+    kind: string,
+    windowMs = 15000
+  ) => {
+    const now = Date.now();
+    const last = errorThrottleRef.current[kind] || 0;
+    if (now - last < windowMs) return;
+    errorThrottleRef.current[kind] = now;
+    reportBloodBankInventoryError(err, kind);
+  };
 
   const branchScopedInventory = useMemo(() => {
     if (branchFilter === 'all') return inventory;
@@ -356,23 +386,29 @@ function BloodBankInventory() {
       orderBy('createdAt', 'desc'),
       limit(15)
     );
-    return onSnapshot(q, (snapshot) => {
-      const rows = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          bloodType: data.bloodType || '',
-          type: data.type || '',
-          deltaUnits: data.deltaUnits || 0,
-          previousUnits: data.previousUnits || 0,
-          newUnits: data.newUnits || 0,
-          reason: data.reason,
-          batchId: data.batchId,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
-        } as InventoryTransaction;
-      });
-      setTransactions(rows);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const rows = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            bloodType: data.bloodType || '',
+            type: data.type || '',
+            deltaUnits: data.deltaUnits || 0,
+            previousUnits: data.previousUnits || 0,
+            newUnits: data.newUnits || 0,
+            reason: data.reason,
+            batchId: data.batchId,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
+          } as InventoryTransaction;
+        });
+        setTransactions(rows);
+      },
+      (err) => {
+        reportBloodBankInventoryError(err, 'transactions.listen');
+      }
+    );
   }, [baseHospitalId]);
 
   useEffect(() => {
@@ -391,53 +427,65 @@ function BloodBankInventory() {
       limit(10)
     );
 
-    const unsubscribeOutgoing = onSnapshot(outgoingQuery, (snapshot) => {
-      const rows = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          fromHospitalId: data.fromHospitalId,
-          toHospitalId: data.toHospitalId,
-          fromHospitalName: data.fromHospitalName,
-          toHospitalName: data.toHospitalName,
-          fromBranchId: data.fromBranchId,
-          toBranchId: data.toBranchId,
-          bloodType: data.bloodType,
-          units: data.units,
-          status: data.status || 'pending',
-          notes: data.notes,
-          collectionDate: data.collectionDate?.toDate ? data.collectionDate.toDate() : undefined,
-          expiryDate: data.expiryDate?.toDate ? data.expiryDate.toDate() : undefined,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : undefined,
-        } as InventoryTransfer;
-      });
-      setOutgoingTransfers(rows);
-    });
+    const unsubscribeOutgoing = onSnapshot(
+      outgoingQuery,
+      (snapshot) => {
+        const rows = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            fromHospitalId: data.fromHospitalId,
+            toHospitalId: data.toHospitalId,
+            fromHospitalName: data.fromHospitalName,
+            toHospitalName: data.toHospitalName,
+            fromBranchId: data.fromBranchId,
+            toBranchId: data.toBranchId,
+            bloodType: data.bloodType,
+            units: data.units,
+            status: data.status || 'pending',
+            notes: data.notes,
+            collectionDate: data.collectionDate?.toDate ? data.collectionDate.toDate() : undefined,
+            expiryDate: data.expiryDate?.toDate ? data.expiryDate.toDate() : undefined,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : undefined,
+          } as InventoryTransfer;
+        });
+        setOutgoingTransfers(rows);
+      },
+      (err) => {
+        reportBloodBankInventoryError(err, 'transfers.outgoing.listen');
+      }
+    );
 
-    const unsubscribeIncoming = onSnapshot(incomingQuery, (snapshot) => {
-      const rows = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          fromHospitalId: data.fromHospitalId,
-          toHospitalId: data.toHospitalId,
-          fromHospitalName: data.fromHospitalName,
-          toHospitalName: data.toHospitalName,
-          fromBranchId: data.fromBranchId,
-          toBranchId: data.toBranchId,
-          bloodType: data.bloodType,
-          units: data.units,
-          status: data.status || 'pending',
-          notes: data.notes,
-          collectionDate: data.collectionDate?.toDate ? data.collectionDate.toDate() : undefined,
-          expiryDate: data.expiryDate?.toDate ? data.expiryDate.toDate() : undefined,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : undefined,
-        } as InventoryTransfer;
-      });
-      setIncomingTransfers(rows);
-    });
+    const unsubscribeIncoming = onSnapshot(
+      incomingQuery,
+      (snapshot) => {
+        const rows = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            fromHospitalId: data.fromHospitalId,
+            toHospitalId: data.toHospitalId,
+            fromHospitalName: data.fromHospitalName,
+            toHospitalName: data.toHospitalName,
+            fromBranchId: data.fromBranchId,
+            toBranchId: data.toBranchId,
+            bloodType: data.bloodType,
+            units: data.units,
+            status: data.status || 'pending',
+            notes: data.notes,
+            collectionDate: data.collectionDate?.toDate ? data.collectionDate.toDate() : undefined,
+            expiryDate: data.expiryDate?.toDate ? data.expiryDate.toDate() : undefined,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : undefined,
+          } as InventoryTransfer;
+        });
+        setIncomingTransfers(rows);
+      },
+      (err) => {
+        reportBloodBankInventoryError(err, 'transfers.incoming.listen');
+      }
+    );
 
     return () => {
       unsubscribeOutgoing();
@@ -466,7 +514,7 @@ function BloodBankInventory() {
           .filter((entry) => entry.id !== baseHospitalId);
         setBloodbanks(list);
       } catch (error) {
-        console.warn('Failed to load bloodbank list', error);
+        reportBloodBankInventoryError(error, 'bloodbanks.fetch');
       }
     };
     loadBloodbanks();
@@ -479,31 +527,37 @@ function BloodBankInventory() {
       where('parentHospitalId', '==', baseHospitalId),
       orderBy('createdAt', 'asc')
     );
-    return onSnapshot(q, (snapshot) => {
-      if (snapshot.empty) {
-        setBranches([
-          {
-            id: baseHospitalId,
-            name: 'Main branch',
-            isPrimary: true,
-          },
-        ]);
-        return;
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        if (snapshot.empty) {
+          setBranches([
+            {
+              id: baseHospitalId,
+              name: 'Main branch',
+              isPrimary: true,
+            },
+          ]);
+          return;
+        }
+        const rows = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            name: data.name || 'Branch',
+            address: data.address,
+            city: data.city,
+            state: data.state,
+            phone: data.phone,
+            isPrimary: data.isPrimary,
+          } as BloodBankBranch;
+        });
+        setBranches(rows);
+      },
+      (err) => {
+        reportBloodBankInventoryError(err, 'branches.listen');
       }
-      const rows = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          name: data.name || 'Branch',
-          address: data.address,
-          city: data.city,
-          state: data.state,
-          phone: data.phone,
-          isPrimary: data.isPrimary,
-        } as BloodBankBranch;
-      });
-      setBranches(rows);
-    });
+    );
   }, [baseHospitalId]);
 
   useEffect(() => {
@@ -514,21 +568,27 @@ function BloodBankInventory() {
       orderBy('createdAt', 'desc'),
       limit(10)
     );
-    return onSnapshot(q, (snapshot) => {
-      const rows = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          bloodType: data.bloodType || '',
-          batchId: data.batchId || '',
-          daysToExpiry: data.daysToExpiry || 0,
-          status: data.status || 'open',
-          message: data.message,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
-        } as InventoryAlert;
-      });
-      setAlerts(rows);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const rows = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            bloodType: data.bloodType || '',
+            batchId: data.batchId || '',
+            daysToExpiry: data.daysToExpiry || 0,
+            status: data.status || 'open',
+            message: data.message,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
+          } as InventoryAlert;
+        });
+        setAlerts(rows);
+      },
+      (err) => {
+        reportBloodBankInventoryError(err, 'alerts.listen');
+      }
+    );
   }, [baseHospitalId]);
 
   useEffect(() => {
@@ -539,24 +599,30 @@ function BloodBankInventory() {
       orderBy('createdAt', 'desc'),
       limit(12)
     );
-    return onSnapshot(q, (snapshot) => {
-      const rows = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          bloodType: data.bloodType || '',
-          units: data.units || 0,
-          requestId: data.requestId || '',
-          requestStatus: data.requestStatus,
-          status: data.status || 'active',
-          reservedBatchIds: data.reservedBatchIds || [],
-          branchId: data.branchId,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : undefined,
-        } as InventoryReservation;
-      });
-      setReservations(rows);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const rows = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            bloodType: data.bloodType || '',
+            units: data.units || 0,
+            requestId: data.requestId || '',
+            requestStatus: data.requestStatus,
+            status: data.status || 'active',
+            reservedBatchIds: data.reservedBatchIds || [],
+            branchId: data.branchId,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : undefined,
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : undefined,
+          } as InventoryReservation;
+        });
+        setReservations(rows);
+      },
+      (err) => {
+        reportBloodBankInventoryError(err, 'reservations.listen');
+      }
+    );
   }, [baseHospitalId]);
 
   useEffect(() => {
@@ -609,14 +675,14 @@ function BloodBankInventory() {
               }
             }
           } catch (error) {
-            console.warn('Barcode scan failed', error);
+            reportBloodBankInventoryErrorThrottled(error, 'barcode.detect');
           }
           scanRafRef.current = requestAnimationFrame(tick);
         };
 
         scanRafRef.current = requestAnimationFrame(tick);
       } catch (error) {
-        console.warn('Camera permission error', error);
+        reportBloodBankInventoryError(error, 'camera.permission');
         setScanError('Camera permission denied. Use manual entry instead.');
       }
     };
@@ -1231,7 +1297,7 @@ function BloodBankInventory() {
         }
       }
     } catch (error) {
-      console.warn('Failed to parse scan payload', error);
+      reportBloodBankInventoryErrorThrottled(error, 'barcode.payload.parse', 30000);
     }
     return batchId;
   };

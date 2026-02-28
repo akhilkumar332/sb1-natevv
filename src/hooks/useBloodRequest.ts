@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { doc, updateDoc, arrayUnion, getDoc, serverTimestamp, collection, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { notify } from 'services/notify.service';
+import { captureHandledError } from '../services/errorLog.service';
 
 interface RespondToRequestParams {
   requestId: string;
@@ -18,6 +19,13 @@ interface RespondToRequestParams {
 export const useBloodRequest = () => {
   const [responding, setResponding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const reportBloodRequestError = (err: unknown, kind: string) => {
+    void captureHandledError(err, {
+      source: 'frontend',
+      scope: 'donor',
+      metadata: { kind, hook: 'useBloodRequest' },
+    });
+  };
 
   const respondToRequest = async (params: RespondToRequestParams) => {
     setResponding(true);
@@ -76,7 +84,7 @@ export const useBloodRequest = () => {
             },
           });
         } catch (notifError) {
-          console.error('Failed to send notification:', notifError);
+          reportBloodRequestError(notifError, 'blood_request.notify_hospital');
           // Don't fail the whole operation if notification fails
         }
       }
@@ -85,7 +93,7 @@ export const useBloodRequest = () => {
       setResponding(false);
       return true;
     } catch (err) {
-      console.error('Error responding to blood request:', err);
+      reportBloodRequestError(err, 'blood_request.respond');
       const errorMessage = err instanceof Error ? err.message : 'Failed to send response';
       setError(errorMessage);
       notify.error(errorMessage);

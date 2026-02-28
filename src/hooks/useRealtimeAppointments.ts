@@ -4,7 +4,7 @@
  * Real-time appointment monitoring using Firebase onSnapshot
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   collection,
   query,
@@ -17,6 +17,7 @@ import {
 import { db } from '../firebase';
 import { Appointment } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
+import { failRealtimeLoad, reportRealtimeError } from '../utils/realtimeError';
 
 interface UseRealtimeAppointmentsOptions {
   donorId?: string;
@@ -48,6 +49,16 @@ export const useRealtimeAppointments = ({
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const appointmentsRef = useRef<Appointment[]>([]);
+  const onNewAppointmentRef = useRef<typeof onNewAppointment>(onNewAppointment);
+
+  useEffect(() => {
+    appointmentsRef.current = appointments;
+  }, [appointments]);
+
+  useEffect(() => {
+    onNewAppointmentRef.current = onNewAppointment;
+  }, [onNewAppointment]);
 
   useEffect(() => {
     setLoading(true);
@@ -91,27 +102,42 @@ export const useRealtimeAppointments = ({
           ]);
 
           // Detect new appointments
-          if (appointments.length > 0 && appointmentData.length > 0) {
+          const previousAppointments = appointmentsRef.current;
+          if (previousAppointments.length > 0 && appointmentData.length > 0) {
             const latestAppointment = appointmentData[0];
-            const wasNew = !appointments.find(a => a.id === latestAppointment.id);
+            const wasNew = !previousAppointments.find(a => a.id === latestAppointment.id);
 
-            if (wasNew && onNewAppointment) {
-              onNewAppointment(latestAppointment);
+            if (wasNew && onNewAppointmentRef.current) {
+              onNewAppointmentRef.current(latestAppointment);
             }
           }
 
           setAppointments(appointmentData);
           setLoading(false);
         } catch (err) {
-          console.error('Error processing appointments:', err);
-          setError('Failed to load appointments');
-          setLoading(false);
+          failRealtimeLoad(
+            { scope: 'unknown', hook: 'useRealtimeAppointments' },
+            {
+              error: err,
+              kind: 'appointments.process',
+              fallbackMessage: 'Failed to load appointments',
+              setError,
+              setLoading,
+            }
+          );
         }
       },
       (err) => {
-        console.error('Error listening to appointments:', err);
-        setError('Failed to listen to appointments');
-        setLoading(false);
+        failRealtimeLoad(
+          { scope: 'unknown', hook: 'useRealtimeAppointments' },
+          {
+            error: err,
+            kind: 'appointments.listen',
+            fallbackMessage: 'Failed to listen to appointments',
+            setError,
+            setLoading,
+          }
+        );
       }
     );
 
@@ -185,15 +211,29 @@ export const useTodayAppointments = (hospitalId: string): UseRealtimeAppointment
           setAppointments(appointmentData);
           setLoading(false);
         } catch (err) {
-          console.error('Error processing today appointments:', err);
-          setError('Failed to load appointments');
-          setLoading(false);
+          failRealtimeLoad(
+            { scope: 'unknown', hook: 'useTodayAppointments' },
+            {
+              error: err,
+              kind: 'appointments.today.process',
+              fallbackMessage: 'Failed to load appointments',
+              setError,
+              setLoading,
+            }
+          );
         }
       },
       (err) => {
-        console.error('Error listening to today appointments:', err);
-        setError('Failed to listen to appointments');
-        setLoading(false);
+        failRealtimeLoad(
+          { scope: 'unknown', hook: 'useTodayAppointments' },
+          {
+            error: err,
+            kind: 'appointments.today.listen',
+            fallbackMessage: 'Failed to listen to appointments',
+            setError,
+            setLoading,
+          }
+        );
       }
     );
 
@@ -232,9 +272,23 @@ export const useUpcomingAppointmentCount = (
 
     const q = query(collection(db, 'appointments'), ...constraints);
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setCount(snapshot.size);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setCount(snapshot.size);
+      },
+      (err) => {
+        reportRealtimeError(
+          { scope: donorId ? 'donor' : hospitalId ? 'bloodbank' : 'unknown', hook: 'useUpcomingAppointmentCount' },
+          err,
+          'appointments.upcoming_count.listen',
+          {
+            donorId: donorId || null,
+            hospitalId: hospitalId || null,
+          }
+        );
+      }
+    );
 
     return () => unsubscribe();
   }, [donorId, hospitalId]);

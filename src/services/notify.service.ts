@@ -7,6 +7,12 @@ type NotificationContext = {
   metadata?: Record<string, unknown>;
 };
 
+type ScopedErrorNotifierOptions = {
+  scope: NonNullable<NotificationContext['scope']>;
+  page: string;
+  source?: NonNullable<NotificationContext['source']>;
+};
+
 const resolveMessage = (
   message: ValueOrFunction<string, Toast>,
   toastInstance: Toast
@@ -84,5 +90,24 @@ export const notify = {
     return toast.error(resolvedMessage, options);
   },
 };
+
+export const createScopedErrorNotifier = ({ scope, page, source = 'frontend' }: ScopedErrorNotifierOptions) => (
+  error: unknown,
+  fallbackMessage: string,
+  options?: ToastOptions,
+  kind?: string
+) => notify.fromError(
+  error,
+  fallbackMessage,
+  options,
+  {
+    source,
+    scope,
+    metadata: {
+      page,
+      ...(kind ? { kind } : {}),
+    },
+  }
+);
 
 export default notify;

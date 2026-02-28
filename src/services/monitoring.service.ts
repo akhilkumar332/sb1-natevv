@@ -3,6 +3,13 @@
  *
  * Handles error tracking, performance monitoring, and analytics
  */
+import { captureHandledError } from './errorLog.service';
+
+const debugLog = (...args: unknown[]) => {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+};
 
 interface MonitoringConfig {
   enableErrorTracking: boolean;
@@ -74,7 +81,7 @@ class MonitoringService {
     //   tracesSampleRate: 1.0,
     // });
 
-    console.log('Error tracking initialized');
+    debugLog('Error tracking initialized');
   }
 
   /**
@@ -130,11 +137,15 @@ class MonitoringService {
         clsObserver.observe({ entryTypes: ['layout-shift'] });
 
       } catch (error) {
-        console.error('Performance monitoring setup failed:', error);
+        void captureHandledError(error, {
+          source: 'frontend',
+          scope: 'unknown',
+          metadata: { kind: 'monitoring.performance.setup' },
+        });
       }
     }
 
-    console.log('Performance monitoring initialized');
+    debugLog('Performance monitoring initialized');
   }
 
   /**
@@ -144,7 +155,7 @@ class MonitoringService {
     // In production, you would initialize GA here:
     // gtag('config', import.meta.env.VITE_GA_TRACKING_ID);
 
-    console.log('Analytics initialized');
+    debugLog('Analytics initialized');
   }
 
   /**
@@ -152,7 +163,14 @@ class MonitoringService {
    */
   logError(error: Error, context?: ErrorContext): void {
     if (!this.config.enableErrorTracking) {
-      console.error('Error:', error);
+      void captureHandledError(error, {
+        source: 'frontend',
+        scope: 'unknown',
+        metadata: {
+          kind: 'monitoring.log_error.disabled',
+          ...(context || {}),
+        },
+      });
       return;
     }
 
@@ -170,7 +188,14 @@ class MonitoringService {
     // In production, send to Sentry:
     // Sentry.captureException(error, { extra: errorData.context });
 
-    console.error('Error tracked:', errorData);
+    void captureHandledError(error, {
+      source: 'frontend',
+      scope: 'unknown',
+      metadata: {
+        kind: 'monitoring.log_error',
+        ...(errorData.context || {}),
+      },
+    });
   }
 
   /**
@@ -182,7 +207,7 @@ class MonitoringService {
     }
 
     // In production, send to analytics or monitoring service
-    console.log('Performance metric:', metric);
+    debugLog('Performance metric:', metric);
 
     // Track in Google Analytics if enabled
     if (this.config.enableAnalytics && typeof window !== 'undefined' && (window as any).gtag) {
@@ -209,7 +234,7 @@ class MonitoringService {
     //   page_path: page
     // });
 
-    console.log('Page view tracked:', page);
+    debugLog('Page view tracked:', page);
   }
 
   /**
@@ -223,7 +248,7 @@ class MonitoringService {
     // In production, send to Google Analytics:
     // gtag('event', eventName, eventParams);
 
-    console.log('Event tracked:', eventName, eventParams);
+    debugLog('Event tracked:', eventName, eventParams);
   }
 
   /**
@@ -237,7 +262,7 @@ class MonitoringService {
     // In production, set user in Sentry:
     // Sentry.setUser({ id: userId, email });
 
-    console.log('User context set:', { userId, email });
+    debugLog('User context set:', { userId, email });
   }
 
   /**
@@ -251,7 +276,7 @@ class MonitoringService {
     // In production, clear user in Sentry:
     // Sentry.setUser(null);
 
-    console.log('User context cleared');
+    debugLog('User context cleared');
   }
 
   /**
@@ -269,7 +294,7 @@ class MonitoringService {
     //   timestamp: Date.now() / 1000,
     // });
 
-    console.log('Breadcrumb:', message, data);
+    debugLog('Breadcrumb:', message, data);
   }
 
   /**

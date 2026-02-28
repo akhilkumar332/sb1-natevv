@@ -44,6 +44,9 @@ const MAX_ROUTE_LEN = 320;
 const DEDUPE_WINDOW_MS = 30_000;
 const inMemoryDedupe = new Map<string, number>();
 const MAX_DEDUPE_ENTRIES = 1500;
+const QUEUE_FLUSH_INTERVAL_MS = 60_000;
+let lastQueueFlushAt = 0;
+let queueFlushInFlight = false;
 const CONSOLE_RATE_WINDOW_MS = 60_000;
 const CONSOLE_RATE_LIMIT = 40;
 const noisyMessagePatterns = [
@@ -386,6 +389,17 @@ export const captureError = async (error: unknown, context?: ErrorLogContext): P
     if (!auth.currentUser) {
       enqueue(payload);
       return;
+    }
+
+    const now = Date.now();
+    if (!queueFlushInFlight && now - lastQueueFlushAt > QUEUE_FLUSH_INTERVAL_MS) {
+      queueFlushInFlight = true;
+      try {
+        await flushQueuedErrorLogs();
+      } finally {
+        lastQueueFlushAt = Date.now();
+        queueFlushInFlight = false;
+      }
     }
 
     await writePayload(payload);

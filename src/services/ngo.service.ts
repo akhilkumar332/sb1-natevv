@@ -30,6 +30,19 @@ import {
 } from '../types/database.types';
 import { extractQueryData, getServerTimestamp } from '../utils/firestore.utils';
 import { DatabaseError, ValidationError, NotFoundError } from '../utils/errorHandler';
+import { captureHandledError } from './errorLog.service';
+
+const reportNgoServiceError = (error: unknown, kind: string, metadata?: Record<string, unknown>) => {
+  void captureHandledError(error, {
+    source: 'frontend',
+    scope: 'ngo',
+    metadata: {
+      kind,
+      service: 'ngo.service',
+      ...(metadata || {}),
+    },
+  });
+};
 
 // ============================================================================
 // CAMPAIGN MANAGEMENT
@@ -283,7 +296,7 @@ export const registerDonorForCampaign = async (
         createdAt: getServerTimestamp(),
       });
     } catch (notificationError) {
-      console.warn('Failed to create campaign notification for donor', notificationError);
+      reportNgoServiceError(notificationError, 'ngo.campaign.notification.create', { campaignId, donorId });
     }
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) {

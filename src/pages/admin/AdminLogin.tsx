@@ -2,14 +2,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { notify } from 'services/notify.service';
 import { Settings, Lock, BarChart3, Shield } from 'lucide-react';
 import LogoMark from '../../components/LogoMark';
 import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
+import AuthStatusScreen from '../../components/auth/AuthStatusScreen';
 import type { ImpersonationUser } from '../../services/admin.service';
-import { authStorage } from '../../utils/authStorage';
-import { auth } from '../../firebase';
 import { authMessages } from '../../constants/messages';
+import { handleRoleGoogleLogin } from '../../utils/roleGoogleLogin';
+import { navigateToPortalDashboard, resolveImpersonationRole, resolvePortalRole } from '../../utils/portalNavigation';
+import { notifyRoleMismatch } from '../../utils/authNotifications';
 
 export function AdminLogin() {
   const navigate = useNavigate();
@@ -30,15 +31,6 @@ export function AdminLogin() {
   const [showPortalModal, setShowPortalModal] = useState(false);
   const hasRedirected = useRef(false);
 
-  const resolvePortalRole = (role?: string | null) => {
-    if (!role) return null;
-    if (role === 'hospital') return 'bloodbank';
-    if (role === 'bloodbank' || role === 'ngo' || role === 'admin' || role === 'donor') {
-      return role;
-    }
-    return 'admin';
-  };
-
   useEffect(() => {
     if (!user || hasRedirected.current) {
       return;
@@ -49,13 +41,11 @@ export function AdminLogin() {
     }
 
     if (isImpersonating) {
-      const role = resolvePortalRole(impersonationSession?.targetRole ?? user.role ?? null);
-      if (role) {
-        hasRedirected.current = true;
-        setShowPortalModal(false);
-        navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
-        return;
-      }
+      const role = resolvePortalRole(impersonationSession?.targetRole ?? user.role ?? null, 'admin');
+      hasRedirected.current = true;
+      setShowPortalModal(false);
+      navigateToPortalDashboard(navigate, role);
+      return;
     }
 
     if (isSuperAdmin) {
@@ -64,7 +54,7 @@ export function AdminLogin() {
     }
 
     if (user.role !== 'admin') {
-      notify.error(authMessages.roleMismatch.admin, { id: 'role-mismatch-admin' });
+      notifyRoleMismatch('admin');
       return;
     }
 
@@ -85,29 +75,21 @@ export function AdminLogin() {
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     try {
-      const response = await loginWithGoogle();
-      if (response.user.role === 'superadmin') {
-        const token = response?.token ?? (await auth.currentUser?.getIdToken());
-        if (token) {
-          authStorage.setAuthToken(token);
-        }
-        setShowPortalModal(true);
-        return;
-      }
-      if (response.user.role !== 'admin') {
-        notify.error(authMessages.roleMismatch.admin, { id: 'role-mismatch-admin' });
-        await logout(navigate, { redirectTo: '/admin/login', showToast: false });
-        return;
-      }
-      notify.success('Successfully logged in as Admin!');
-
-      if (response.user.onboardingCompleted === true) {
-        navigate('/admin/dashboard');
-      } else {
-        navigate('/admin/onboarding');
-      }
-    } catch (error) {
-      notify.error('Failed to sign in with Google. Please try again.');
+      await handleRoleGoogleLogin({
+        loginWithGoogle,
+        logout,
+        navigate,
+        setShowPortalModal,
+        expectedRoles: ['admin'],
+        roleMismatchMessage: authMessages.roleMismatch.admin,
+        roleMismatchId: 'role-mismatch-admin',
+        mismatchRedirectTo: '/admin/login',
+        successMessage: 'Successfully logged in as Admin!',
+        dashboardPath: '/admin/dashboard',
+        onboardingPath: '/admin/onboarding',
+        scope: 'admin',
+        page: 'AdminLogin',
+      });
     } finally {
       setGoogleLoading(false);
     }
@@ -116,36 +98,20 @@ export function AdminLogin() {
   const handlePortalSelect = (role: 'donor' | 'ngo' | 'bloodbank' | 'admin') => {
     setPortalRole(role);
     hasRedirected.current = true;
-    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+    navigateToPortalDashboard(navigate, role);
   };
 
   const handleImpersonate = async (target: ImpersonationUser, reason?: string) => {
     const resolved = await startImpersonation(target, { ...(reason ? { reason } : {}) });
     if (!resolved) return;
-    const role =
-      resolved.role === 'hospital'
-        ? 'bloodbank'
-        : resolved.role === 'ngo'
-          ? 'ngo'
-          : resolved.role === 'bloodbank'
-            ? 'bloodbank'
-            : resolved.role === 'admin'
-              ? 'admin'
-              : 'donor';
+    const role = resolveImpersonationRole(resolved.role);
     hasRedirected.current = true;
     setShowPortalModal(false);
-    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+    navigateToPortalDashboard(navigate, role);
   };
 
   if (user && !profileResolved) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex items-center gap-3 text-gray-600">
-          <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-medium">Checking account…</span>
-        </div>
-      </div>
-    );
+    return <AuthStatusScreen message="Checking account…" />;
   }
 
   return (

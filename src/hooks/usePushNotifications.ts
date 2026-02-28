@@ -20,6 +20,7 @@ import {
   writeFcmTokenMeta,
   writeStoredFcmToken,
 } from '../utils/fcmStorage';
+import { captureHandledError } from '../services/errorLog.service';
 
 // ============================================================================
 // PUSH NOTIFICATIONS HOOK
@@ -46,6 +47,16 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
   const [messaging, setMessaging] = useState<Messaging | null>(null);
   const deviceId = getDeviceId();
   const deviceInfo = getDeviceInfo();
+  const reportPushNotificationError = (err: unknown, kind: string) => {
+    void captureHandledError(err, {
+      source: 'frontend',
+      scope: 'unknown',
+      metadata: {
+        hook: 'usePushNotifications',
+        kind,
+      },
+    });
+  };
 
   // Initialize messaging
   useEffect(() => {
@@ -53,7 +64,7 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
       const msg = getMessaging();
       setMessaging(msg);
     } catch (err) {
-      console.error('Failed to initialize messaging:', err);
+      reportPushNotificationError(err, 'push.messaging.init');
     }
   }, []);
 
@@ -97,6 +108,7 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
         setPermission(Notification.permission);
       }
     } catch (err) {
+      reportPushNotificationError(err, 'push.permission.request');
       setError(err instanceof Error ? err : new Error('Failed to request permission'));
       if (typeof window !== 'undefined' && 'Notification' in window) {
         setPermission(Notification.permission);
@@ -128,6 +140,7 @@ export const usePushNotifications = (): UsePushNotificationsResult => {
       setToken(null);
       clearStoredFcmToken(user.uid);
     } catch (err) {
+      reportPushNotificationError(err, 'push.unsubscribe');
       setError(err instanceof Error ? err : new Error('Failed to unsubscribe'));
     } finally {
       setLoading(false);
@@ -160,6 +173,16 @@ export const useForegroundMessages = (
   options: UseForegroundMessagesOptions = {}
 ): void => {
   const { onMessage: onMessageCallback, enabled = true } = options;
+  const reportForegroundMessageError = (err: unknown, kind: string) => {
+    void captureHandledError(err, {
+      source: 'frontend',
+      scope: 'unknown',
+      metadata: {
+        hook: 'useForegroundMessages',
+        kind,
+      },
+    });
+  };
 
   useEffect(() => {
     if (!enabled) {
@@ -188,11 +211,20 @@ export const useForegroundMessages = (
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.ready
               .then((registration) => registration.showNotification(notificationTitle, notificationOptions))
-              .catch(() => {
-                new Notification(notificationTitle, notificationOptions);
+              .catch((error) => {
+                reportForegroundMessageError(error, 'push.foreground.service_worker_show');
+                try {
+                  new Notification(notificationTitle, notificationOptions);
+                } catch (notificationError) {
+                  reportForegroundMessageError(notificationError, 'push.foreground.notification_fallback');
+                }
               });
           } else {
-            new Notification(notificationTitle, notificationOptions);
+            try {
+              new Notification(notificationTitle, notificationOptions);
+            } catch (notificationError) {
+              reportForegroundMessageError(notificationError, 'push.foreground.notification_direct');
+            }
           }
         }
 
@@ -202,7 +234,7 @@ export const useForegroundMessages = (
         }
       });
     } catch (err) {
-      console.error('Failed to setup foreground message listener:', err);
+      reportForegroundMessageError(err, 'push.foreground.listener_setup');
     }
 
     return () => {
@@ -277,6 +309,17 @@ export const useNotificationSound = (
   options: UseNotificationSoundOptions = {}
 ): ((type?: string) => void) => {
   const { soundUrl = '/notification-sound.mp3', enabled = true } = options;
+  const reportNotificationSoundError = (err: unknown, kind: string, audioUrl: string) => {
+    void captureHandledError(err, {
+      source: 'frontend',
+      scope: 'unknown',
+      metadata: {
+        hook: 'useNotificationSound',
+        kind,
+        audioUrl,
+      },
+    });
+  };
 
   const playSound = useCallback(
     (type?: string) => {
@@ -295,10 +338,10 @@ export const useNotificationSound = (
         const audio = new Audio(audioUrl);
         audio.volume = 0.5;
         audio.play().catch((err) => {
-          console.warn('Failed to play notification sound:', err);
+          reportNotificationSoundError(err, 'push.sound.play', audioUrl);
         });
       } catch (err) {
-        console.warn('Failed to create audio:', err);
+        reportNotificationSoundError(err, 'push.sound.create', audioUrl);
       }
     },
     [soundUrl, enabled]

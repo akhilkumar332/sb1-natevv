@@ -1,24 +1,29 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useOutletContext, useParams } from 'react-router-dom';
-import { notify } from 'services/notify.service';
+import { createScopedErrorNotifier, notify } from 'services/notify.service';
 import {
   MapPin,
   ArrowLeft,
-  Archive,
-  Trash2,
   Edit3,
   Target,
   Calendar,
   Locate,
   X,
 } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { Timestamp } from 'firebase/firestore';
 import type { NgoDashboardContext } from '../NgoDashboard';
 import { archiveCampaign, deleteCampaign, updateCampaign } from '../../../services/ngo.service';
-import { getCurrentCoordinates, reverseGeocode } from '../../../utils/geolocation.utils';
+import { useAddressAutocomplete } from '../../../hooks/useAddressAutocomplete';
+import { LeafletClickMarker, LeafletMapUpdater } from '../../../components/shared/leaflet/LocationMapPrimitives';
+import { ArchiveDeleteActions } from '../../../components/shared/ArchiveDeleteActions';
+import { formatDateRange, parseLocalDate, toInputDate, validateCampaignDateRangeInput } from '../../../utils/campaignDate';
+import { DeleteConfirmModal } from '../../../components/shared/DeleteConfirmModal';
+import { getCampaignTargetLabel, getCampaignTypeLabel } from '../../../utils/campaignLabels';
+import { ModalShell } from '../../../components/shared/ModalShell';
+import { useLocationResolver } from '../../../hooks/useLocationResolver';
 
 const emptyForm = {
   title: '',
@@ -36,61 +41,6 @@ const emptyForm = {
   latitude: '',
   longitude: '',
 };
-
-const parseLocalDate = (value: string) => {
-  if (!value) return null;
-  const [year, month, day] = value.split('-').map(Number);
-  if (!year || !month || !day) return null;
-  return new Date(year, month - 1, day);
-};
-
-const typeLabels: Record<string, string> = {
-  'blood-drive': 'Blood Drive',
-  awareness: 'Awareness',
-  fundraising: 'Fundraising',
-  volunteer: 'Volunteer Drive',
-};
-
-const targetLabels: Record<string, string> = {
-  units: 'Units',
-  donors: 'Donors',
-  funds: 'Funds',
-  volunteers: 'Volunteers',
-};
-
-const formatDateRange = (start: Date, end: Date) => {
-  const startText = start.toLocaleDateString();
-  const endText = end.toLocaleDateString();
-  return `${startText} • ${endText}`;
-};
-
-function toInputDate(date: Date) {
-  return date.toISOString().split('T')[0];
-}
-
-function MapUpdater({ center }: { center: [number, number] }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center);
-  }, [center, map]);
-  return null;
-}
-
-function LocationMarker({
-  position,
-  onChange,
-}: {
-  position: [number, number];
-  onChange: (pos: [number, number]) => void;
-}) {
-  useMapEvents({
-    click(e: L.LeafletMouseEvent) {
-      onChange([e.latlng.lat, e.latlng.lng]);
-    },
-  });
-
-  return position ? <Marker position={position} /> : null;
-}
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -110,29 +60,22 @@ function NgoCampaignDetail() {
   const [saving, setSaving] = useState(false);
   const [mapPosition, setMapPosition] = useState<[number, number]>([20.5937, 78.9629]);
   const [locating, setLocating] = useState(false);
-  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [noResults, setNoResults] = useState(false);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const {
+    suggestions: addressSuggestions,
+    showSuggestions,
+    noResults,
+    searchSuggestions,
+    clearSuggestions,
+  } = useAddressAutocomplete({
+    scope: 'ngo',
+    page: 'NgoCampaignDetail',
+  });
+  const { resolveCurrentLocation, resolveFromCoordinates } = useLocationResolver('ngo');
   const [participantDonors, setParticipantDonors] = useState<any[]>([]);
   const [participantsLoading, setParticipantsLoading] = useState(false);
   const [participantSearch, setParticipantSearch] = useState('');
 
-  const notifyNgoCampaignDetailError = (
-    error: unknown,
-    fallbackMessage: string,
-    toastId: string,
-    kind: string
-  ) => notify.fromError(
-    error,
-    fallbackMessage,
-    { id: toastId },
-    {
-      source: 'frontend',
-      scope: 'ngo',
-      metadata: { page: 'NgoCampaignDetail', kind },
-    }
-  );
+  const notifyNgoCampaignDetailError = createScopedErrorNotifier({ scope: 'ngo', page: 'NgoCampaignDetail' });
 
   const campaign = useMemo(
     () => campaigns.find((item) => item.id === campaignId),
@@ -165,8 +108,14 @@ function NgoCampaignDetail() {
         if (!isActive) return;
         setParticipantDonors(donors);
       })
-      .catch(() => {
+      .catch((error) => {
         if (!isActive) return;
+        notifyNgoCampaignDetailError(
+          error,
+          'Unable to load participant donors.',
+          { id: 'ngo-campaign-detail-participants-load-error' },
+          'ngo.campaignDetail.participants.load'
+        );
         setParticipantDonors([]);
       })
       .finally(() => {
@@ -196,14 +145,6 @@ function NgoCampaignDetail() {
     }
   }, [form.latitude, form.longitude]);
 
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, []);
-
   if (!campaign) {
     return (
       <div className="bg-white rounded-2xl shadow-xl p-6">
@@ -227,8 +168,8 @@ function NgoCampaignDetail() {
       : 0;
   const achievedValue = Math.max(campaign.achieved || 0, registeredCount);
   const progress = campaign.target > 0 ? Math.min((achievedValue / campaign.target) * 100, 100) : 0;
-  const typeLabel = typeLabels[campaign.type] || 'Campaign';
-  const targetLabel = targetLabels[campaign.targetType || 'units'] || 'Units';
+  const typeLabel = getCampaignTypeLabel(campaign.type);
+  const targetLabel = getCampaignTargetLabel(campaign.targetType || 'units');
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const daysUntilStart = Math.ceil((campaign.startDate.getTime() - today.getTime()) / 86400000);
@@ -250,7 +191,7 @@ function NgoCampaignDetail() {
       notifyNgoCampaignDetailError(
         error,
         'Failed to archive campaign.',
-        'ngo-campaign-detail-archive-error',
+        { id: 'ngo-campaign-detail-archive-error' },
         'ngo.campaignDetail.archive'
       );
     }
@@ -265,7 +206,7 @@ function NgoCampaignDetail() {
       notifyNgoCampaignDetailError(
         error,
         'Failed to delete campaign.',
-        'ngo-campaign-detail-delete-error',
+        { id: 'ngo-campaign-detail-delete-error' },
         'ngo.campaignDetail.delete'
       );
     } finally {
@@ -296,6 +237,7 @@ function NgoCampaignDetail() {
     } else {
       setMapPosition([20.5937, 78.9629]);
     }
+    clearSuggestions();
     setIsEditOpen(true);
   };
 
@@ -303,9 +245,7 @@ function NgoCampaignDetail() {
     if (saving) return;
     setIsEditOpen(false);
     setForm({ ...emptyForm });
-    setShowSuggestions(false);
-    setAddressSuggestions([]);
-    setNoResults(false);
+    clearSuggestions();
   };
 
   const handleMapChange = (pos: [number, number]) => {
@@ -319,10 +259,10 @@ function NgoCampaignDetail() {
   };
 
   const syncAddressFromCoordinates = async (pos: [number, number]) => {
-    const data = await reverseGeocode(pos[0], pos[1], {
-      scope: 'ngo',
+    const result = await resolveFromCoordinates(pos, {
       errorMessage: 'Could not fetch address for this location',
     });
+    const data = result.geocode;
     if (data?.display_name) {
       setForm((prev) => ({
         ...prev,
@@ -334,47 +274,32 @@ function NgoCampaignDetail() {
   };
 
   const handleUseCurrentLocation = async () => {
-    setLocating(true);
-    const pos = await getCurrentCoordinates({
-      scope: 'ngo',
-      positionErrorMessage: 'Unable to fetch your location.',
-      unsupportedErrorMessage: 'Geolocation not supported in this browser.',
-    });
-    if (!pos) {
+    try {
+      setLocating(true);
+      const result = await resolveCurrentLocation({
+        positionErrorMessage: 'Unable to fetch your location.',
+        unsupportedErrorMessage: 'Geolocation not supported in this browser.',
+      });
+      if (!result) {
+        return;
+      }
+      handleMapChange(result.coords);
+    } catch (error) {
+      notifyNgoCampaignDetailError(
+        error,
+        'Unable to fetch your location.',
+        { id: 'ngo-campaign-detail-location-error' },
+        'ngo.campaignDetail.location.current'
+      );
+    } finally {
       setLocating(false);
-      return;
     }
-    handleMapChange(pos);
-    setLocating(false);
   };
 
   const handleAddressChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setForm((prev) => ({ ...prev, address: value }));
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    if (!value.trim()) {
-      setAddressSuggestions([]);
-      setShowSuggestions(false);
-      setNoResults(false);
-      return;
-    }
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(value)}&limit=5&addressdetails=1`
-        );
-        const data = await response.json();
-        setAddressSuggestions(data);
-        setShowSuggestions(true);
-        setNoResults(data.length === 0);
-      } catch (error) {
-        setAddressSuggestions([]);
-        setShowSuggestions(true);
-        setNoResults(true);
-      }
-    }, 400);
+    searchSuggestions(value);
   };
 
   const handleAddressSelect = (suggestion: any) => {
@@ -391,9 +316,7 @@ function NgoCampaignDetail() {
     if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
       setMapPosition([lat, lon]);
     }
-    setShowSuggestions(false);
-    setAddressSuggestions([]);
-    setNoResults(false);
+    clearSuggestions();
   };
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -413,28 +336,13 @@ function NgoCampaignDetail() {
       return;
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const startDate = parseLocalDate(form.startDate);
-    const endDate = parseLocalDate(form.endDate);
-
-    if (!startDate || !endDate) {
-      notify.error('Please enter valid dates.');
+    const dateError = validateCampaignDateRangeInput(form.startDate, form.endDate);
+    if (dateError) {
+      notify.error(dateError);
       return;
     }
-
-    if (startDate < today) {
-      notify.error('Start date cannot be in the past.');
-      return;
-    }
-    if (endDate < today) {
-      notify.error('End date cannot be in the past.');
-      return;
-    }
-    if (endDate <= startDate) {
-      notify.error('End date must be after start date.');
-      return;
-    }
+    const startDate = parseLocalDate(form.startDate) as Date;
+    const endDate = parseLocalDate(form.endDate) as Date;
 
     setSaving(true);
     try {
@@ -466,7 +374,7 @@ function NgoCampaignDetail() {
       notifyNgoCampaignDetailError(
         error,
         'Failed to update campaign.',
-        'ngo-campaign-detail-update-error',
+        { id: 'ngo-campaign-detail-update-error' },
         'ngo.campaignDetail.update'
       );
     } finally {
@@ -515,37 +423,15 @@ function NgoCampaignDetail() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {campaign.status === 'cancelled' ? (
-              <span className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-400">
-                <Archive className="w-4 h-4" />
-                Archived
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={handleArchive}
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-              >
-                <Archive className="w-4 h-4" />
-                Archive
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
+            <ArchiveDeleteActions
+              isArchived={campaign.status === 'cancelled'}
+              onArchive={handleArchive}
+              onDelete={() => {
                 if (campaign.status === 'completed') return;
                 setDeleteOpen(true);
               }}
-              disabled={campaign.status === 'completed'}
-              className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold ${
-                campaign.status === 'completed'
-                  ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
-                  : 'border-red-200 text-red-600 hover:bg-red-50'
-              }`}
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
+              deleteDisabled={campaign.status === 'completed'}
+            />
             <button
               type="button"
               onClick={() => {
@@ -686,8 +572,7 @@ function NgoCampaignDetail() {
       </div>
 
       {isEditOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <ModalShell containerClassName="bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-white">
               <h3 className="text-lg font-bold text-gray-900">Edit Campaign</h3>
               <button
@@ -881,8 +766,8 @@ function NgoCampaignDetail() {
                       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
-                    <MapUpdater center={mapPosition} />
-                    <LocationMarker position={mapPosition} onChange={handleMapChange} />
+                    <LeafletMapUpdater center={mapPosition} />
+                    <LeafletClickMarker position={mapPosition} onPositionChange={handleMapChange} />
                   </MapContainer>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
@@ -916,37 +801,19 @@ function NgoCampaignDetail() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ModalShell>
       )}
 
-      {deleteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-gray-900">Delete campaign?</h3>
-            <p className="mt-2 text-sm text-gray-600">
-              This will permanently remove the campaign and its data.
-            </p>
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-1 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-              >
-                {deleting ? 'Deleting...' : 'Delete'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeleteOpen(false)}
-                className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        open={deleteOpen}
+        title="Delete campaign?"
+        message="This will permanently remove the campaign and its data."
+        onConfirm={() => {
+          void handleDelete();
+        }}
+        onCancel={() => setDeleteOpen(false)}
+        isConfirming={deleting}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@
  *
  * Utilities for exporting data to CSV, PDF, etc.
  */
+import { captureHandledError } from '../services/errorLog.service';
 
 // ============================================================================
 // CSV EXPORT
@@ -101,7 +102,11 @@ export const exportToPDF = (elementId: string, filename: string): void => {
   const element = document.getElementById(elementId);
 
   if (!element) {
-    console.error(`Element with id ${elementId} not found`);
+    void captureHandledError(new Error(`Element with id ${elementId} not found`), {
+      source: 'frontend',
+      scope: 'unknown',
+      metadata: { kind: 'export.pdf.element_not_found', elementId, filename },
+    });
     return;
   }
 
@@ -109,7 +114,11 @@ export const exportToPDF = (elementId: string, filename: string): void => {
   const printWindow = window.open('', '', 'width=800,height=600');
 
   if (!printWindow) {
-    console.error('Could not open print window');
+    void captureHandledError(new Error('Could not open print window'), {
+      source: 'frontend',
+      scope: 'unknown',
+      metadata: { kind: 'export.pdf.print_window', elementId, filename },
+    });
     return;
   }
 
@@ -190,14 +199,22 @@ export const printElement = (elementId: string): void => {
   const element = document.getElementById(elementId);
 
   if (!element) {
-    console.error(`Element with id ${elementId} not found`);
+    void captureHandledError(new Error(`Element with id ${elementId} not found`), {
+      source: 'frontend',
+      scope: 'unknown',
+      metadata: { kind: 'export.print.element_not_found', elementId },
+    });
     return;
   }
 
   const printWindow = window.open('', '', 'width=800,height=600');
 
   if (!printWindow) {
-    console.error('Could not open print window');
+    void captureHandledError(new Error('Could not open print window'), {
+      source: 'frontend',
+      scope: 'unknown',
+      metadata: { kind: 'export.print.print_window', elementId },
+    });
     return;
   }
 

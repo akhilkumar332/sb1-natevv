@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import { captureHandledError } from '../services/errorLog.service';
 
 export interface BloodInventoryItem {
   id: string;
@@ -137,6 +138,13 @@ export const useBloodBankLegacyData = (hospitalId: string): UseBloodBankLegacyDa
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const reportLegacyError = (err: unknown, kind: string) => {
+    void captureHandledError(err, {
+      source: 'frontend',
+      scope: 'bloodbank',
+      metadata: { kind, hook: 'useBloodBankLegacyData' },
+    });
+  };
 
   // Fetch blood inventory
   const fetchInventory = async () => {
@@ -147,34 +155,40 @@ export const useBloodBankLegacyData = (hospitalId: string): UseBloodBankLegacyDa
         where('hospitalId', '==', hospitalId)
       );
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const inventoryList: BloodInventoryItem[] = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            hospitalId: data.hospitalId || '',
-            bloodType: data.bloodType || '',
-            units: data.units || 0,
-            status: data.status || 'adequate',
-            lowLevel: data.lowLevel || 10,
-            criticalLevel: data.criticalLevel || 5,
-            lastRestocked: data.lastRestocked?.toDate() || new Date(),
-            batches: (data.batches || []).map((batch: any) => ({
-              batchId: batch.batchId || '',
-              units: batch.units || 0,
-              collectionDate: batch.collectionDate?.toDate() || new Date(),
-              expiryDate: batch.expiryDate?.toDate() || new Date(),
-              status: batch.status || 'available',
-            })),
-            updatedAt: data.updatedAt?.toDate() || new Date(),
-          };
-        });
-        setInventory(inventoryList);
-      });
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const inventoryList: BloodInventoryItem[] = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              hospitalId: data.hospitalId || '',
+              bloodType: data.bloodType || '',
+              units: data.units || 0,
+              status: data.status || 'adequate',
+              lowLevel: data.lowLevel || 10,
+              criticalLevel: data.criticalLevel || 5,
+              lastRestocked: data.lastRestocked?.toDate() || new Date(),
+              batches: (data.batches || []).map((batch: any) => ({
+                batchId: batch.batchId || '',
+                units: batch.units || 0,
+                collectionDate: batch.collectionDate?.toDate() || new Date(),
+                expiryDate: batch.expiryDate?.toDate() || new Date(),
+                status: batch.status || 'available',
+              })),
+              updatedAt: data.updatedAt?.toDate() || new Date(),
+            };
+          });
+          setInventory(inventoryList);
+        },
+        (err) => {
+          reportLegacyError(err, 'fetch_inventory.listen');
+        }
+      );
 
       return unsubscribe;
     } catch (err) {
-      console.error('Error fetching inventory:', err);
+      reportLegacyError(err, 'fetch_inventory');
       setError('Failed to load inventory');
       return () => {};
     }
@@ -191,43 +205,49 @@ export const useBloodBankLegacyData = (hospitalId: string): UseBloodBankLegacyDa
         limit(50)
       );
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const requestsList: BloodRequest[] = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            requesterId: data.requesterId || '',
-            hospitalId: data.hospitalId || data.requesterId || '',
-            hospitalName: data.hospitalName || '',
-            bloodType: data.bloodType || '',
-            units: data.units || 0,
-            unitsReceived: data.unitsReceived || 0,
-            urgency: data.urgency || 'medium',
-            isEmergency: data.isEmergency || false,
-            patientId: data.patientId,
-            patientName: data.patientName,
-            department: data.department,
-            reason: data.reason || '',
-            status: data.status || 'active',
-            requestedAt: data.requestedAt?.toDate() || data.createdAt?.toDate() || new Date(),
-            neededBy: data.neededBy?.toDate() || new Date(),
-            respondedDonors: (data.respondedDonors || []).map((donor: any) => ({
-              donorId: donor.donorId || '',
-              donorName: donor.donorName || '',
-              respondedAt: donor.respondedAt?.toDate() || new Date(),
-              status: donor.status || 'pending',
-            })),
-            confirmedDonors: data.confirmedDonors || [],
-            fulfilledAt: data.fulfilledAt?.toDate(),
-            location: data.location || { city: '', state: '' },
-          };
-        });
-        setBloodRequests(requestsList);
-      });
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const requestsList: BloodRequest[] = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              requesterId: data.requesterId || '',
+              hospitalId: data.hospitalId || data.requesterId || '',
+              hospitalName: data.hospitalName || '',
+              bloodType: data.bloodType || '',
+              units: data.units || 0,
+              unitsReceived: data.unitsReceived || 0,
+              urgency: data.urgency || 'medium',
+              isEmergency: data.isEmergency || false,
+              patientId: data.patientId,
+              patientName: data.patientName,
+              department: data.department,
+              reason: data.reason || '',
+              status: data.status || 'active',
+              requestedAt: data.requestedAt?.toDate() || data.createdAt?.toDate() || new Date(),
+              neededBy: data.neededBy?.toDate() || new Date(),
+              respondedDonors: (data.respondedDonors || []).map((donor: any) => ({
+                donorId: donor.donorId || '',
+                donorName: donor.donorName || '',
+                respondedAt: donor.respondedAt?.toDate() || new Date(),
+                status: donor.status || 'pending',
+              })),
+              confirmedDonors: data.confirmedDonors || [],
+              fulfilledAt: data.fulfilledAt?.toDate(),
+              location: data.location || { city: '', state: '' },
+            };
+          });
+          setBloodRequests(requestsList);
+        },
+        (err) => {
+          reportLegacyError(err, 'fetch_blood_requests.listen');
+        }
+      );
 
       return unsubscribe;
     } catch (err) {
-      console.error('Error fetching blood requests:', err);
+      reportLegacyError(err, 'fetch_blood_requests');
       setError('Failed to load blood requests');
       return () => {};
     }
@@ -265,7 +285,7 @@ export const useBloodBankLegacyData = (hospitalId: string): UseBloodBankLegacyDa
       });
       setAppointments(appointmentsList);
     } catch (err) {
-      console.error('Error fetching appointments:', err);
+      reportLegacyError(err, 'fetch_appointments');
     }
   };
 
@@ -301,7 +321,7 @@ export const useBloodBankLegacyData = (hospitalId: string): UseBloodBankLegacyDa
       });
       setDonations(donationsList);
     } catch (err) {
-      console.error('Error fetching donations:', err);
+      reportLegacyError(err, 'fetch_donations');
     }
   };
 
@@ -384,6 +404,9 @@ export const useBloodBankLegacyData = (hospitalId: string): UseBloodBankLegacyDa
   // Initial data fetch
   useEffect(() => {
     if (!hospitalId) return;
+    let isActive = true;
+    let unsubscribeInventory: (() => void) | null = null;
+    let unsubscribeRequests: (() => void) | null = null;
 
     const loadData = async () => {
       setLoading(true);
@@ -391,8 +414,8 @@ export const useBloodBankLegacyData = (hospitalId: string): UseBloodBankLegacyDa
 
       try {
         // Set up real-time listeners
-        const unsubscribeInventory = await fetchInventory();
-        const unsubscribeRequests = await fetchBloodRequests();
+        unsubscribeInventory = await fetchInventory();
+        unsubscribeRequests = await fetchBloodRequests();
 
         // Fetch other data
         await Promise.all([
@@ -400,21 +423,25 @@ export const useBloodBankLegacyData = (hospitalId: string): UseBloodBankLegacyDa
           fetchDonations(),
         ]);
 
-        setLoading(false);
-
-        // Cleanup listeners on unmount
-        return () => {
-          unsubscribeInventory();
-          unsubscribeRequests();
-        };
+        if (isActive) {
+          setLoading(false);
+        }
       } catch (err) {
-        console.error('Error loading bloodbank data:', err);
-        setError('Failed to load bloodbank data');
-        setLoading(false);
+        reportLegacyError(err, 'load_bloodbank_data');
+        if (isActive) {
+          setError('Failed to load bloodbank data');
+          setLoading(false);
+        }
       }
     };
 
-    loadData();
+    void loadData();
+
+    return () => {
+      isActive = false;
+      unsubscribeInventory?.();
+      unsubscribeRequests?.();
+    };
   }, [hospitalId]);
 
   // Recalculate stats when data changes

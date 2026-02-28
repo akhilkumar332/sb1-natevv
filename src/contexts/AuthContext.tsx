@@ -40,7 +40,7 @@ import { auth, db, googleProvider } from '../firebase';
 import { getMessaging } from 'firebase/messaging';
 import { initializeFCM, saveFCMDeviceToken, saveFCMToken } from '../services/notification.service';
 import { requestImpersonation, requestImpersonationResume } from '../services/impersonation.service';
-import { flushQueuedErrorLogs } from '../services/errorLog.service';
+import { captureHandledError, flushQueuedErrorLogs } from '../services/errorLog.service';
 import { generateBhId } from '../utils/bhId';
 import { getDeviceId, getDeviceInfo } from '../utils/device';
 import { normalizePhoneNumber } from '../utils/phone';
@@ -249,6 +249,22 @@ const userCacheAtKey = 'bh_user_cache_at';
 const userCacheTtlMs = 24 * 60 * 60 * 1000;
 const IMPERSONATION_TTL_MS = 30 * 60 * 1000;
 
+const reportAuthContextError = (
+  error: unknown,
+  kind: string,
+  metadata?: Record<string, unknown>
+) => {
+  void captureHandledError(error, {
+    source: 'frontend',
+    scope: 'auth',
+    metadata: {
+      kind,
+      page: 'AuthContext',
+      ...(metadata || {}),
+    },
+  });
+};
+
 const parseCachedDate = (value?: string | null) => {
   if (!value) return undefined;
   const parsed = new Date(value);
@@ -407,7 +423,7 @@ const cleanupRecaptcha = () => {
     try {
       window.recaptchaVerifier.clear();
     } catch (error) {
-      console.warn('Error clearing recaptcha:', error);
+      reportAuthContextError(error, 'auth.recaptcha.clear');
     }
     window.recaptchaVerifier = undefined;
   }
@@ -431,7 +447,7 @@ const readPendingPhoneLink = () => {
     }
     return parsed;
   } catch (error) {
-    console.warn('Failed to parse pending phone link data:', error);
+    reportAuthContextError(error, 'auth.pending_phone_link.parse');
     return null;
   }
 };
@@ -489,7 +505,7 @@ const updateUserInFirestore = async (
 
     // If user document doesn't exist, return null
     if (!userDoc.exists()) {
-      console.warn('User document does not exist for:', firebaseUser.uid);
+      reportAuthContextError(new Error('User document missing'), 'auth.user_doc.missing', { uid: firebaseUser.uid });
       return { user: null, missing: true };
     }
 
@@ -524,7 +540,7 @@ const updateUserInFirestore = async (
       }
       await updateDoc(userRef, updatePayload);
     } catch (updateError) {
-      console.warn('Failed to update lastLoginAt, continuing anyway:', updateError);
+      reportAuthContextError(updateError, 'auth.user_doc.last_login_update');
       // Continue even if update fails - not critical
     }
 
@@ -562,13 +578,13 @@ const updateUserInFirestore = async (
           { merge: true }
         );
       } catch (publicError) {
-        console.warn('Failed to sync public donor record:', publicError);
+        reportAuthContextError(publicError, 'auth.public_donor.sync');
       }
     }
 
     return { user: resolvedUser, missing: false };
   } catch (error) {
-    console.error('Error in updateUserInFirestore:', error);
+    reportAuthContextError(error, 'auth.user_doc.update');
     throw error;
   }
 };
@@ -598,7 +614,7 @@ const updateSessionMetadata = async (firebaseUser: FirebaseUser, knownUser?: Use
     }
     await updateDoc(userRef, updatePayload);
   } catch (error) {
-    console.warn('Failed to update session metadata:', error);
+    reportAuthContextError(error, 'auth.session_metadata.update');
   }
 };
 
@@ -631,7 +647,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logProfileIssue = (label: string, error: unknown, context?: Record<string, unknown>) => {
     const err = error as any;
-    console.warn(`[auth] ${label}`, {
+    reportAuthContextError(error, `auth.profile.${label}`, {
       code: err?.code,
       name: err?.name,
       message: err?.message,
@@ -798,7 +814,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return targetUser;
     } catch (error: any) {
-      console.error('Failed to start impersonation:', error);
+      reportAuthContextError(error, 'auth.impersonation.start');
       notify.error(error?.message || authMessages.failedToStartImpersonation);
       updateImpersonationSession(null);
       setImpersonationTransition(null);
@@ -842,7 +858,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       await attemptResume(refreshed.resumeToken);
     } catch (error) {
-      console.error('Failed to resume admin session:', error);
+      reportAuthContextError(error, 'auth.impersonation.resume');
       notify.error(authMessages.failedToResumeAdminSession);
       trackImpersonationEvent('impersonation_failed', {
         reason: 'resume_failed',
@@ -1052,7 +1068,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           firestoreNetworkDisabledRef.current = false;
         })
         .catch((error) => {
-          console.warn('Failed to re-enable Firestore network (online):', error);
+          reportAuthContextError(error, 'auth.firestore.network_enable_online');
         });
     };
 
@@ -1063,7 +1079,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           firestoreNetworkDisabledRef.current = true;
         })
         .catch((error) => {
-          console.warn('Failed to disable Firestore network (offline):', error);
+          reportAuthContextError(error, 'auth.firestore.network_disable_offline');
         });
     };
 
@@ -1090,7 +1106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         firestoreNetworkDisabledRef.current = false;
       })
       .catch((error) => {
-        console.warn('Failed to re-enable Firestore network:', error);
+        reportAuthContextError(error, 'auth.firestore.network_reenable');
       });
   }, [user?.uid]);
 
@@ -1159,7 +1175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (error) {
-        console.warn('Failed to ensure push token on login:', error);
+        reportAuthContextError(error, 'auth.push.ensure_on_login');
       }
     };
 
@@ -1202,7 +1218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       { merge: true }
     ).catch((error) => {
-      console.warn('Failed to sync public donor record:', error);
+      reportAuthContextError(error, 'auth.public_donor.sync_effect');
     });
   }, [
     user?.uid,
@@ -1234,7 +1250,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               await enableNetwork(db);
               firestoreNetworkDisabledRef.current = false;
             } catch (error) {
-              console.warn('Failed to re-enable Firestore network on login:', error);
+              reportAuthContextError(error, 'auth.firestore.network_reenable_login');
             }
           }
           const now = Date.now();
@@ -1278,7 +1294,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   return;
                 }
                 if (result.missing) {
-                  console.warn('User document missing. Keeping cached session active.');
+                  reportAuthContextError(new Error('User document missing'), 'auth.user_doc.missing_cached', { uid: firebaseUser.uid });
                   if (isRegistrationRoute) {
                     setUser({
                       uid: firebaseUser.uid,
@@ -1339,7 +1355,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
               // If document doesn't exist and user is NEW, wait for registration to complete
               if (isNewUser && !userData) {
-                console.log(`⏳ New user detected, waiting for registration (${retries} retries left)...`);
                 retries--;
                 if (retries > 0) {
                   await new Promise(resolve => setTimeout(resolve, delay));
@@ -1350,7 +1365,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
             } catch (error) {
               lastError = error;
-              console.warn(`Attempt ${(isNewUser ? 5 : 3) - retries + 1} failed, retrying...`, error);
+              reportAuthContextError(error, 'auth.profile.retry_attempt', {
+                attempt: (isNewUser ? 5 : 3) - retries + 1,
+                isNewUser,
+              });
               retries--;
               if (retries > 0) {
                 await new Promise(resolve => setTimeout(resolve, delay));
@@ -1362,7 +1380,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(userData);
           } else {
             if (missingUserDoc) {
-              console.warn('User document missing. Keeping session active.');
+              reportAuthContextError(new Error('User document missing'), 'auth.user_doc.missing_session', { uid: firebaseUser.uid });
             } else if (lastError) {
               logProfileIssue('profile-load-failed', lastError, { uid: firebaseUser.uid });
               if (profileRetryTimeoutRef.current !== null) {
@@ -1384,7 +1402,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (fallbackUser) {
               setUser(fallbackUser);
             } else {
-              console.log('⏳ Profile unavailable; keeping minimal session until retry.');
               setUser({
                 uid: firebaseUser.uid,
                 email: firebaseUser.email,
@@ -1400,7 +1417,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProfileResolved(true);
         }
       } catch (error) {
-        console.error('Error in auth state change:', error);
+        reportAuthContextError(error, 'auth.state_change');
         setUser(null);
         setProfileResolved(true);
       } finally {
@@ -1463,7 +1480,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch((error) => {
-        console.warn('Deferred referral apply failed:', error);
+        reportAuthContextError(error, 'auth.referral.deferred_apply');
       });
   }, [user?.uid, user?.referredByUid, user?.referredByBhId]);
 
@@ -1471,7 +1488,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user?.uid) return;
     if (!user.referredByUid) return;
     ensureReferralTrackingForExistingReferral(user).catch((error) => {
-      console.warn('Referral status sync failed:', error);
+      reportAuthContextError(error, 'auth.referral.status_sync');
     });
   }, [user?.uid, user?.referredByUid, user?.onboardingCompleted, user?.status]);
 
@@ -1487,7 +1504,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(userCacheKey, JSON.stringify(serializeUserForCache(user)));
       localStorage.setItem(userCacheAtKey, Date.now().toString());
     } catch (error) {
-      console.warn('Failed to update user cache:', error);
+      reportAuthContextError(error, 'auth.user_cache.write');
     }
   }, [user]);
 
@@ -1501,7 +1518,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           window.recaptchaVerifier.clear();
         } catch (e) {
-          console.warn('Error clearing recaptcha:', e);
+          reportAuthContextError(e, 'auth.recaptcha.clear_login_with_phone');
         }
         window.recaptchaVerifier = undefined;
       }
@@ -1520,9 +1537,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Create new recaptcha verifier
       const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         'size': 'invisible',
-        'callback': () => {
-          console.log('reCAPTCHA solved');
-        },
+        'callback': () => {},
         'expired-callback': () => {
           notify.error('reCAPTCHA expired. Please try again.');
         }
@@ -1533,14 +1548,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Send OTP
       const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
 
-      console.log('OTP sent successfully');
-
       // DON'T clean up here - keep recaptcha active until OTP is verified
       return confirmation;
     } catch (error) {
       // Clean up on error only
       cleanupRecaptcha();
-      console.error('Phone login error:', error);
+      reportAuthContextError(error, 'auth.phone_login');
       throw error;
     } finally {
       setLoginLoading(false);
@@ -1599,7 +1612,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             await userCredential.user.delete();
           } catch (deleteError) {
-            console.warn('Failed to delete temporary phone user:', deleteError);
+            reportAuthContextError(deleteError, 'auth.phone_login.temp_user_delete');
           }
 
           await signOut(auth);
@@ -1643,7 +1656,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updatePayload.bhId = generatedBhId;
       }
       updateDoc(userRef, updatePayload).catch(err =>
-        console.error('Failed to update lastLoginAt:', err)
+        reportAuthContextError(err, 'auth.phone_login.last_login_update')
       );
 
       // Prepare user data
@@ -1667,7 +1680,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Return user data for immediate navigation
       return userDataToReturn;
     } catch (error) {
-      console.error('OTP verification error:', error);
+      reportAuthContextError(error, 'auth.otp.verify');
 
       // Clean up reCAPTCHA on error too
       cleanupRecaptcha();
@@ -1711,7 +1724,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         window.recaptchaVerifier.clear();
       } catch (e) {
-        console.warn('Error clearing recaptcha:', e);
+        reportAuthContextError(e, 'auth.recaptcha.clear_start_phone_link');
       }
       window.recaptchaVerifier = undefined;
     }
@@ -1727,9 +1740,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
       'size': 'invisible',
-      'callback': () => {
-        console.log('reCAPTCHA solved');
-      },
+      'callback': () => {},
       'expired-callback': () => {
         notify.error('reCAPTCHA expired. Please try again.');
       }
@@ -1791,7 +1802,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         window.recaptchaVerifier.clear();
       } catch (e) {
-        console.warn('Error clearing recaptcha:', e);
+        reportAuthContextError(e, 'auth.recaptcha.clear_start_phone_update');
       }
       window.recaptchaVerifier = undefined;
     }
@@ -1807,9 +1818,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
       'size': 'invisible',
-      'callback': () => {
-        console.log('reCAPTCHA solved');
-      },
+      'callback': () => {},
       'expired-callback': () => {
         notify.error('reCAPTCHA expired. Please try again.');
       }
@@ -1969,7 +1978,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updatePayload.bhId = generatedBhId;
       }
       updateDoc(userRef, updatePayload).catch(err =>
-        console.error('Failed to update lastLoginAt:', err)
+        reportAuthContextError(err, 'auth.email_login.last_login_update')
       );
 
       // Update user state immediately
@@ -1981,7 +1990,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user: userDataToReturn
       };
     } catch (error: any) {
-      console.error('Email login error:', error);
+      reportAuthContextError(error, 'auth.email_login');
 
       // Provide user-friendly error messages
       let errorMessage = 'Failed to sign in';
@@ -2026,7 +2035,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return result.user;
     } catch (error: any) {
-      console.error('Email registration error:', error);
+      reportAuthContextError(error, 'auth.email_register');
 
       // Provide user-friendly error messages
       let errorMessage = 'Failed to register';
@@ -2052,7 +2061,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await sendPasswordResetEmail(auth, email);
       notify.success('Password reset email sent! Please check your inbox.');
     } catch (error: any) {
-      console.error('Password reset error:', error);
+      reportAuthContextError(error, 'auth.password_reset');
 
       let errorMessage = 'Failed to send password reset email';
       if (error.code === 'auth/user-not-found') {
@@ -2102,7 +2111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await linkWithCredential(result.user, credential);
           clearPendingPhoneLink();
         } catch (linkError: any) {
-          console.error('Phone link error:', linkError);
+          reportAuthContextError(linkError, 'auth.google_login.phone_link');
           if (linkError?.code === 'auth/provider-already-linked') {
             clearPendingPhoneLink();
           } else if (linkError?.code === 'auth/credential-already-in-use') {
@@ -2167,7 +2176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updatePayload.bhId = generatedBhId;
       }
       updateDoc(userRef, updatePayload).catch(err =>
-        console.error('Failed to update lastLoginAt:', err)
+        reportAuthContextError(err, 'auth.google_login.last_login_update')
       );
 
       // Update user state immediately for navigation
@@ -2179,7 +2188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user: userDataToReturn
       };
     } catch (error) {
-      console.error('Google login error:', error);
+      reportAuthContextError(error, 'auth.google_login');
       if (error instanceof Error) {
         notify.error(error.message);
       }
@@ -2204,14 +2213,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         firestoreNetworkDisabledRef.current = true;
       }
     } catch (error) {
-      console.warn('Failed to disable Firestore network during logout:', error);
+      reportAuthContextError(error, 'auth.logout.firestore_disable');
     }
 
     try {
       await auth.signOut();
     } catch (error) {
       signOutFailed = true;
-      console.warn('Sign out failed, proceeding with local cleanup:', error);
+      reportAuthContextError(error, 'auth.logout.signout');
     }
 
     try {
@@ -2226,7 +2235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Optional: Clear any cached data
       indexedDB.deleteDatabase('firebaseLocalStorageDb');
     } catch (error) {
-      console.warn('Local logout cleanup failed:', error);
+      reportAuthContextError(error, 'auth.logout.local_cleanup');
     }
 
     if (signOutFailed) {
@@ -2258,7 +2267,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await handleLogout();
     } catch (error) {
       hadError = true;
-      console.error('Logout error:', error);
+      reportAuthContextError(error, 'auth.logout');
     }
 
     setPortalRole(null);
@@ -2267,7 +2276,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Broadcast logout event to other tabs
       logoutChannel.postMessage('logout');
     } catch (error) {
-      console.warn('Failed to broadcast logout event:', error);
+      reportAuthContextError(error, 'auth.logout.broadcast');
     }
 
     if (showToast) {
@@ -2298,7 +2307,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         delete sanitizedData.breakGlass;
       }
     }
-    console.log('Updating user profile with:', sanitizedData);
     try {
       const nextDateOfBirth = sanitizedData.dateOfBirth ?? user.dateOfBirth;
       const nextPostalCode = sanitizedData.postalCode ?? user.postalCode;
@@ -2364,7 +2372,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             { merge: true }
           );
         } catch (publicError) {
-          console.warn('Failed to update public donor record:', publicError);
+          reportAuthContextError(publicError, 'auth.profile_update.public_donor');
         }
       }
 
@@ -2376,7 +2384,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bhId: prev?.bhId || generatedBhId || undefined
       } as User));
     } catch (error) {
-      console.error('Error updating user profile:', error);
+      reportAuthContextError(error, 'auth.profile_update');
       throw error; // Re-throw the error so the caller can handle it
     }
   };

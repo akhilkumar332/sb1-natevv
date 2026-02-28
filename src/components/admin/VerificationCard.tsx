@@ -11,6 +11,7 @@ import {
   ORGANIZATION_TYPE_LABELS,
 } from '../../constants/app.constants';
 import { formatDateTime } from '../../utils/dataTransform';
+import { captureHandledError } from '../../services/errorLog.service';
 
 interface VerificationCardProps {
   request: VerificationRequest;
@@ -40,7 +41,11 @@ export const VerificationCard: React.FC<VerificationCardProps> = ({
     try {
       await onApprove(request.id, reviewNotes || undefined);
     } catch (error) {
-      console.error('Error approving request:', error);
+      void captureHandledError(error, {
+        source: 'frontend',
+        scope: 'admin',
+        metadata: { kind: 'verification.approve', component: 'VerificationCard' },
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -55,7 +60,11 @@ export const VerificationCard: React.FC<VerificationCardProps> = ({
       setShowRejectModal(false);
       setRejectionReason('');
     } catch (error) {
-      console.error('Error rejecting request:', error);
+      void captureHandledError(error, {
+        source: 'frontend',
+        scope: 'admin',
+        metadata: { kind: 'verification.reject', component: 'VerificationCard' },
+      });
     } finally {
       setIsProcessing(false);
     }

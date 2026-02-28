@@ -3,14 +3,15 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { ImpersonationUser } from '../../services/admin.service';
-import { notify } from 'services/notify.service';
 import { Heart, Users, Calendar, TrendingUp, Shield } from 'lucide-react';
 import LogoMark from '../../components/LogoMark';
 import PwaInstallCta from '../../components/PwaInstallCta';
-import { authStorage } from '../../utils/authStorage';
-import { auth } from '../../firebase';
 import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
+import AuthStatusScreen from '../../components/auth/AuthStatusScreen';
 import { authMessages } from '../../constants/messages';
+import { handleRoleGoogleLogin } from '../../utils/roleGoogleLogin';
+import { navigateToPortalDashboard, resolveImpersonationRole, resolvePortalRole } from '../../utils/portalNavigation';
+import { notifyRoleMismatch } from '../../utils/authNotifications';
 
 export function NgoLogin() {
   const navigate = useNavigate();
@@ -31,15 +32,6 @@ export function NgoLogin() {
   const [showPortalModal, setShowPortalModal] = useState(false);
   const hasRedirected = useRef(false);
 
-  const resolvePortalRole = (role?: string | null) => {
-    if (!role) return null;
-    if (role === 'hospital') return 'bloodbank';
-    if (role === 'bloodbank' || role === 'ngo' || role === 'admin' || role === 'donor') {
-      return role;
-    }
-    return 'ngo';
-  };
-
   useEffect(() => {
     if (!user || hasRedirected.current) {
       return;
@@ -50,13 +42,11 @@ export function NgoLogin() {
     }
 
     if (isImpersonating) {
-      const role = resolvePortalRole(impersonationSession?.targetRole ?? user.role ?? null);
-      if (role) {
-        hasRedirected.current = true;
-        setShowPortalModal(false);
-        navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
-        return;
-      }
+      const role = resolvePortalRole(impersonationSession?.targetRole ?? user.role ?? null, 'ngo');
+      hasRedirected.current = true;
+      setShowPortalModal(false);
+      navigateToPortalDashboard(navigate, role);
+      return;
     }
 
     if (isSuperAdmin) {
@@ -65,7 +55,7 @@ export function NgoLogin() {
     }
 
     if (user.role !== 'ngo') {
-      notify.error(authMessages.roleMismatch.ngo, { id: 'role-mismatch-ngo' });
+      notifyRoleMismatch('ngo');
       return;
     }
 
@@ -86,82 +76,48 @@ export function NgoLogin() {
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     try {
-      const response = await loginWithGoogle();
-      if (response.user.role === 'superadmin') {
-        const token = response?.token ?? (await auth.currentUser?.getIdToken());
-        if (token) {
-          authStorage.setAuthToken(token);
-        }
-        setShowPortalModal(true);
-        return;
-      }
-      if (response.user.role !== 'ngo') {
-        notify.error(authMessages.roleMismatch.ngo, { id: 'role-mismatch-ngo' });
-        await logout(navigate, { redirectTo: '/ngo/login', showToast: false });
-        return;
-      }
-      const token = response?.token ?? (await auth.currentUser?.getIdToken());
-      if (token) {
-        authStorage.setAuthToken(token);
-      }
-      notify.success('Successfully logged in as NGO!');
-
-      if (response.user.onboardingCompleted === true) {
-        navigate('/ngo/dashboard');
-      } else {
-        navigate('/ngo/onboarding');
-      }
-    } catch (error) {
-      notify.error('Failed to sign in with Google. Please try again.');
+      await handleRoleGoogleLogin({
+        loginWithGoogle,
+        logout,
+        navigate,
+        setShowPortalModal,
+        expectedRoles: ['ngo'],
+        roleMismatchMessage: authMessages.roleMismatch.ngo,
+        roleMismatchId: 'role-mismatch-ngo',
+        mismatchRedirectTo: '/ngo/login',
+        successMessage: 'Successfully logged in as NGO!',
+        dashboardPath: '/ngo/dashboard',
+        onboardingPath: '/ngo/onboarding',
+        persistTokenOnSuccess: true,
+        scope: 'ngo',
+        page: 'NgoLogin',
+      });
     } finally {
       setGoogleLoading(false);
     }
   };
 
   if (user && !profileResolved) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex items-center gap-3 text-gray-600">
-          <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-medium">Checking account…</span>
-        </div>
-      </div>
-    );
+    return <AuthStatusScreen message="Checking account…" />;
   }
 
   if (user && user.role === 'ngo' && !isSuperAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex items-center gap-3 text-gray-600">
-          <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-medium">Signing you in…</span>
-        </div>
-      </div>
-    );
+    return <AuthStatusScreen message="Signing you in…" />;
   }
 
   const handlePortalSelect = (role: 'donor' | 'ngo' | 'bloodbank' | 'admin') => {
     setPortalRole(role);
     hasRedirected.current = true;
-    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+    navigateToPortalDashboard(navigate, role);
   };
 
   const handleImpersonate = async (target: ImpersonationUser, reason?: string) => {
     const resolved = await startImpersonation(target, { ...(reason ? { reason } : {}) });
     if (!resolved) return;
-    const role =
-      resolved.role === 'hospital'
-        ? 'bloodbank'
-        : resolved.role === 'ngo'
-          ? 'ngo'
-          : resolved.role === 'bloodbank'
-            ? 'bloodbank'
-            : resolved.role === 'admin'
-              ? 'admin'
-              : 'donor';
+    const role = resolveImpersonationRole(resolved.role);
     hasRedirected.current = true;
     setShowPortalModal(false);
-    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+    navigateToPortalDashboard(navigate, role);
   };
 
   return (

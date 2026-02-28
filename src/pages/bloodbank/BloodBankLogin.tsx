@@ -3,14 +3,15 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { ImpersonationUser } from '../../services/admin.service';
-import { notify } from 'services/notify.service';
 import { Building2, Users, Activity, Shield } from 'lucide-react';
 import LogoMark from '../../components/LogoMark';
 import PwaInstallCta from '../../components/PwaInstallCta';
 import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
-import { authStorage } from '../../utils/authStorage';
-import { auth } from '../../firebase';
+import AuthStatusScreen from '../../components/auth/AuthStatusScreen';
 import { authMessages } from '../../constants/messages';
+import { handleRoleGoogleLogin } from '../../utils/roleGoogleLogin';
+import { navigateToPortalDashboard, resolveImpersonationRole, resolvePortalRole } from '../../utils/portalNavigation';
+import { notifyRoleMismatch } from '../../utils/authNotifications';
 
 export function BloodBankLogin() {
   const navigate = useNavigate();
@@ -31,15 +32,6 @@ export function BloodBankLogin() {
   const [showPortalModal, setShowPortalModal] = useState(false);
   const hasRedirected = useRef(false);
 
-  const resolvePortalRole = (role?: string | null) => {
-    if (!role) return null;
-    if (role === 'hospital') return 'bloodbank';
-    if (role === 'bloodbank' || role === 'ngo' || role === 'admin' || role === 'donor') {
-      return role;
-    }
-    return 'bloodbank';
-  };
-
   useEffect(() => {
     if (!user || hasRedirected.current) {
       return;
@@ -50,13 +42,11 @@ export function BloodBankLogin() {
     }
 
     if (isImpersonating) {
-      const role = resolvePortalRole(impersonationSession?.targetRole ?? user.role ?? null);
-      if (role) {
-        hasRedirected.current = true;
-        setShowPortalModal(false);
-        navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
-        return;
-      }
+      const role = resolvePortalRole(impersonationSession?.targetRole ?? user.role ?? null, 'bloodbank');
+      hasRedirected.current = true;
+      setShowPortalModal(false);
+      navigateToPortalDashboard(navigate, role);
+      return;
     }
 
     if (isSuperAdmin) {
@@ -65,7 +55,7 @@ export function BloodBankLogin() {
     }
 
     if (user.role !== 'bloodbank' && user.role !== 'hospital') {
-      notify.error(authMessages.roleMismatch.bloodbank, { id: 'role-mismatch-bloodbank' });
+      notifyRoleMismatch('bloodbank');
       return;
     }
 
@@ -86,29 +76,21 @@ export function BloodBankLogin() {
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     try {
-      const response = await loginWithGoogle();
-      if (response.user.role === 'superadmin') {
-        const token = response?.token ?? (await auth.currentUser?.getIdToken());
-        if (token) {
-          authStorage.setAuthToken(token);
-        }
-        setShowPortalModal(true);
-        return;
-      }
-      if (response.user.role !== 'bloodbank' && response.user.role !== 'hospital') {
-        notify.error(authMessages.roleMismatch.bloodbank, { id: 'role-mismatch-bloodbank' });
-        await logout(navigate, { redirectTo: '/bloodbank/login', showToast: false });
-        return;
-      }
-      notify.success('Successfully logged in as BloodBank!');
-
-      if (response.user.onboardingCompleted === true) {
-        navigate('/bloodbank/dashboard');
-      } else {
-        navigate('/bloodbank/onboarding');
-      }
-    } catch (error) {
-      notify.error('Failed to sign in with Google. Please try again.');
+      await handleRoleGoogleLogin({
+        loginWithGoogle,
+        logout,
+        navigate,
+        setShowPortalModal,
+        expectedRoles: ['bloodbank', 'hospital'],
+        roleMismatchMessage: authMessages.roleMismatch.bloodbank,
+        roleMismatchId: 'role-mismatch-bloodbank',
+        mismatchRedirectTo: '/bloodbank/login',
+        successMessage: 'Successfully logged in as BloodBank!',
+        dashboardPath: '/bloodbank/dashboard',
+        onboardingPath: '/bloodbank/onboarding',
+        scope: 'bloodbank',
+        page: 'BloodBankLogin',
+      });
     } finally {
       setGoogleLoading(false);
     }
@@ -117,36 +99,20 @@ export function BloodBankLogin() {
   const handlePortalSelect = (role: 'donor' | 'ngo' | 'bloodbank' | 'admin') => {
     setPortalRole(role);
     hasRedirected.current = true;
-    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+    navigateToPortalDashboard(navigate, role);
   };
 
   const handleImpersonate = async (target: ImpersonationUser, reason?: string) => {
     const resolved = await startImpersonation(target, { ...(reason ? { reason } : {}) });
     if (!resolved) return;
-    const role =
-      resolved.role === 'hospital'
-        ? 'bloodbank'
-        : resolved.role === 'ngo'
-          ? 'ngo'
-          : resolved.role === 'bloodbank'
-            ? 'bloodbank'
-            : resolved.role === 'admin'
-              ? 'admin'
-              : 'donor';
+    const role = resolveImpersonationRole(resolved.role);
     hasRedirected.current = true;
     setShowPortalModal(false);
-    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+    navigateToPortalDashboard(navigate, role);
   };
 
   if (user && !profileResolved) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex items-center gap-3 text-gray-600">
-          <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-medium">Checking account…</span>
-        </div>
-      </div>
-    );
+    return <AuthStatusScreen message="Checking account…" />;
   }
 
   return (

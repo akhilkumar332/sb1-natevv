@@ -21,7 +21,6 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { notify } from 'services/notify.service';
 import { addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, runTransaction, serverTimestamp, Timestamp, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
-import { normalizePhoneNumber, isValidPhoneNumber } from '../../utils/phone';
 import { useReferrals } from '../../hooks/useReferrals';
 import PortalNotificationBridge from '../../components/shared/PortalNotificationBridge';
 import {
@@ -38,8 +37,10 @@ import {
   type PendingDonorRequestBatch,
   type PendingDonorRequestPayload,
 } from '../../services/donorRequest.service';
+import { filterSelfTargets } from '../../services/donorRequestGuard.service';
 import type { ConfirmationResult } from 'firebase/auth';
 import { captureHandledError } from '../../services/errorLog.service';
+import { authInputMessages, getOtpValidationError, sanitizeOtp, validateGeneralPhoneInput } from '../../utils/authInputValidation';
 import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
 
 type ShareOptions = {
@@ -426,7 +427,7 @@ function DonorDashboard() {
             emergencyAlerts: false,
           },
         }).catch(error => {
-          console.warn('Failed to auto-disable availability:', error);
+          reportDonorDashboardError(error, 'donor.dashboard.availability.auto_disable');
         });
       } else {
         updateUserProfile({
@@ -436,7 +437,7 @@ function DonorDashboard() {
             emergencyAlerts: true,
           },
         }).catch(error => {
-          console.warn('Failed to auto-enable availability:', error);
+          reportDonorDashboardError(error, 'donor.dashboard.availability.auto_enable');
         });
       }
     }
@@ -467,7 +468,7 @@ function DonorDashboard() {
       });
       setDonationFeedbackMap(nextMap);
     }, (error) => {
-      console.warn('Failed to load donation feedback:', error);
+      reportDonorDashboardError(error, 'donor.dashboard.feedback.load');
     });
     return () => unsubscribe();
   }, [user?.uid]);
@@ -527,7 +528,7 @@ function DonorDashboard() {
           { merge: true }
         );
       } catch (error) {
-        console.warn('Donation type backfill failed:', error);
+        reportDonorDashboardError(error, 'donor.dashboard.donation_type.backfill');
       }
     };
 
@@ -601,7 +602,7 @@ function DonorDashboard() {
           window.localStorage.setItem(storageKey, 'done');
         }
       } catch (error) {
-        console.warn('Donation location backfill failed:', error);
+        reportDonorDashboardError(error, 'donor.dashboard.donation_location.backfill');
       }
     };
 
@@ -701,7 +702,7 @@ function DonorDashboard() {
               window.sessionStorage.setItem(requestCacheKey, JSON.stringify(sanitized));
             }
           } catch (error) {
-            console.warn('Failed to sanitize legacy donor request cache', error);
+            reportDonorDashboardError(error, 'donor.dashboard.request_cache.sanitize_legacy');
           }
           window.localStorage.removeItem(requestCacheKey);
         }
@@ -748,11 +749,11 @@ function DonorDashboard() {
               try {
                 window.sessionStorage.setItem(requestCacheKey, JSON.stringify(sanitized));
               } catch (error) {
-                console.warn('Failed to purge donor request cache PII', error);
+                reportDonorDashboardError(error, 'donor.dashboard.request_cache.purge_pii');
               }
             }
           } catch (error) {
-            console.warn('Failed to hydrate donor request cache', error);
+            reportDonorDashboardError(error, 'donor.dashboard.request_cache.hydrate');
           }
         }
       }
@@ -815,7 +816,7 @@ function DonorDashboard() {
           updatedAt: serverTimestamp(),
         }).catch((error) => {
           refGuard.current.delete(item.id);
-          console.warn('Failed to expire donor request', error);
+          reportDonorDashboardError(error, 'donor.dashboard.requests.expire_outgoing');
         });
       });
     };
@@ -835,7 +836,7 @@ function DonorDashboard() {
           updatedAt: serverTimestamp(),
         }).catch((error) => {
           refGuard.current.delete(item.id);
-          console.warn('Failed to expire accepted donor request', error);
+          reportDonorDashboardError(error, 'donor.dashboard.requests.expire_accepted');
         });
       });
     };
@@ -891,7 +892,7 @@ function DonorDashboard() {
       try {
         window.sessionStorage.setItem(requestCacheKey, JSON.stringify(payload));
       } catch (error) {
-        console.warn('Failed to write donor request cache', error);
+        reportDonorDashboardError(error, 'donor.dashboard.request_cache.write');
       }
     };
 
@@ -914,7 +915,7 @@ function DonorDashboard() {
         requestBatchesRef.current
       );
     }, (error) => {
-      console.warn('Failed to load incoming donor requests:', error);
+      reportDonorDashboardError(error, 'donor.dashboard.requests.load_incoming');
       setIncomingRequestsLoading(false);
     });
 
@@ -937,7 +938,7 @@ function DonorDashboard() {
         requestBatchesRef.current
       );
     }, (error) => {
-      console.warn('Failed to load outgoing donor requests:', error);
+      reportDonorDashboardError(error, 'donor.dashboard.requests.load_outgoing');
       setOutgoingRequestsLoading(false);
     });
 
@@ -966,7 +967,7 @@ function DonorDashboard() {
         requestBatchesRef.current
       );
     }, (error) => {
-      console.warn('Failed to load donor request batches:', error);
+      reportDonorDashboardError(error, 'donor.dashboard.requests.load_batches');
       setDonorRequestBatchesLoading(false);
     });
 
@@ -1007,7 +1008,7 @@ function DonorDashboard() {
     const task = () => {
       refreshData({ silent: true })
         .catch((error) => {
-          console.warn('Donor dashboard prefetch failed', error);
+          reportDonorDashboardError(error, 'donor.dashboard.prefetch');
         })
         .finally(() => {
           window.sessionStorage.setItem(prefetchKey, Date.now().toString());
@@ -1055,7 +1056,7 @@ function DonorDashboard() {
         try {
           await savePendingDonorRequestDoc(user.uid, pendingFromSearch as PendingDonorRequestPayload);
         } catch (error) {
-          console.warn('Failed to persist pending donor request. Clearing payload.', error);
+          reportDonorDashboardError(error, 'donor.dashboard.pending_request.persist');
         }
         if (pendingKey) {
           clearPendingDonorRequestFromSession(pendingKey);
@@ -1096,7 +1097,7 @@ function DonorDashboard() {
         return;
       }
 
-      const filteredTargets = payload.targets.filter((target) => target.id !== user.uid);
+      const filteredTargets = filterSelfTargets(payload.targets, user.uid);
       if (filteredTargets.length === 0) {
         const selfKey = `self:${payload.createdAt}`;
         if (pendingRequestProcessedRef.current !== selfKey) {
@@ -1166,7 +1167,7 @@ function DonorDashboard() {
     if (serialized === shareOptionsSyncRef.current) return;
     shareOptionsSyncRef.current = serialized;
     updateUserProfile({ donorCardShareOptions: shareOptions }).catch((error) => {
-      console.warn('Failed to save donor card share options', error);
+      reportDonorDashboardError(error, 'donor.dashboard.share_options.save');
     });
   }, [shareOptions, user?.uid, updateUserProfile]);
 
@@ -1213,9 +1214,9 @@ function DonorDashboard() {
   };
 
   const handlePhoneLinkStart = async () => {
-    const normalized = normalizePhoneNumber(linkPhoneNumber);
-    if (!isValidPhoneNumber(normalized)) {
-      notify.error('Please enter a valid phone number.');
+    const { normalized, error } = validateGeneralPhoneInput(linkPhoneNumber);
+    if (error) {
+      notify.error(error);
       return;
     }
 
@@ -1234,19 +1235,16 @@ function DonorDashboard() {
 
   const handlePhoneLinkConfirm = async () => {
     if (!linkConfirmation) {
-      notify.error('Please request an OTP before verifying.');
+      notify.error(authInputMessages.requestOtpFirst);
       return;
     }
 
-    const sanitizedOtp = linkOtp.replace(/\D/g, '').trim();
-    if (!sanitizedOtp) {
-      notify.error('Please enter the OTP.');
+    const otpError = getOtpValidationError(linkOtp);
+    if (otpError) {
+      notify.error(otpError);
       return;
     }
-    if (sanitizedOtp.length !== 6) {
-      notify.error('Invalid OTP length. Please enter the 6-digit code.');
-      return;
-    }
+    const sanitizedOtp = sanitizeOtp(linkOtp);
 
     try {
       setLinkPhoneLoading(true);
@@ -1420,7 +1418,7 @@ function DonorDashboard() {
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
         const label = index === 0 ? 'requester' : 'self';
-        console.warn(`Failed to send ${label} notification for donor request`, result.reason);
+        reportDonorDashboardError(result.reason, `donor.dashboard.requests.notification.${label}`);
       }
     });
   };
@@ -1547,7 +1545,7 @@ function DonorDashboard() {
         }
       })
       .catch((error) => {
-        console.warn('QR code generation failed', error);
+        reportDonorDashboardError(error, 'donor.dashboard.qr.generate');
         if (active) {
           setQrCodeDataUrl(null);
         }
@@ -1953,7 +1951,7 @@ function DonorDashboard() {
           qrOverride = await createQrCodeDataUrl();
           setQrCodeDataUrl(qrOverride);
         } catch (qrError) {
-          console.warn('QR code not available for share card', qrError);
+          reportDonorDashboardError(qrError, 'donor.dashboard.share_card.qr_missing');
         }
       }
       const svgMarkup = buildDonorCardSvg(qrOverride);

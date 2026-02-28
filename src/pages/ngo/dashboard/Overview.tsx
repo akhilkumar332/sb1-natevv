@@ -11,20 +11,7 @@ import {
   Users,
 } from 'lucide-react';
 import type { NgoDashboardContext } from '../NgoDashboard';
-
-const typeLabels: Record<string, string> = {
-  'blood-drive': 'Blood Drive',
-  awareness: 'Awareness',
-  fundraising: 'Fundraising',
-  volunteer: 'Volunteer Drive',
-};
-
-const targetLabels: Record<string, string> = {
-  units: 'Units',
-  donors: 'Donors',
-  funds: 'Funds',
-  volunteers: 'Volunteers',
-};
+import { getCampaignTargetLabel, getCampaignTypeLabel } from '../../../utils/campaignLabels';
 
 const formatDateRange = (start: Date, end: Date) => {
   const startText = start.toLocaleDateString();
@@ -129,8 +116,8 @@ function NgoOverview() {
                     : 0;
                 const achievedValue = Math.max(campaign.achieved || 0, registeredCount);
                 const progress = campaign.target > 0 ? Math.min((achievedValue / campaign.target) * 100, 100) : 0;
-                const typeLabel = typeLabels[campaign.type] || 'Campaign';
-                const targetLabel = targetLabels[campaign.targetType || 'units'] || 'Units';
+                const typeLabel = getCampaignTypeLabel(campaign.type);
+                const targetLabel = getCampaignTargetLabel(campaign.targetType || 'units');
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
                 const daysUntilStart = Math.ceil((campaign.startDate.getTime() - today.getTime()) / 86400000);

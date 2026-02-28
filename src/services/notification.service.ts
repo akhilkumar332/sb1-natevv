@@ -25,10 +25,23 @@ import { FCM_CONFIG } from '../config/fcm.config';
 import { calculateDistance } from '../utils/geolocation';
 import { DatabaseError } from '../utils/errorHandler';
 import type { DeviceInfo } from '../utils/device';
+import { captureHandledError } from './errorLog.service';
 
 // ============================================================================
 // FCM TOKEN MANAGEMENT
 // ============================================================================
+
+const reportNotificationServiceError = (error: unknown, kind: string, metadata?: Record<string, unknown>) => {
+  void captureHandledError(error, {
+    source: 'frontend',
+    scope: 'unknown',
+    metadata: {
+      kind,
+      service: 'notification.service',
+      ...(metadata || {}),
+    },
+  });
+};
 
 /**
  * Request notification permission and get FCM token
@@ -79,7 +92,7 @@ const ensureMessagingServiceWorker = async () => {
     }
     return registration || null;
   } catch (error) {
-    console.warn('Failed to register FCM service worker:', error);
+    reportNotificationServiceError(error, 'notification.fcm_service_worker.register');
     return null;
   }
 };
@@ -108,7 +121,10 @@ export const requestNotificationPermission = async (
       } catch (error: any) {
         const message = error?.message || '';
         if (error?.name === 'AbortError' || message.includes('no active Service Worker')) {
-          console.warn('FCM subscription not ready yet. Retry after service worker activates.');
+          reportNotificationServiceError(
+            new Error('FCM subscription not ready yet. Retry after service worker activates.'),
+            'notification.fcm_subscription.not_ready'
+          );
           return null;
         }
         throw error;
@@ -120,10 +136,13 @@ export const requestNotificationPermission = async (
     const err = error as any;
     const message = err?.message || '';
     if (err?.name === 'AbortError' || message.includes('no active Service Worker')) {
-      console.warn('FCM subscription not ready yet. Retry after service worker activates.');
+      reportNotificationServiceError(
+        new Error('FCM subscription not ready yet. Retry after service worker activates.'),
+        'notification.fcm_subscription.not_ready'
+      );
       return null;
     }
-    console.error('Error requesting notification permission:', error);
+    reportNotificationServiceError(error, 'notification.permission.request');
     throw new DatabaseError('Failed to request notification permission');
   }
 };
@@ -275,7 +294,7 @@ export const initializeFCM = async (
 
     return null;
   } catch (error) {
-    console.error('Error initializing FCM:', error);
+    reportNotificationServiceError(error, 'notification.fcm.initialize', { userId });
     return null;
   }
 };

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { notify } from 'services/notify.service';
+import { captureHandledError } from '../services/errorLog.service';
 
 const VERSION_URL = '/version.json';
 const POLL_INTERVAL_MS = 60_000;
@@ -64,7 +65,11 @@ export const useVersionCheck = () => {
       try {
         await Promise.all([clearCaches(), unregisterServiceWorkers()]);
       } catch (error) {
-        console.warn('Failed to clear caches or service workers:', error);
+        void captureHandledError(error, {
+          source: 'frontend',
+          scope: 'unknown',
+          metadata: { kind: 'version_check.clear_caches' },
+        });
       }
 
       clearCookies();
@@ -140,7 +145,11 @@ export const useVersionCheck = () => {
           }
         }
       } catch (error) {
-        console.warn('Failed to fetch version metadata:', error);
+        void captureHandledError(error, {
+          source: 'frontend',
+          scope: 'unknown',
+          metadata: { kind: 'version_check.fetch_metadata' },
+        });
       }
     };
 

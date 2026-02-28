@@ -7,6 +7,8 @@ import LogoMark from './LogoMark';
 import NotificationBadge from './shared/NotificationBadge';
 import { gamificationService } from '../services/gamification.service';
 import ThemeToggle from './ThemeToggle';
+import { captureHandledError } from '../services/errorLog.service';
+import { useScopedErrorReporter } from '../hooks/useScopedErrorReporter';
 
 const TOP_BADGE_TTL_MS = 10 * 60 * 1000;
 
@@ -53,7 +55,11 @@ const useTopDonorBadge = (user: any) => {
           }
         }
       } catch (error) {
-        console.warn('Failed to read badge cache', error);
+        void captureHandledError(error, {
+          source: 'frontend',
+          scope: 'donor',
+          metadata: { component: 'Navbar', kind: 'top_badge.cache.read' },
+        });
       }
     }
     let active = true;
@@ -66,12 +72,20 @@ const useTopDonorBadge = (user: any) => {
           try {
             window.sessionStorage.setItem(cacheKey, JSON.stringify({ name: topBadge.name, icon: topBadge.icon, savedAt: Date.now() }));
           } catch (error) {
-            console.warn('Failed to cache badge name', error);
+            void captureHandledError(error, {
+              source: 'frontend',
+              scope: 'donor',
+              metadata: { component: 'Navbar', kind: 'top_badge.cache.write' },
+            });
           }
         }
       })
       .catch((error) => {
-        console.warn('Failed to load badge name', error);
+        void captureHandledError(error, {
+          source: 'frontend',
+          scope: 'donor',
+          metadata: { component: 'Navbar', kind: 'top_badge.fetch' },
+        });
         if (active) setBadge({ name: '', icon: '' });
       });
     return () => {
@@ -238,6 +252,10 @@ function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: 
   const { user, logout, isSuperAdmin, portalRole, setPortalRole, isImpersonating, stopImpersonation } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
+  const reportNavbarError = useScopedErrorReporter({
+    scope: 'unknown',
+    metadata: { component: 'Navbar', section: 'UserMenu' },
+  });
 
   const handleLogout = async () => {
     await logout(navigate);
@@ -289,7 +307,7 @@ function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: 
             alt={user?.displayName || 'User'}
             className="w-8 h-8 rounded-full object-cover ring-2 ring-red-600"
             onError={(e) => {
-              console.error('Error loading profile image:', e);
+              reportNavbarError(e, 'profile_image.load_error');
               e.currentTarget.src = `https://ui-avatars.com/api/?background=dc2626&color=fff&name=${encodeURIComponent(user?.displayName || user?.email || 'User')}`;
             }}
           />
@@ -415,6 +433,10 @@ function MobileUserMenu({
 }) {
   const { user, logout, isSuperAdmin, portalRole, setPortalRole, isImpersonating, stopImpersonation } = useAuth();
   const navigate = useNavigate();
+  const reportNavbarError = useScopedErrorReporter({
+    scope: 'unknown',
+    metadata: { component: 'Navbar', section: 'MobileUserMenu' },
+  });
 
   const handleLogout = async () => {
     await logout(navigate);
@@ -483,7 +505,7 @@ function MobileUserMenu({
             alt={user?.displayName || 'User'}
             className="w-10 h-10 rounded-full object-cover ring-2 ring-red-600"
             onError={(e) => {
-              console.error('Error loading profile image:', e);
+              reportNavbarError(e, 'profile_image.load_error');
               e.currentTarget.src = `https://ui-avatars.com/api/?background=dc2626&color=fff&name=${encodeURIComponent(user?.displayName || user?.email || 'User')}`;
             }}
           />

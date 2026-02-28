@@ -23,6 +23,7 @@ import { db } from '../../firebase';
 import { timestampToDate } from '../../utils/firestore.utils';
 import { useAuth } from '../../contexts/AuthContext';
 import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
+import { useScopedErrorReporter } from '../../hooks/useScopedErrorReporter';
 
 export type ImpersonationEvent = {
   id: string;
@@ -82,6 +83,10 @@ const mapEventDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): Impersonatio
 
 const ImpersonationAudit = () => {
   const { isSuperAdmin } = useAuth();
+  const reportImpersonationAuditError = useScopedErrorReporter({
+    scope: 'admin',
+    metadata: { page: 'ImpersonationAudit' },
+  });
   const [events, setEvents] = useState<ImpersonationEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +152,7 @@ const ImpersonationAudit = () => {
         return next;
       });
     } catch (err) {
-      console.error('Failed to load impersonation events', err);
+      reportImpersonationAuditError(err, 'impersonation.audit.load_events');
       setError('Unable to load impersonation events. Please try again.');
     } finally {
       setLoading(false);

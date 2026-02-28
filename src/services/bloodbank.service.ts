@@ -32,6 +32,19 @@ import {
 } from '../types/database.types';
 import { extractQueryData, getServerTimestamp } from '../utils/firestore.utils';
 import { DatabaseError, ValidationError, NotFoundError } from '../utils/errorHandler';
+import { captureHandledError } from './errorLog.service';
+
+const reportBloodBankServiceError = (error: unknown, kind: string, metadata?: Record<string, unknown>) => {
+  void captureHandledError(error, {
+    source: 'frontend',
+    scope: 'bloodbank',
+    metadata: {
+      kind,
+      service: 'bloodbank.service',
+      ...(metadata || {}),
+    },
+  });
+};
 
 // ============================================================================
 // BLOOD INVENTORY MANAGEMENT
@@ -355,7 +368,7 @@ const notifyMatchingDonors = async (
     await Promise.all(notificationPromises);
   } catch (error) {
     // Log error but don't fail the request creation
-    console.error('Failed to notify donors:', error);
+    reportBloodBankServiceError(error, 'bloodbank.request.notify_donors', { requestId, bloodType, city });
   }
 };
 

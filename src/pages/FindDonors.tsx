@@ -25,8 +25,9 @@ import {
   type PendingDonorRequestPayload,
 } from '../services/donorRequest.service';
 import { notify } from 'services/notify.service';
-import { captureHandledError } from '../services/errorLog.service';
 import { getCurrentCoordinates } from '../utils/geolocation.utils';
+import { useScopedErrorReporter } from '../hooks/useScopedErrorReporter';
+import { filterSelfTargets, getPendingCooldownHours } from '../services/donorRequestGuard.service';
 
 interface Donor {
   id: string;
@@ -103,13 +104,10 @@ function FindDonors() {
   const sliderTrackRef = useRef<HTMLDivElement | null>(null);
   const sliderValueRef = useRef(0);
   const REQUEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-  const reportFindDonorsError = (err: unknown, kind: string) => {
-    void captureHandledError(err, {
-      source: 'frontend',
-      scope: 'donor',
-      metadata: { kind, page: 'FindDonors' },
-    });
-  };
+  const reportFindDonorsError = useScopedErrorReporter({
+    scope: 'donor',
+    metadata: { page: 'FindDonors' },
+  });
 
   const requestLocation = async () => {
     setLocationRequesting(true);
@@ -181,9 +179,9 @@ function FindDonors() {
     if (compactPrefRef.current === compactMode) return;
     compactPrefRef.current = compactMode;
     updateUserProfile({ findDonorsCompactMode: compactMode }).catch((error) => {
-      console.warn('Failed to sync compact mode preference', error);
+      reportFindDonorsError(error, 'compact_mode.sync');
     });
-  }, [compactMode, user?.uid, updateUserProfile]);
+  }, [compactMode, user?.uid, updateUserProfile, reportFindDonorsError]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -202,7 +200,7 @@ function FindDonors() {
     }
     const timer = setTimeout(task, 800);
     return () => clearTimeout(timer);
-  }, [user?.uid]);
+  }, [user?.uid, reportFindDonorsError]);
 
   useEffect(() => {
     if (!user?.uid) {
@@ -254,7 +252,7 @@ function FindDonors() {
                   updatedAt: serverTimestamp(),
                 }).catch((error) => {
                   pendingExpiryRef.current.delete(docSnap.id);
-                  console.warn('Failed to expire donor request', error);
+                  reportFindDonorsError(error, 'donor_request.expire');
                 });
               }
             } else if (data.targetDonorUid) {
@@ -287,7 +285,7 @@ function FindDonors() {
             updatePayload.connectionExpiresAt = Timestamp.fromDate(expiresAt);
           }
           updateDoc(docSnap.ref, updatePayload).catch((error) => {
-            console.warn('Failed to backfill donor connection fields', error);
+            reportFindDonorsError(error, 'donor_connections.backfill');
           });
         }
       });
@@ -312,13 +310,13 @@ function FindDonors() {
       requesterConnectionsRef.current = snapshot.docs;
       computeConnections();
     }, (error) => {
-      console.warn('Failed to load requester donor connections', error);
+      reportFindDonorsError(error, 'donor_connections.requester.load');
     });
     const unsubscribeTarget = onSnapshot(targetQuery, (snapshot) => {
       targetConnectionsRef.current = snapshot.docs;
       computeConnections();
     }, (error) => {
-      console.warn('Failed to load target donor connections', error);
+      reportFindDonorsError(error, 'donor_connections.target.load');
     });
 
     return () => {
@@ -537,7 +535,6 @@ function FindDonors() {
         void fetchMore();
       }
     } catch (error) {
-      console.error('Failed to load donors:', error);
       reportFindDonorsError(error, 'load_donors');
       if (!rawDonorsRef.current || rawDonorsRef.current.length === 0) {
         setBaseDonors([]);
@@ -675,7 +672,7 @@ function FindDonors() {
         return;
       }
 
-      const filteredTargets = payload.targets.filter((target) => target.id !== user.uid);
+      const filteredTargets = filterSelfTargets(payload.targets, user.uid);
       if (filteredTargets.length === 0) {
         const selfKey = `self:${payload.createdAt}`;
         if (selfRequestToastRef.current !== selfKey) {
@@ -698,7 +695,6 @@ function FindDonors() {
         setRequestResult({ sent: result.sentCount, skipped: result.skippedCount });
         notify.success('Request submitted successfully.');
       } catch (error) {
-        console.error('Failed to submit pending donor request:', error);
         reportFindDonorsError(error, 'submit_pending_donor_request');
         notify.error('Failed to submit your request.');
         pendingRequestProcessedRef.current = null;
@@ -708,7 +704,6 @@ function FindDonors() {
     };
 
     submitPending().catch((error) => {
-      console.error('Pending donor request submission failed:', error);
       reportFindDonorsError(error, 'submit_pending_donor_request_uncaught');
     });
   }, [user, requestSubmitting, location.search, navigate]);
@@ -760,8 +755,7 @@ function FindDonors() {
       }
       if (pendingRequestTargets.has(donor.id)) {
         const expiresAt = pendingRequestExpiryMap[donor.id];
-        const diffMs = expiresAt ? expiresAt - Date.now() : 0;
-        const diffHours = diffMs > 0 ? Math.ceil(diffMs / (1000 * 60 * 60)) : 24;
+        const diffHours = getPendingCooldownHours(expiresAt);
         notify.error(`Already requested. Try again in ${diffHours}h.`);
         return;
       }
@@ -860,7 +854,7 @@ function FindDonors() {
     }
     let safeRecipients = recipients;
     if (user?.uid) {
-      const filtered = recipients.filter((donor) => donor.id !== user.uid);
+      const filtered = filterSelfTargets(recipients, user.uid);
       if (filtered.length !== recipients.length) {
         notify.error('You cannot request yourself.');
       }
@@ -929,7 +923,6 @@ function FindDonors() {
       setUseFilteredRecipients(false);
       setShowRequestStudio(false);
     } catch (error) {
-      console.error('Failed to submit donor request batch:', error);
       reportFindDonorsError(error, 'submit_donor_request_batch');
       notify.error('Failed to send requests.');
     } finally {
@@ -953,7 +946,6 @@ function FindDonors() {
       });
       notify.success('Default request template saved.');
     } catch (error) {
-      console.error('Failed to save donor request template:', error);
       reportFindDonorsError(error, 'save_donor_request_template');
       notify.error('Failed to save template.');
     } finally {
@@ -1001,7 +993,6 @@ function FindDonors() {
       });
       notify.success('Request batch undone.');
     } catch (error) {
-      console.error('Failed to undo donor request batch:', error);
       reportFindDonorsError(error, 'undo_donor_request_batch');
       notify.error('Unable to undo requests. Please try again.');
     } finally {

@@ -37,6 +37,7 @@ import {
 import { extractQueryData, getServerTimestamp } from '../utils/firestore.utils';
 import { DatabaseError, ValidationError, NotFoundError, PermissionError } from '../utils/errorHandler';
 import { logAuditEvent } from './audit.service';
+import { captureHandledError } from './errorLog.service';
 
 export type ImpersonationUser = {
   uid: string;
@@ -46,6 +47,18 @@ export type ImpersonationUser = {
   bhId?: string | null;
   photoURL?: string | null;
   status?: User['status'];
+};
+
+const reportAdminServiceError = (error: unknown, kind: string, metadata?: Record<string, unknown>) => {
+  void captureHandledError(error, {
+    source: 'frontend',
+    scope: 'admin',
+    metadata: {
+      kind,
+      service: 'admin.service',
+      ...(metadata || {}),
+    },
+  });
 };
 
 const buildVariants = (value: string) => {
@@ -89,7 +102,7 @@ const buildPrefixTasks = (
             }
           });
         } catch (error) {
-          console.warn(`Impersonation search failed for ${field}:`, error);
+          reportAdminServiceError(error, 'admin.impersonation.search_field_failed', { field, prefix });
         }
       });
     }
@@ -267,7 +280,7 @@ export const getAllUsers = async (
       if (!isRecoverableQueryError(primaryError)) {
         throw primaryError;
       }
-      console.warn('Primary users query failed, retrying with relaxed constraints.', primaryError);
+      reportAdminServiceError(primaryError, 'admin.users.query_primary_failed');
     }
 
     try {
@@ -278,7 +291,7 @@ export const getAllUsers = async (
       if (!isRecoverableQueryError(relaxedError)) {
         throw relaxedError;
       }
-      console.warn('Relaxed users query failed, falling back to broad query and client-side filters.', relaxedError);
+      reportAdminServiceError(relaxedError, 'admin.users.query_relaxed_failed');
     }
 
     const broadLimit = Math.max(limitCount * 4, 1000);
@@ -926,7 +939,7 @@ export const getInventoryAlerts = async (): Promise<BloodInventory[]> => {
           .sort((a, b) => (a.units || 0) - (b.units || 0))
           .slice(0, 50);
       } catch (fallbackError) {
-        console.warn('Inventory alerts fallback query failed:', fallbackError);
+        reportAdminServiceError(fallbackError, 'admin.inventory_alerts.fallback_query_failed');
       }
     }
     throw new DatabaseError('Failed to fetch inventory alerts');
@@ -991,7 +1004,7 @@ export const getEmergencyRequests = async (): Promise<BloodRequest[]> => {
           })
           .slice(0, 20);
       } catch (fallbackError) {
-        console.warn('Emergency requests fallback query failed:', fallbackError);
+        reportAdminServiceError(fallbackError, 'admin.emergency_requests.fallback_query_failed');
       }
     }
     throw new DatabaseError('Failed to fetch emergency requests');

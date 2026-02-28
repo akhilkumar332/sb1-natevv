@@ -414,9 +414,9 @@ export const reportError = (
   // TODO: In production, integrate with error reporting service
   // Examples: Sentry, Rollbar, Bugsnag, etc.
 
-  // For now, just log to console in development
+  // Keep the structured debug dump in development only via debug channel.
   if (import.meta.env.DEV) {
-    console.error('Error Report:', {
+    console.debug('Error Report:', {
       error,
       context,
       metadata,

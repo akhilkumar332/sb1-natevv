@@ -19,7 +19,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { gamificationService } from '../services/gamification.service';
-import { captureHandledError } from '../services/errorLog.service';
+import { useScopedErrorReporter } from './useScopedErrorReporter';
+import { readCacheWithTtl, writeCache } from '../utils/cacheLifecycle';
 
 export interface DonationHistory {
   id: string;
@@ -122,13 +123,10 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
   };
   const cacheKey = useMemo(() => (userId ? `donor_dashboard_cache_${userId}` : ''), [userId]);
   const cacheTTL = 5 * 60 * 1000;
-  const reportDonorDataError = (err: unknown, kind: string) => {
-    void captureHandledError(err, {
-      source: 'frontend',
-      scope: 'donor',
-      metadata: { kind, hook: 'useDonorData' },
-    });
-  };
+  const reportDonorDataError = useScopedErrorReporter({
+    scope: 'donor',
+    metadata: { hook: 'useDonorData' },
+  });
 
   const serializeDonationHistory = (items: DonationHistory[]) =>
     items.map((entry) => ({
@@ -321,7 +319,6 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       );
     } catch (err) {
       if (!isOfflineFirestoreError(err)) {
-        console.error('Error syncing legacy donation history:', err);
         reportDonorDataError(err, 'sync_legacy_donation_history');
       }
     }
@@ -335,26 +332,32 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
   useEffect(() => {
     if (!userId) return;
     const userStatsRef = doc(db, 'userStats', userId);
-    const unsubscribe = onSnapshot(userStatsRef, (snapshot) => {
-      if (!snapshot.exists()) return;
-      const data = snapshot.data();
-      setStats((prev) => {
-        const totalDonationsValue = data.totalDonations ?? prev?.totalDonations ?? 0;
-        const pointsValue = typeof data.points === 'number' ? data.points : prev?.impactScore;
-        const impactScoreValue = pointsValue && pointsValue > 0 ? pointsValue : totalDonationsValue * 100;
-        return {
-          totalDonations: totalDonationsValue,
-          livesSaved: totalDonationsValue * 3,
-          nextEligibleDate: prev?.nextEligibleDate ?? null,
-          daysUntilEligible: prev?.daysUntilEligible ?? 0,
-          impactScore: impactScoreValue,
-          streak: data.currentStreak ?? prev?.streak ?? 0,
-          emergencyResponses: data.emergencyResponses ?? prev?.emergencyResponses ?? 0,
-          rank: data.rank ?? prev?.rank,
-          badges: prev?.badges ?? [],
-        };
-      });
-    });
+    const unsubscribe = onSnapshot(
+      userStatsRef,
+      (snapshot) => {
+        if (!snapshot.exists()) return;
+        const data = snapshot.data();
+        setStats((prev) => {
+          const totalDonationsValue = data.totalDonations ?? prev?.totalDonations ?? 0;
+          const pointsValue = typeof data.points === 'number' ? data.points : prev?.impactScore;
+          const impactScoreValue = pointsValue && pointsValue > 0 ? pointsValue : totalDonationsValue * 100;
+          return {
+            totalDonations: totalDonationsValue,
+            livesSaved: totalDonationsValue * 3,
+            nextEligibleDate: prev?.nextEligibleDate ?? null,
+            daysUntilEligible: prev?.daysUntilEligible ?? 0,
+            impactScore: impactScoreValue,
+            streak: data.currentStreak ?? prev?.streak ?? 0,
+            emergencyResponses: data.emergencyResponses ?? prev?.emergencyResponses ?? 0,
+            rank: data.rank ?? prev?.rank,
+            badges: prev?.badges ?? [],
+          };
+        });
+      },
+      (err) => {
+        reportDonorDataError(err, 'user_stats.listen');
+      }
+    );
     return () => unsubscribe();
   }, [userId]);
 
@@ -367,40 +370,45 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       }
 
       const historyRef = doc(db, 'DonationHistory', userId);
-      const unsubscribe = onSnapshot(historyRef, (snapshot) => {
-        if (!snapshot.exists()) {
-          setDonationHistory([]);
-          setFirstDonationDate(null);
-          return;
+      const unsubscribe = onSnapshot(
+        historyRef,
+        (snapshot) => {
+          if (!snapshot.exists()) {
+            setDonationHistory([]);
+            setFirstDonationDate(null);
+            return;
+          }
+
+          const data = snapshot.data();
+          const rawDonations = Array.isArray(data.donations) ? data.donations : [];
+          const mapped = rawDonations.map((entry: any, index: number) => (
+            mapDonationEntry(entry, `donation-${index}`)
+          ));
+
+          if (mapped.length === 0) {
+            setDonationHistory([]);
+            setFirstDonationDate(null);
+            return;
+          }
+
+          const sortedDonations = [...mapped]
+            .sort((a, b) => b.date.getTime() - a.date.getTime())
+            .slice(0, 20);
+
+          const oldestDonation = mapped.reduce((oldest, donation) => (
+            donation.date < oldest ? donation.date : oldest
+          ), mapped[0].date);
+
+          setDonationHistory(sortedDonations);
+          setFirstDonationDate(oldestDonation);
+        },
+        (err) => {
+          reportDonorDataError(err, 'donation_history.listen');
         }
-
-        const data = snapshot.data();
-        const rawDonations = Array.isArray(data.donations) ? data.donations : [];
-        const mapped = rawDonations.map((entry: any, index: number) => (
-          mapDonationEntry(entry, `donation-${index}`)
-        ));
-
-        if (mapped.length === 0) {
-          setDonationHistory([]);
-          setFirstDonationDate(null);
-          return;
-        }
-
-        const sortedDonations = [...mapped]
-          .sort((a, b) => b.date.getTime() - a.date.getTime())
-          .slice(0, 20);
-
-        const oldestDonation = mapped.reduce((oldest, donation) => (
-          donation.date < oldest ? donation.date : oldest
-        ), mapped[0].date);
-
-        setDonationHistory(sortedDonations);
-        setFirstDonationDate(oldestDonation);
-      });
+      );
 
       return unsubscribe;
     } catch (err) {
-      console.error('Error fetching donation history:', err);
       reportDonorDataError(err, 'fetch_donation_history');
       setError('Failed to load donation history');
       return () => {};
@@ -436,7 +444,6 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       setDonationHistory(sortedDonations);
       setFirstDonationDate(oldestDonation);
     } catch (err) {
-      console.error('Error fetching donation history (once):', err);
       reportDonorDataError(err, 'fetch_donation_history_once');
     }
   };
@@ -454,44 +461,49 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
         limit(20) // Fetch more to allow client-side filtering
       );
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const allRequests: EmergencyRequest[] = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            bloodType: data.bloodType,
-            units: data.units || data.unitsNeeded || 1,
-            urgency: data.urgency || 'medium',
-            hospitalName: data.hospitalName || data.hospital || 'BloodBank',
-            hospitalId: data.hospitalId || '',
-            location: data.location || data.city || '',
-            city: data.city || '',
-            requestedAt: data.createdAt?.toDate() || data.requestedAt?.toDate() || new Date(),
-            patientInfo: data.patientInfo,
-            contactPhone: data.contactPhone,
-            status: data.status || 'active',
-          };
-        });
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const allRequests: EmergencyRequest[] = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              bloodType: data.bloodType,
+              units: data.units || data.unitsNeeded || 1,
+              urgency: data.urgency || 'medium',
+              hospitalName: data.hospitalName || data.hospital || 'BloodBank',
+              hospitalId: data.hospitalId || '',
+              location: data.location || data.city || '',
+              city: data.city || '',
+              requestedAt: data.createdAt?.toDate() || data.requestedAt?.toDate() || new Date(),
+              patientInfo: data.patientInfo,
+              contactPhone: data.contactPhone,
+              status: data.status || 'active',
+            };
+          });
 
-        // Filter for active requests and sort by urgency then date (client-side)
-        const urgencyOrder = { critical: 3, high: 2, medium: 1 };
-        const activeRequests = allRequests
-          .filter(r => r.status === 'active')
-          .sort((a, b) => {
-            // Sort by urgency first
-            const urgencyDiff = (urgencyOrder[b.urgency] || 0) - (urgencyOrder[a.urgency] || 0);
-            if (urgencyDiff !== 0) return urgencyDiff;
-            // Then by date (newest first)
-            return b.requestedAt.getTime() - a.requestedAt.getTime();
-          })
-          .slice(0, 5); // Take top 5
+          // Filter for active requests and sort by urgency then date (client-side)
+          const urgencyOrder = { critical: 3, high: 2, medium: 1 };
+          const activeRequests = allRequests
+            .filter(r => r.status === 'active')
+            .sort((a, b) => {
+              // Sort by urgency first
+              const urgencyDiff = (urgencyOrder[b.urgency] || 0) - (urgencyOrder[a.urgency] || 0);
+              if (urgencyDiff !== 0) return urgencyDiff;
+              // Then by date (newest first)
+              return b.requestedAt.getTime() - a.requestedAt.getTime();
+            })
+            .slice(0, 5); // Take top 5
 
-        setEmergencyRequests(activeRequests);
-      });
+          setEmergencyRequests(activeRequests);
+        },
+        (err) => {
+          reportDonorDataError(err, 'emergency_requests.listen');
+        }
+      );
 
       return unsubscribe;
     } catch (err) {
-      console.error('Error fetching emergency requests:', err);
       reportDonorDataError(err, 'fetch_emergency_requests');
       setError('Failed to load emergency requests');
       return () => {};
@@ -536,7 +548,6 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
         .slice(0, 5);
       setEmergencyRequests(activeRequests);
     } catch (err) {
-      console.error('Error fetching emergency requests (once):', err);
       reportDonorDataError(err, 'fetch_emergency_requests_once');
     }
   };
@@ -586,7 +597,6 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
 
       setBloodCamps(activeCamps);
     } catch (err) {
-      console.error('Error fetching blood camps:', err);
       reportDonorDataError(err, 'fetch_blood_camps');
     }
   };
@@ -639,7 +649,6 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       });
     } catch (err) {
       if (!isOfflineFirestoreError(err)) {
-        console.error('Error fetching stats and badges:', err);
         reportDonorDataError(err, 'fetch_stats_and_badges');
         setError('Failed to load donor stats');
       }
@@ -658,42 +667,41 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     const loadData = async () => {
       setError(null);
       let usedCache = false;
-      if (cacheKey && typeof window !== 'undefined' && window.sessionStorage) {
-        const cachedRaw = window.sessionStorage.getItem(cacheKey);
-        if (cachedRaw) {
-          try {
-            const cached = JSON.parse(cachedRaw);
-            if (cached.timestamp && Date.now() - cached.timestamp < cacheTTL) {
-              if (cached.donationHistory) {
-                const hydrated = hydrateDonationHistory(cached.donationHistory);
-                setDonationHistory(hydrated);
-                if (cached.firstDonationDate) {
-                  setFirstDonationDate(new Date(cached.firstDonationDate));
-                } else if (hydrated.length > 0) {
-                  const oldestDonation = hydrated.reduce((oldest, donation) => (
-                    donation.date < oldest ? donation.date : oldest
-                  ), hydrated[0].date);
-                  setFirstDonationDate(oldestDonation);
-                }
-              }
-              if (cached.emergencyRequests) {
-                setEmergencyRequests(hydrateEmergencyRequests(cached.emergencyRequests));
-              }
-              if (cached.bloodCamps) {
-                setBloodCamps(hydrateBloodCamps(cached.bloodCamps));
-              }
-              if (cached.stats) {
-                setStats(hydrateStats(cached.stats));
-              }
-              if (cached.badges) {
-                setBadges(hydrateBadges(cached.badges));
-              }
-              setLoading(false);
-              usedCache = true;
+      if (cacheKey) {
+        const cached = readCacheWithTtl<any>({
+          storage: 'session',
+          key: cacheKey,
+          ttlMs: cacheTTL,
+          kindPrefix: 'donor.dashboard.cache',
+          onError: (err) => reportDonorDataError(err, 'cache_hydrate_donor_dashboard'),
+        });
+        if (cached) {
+          if (cached.donationHistory) {
+            const hydrated = hydrateDonationHistory(cached.donationHistory);
+            setDonationHistory(hydrated);
+            if (cached.firstDonationDate) {
+              setFirstDonationDate(new Date(cached.firstDonationDate));
+            } else if (hydrated.length > 0) {
+              const oldestDonation = hydrated.reduce((oldest, donation) => (
+                donation.date < oldest ? donation.date : oldest
+              ), hydrated[0].date);
+              setFirstDonationDate(oldestDonation);
             }
-          } catch (err) {
-            console.warn('Failed to hydrate donor dashboard cache', err);
           }
+          if (cached.emergencyRequests) {
+            setEmergencyRequests(hydrateEmergencyRequests(cached.emergencyRequests));
+          }
+          if (cached.bloodCamps) {
+            setBloodCamps(hydrateBloodCamps(cached.bloodCamps));
+          }
+          if (cached.stats) {
+            setStats(hydrateStats(cached.stats));
+          }
+          if (cached.badges) {
+            setBadges(hydrateBadges(cached.badges));
+          }
+          setLoading(false);
+          usedCache = true;
         }
       }
       if (!usedCache) {
@@ -727,7 +735,6 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
         });
       } catch (err) {
         if (!isActive) return;
-        console.error('Error loading donor data:', err);
         reportDonorDataError(err, 'load_donor_data');
         setError('Failed to load donor data');
         setLoading(false);
@@ -776,9 +783,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
 
   useEffect(() => {
     if (!cacheKey || loading) return;
-    if (typeof window === 'undefined' || !window.sessionStorage) return;
     const payload = {
-      timestamp: Date.now(),
       donationHistory: serializeDonationHistory(donationHistory),
       firstDonationDate: firstDonationDate?.toISOString() ?? null,
       emergencyRequests: serializeEmergencyRequests(emergencyRequests),
@@ -786,11 +791,13 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       stats: serializeStats(stats),
       badges: serializeBadges(badges),
     };
-    try {
-      window.sessionStorage.setItem(cacheKey, JSON.stringify(payload));
-    } catch (err) {
-      console.warn('Failed to write donor dashboard cache', err);
-    }
+    writeCache({
+      storage: 'session',
+      key: cacheKey,
+      data: payload,
+      kindPrefix: 'donor.dashboard.cache',
+      onError: (err) => reportDonorDataError(err, 'cache_write_donor_dashboard'),
+    });
   }, [cacheKey, loading, donationHistory, firstDonationDate, emergencyRequests, bloodCamps, stats, badges]);
 
   return {

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../firebase';
 import { authStorage } from '../utils/authStorage';
+import { captureHandledError } from '../services/errorLog.service';
 
 const CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes instead of every minute
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
@@ -13,6 +14,16 @@ export const useAuthSync = () => {
   const { user, logout, impersonationSession } = useAuth();
   const navigate = useNavigate();
   const lastCheckRef = useRef(Date.now());
+  const reportAuthSyncError = (error: unknown, kind: string) => {
+    void captureHandledError(error, {
+      source: 'frontend',
+      scope: 'auth',
+      metadata: {
+        hook: 'useAuthSync',
+        kind,
+      },
+    });
+  };
 
   useEffect(() => {
     const checkAuthStatus = () => {
@@ -45,7 +56,8 @@ export const useAuthSync = () => {
               logout(navigate);
             }
           })
-          .catch(() => {
+          .catch((error) => {
+            reportAuthSyncError(error, 'auth.sync.token_refresh');
             if (!impersonationSession) {
               logout(navigate);
             }

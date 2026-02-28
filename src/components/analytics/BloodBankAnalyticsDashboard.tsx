@@ -21,6 +21,7 @@ import {
   type TrendData,
   type BloodTypeDistribution,
 } from '../../services/analytics.service';
+import { captureHandledError } from '../../services/errorLog.service';
 
 interface BloodBankAnalyticsDashboardProps {
   bloodBankId: string;
@@ -67,7 +68,11 @@ export const BloodBankAnalyticsDashboard: React.FC<BloodBankAnalyticsDashboardPr
         const inventory = await getInventoryDistribution(bloodBankId);
         setInventoryData(inventory);
       } catch (error) {
-        console.error('Error loading analytics:', error);
+        void captureHandledError(error, {
+          source: 'frontend',
+          scope: 'bloodbank',
+          metadata: { kind: 'analytics.load', component: 'BloodBankAnalyticsDashboard' },
+        });
       } finally {
         setLoading(false);
       }

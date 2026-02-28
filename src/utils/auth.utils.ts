@@ -9,6 +9,7 @@ import { User, UserRole, UserStatus } from '../types/database.types';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { timestampToDate } from './firestore.utils';
+import { captureHandledError } from '../services/errorLog.service';
 
 // ============================================================================
 // ROLE CHECKING FUNCTIONS
@@ -383,7 +384,11 @@ export const fetchUserByUid = async (uid: string): Promise<User | null> => {
 
     return null;
   } catch (error) {
-    console.error('Error fetching user:', error);
+    void captureHandledError(error, {
+      source: 'frontend',
+      scope: 'auth',
+      metadata: { kind: 'auth.fetch_user_by_uid', uid },
+    });
     return null;
   }
 };

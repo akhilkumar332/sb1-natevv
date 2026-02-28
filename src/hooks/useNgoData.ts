@@ -8,6 +8,7 @@ import { collection, query, where, limit, onSnapshot, getDocs, documentId, write
 import { db } from '../firebase';
 import { getServerTimestamp } from '../utils/firestore.utils';
 import { captureHandledError } from '../services/errorLog.service';
+import { readCacheWithTtl, writeCache } from '../utils/cacheLifecycle';
 
 export interface Campaign {
   id: string;
@@ -203,54 +204,59 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
         limit(50)
       );
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const campaignList: Campaign[] = snapshot.docs.map(doc => {
-          const data = doc.data();
-          const locationData = data.location;
-          const registeredCount = Array.isArray(data.registeredDonors)
-            ? data.registeredDonors.length
-            : typeof data.registeredDonors === 'number'
-              ? data.registeredDonors
-              : 0;
-          return {
-            id: doc.id,
-            title: data.title || data.name || '',
-            type: data.type || 'blood-drive',
-            status: data.status || 'draft',
-            startDate: data.startDate?.toDate() || new Date(),
-            endDate: data.endDate?.toDate() || new Date(),
-            target: data.target || data.targetDonors || 0,
-            achieved: data.achieved || registeredCount || 0,
-            targetType: data.targetType,
-            location: buildLocationLabel(locationData) || (typeof data.location === 'string' ? data.location : ''),
-            city: data.city || locationData?.city,
-            state: data.state || locationData?.state,
-            description: data.description,
-            registeredDonors: Array.isArray(data.registeredDonors)
-              ? data.registeredDonors
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const campaignList: Campaign[] = snapshot.docs.map(doc => {
+            const data = doc.data();
+            const locationData = data.location;
+            const registeredCount = Array.isArray(data.registeredDonors)
+              ? data.registeredDonors.length
               : typeof data.registeredDonors === 'number'
                 ? data.registeredDonors
-                : [],
-            confirmedDonors: data.confirmedDonors?.length || 0,
-            locationDetails: typeof locationData === 'object'
-              ? {
-                  address: locationData.address,
-                  city: locationData.city,
-                  state: locationData.state,
-                  latitude: locationData.latitude,
-                  longitude: locationData.longitude,
-                  venue: locationData.venue,
-                }
-              : undefined,
-          };
-        });
-        const sorted = [...campaignList].sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
-        setCampaigns(sorted);
-      });
+                : 0;
+            return {
+              id: doc.id,
+              title: data.title || data.name || '',
+              type: data.type || 'blood-drive',
+              status: data.status || 'draft',
+              startDate: data.startDate?.toDate() || new Date(),
+              endDate: data.endDate?.toDate() || new Date(),
+              target: data.target || data.targetDonors || 0,
+              achieved: data.achieved || registeredCount || 0,
+              targetType: data.targetType,
+              location: buildLocationLabel(locationData) || (typeof data.location === 'string' ? data.location : ''),
+              city: data.city || locationData?.city,
+              state: data.state || locationData?.state,
+              description: data.description,
+              registeredDonors: Array.isArray(data.registeredDonors)
+                ? data.registeredDonors
+                : typeof data.registeredDonors === 'number'
+                  ? data.registeredDonors
+                  : [],
+              confirmedDonors: data.confirmedDonors?.length || 0,
+              locationDetails: typeof locationData === 'object'
+                ? {
+                    address: locationData.address,
+                    city: locationData.city,
+                    state: locationData.state,
+                    latitude: locationData.latitude,
+                    longitude: locationData.longitude,
+                    venue: locationData.venue,
+                  }
+                : undefined,
+            };
+          });
+          const sorted = [...campaignList].sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+          setCampaigns(sorted);
+        },
+        (err) => {
+          reportNgoDataError(err, 'fetch_campaigns_realtime.listen');
+        }
+      );
 
       return unsubscribe;
     } catch (err) {
-      console.error('Error fetching campaigns:', err);
       reportNgoDataError(err, 'fetch_campaigns_realtime');
       setError('Failed to load campaigns');
       return () => {};
@@ -309,7 +315,6 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       const sorted = [...campaignList].sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
       setCampaigns(sorted);
     } catch (err) {
-      console.error('Error fetching campaigns:', err);
       reportNgoDataError(err, 'fetch_campaigns_once');
     }
   };
@@ -343,7 +348,6 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       const sorted = [...volunteerList].sort((a, b) => b.joinDate.getTime() - a.joinDate.getTime());
       setVolunteers(sorted);
     } catch (err) {
-      console.error('Error fetching volunteers:', err);
       reportNgoDataError(err, 'fetch_volunteers');
     }
   };
@@ -377,7 +381,6 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       const sorted = [...partnershipList].sort((a, b) => b.since.getTime() - a.since.getTime());
       setPartnerships(sorted);
     } catch (err) {
-      console.error('Error fetching partnerships:', err);
       reportNgoDataError(err, 'fetch_partnerships');
     }
   };
@@ -418,7 +421,6 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
         retentionRate: Math.round(retentionRate * 10) / 10,
       });
     } catch (err) {
-      console.error('Error fetching donor community:', err);
       reportNgoDataError(err, 'fetch_donor_community');
     }
   };
@@ -489,52 +491,42 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
           };
         };
 
-        if (window.localStorage && window.sessionStorage) {
+        if (window.localStorage) {
           const legacyRaw = window.localStorage.getItem(cacheKey);
           if (legacyRaw) {
             try {
               const legacy = JSON.parse(legacyRaw);
               const sanitized = sanitizeCache(legacy);
-              let shouldWrite = true;
-              const existingRaw = window.sessionStorage.getItem(cacheKey);
-              if (existingRaw) {
-                try {
-                  const existing = JSON.parse(existingRaw);
-                  if (existing?.timestamp && existing.timestamp > sanitized.timestamp) {
-                    shouldWrite = false;
-                  }
-                } catch {
-                  // ignore
-                }
-              }
-              if (shouldWrite) {
-                window.sessionStorage.setItem(cacheKey, JSON.stringify(sanitized));
-              }
+              writeCache({
+                storage: 'session',
+                key: cacheKey,
+                data: sanitized,
+                kindPrefix: 'ngo.dashboard.cache',
+                onError: (err) => reportNgoDataError(err, 'cache_migrate_ngo_dashboard'),
+              });
             } catch (err) {
-              console.warn('Failed to migrate NGO dashboard cache', err);
+              reportNgoDataError(err, 'cache_migrate_ngo_dashboard');
             }
             window.localStorage.removeItem(cacheKey);
           }
         }
 
-        if (window.sessionStorage) {
-          const cachedRaw = window.sessionStorage.getItem(cacheKey);
-          if (cachedRaw) {
-            try {
-              const cached = sanitizeCache(JSON.parse(cachedRaw));
-              if (cached?.timestamp && Date.now() - cached.timestamp < cacheTTL) {
-                setCampaigns(hydrateCampaigns(cached.campaigns));
-                setVolunteers(hydrateVolunteers(cached.volunteers));
-                setPartnerships(hydratePartnerships(cached.partnerships));
-                setDonorCommunity(cached.donorCommunity || donorCommunity);
-                setStats(cached.stats || stats);
-                setLoading(false);
-                usedCache = true;
-              }
-            } catch (err) {
-              console.warn('Failed to hydrate NGO dashboard cache', err);
-            }
-          }
+        const cached = readCacheWithTtl<any>({
+          storage: 'session',
+          key: cacheKey,
+          ttlMs: cacheTTL,
+          kindPrefix: 'ngo.dashboard.cache',
+          onError: (err) => reportNgoDataError(err, 'cache_hydrate_ngo_dashboard'),
+          sanitize: sanitizeCache,
+        });
+        if (cached) {
+          setCampaigns(hydrateCampaigns(cached.campaigns));
+          setVolunteers(hydrateVolunteers(cached.volunteers));
+          setPartnerships(hydratePartnerships(cached.partnerships));
+          setDonorCommunity(cached.donorCommunity || donorCommunity);
+          setStats(cached.stats || stats);
+          setLoading(false);
+          usedCache = true;
         }
       }
       if (!usedCache) {
@@ -555,7 +547,6 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
           await fetchDonorCommunity();
         } catch (err) {
           if (!isActive) return;
-          console.error('Error loading NGO data:', err);
           reportNgoDataError(err, 'load_ngo_data');
           setError('Failed to load NGO data');
           setLoading(false);
@@ -621,7 +612,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
     });
     batch.commit()
       .catch((error) => {
-        console.warn('Failed to auto-complete past campaigns', error);
+        reportNgoDataError(error, 'campaigns_auto_complete');
       })
       .finally(() => {
         autoCompleteRef.current.lastRun = Date.now();
@@ -637,20 +628,20 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
 
   useEffect(() => {
     if (!cacheKey || loading) return;
-    if (typeof window === 'undefined' || !window.sessionStorage) return;
     const payload = {
-      timestamp: Date.now(),
       campaigns: serializeCampaigns(campaigns),
       volunteers: serializeVolunteers(volunteers),
       partnerships: serializePartnerships(partnerships),
       donorCommunity,
       stats,
     };
-    try {
-      window.sessionStorage.setItem(cacheKey, JSON.stringify(payload));
-    } catch (err) {
-      console.warn('Failed to write NGO dashboard cache', err);
-    }
+    writeCache({
+      storage: 'session',
+      key: cacheKey,
+      data: payload,
+      kindPrefix: 'ngo.dashboard.cache',
+      onError: (err) => reportNgoDataError(err, 'cache_write_ngo_dashboard'),
+    });
   }, [cacheKey, loading, campaigns, volunteers, partnerships, donorCommunity, stats]);
 
   const refreshData = async (options?: { silent?: boolean }) => {
@@ -685,7 +676,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
               : [];
           }
         } catch (error) {
-          console.warn('Failed to parse campaign participants cache', error);
+          reportNgoDataError(error, 'cache_parse_campaign_participants');
         }
       }
     }
@@ -729,7 +720,6 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
         });
       });
     } catch (error) {
-      console.error('Failed to load participant donors', error);
       reportNgoDataError(error, 'load_participant_donors');
     }
 
@@ -754,7 +744,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
           })
         );
       } catch (error) {
-        console.warn('Failed to write participant donors cache', error);
+        reportNgoDataError(error, 'cache_write_campaign_participants');
       }
     }
 

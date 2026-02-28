@@ -3,6 +3,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { API_CONFIG } from './config';
 import { ApiResponse, ApiError } from './types';
+import { captureHandledError } from '../errorLog.service';
 
 export class BaseApiClient {
   protected client: AxiosInstance;
@@ -37,12 +38,20 @@ export class BaseApiClient {
 
   protected handleError(error: any): never {
     if (axios.isAxiosError(error)) {
-      console.error('API Error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
+      void captureHandledError(error, {
+        source: 'frontend',
+        scope: 'unknown',
+        metadata: {
+          kind: 'api.client.error',
+          status: error.response?.status,
+          code: error.response?.data?.code,
+          message: error.message,
+          responseMessage: error.response?.data?.message,
+          requestUrl: error.config?.url,
+          method: error.config?.method,
+        },
       });
-  
+
       const apiError: ApiError = {
         message: error.response?.data?.message || error.message,
         status: error.response?.status,
@@ -50,7 +59,11 @@ export class BaseApiClient {
       };
       throw apiError;
     }
-    console.error('Unexpected error:', error);
+    void captureHandledError(error, {
+      source: 'frontend',
+      scope: 'unknown',
+      metadata: { kind: 'api.client.unexpected_error' },
+    });
     throw new Error('An unexpected error occurred');
   }
 

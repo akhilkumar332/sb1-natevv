@@ -4,6 +4,7 @@ import { AlertTriangle, Calendar, ChevronRight, Heart, Package, Users } from 'lu
 import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import type { BloodBankDashboardContext } from '../BloodBankDashboard';
+import { captureHandledError } from '../../../services/errorLog.service';
 
 type BloodBankBranch = {
   id: string;
@@ -28,6 +29,13 @@ function BloodBankOverview() {
 
   const baseHospitalId = user?.parentHospitalId || user?.uid || '';
   const [branches, setBranches] = useState<BloodBankBranch[]>([]);
+  const reportBloodBankOverviewError = (err: unknown, kind: string) => {
+    void captureHandledError(err, {
+      source: 'frontend',
+      scope: 'bloodbank',
+      metadata: { kind, page: 'BloodBankOverview' },
+    });
+  };
 
   const criticalInventory = inventory.filter((item) => item.status === 'critical' || item.status === 'low');
   const activeRequests = bloodRequests.filter((request) => request.status === 'active' || request.status === 'partially_fulfilled');
@@ -43,18 +51,24 @@ function BloodBankOverview() {
       where('parentHospitalId', '==', baseHospitalId),
       orderBy('createdAt', 'asc')
     );
-    return onSnapshot(q, (snapshot) => {
-      const rows = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          name: data.name || 'Branch',
-          city: data.city,
-          state: data.state,
-        } as BloodBankBranch;
-      });
-      setBranches(rows);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const rows = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            name: data.name || 'Branch',
+            city: data.city,
+            state: data.state,
+          } as BloodBankBranch;
+        });
+        setBranches(rows);
+      },
+      (err) => {
+        reportBloodBankOverviewError(err, 'branches.listen');
+      }
+    );
   }, [baseHospitalId]);
 
   const branchSummary = useMemo(() => {

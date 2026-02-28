@@ -1,6 +1,7 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { AuditLog } from '../types/database.types';
+import { captureHandledError } from './errorLog.service';
 
 export type AuditAction =
   | 'role_change'
@@ -35,6 +36,10 @@ export const logAuditEvent = async (event: AuditEventInput): Promise<void> => {
     };
     await addDoc(collection(db, 'auditLogs'), payload);
   } catch (error) {
-    console.warn('Failed to write audit log:', error);
+    void captureHandledError(error, {
+      source: 'frontend',
+      scope: 'admin',
+      metadata: { kind: 'audit.log.write' },
+    });
   }
 };

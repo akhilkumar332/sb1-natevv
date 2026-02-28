@@ -300,8 +300,11 @@ export const geocodeAddress = async (address: string): Promise<Coordinates | nul
     return cityCoords;
   }
 
-  // For production, implement actual geocoding API call
-  console.warn('Geocoding not implemented. Using city coordinates if available.');
+  // For production, implement actual geocoding API call.
+  // Keep this as a dev diagnostic only to avoid noisy runtime logs.
+  if (import.meta.env.DEV) {
+    console.warn('Geocoding not implemented. Using city coordinates if available.');
+  }
   return null;
 };
 
@@ -322,8 +325,11 @@ export const reverseGeocode = async (
     };
   }
 
-  // For production, implement actual reverse geocoding API call
-  console.warn('Reverse geocoding not implemented. Using nearest city.');
+  // For production, implement actual reverse geocoding API call.
+  // Keep this as a dev diagnostic only to avoid noisy runtime logs.
+  if (import.meta.env.DEV) {
+    console.warn('Reverse geocoding not implemented. Using nearest city.');
+  }
   return null;
 };
 

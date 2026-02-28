@@ -4,11 +4,16 @@ import { getQueuedFcmMessages, removeQueuedFcmMessages } from '../utils/fcmQueue
 import { saveFcmNotification } from '../services/fcmNotification.service';
 import { sendFcmToBridge } from '../services/fcmBridge.service';
 import { useAuth } from '../contexts/AuthContext';
+import { useScopedErrorReporter } from './useScopedErrorReporter';
 
 const SUPPORTED_ROLES = new Set(['donor', 'ngo', 'bloodbank']);
 
 export const useFcmNotificationBridge = () => {
   const { user } = useAuth();
+  const reportFcmBridgeError = useScopedErrorReporter({
+    scope: 'unknown',
+    metadata: { hook: 'useFcmNotificationBridge' },
+  });
   const queuedFlushInFlightRef = useRef(false);
   const queuedFlushRef = useRef<string | null>(null);
   const isSupportedRole = Boolean(user?.role && SUPPORTED_ROLES.has(user.role));
@@ -26,7 +31,7 @@ export const useFcmNotificationBridge = () => {
           await sendFcmToBridge(payload);
         }
       } catch (error) {
-        console.warn('Failed to persist foreground FCM notification:', error);
+        reportFcmBridgeError(error, 'fcm.foreground.persist');
         if (targetUserId) {
           await sendFcmToBridge(payload);
         }
@@ -54,17 +59,17 @@ export const useFcmNotificationBridge = () => {
           await saveFcmNotification(user.uid, user.role || 'donor', payload, entry.id);
           idsToRemove.push(entry.id);
         } catch (error) {
-          console.warn('Failed to persist queued FCM notification:', error);
+          reportFcmBridgeError(error, 'fcm.queue.persist');
           await sendFcmToBridge(payload);
         }
       }
       await removeQueuedFcmMessages(idsToRemove);
     } catch (error) {
-      console.warn('Failed to flush queued FCM notifications:', error);
+      reportFcmBridgeError(error, 'fcm.queue.flush');
     } finally {
       queuedFlushInFlightRef.current = false;
     }
-  }, [user?.role, user?.uid]);
+  }, [reportFcmBridgeError, user?.role, user?.uid]);
 
   useEffect(() => {
     if (!canBridge) {

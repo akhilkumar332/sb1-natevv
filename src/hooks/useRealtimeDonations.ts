@@ -4,7 +4,7 @@
  * Real-time donation monitoring using Firebase onSnapshot
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   collection,
   query,
@@ -16,6 +16,7 @@ import {
 import { db } from '../firebase';
 import { Donation } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
+import { failRealtimeLoad } from '../utils/realtimeError';
 
 interface UseRealtimeDonationsOptions {
   donorId?: string;
@@ -47,6 +48,16 @@ export const useRealtimeDonations = ({
   const [donations, setDonations] = useState<Donation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const donationsRef = useRef<Donation[]>([]);
+  const onNewDonationRef = useRef<typeof onNewDonation>(onNewDonation);
+
+  useEffect(() => {
+    donationsRef.current = donations;
+  }, [donations]);
+
+  useEffect(() => {
+    onNewDonationRef.current = onNewDonation;
+  }, [onNewDonation]);
 
   useEffect(() => {
     setLoading(true);
@@ -84,27 +95,42 @@ export const useRealtimeDonations = ({
           ]);
 
           // Detect new donations
-          if (donations.length > 0 && donationData.length > 0) {
+          const previousDonations = donationsRef.current;
+          if (previousDonations.length > 0 && donationData.length > 0) {
             const latestDonation = donationData[0];
-            const wasNew = !donations.find(d => d.id === latestDonation.id);
+            const wasNew = !previousDonations.find(d => d.id === latestDonation.id);
 
-            if (wasNew && onNewDonation) {
-              onNewDonation(latestDonation);
+            if (wasNew && onNewDonationRef.current) {
+              onNewDonationRef.current(latestDonation);
             }
           }
 
           setDonations(donationData);
           setLoading(false);
         } catch (err) {
-          console.error('Error processing donations:', err);
-          setError('Failed to load donations');
-          setLoading(false);
+          failRealtimeLoad(
+            { scope: 'unknown', hook: 'useRealtimeDonations' },
+            {
+              error: err,
+              kind: 'donations.process',
+              fallbackMessage: 'Failed to load donations',
+              setError,
+              setLoading,
+            }
+          );
         }
       },
       (err) => {
-        console.error('Error listening to donations:', err);
-        setError('Failed to listen to donations');
-        setLoading(false);
+        failRealtimeLoad(
+          { scope: 'unknown', hook: 'useRealtimeDonations' },
+          {
+            error: err,
+            kind: 'donations.listen',
+            fallbackMessage: 'Failed to listen to donations',
+            setError,
+            setLoading,
+          }
+        );
       }
     );
 

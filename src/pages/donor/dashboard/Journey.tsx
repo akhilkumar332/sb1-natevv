@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { notify } from 'services/notify.service';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import {
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { getCurrentCoordinates, reverseGeocode } from '../../../utils/geolocation.utils';
 import { captureHandledError } from '../../../services/errorLog.service';
+import { LeafletClickMarker, LeafletMapUpdater } from '../../../components/shared/leaflet/LocationMapPrimitives';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -29,28 +30,6 @@ L.Icon.Default.mergeOptions({
 });
 
 type MapPosition = [number, number];
-
-function LocationMarker({ position, onPositionChange }: { position: MapPosition; onPositionChange: (pos: MapPosition) => void }) {
-  useMapEvents({
-    click(event) {
-      onPositionChange([event.latlng.lat, event.latlng.lng]);
-    },
-  });
-
-  return position ? (
-    <Marker position={position}>
-      <Popup>Selected location</Popup>
-    </Marker>
-  ) : null;
-}
-
-function MapUpdater({ center }: { center: MapPosition }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center, 13);
-  }, [center, map]);
-  return null;
-}
 
 function LocationPicker({
   value,
@@ -176,8 +155,12 @@ function LocationPicker({
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <MapUpdater center={position} />
-          <LocationMarker position={position} onPositionChange={handleMapPositionChange} />
+          <LeafletMapUpdater center={position} zoom={13} />
+          <LeafletClickMarker
+            position={position}
+            onPositionChange={handleMapPositionChange}
+            popupText="Selected location"
+          />
         </MapContainer>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
