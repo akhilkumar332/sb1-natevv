@@ -9,6 +9,7 @@ import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
 import type { ImpersonationUser } from '../../services/admin.service';
 import { authStorage } from '../../utils/authStorage';
 import { auth } from '../../firebase';
+import { authMessages } from '../../constants/messages';
 
 export function AdminLogin() {
   const navigate = useNavigate();
@@ -63,7 +64,7 @@ export function AdminLogin() {
     }
 
     if (user.role !== 'admin') {
-      notify.error("You're not an Admin", { id: 'role-mismatch-admin' });
+      notify.error(authMessages.roleMismatch.admin, { id: 'role-mismatch-admin' });
       return;
     }
 
@@ -94,7 +95,7 @@ export function AdminLogin() {
         return;
       }
       if (response.user.role !== 'admin') {
-        notify.error("You're not an Admin", { id: 'role-mismatch-admin' });
+        notify.error(authMessages.roleMismatch.admin, { id: 'role-mismatch-admin' });
         await logout(navigate, { redirectTo: '/admin/login', showToast: false });
         return;
       }

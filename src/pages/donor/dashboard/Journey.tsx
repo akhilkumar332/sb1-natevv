@@ -19,6 +19,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { getCurrentCoordinates, reverseGeocode } from '../../../utils/geolocation.utils';
+import { captureHandledError } from '../../../services/errorLog.service';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -102,7 +103,11 @@ function LocationPicker({
         setNoResults(data.length === 0);
         setShowSuggestions(true);
       } catch (error) {
-        console.error('Address search error:', error);
+        void captureHandledError(error, {
+          source: 'frontend',
+          scope: 'donor',
+          metadata: { page: 'DonorJourney', kind: 'donor.journey.locationSearch.lookup' },
+        });
         if (!mountedRef.current || requestId !== searchRequestIdRef.current) return;
         setSuggestions([]);
         setNoResults(true);
@@ -321,6 +326,18 @@ const DonorJourney = () => {
     notes: '',
   });
 
+  const reportDonorJourneyError = (error: unknown, kind: string, metadata?: Record<string, unknown>) => {
+    void captureHandledError(error, {
+      source: 'frontend',
+      scope: 'donor',
+      metadata: {
+        page: 'DonorJourney',
+        kind,
+        ...(metadata || {}),
+      },
+    });
+  };
+
   const openLogDonation = () => {
     setDeleteCandidate(null);
     handleCancelDonationEdit();
@@ -398,7 +415,7 @@ const DonorJourney = () => {
           longitude: nextPosition[1],
         }));
       } catch (error) {
-        console.error('Edit location lookup error:', error);
+        reportDonorJourneyError(error, 'donor.journey.editLocation.lookup');
       }
     };
     void lookup();
@@ -445,8 +462,17 @@ const DonorJourney = () => {
         longitude: coords ? coords[1] : null,
       });
       setLogDonationOpen(false);
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to log donation.');
+    } catch (error: unknown) {
+      notify.fromError(
+        error,
+        'Failed to log donation.',
+        { id: 'donor-journey-log-donation-error' },
+        {
+          source: 'frontend',
+          scope: 'donor',
+          metadata: { page: 'DonorJourney', kind: 'donor.journey.logDonation' },
+        }
+      );
     } finally {
       setLogDonationSaving(false);
     }

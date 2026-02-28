@@ -24,6 +24,7 @@ import {
   type AdminUserTimelineItem,
 } from '../../services/adminUserDetail.service';
 import type { BloodInventory, BloodRequest, User, VerificationRequest } from '../../types/database.types';
+import { toDateValue } from '../../utils/dateValue';
 
 type PlatformStatsResponse = Awaited<ReturnType<typeof getPlatformStats>>;
 type AdminEntity = Record<string, any> & { id?: string };
@@ -63,14 +64,6 @@ export type AdminSystemAlert = {
   timestamp: Date;
   resolved: boolean;
   action?: string;
-};
-
-const toDate = (value: any): Date | undefined => {
-  if (!value) return undefined;
-  if (value instanceof Date) return value;
-  if (typeof value?.toDate === 'function') return value.toDate();
-  if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
-  return undefined;
 };
 
 const useCachedAdminQuery = <T,>(
@@ -127,10 +120,10 @@ const fetchCampaigns = async (limitCount: number): Promise<AdminEntity[]> => {
     return {
       ...data,
       id: docSnap.id,
-      createdAt: toDate(data.createdAt),
-      updatedAt: toDate(data.updatedAt),
-      startDate: toDate(data.startDate),
-      endDate: toDate(data.endDate),
+      createdAt: toDateValue(data.createdAt),
+      updatedAt: toDateValue(data.updatedAt),
+      startDate: toDateValue(data.startDate),
+      endDate: toDateValue(data.endDate),
     };
   });
 };
@@ -142,9 +135,9 @@ const fetchVolunteers = async (limitCount: number): Promise<AdminEntity[]> => {
     return {
       ...data,
       id: docSnap.id,
-      createdAt: toDate(data.createdAt),
-      updatedAt: toDate(data.updatedAt),
-      joinDate: toDate(data.joinDate),
+      createdAt: toDateValue(data.createdAt),
+      updatedAt: toDateValue(data.updatedAt),
+      joinDate: toDateValue(data.joinDate),
     };
   });
 };
@@ -156,9 +149,9 @@ const fetchPartnerships = async (limitCount: number): Promise<AdminEntity[]> => 
     return {
       ...data,
       id: docSnap.id,
-      createdAt: toDate(data.createdAt),
-      updatedAt: toDate(data.updatedAt),
-      since: toDate(data.since),
+      createdAt: toDateValue(data.createdAt),
+      updatedAt: toDateValue(data.updatedAt),
+      since: toDateValue(data.since),
     };
   });
 };
@@ -170,10 +163,10 @@ const fetchAppointments = async (limitCount: number): Promise<AdminEntity[]> => 
     return {
       ...data,
       id: docSnap.id,
-      createdAt: toDate(data.createdAt),
-      updatedAt: toDate(data.updatedAt),
-      scheduledDate: toDate(data.scheduledDate),
-      completedAt: toDate(data.completedAt),
+      createdAt: toDateValue(data.createdAt),
+      updatedAt: toDateValue(data.updatedAt),
+      scheduledDate: toDateValue(data.scheduledDate),
+      completedAt: toDateValue(data.completedAt),
     };
   });
 };
@@ -185,9 +178,9 @@ const fetchDonations = async (limitCount: number): Promise<AdminEntity[]> => {
     return {
       ...data,
       id: docSnap.id,
-      createdAt: toDate(data.createdAt),
-      updatedAt: toDate(data.updatedAt),
-      donationDate: toDate(data.donationDate),
+      createdAt: toDateValue(data.createdAt),
+      updatedAt: toDateValue(data.updatedAt),
+      donationDate: toDateValue(data.donationDate),
     };
   });
 };
@@ -199,8 +192,8 @@ const fetchNotifications = async (limitCount: number): Promise<AdminEntity[]> =>
     return {
       ...data,
       id: docSnap.id,
-      createdAt: toDate(data.createdAt),
-      updatedAt: toDate(data.updatedAt),
+      createdAt: toDateValue(data.createdAt),
+      updatedAt: toDateValue(data.updatedAt),
     };
   });
 };
@@ -212,8 +205,8 @@ const fetchAuditLogs = async (limitCount: number): Promise<AdminEntity[]> => {
     return {
       ...data,
       id: docSnap.id,
-      createdAt: toDate(data.createdAt),
-      updatedAt: toDate(data.updatedAt),
+      createdAt: toDateValue(data.createdAt),
+      updatedAt: toDateValue(data.updatedAt),
     };
   });
 };
@@ -225,8 +218,8 @@ const fetchErrorLogs = async (limitCount: number): Promise<AdminEntity[]> => {
     return {
       ...data,
       id: docSnap.id,
-      createdAt: toDate(data.createdAt),
-      updatedAt: toDate(data.updatedAt),
+      createdAt: toDateValue(data.createdAt),
+      updatedAt: toDateValue(data.updatedAt),
     };
   });
 };
@@ -301,16 +294,16 @@ export const useAdminRecentActivity = (limitCount: number = 5) =>
       return {
         donations: (raw.donations || []).map((entry) => ({
           ...entry,
-          donationDate: toDate(entry.donationDate) || toDate(entry.createdAt),
+          donationDate: toDateValue(entry.donationDate) || toDateValue(entry.createdAt),
         })),
         requests: (raw.requests || []).map((entry: any) => ({
           ...entry,
-          requestedAt: toDate(entry.requestedAt) || toDate(entry.createdAt),
+          requestedAt: toDateValue(entry.requestedAt) || toDateValue(entry.createdAt),
           hospitalName: entry.hospitalName || entry.requesterName || '',
         })),
         campaigns: (raw.campaigns || []).map((entry: any) => ({
           ...entry,
-          startDate: toDate(entry.startDate) || toDate(entry.createdAt),
+          startDate: toDateValue(entry.startDate) || toDateValue(entry.createdAt),
           organizer: entry.organizer || entry.organizerName || entry.ngoName || '',
         })),
       };
@@ -570,7 +563,7 @@ export const useAdminOverviewData = () => {
         type: isCritical ? 'critical' : 'warning',
         message: `${isCritical ? 'Critical' : 'Low'} blood shortage for ${item.bloodType} - Only ${item.units || 0} units available`,
         source: `Inventory Alert - BloodBank ID: ${item.hospitalId}`,
-        timestamp: toDate(item.updatedAt) || new Date(),
+        timestamp: toDateValue(item.updatedAt) || new Date(),
         resolved: false,
         action: 'View Inventory',
       };

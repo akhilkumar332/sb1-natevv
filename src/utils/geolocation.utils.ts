@@ -8,16 +8,25 @@ const DEFAULT_REVERSE_GEOCODE_ERROR = 'Could not fetch address details';
 
 export const getCurrentCoordinates = async (options?: {
   positionErrorMessage?: string;
+  positionErrorMessages?: {
+    permissionDenied?: string;
+    positionUnavailable?: string;
+    timeout?: string;
+    default?: string;
+  };
   unsupportedErrorMessage?: string;
   enableHighAccuracy?: boolean;
   timeout?: number;
   maximumAge?: number;
   scope?: 'auth' | 'donor' | 'ngo' | 'bloodbank' | 'admin' | 'unknown';
+  onErrorMessage?: (message: string) => void;
 }): Promise<CoordinatesTuple | null> => {
   const scope = options?.scope || 'unknown';
-  if (!navigator.geolocation) {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    const message = options?.unsupportedErrorMessage || DEFAULT_UNSUPPORTED_ERROR;
+    options?.onErrorMessage?.(message);
     notify.error(
-      options?.unsupportedErrorMessage || DEFAULT_UNSUPPORTED_ERROR,
+      message,
       { id: 'geolocation-unsupported' },
       { scope, source: 'frontend', metadata: { kind: 'geolocation.unsupported' } }
     );
@@ -38,9 +47,22 @@ export const getCurrentCoordinates = async (options?: {
     });
     return [position.coords.latitude, position.coords.longitude];
   } catch (error) {
+    const geolocationCode = typeof (error as { code?: unknown })?.code === 'number'
+      ? Number((error as { code?: number }).code)
+      : null;
+    const mappedPositionMessage =
+      geolocationCode === 1
+        ? options?.positionErrorMessages?.permissionDenied
+        : geolocationCode === 2
+          ? options?.positionErrorMessages?.positionUnavailable
+          : geolocationCode === 3
+            ? options?.positionErrorMessages?.timeout
+            : options?.positionErrorMessages?.default;
+    const message = mappedPositionMessage || options?.positionErrorMessage || DEFAULT_POSITION_ERROR;
+    options?.onErrorMessage?.(message);
     notify.fromError(
       error,
-      options?.positionErrorMessage || DEFAULT_POSITION_ERROR,
+      message,
       { id: 'geolocation-position-error' },
       { scope, source: 'frontend', metadata: { kind: 'geolocation.position' } }
     );

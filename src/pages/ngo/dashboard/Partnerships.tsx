@@ -34,6 +34,22 @@ function NgoPartnerships() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusTab, setStatusTab] = useState<'active' | 'archived' | 'all'>('active');
 
+  const notifyNgoPartnershipsError = (
+    error: unknown,
+    fallbackMessage: string,
+    toastId: string,
+    kind: string
+  ) => notify.fromError(
+    error,
+    fallbackMessage,
+    { id: toastId },
+    {
+      source: 'frontend',
+      scope: 'ngo',
+      metadata: { page: 'NgoPartnerships', kind },
+    }
+  );
+
   const activeCount = useMemo(
     () => partnerships.filter((partner) => partner.status !== 'inactive').length,
     [partnerships]
@@ -105,8 +121,13 @@ function NgoPartnerships() {
       await archivePartnership(partnershipId);
       notify.success('Partnership archived.');
       await refreshData();
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to archive partnership.');
+    } catch (error: unknown) {
+      notifyNgoPartnershipsError(
+        error,
+        'Failed to archive partnership.',
+        'ngo-partnership-archive-error',
+        'ngo.partnerships.archive'
+      );
     }
   };
 
@@ -117,8 +138,13 @@ function NgoPartnerships() {
       notify.success('Partnership deleted.');
       await refreshData();
       setDeleteCandidate(null);
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to delete partnership.');
+    } catch (error: unknown) {
+      notifyNgoPartnershipsError(
+        error,
+        'Failed to delete partnership.',
+        'ngo-partnership-delete-error',
+        'ngo.partnerships.delete'
+      );
     } finally {
       setDeletingId(null);
     }
@@ -172,8 +198,13 @@ function NgoPartnerships() {
       }
 
       closeModal();
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to save partnership.');
+    } catch (error: unknown) {
+      notifyNgoPartnershipsError(
+        error,
+        'Failed to save partnership.',
+        'ngo-partnership-save-error',
+        editingPartnershipId ? 'ngo.partnerships.update' : 'ngo.partnerships.create'
+      );
     } finally {
       setSaving(false);
     }

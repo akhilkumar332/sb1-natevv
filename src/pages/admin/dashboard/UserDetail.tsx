@@ -33,6 +33,7 @@ import UserReferralTable from '../../../components/admin/UserReferralTable';
 import UserDetailTabSkeleton from '../../../components/admin/UserDetailTabSkeleton';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
+import { refetchQueries } from '../../../utils/queryRefetch';
 
 type DetailTab = 'profile' | 'security' | 'kpis' | 'referrals' | 'timeline';
 type PendingActionType = 'verify' | 'active' | 'suspended' | 'inactive' | 'revokeToken' | 'revokeAllTokens';
@@ -171,9 +172,8 @@ function UserDetailPage() {
 
   useEffect(() => {
     if (activeTab !== 'security') return;
-    void securityQuery.refetch();
-    void userQuery.refetch();
-  }, [activeTab, securityQuery.refetch, userQuery.refetch]);
+    refetchQueries(securityQuery, userQuery);
+  }, [activeTab, securityQuery, userQuery]);
 
   const canModify = useMemo(() => {
     if (!authUser?.uid || !user?.uid) return false;
@@ -287,11 +287,7 @@ function UserDetailPage() {
   }, [safeUid, referrals.length]);
 
   const refreshAll = () => {
-    void userQuery.refetch();
-    void securityQuery.refetch();
-    void kpiQuery.refetch();
-    void referralsQuery.refetch();
-    void timelineQuery.refetch();
+    refetchQueries(userQuery, securityQuery, kpiQuery, referralsQuery, timelineQuery);
   };
 
   const confirmAction = async (reason: string) => {

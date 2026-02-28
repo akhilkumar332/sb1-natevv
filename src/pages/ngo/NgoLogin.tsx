@@ -10,6 +10,7 @@ import PwaInstallCta from '../../components/PwaInstallCta';
 import { authStorage } from '../../utils/authStorage';
 import { auth } from '../../firebase';
 import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
+import { authMessages } from '../../constants/messages';
 
 export function NgoLogin() {
   const navigate = useNavigate();
@@ -64,7 +65,7 @@ export function NgoLogin() {
     }
 
     if (user.role !== 'ngo') {
-      notify.error("You're not an NGO", { id: 'role-mismatch-ngo' });
+      notify.error(authMessages.roleMismatch.ngo, { id: 'role-mismatch-ngo' });
       return;
     }
 
@@ -95,7 +96,7 @@ export function NgoLogin() {
         return;
       }
       if (response.user.role !== 'ngo') {
-        notify.error("You're not an NGO", { id: 'role-mismatch-ngo' });
+        notify.error(authMessages.roleMismatch.ngo, { id: 'role-mismatch-ngo' });
         await logout(navigate, { redirectTo: '/ngo/login', showToast: false });
         return;
       }

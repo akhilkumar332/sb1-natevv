@@ -16,6 +16,8 @@ import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminVerificationRequests } from '../../../hooks/admin/useAdminQueries';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
+import { refetchQuery } from '../../../utils/queryRefetch';
+import { runWithFeedback } from '../../../utils/runWithFeedback';
 
 type StatusFilter = 'all' | 'pending' | 'under_review' | 'approved' | 'rejected';
 type TypeFilter = 'all' | 'bloodbank' | 'hospital' | 'ngo';
@@ -78,37 +80,37 @@ function VerificationPage() {
 
   const handleApprove = async (requestId: string, notes?: string) => {
     withAdminGuard(async () => {
-      try {
-        await approveVerificationRequest(requestId, user!.uid, notes);
-        notify.success('Verification approved');
-        await invalidateAdminRecipe(queryClient, 'verificationApproved');
-      } catch (approveError: any) {
-        notify.error(approveError?.message || 'Failed to approve request.');
-      }
+      await runWithFeedback({
+        action: () => approveVerificationRequest(requestId, user!.uid, notes),
+        successMessage: 'Verification approved',
+        errorMessage: 'Failed to approve request.',
+        capture: { scope: 'admin', metadata: { kind: 'admin.verification.approve' } },
+        invalidate: () => invalidateAdminRecipe(queryClient, 'verificationApproved'),
+      });
     });
   };
 
   const handleReject = async (requestId: string, reason: string) => {
     withAdminGuard(async () => {
-      try {
-        await rejectVerificationRequest(requestId, user!.uid, reason);
-        notify.success('Verification rejected');
-        await invalidateAdminRecipe(queryClient, 'verificationRejected');
-      } catch (rejectError: any) {
-        notify.error(rejectError?.message || 'Failed to reject request.');
-      }
+      await runWithFeedback({
+        action: () => rejectVerificationRequest(requestId, user!.uid, reason),
+        successMessage: 'Verification rejected',
+        errorMessage: 'Failed to reject request.',
+        capture: { scope: 'admin', metadata: { kind: 'admin.verification.reject' } },
+        invalidate: () => invalidateAdminRecipe(queryClient, 'verificationRejected'),
+      });
     });
   };
 
   const handleMarkUnderReview = async (requestId: string) => {
     withAdminGuard(async () => {
-      try {
-        await markVerificationUnderReview(requestId, user!.uid);
-        notify.success('Request moved to under review');
-        await invalidateAdminRecipe(queryClient, 'verificationUnderReview');
-      } catch (reviewError: any) {
-        notify.error(reviewError?.message || 'Failed to update request status.');
-      }
+      await runWithFeedback({
+        action: () => markVerificationUnderReview(requestId, user!.uid),
+        successMessage: 'Request moved to under review',
+        errorMessage: 'Failed to update request status.',
+        capture: { scope: 'admin', metadata: { kind: 'admin.verification.under_review' } },
+        invalidate: () => invalidateAdminRecipe(queryClient, 'verificationUnderReview'),
+      });
     });
   };
 
@@ -121,7 +123,7 @@ function VerificationPage() {
             <p className="text-sm text-gray-600">Review and process BloodBank/NGO verification requests.</p>
           </div>
           <AdminRefreshButton
-            onClick={() => void requestsQuery.refetch()}
+            onClick={() => refetchQuery(requestsQuery)}
             isRefreshing={requestsQuery.isFetching}
             label="Refresh verification queue"
           />
@@ -161,7 +163,7 @@ function VerificationPage() {
       />
 
       <AdminRefreshingBanner show={loading} message="Refreshing verification queue..." />
-      <AdminErrorCard message={error} onRetry={() => void requestsQuery.refetch()} />
+      <AdminErrorCard message={error} onRetry={() => refetchQuery(requestsQuery)} />
 
       {paged.length === 0 ? (
         <AdminEmptyStateCard message="No verification requests found for selected filters." />

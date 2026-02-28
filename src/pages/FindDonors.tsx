@@ -26,6 +26,7 @@ import {
 } from '../services/donorRequest.service';
 import { notify } from 'services/notify.service';
 import { captureHandledError } from '../services/errorLog.service';
+import { getCurrentCoordinates } from '../utils/geolocation.utils';
 
 interface Donor {
   id: string;
@@ -110,42 +111,38 @@ function FindDonors() {
     });
   };
 
-  const requestLocation = () => {
-    if (!navigator?.geolocation) {
-      setLocationEnabled(false);
-      setLocationError('Location services are not supported in this browser.');
-      return;
-    }
+  const requestLocation = async () => {
     setLocationRequesting(true);
     setLocationError(null);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setViewerLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-        setLocationEnabled(true);
-        setLocationRequesting(false);
+    const coords = await getCurrentCoordinates({
+      scope: 'donor',
+      enableHighAccuracy: true,
+      timeout: 8000,
+      maximumAge: 60000,
+      onErrorMessage: setLocationError,
+      unsupportedErrorMessage: 'Location services are not supported in this browser.',
+      positionErrorMessages: {
+        permissionDenied: 'Location access is blocked. Please enable location to find donors.',
+        positionUnavailable: 'Unable to determine your location. Please try again.',
+        timeout: 'Location request timed out. Please try again.',
+        default: 'Enable location to use Find Donors.',
       },
-      (error) => {
-        setLocationEnabled(false);
-        setLocationRequesting(false);
-        if (error.code === 1) {
-          setLocationError('Location access is blocked. Please enable location to find donors.');
-        } else if (error.code === 2) {
-          setLocationError('Unable to determine your location. Please try again.');
-        } else if (error.code === 3) {
-          setLocationError('Location request timed out. Please try again.');
-        } else {
-          setLocationError('Enable location to use Find Donors.');
-        }
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
-    );
+    });
+    if (coords) {
+      setViewerLocation({
+        latitude: coords[0],
+        longitude: coords[1],
+      });
+      setLocationEnabled(true);
+      setLocationRequesting(false);
+      return;
+    }
+    setLocationEnabled(false);
+    setLocationRequesting(false);
   };
 
   useEffect(() => {
-    requestLocation();
+    void requestLocation();
   }, []);
 
   const updateURL = () => {

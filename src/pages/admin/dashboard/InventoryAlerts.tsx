@@ -7,6 +7,7 @@ import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminInventoryAlerts } from '../../../hooks/admin/useAdminQueries';
+import { refetchQuery } from '../../../utils/queryRefetch';
 
 type StatusFilter = 'all' | 'critical' | 'low' | 'adequate' | 'surplus';
 
@@ -81,7 +82,7 @@ function InventoryAlertsPage() {
             <p className="text-sm text-gray-600">Monitor low and critical stock across all blood banks and branches.</p>
           </div>
           <AdminRefreshButton
-            onClick={() => void inventoryQuery.refetch()}
+            onClick={() => refetchQuery(inventoryQuery)}
             isRefreshing={inventoryQuery.isFetching}
             label="Refresh inventory alerts"
           />
@@ -109,7 +110,7 @@ function InventoryAlertsPage() {
       />
 
       <AdminRefreshingBanner show={loading} message="Refreshing inventory alerts..." />
-      <AdminErrorCard message={error} onRetry={() => void inventoryQuery.refetch()} />
+      <AdminErrorCard message={error} onRetry={() => refetchQuery(inventoryQuery)} />
 
       {paged.length === 0 ? (
         <AdminEmptyStateCard message="No inventory alerts found." />

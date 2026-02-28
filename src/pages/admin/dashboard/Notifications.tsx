@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { notify } from 'services/notify.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { BellRing, MailCheck } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -11,7 +10,9 @@ import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminNotifications } from '../../../hooks/admin/useAdminQueries';
+import { refetchQuery } from '../../../utils/queryRefetch';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
+import { runWithFeedback } from '../../../utils/runWithFeedback';
 
 type NotificationRow = {
   id: string;
@@ -82,18 +83,17 @@ function NotificationsPage() {
 
   const toggleRead = async (entry: NotificationRow, read: boolean) => {
     setProcessingId(entry.id);
-    try {
-      await updateDoc(doc(db, 'notifications', entry.id), {
+    await runWithFeedback({
+      action: () => updateDoc(doc(db, 'notifications', entry.id), {
         read,
         updatedAt: getServerTimestamp(),
-      });
-      notify.success(read ? 'Marked as read' : 'Marked as unread');
-      await invalidateAdminRecipe(queryClient, 'notificationUpdated');
-    } catch (updateError: any) {
-      notify.error(updateError?.message || 'Failed to update notification.');
-    } finally {
-      setProcessingId(null);
-    }
+      }),
+      successMessage: read ? 'Marked as read' : 'Marked as unread',
+      errorMessage: 'Failed to update notification.',
+      capture: { scope: 'admin', metadata: { kind: 'admin.notification.read.toggle', read } },
+      invalidate: () => invalidateAdminRecipe(queryClient, 'notificationUpdated'),
+    });
+    setProcessingId(null);
   };
 
   return (
@@ -105,7 +105,7 @@ function NotificationsPage() {
             <p className="text-sm text-gray-600">Review and moderate platform notifications for all user roles.</p>
           </div>
           <AdminRefreshButton
-            onClick={() => void notificationsQuery.refetch()}
+            onClick={() => refetchQuery(notificationsQuery)}
             isRefreshing={notificationsQuery.isFetching}
             label="Refresh notifications"
           />
@@ -142,7 +142,7 @@ function NotificationsPage() {
       />
 
       <AdminRefreshingBanner show={loading} message="Refreshing notifications..." />
-      <AdminErrorCard message={error} onRetry={() => void notificationsQuery.refetch()} />
+      <AdminErrorCard message={error} onRetry={() => refetchQuery(notificationsQuery)} />
 
       {paged.length === 0 ? (
         <AdminEmptyStateCard message="No notifications found." />

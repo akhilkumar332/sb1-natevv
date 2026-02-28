@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
-import { notify } from 'services/notify.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
@@ -11,7 +10,9 @@ import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminCampaigns } from '../../../hooks/admin/useAdminQueries';
+import { refetchQuery } from '../../../utils/queryRefetch';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
+import { runWithFeedback } from '../../../utils/runWithFeedback';
 
 type CampaignRow = {
   id: string;
@@ -91,18 +92,17 @@ function CampaignsPage() {
 
   const handleStatusUpdate = async (campaignId: string, nextStatus: 'active' | 'completed' | 'cancelled') => {
     setProcessingId(campaignId);
-    try {
-      await updateDoc(doc(db, 'campaigns', campaignId), {
+    await runWithFeedback({
+      action: () => updateDoc(doc(db, 'campaigns', campaignId), {
         status: nextStatus,
         updatedAt: getServerTimestamp(),
-      });
-      notify.success(`Campaign marked ${nextStatus}`);
-      await invalidateAdminRecipe(queryClient, 'campaignStatusUpdated');
-    } catch (updateError: any) {
-      notify.error(updateError?.message || 'Failed to update campaign status.');
-    } finally {
-      setProcessingId(null);
-    }
+      }),
+      successMessage: `Campaign marked ${nextStatus}`,
+      errorMessage: 'Failed to update campaign status.',
+      capture: { scope: 'admin', metadata: { kind: 'admin.campaign.status.update', nextStatus } },
+      invalidate: () => invalidateAdminRecipe(queryClient, 'campaignStatusUpdated'),
+    });
+    setProcessingId(null);
   };
 
   return (
@@ -114,7 +114,7 @@ function CampaignsPage() {
             <p className="text-sm text-gray-600">Manage campaign lifecycle across NGOs and partner organizations.</p>
           </div>
           <AdminRefreshButton
-            onClick={() => void campaignsQuery.refetch()}
+            onClick={() => refetchQuery(campaignsQuery)}
             isRefreshing={campaignsQuery.isFetching}
             label="Refresh campaigns"
           />
@@ -143,7 +143,7 @@ function CampaignsPage() {
       />
 
       <AdminRefreshingBanner show={loading} message="Refreshing campaigns..." />
-      <AdminErrorCard message={error} onRetry={() => void campaignsQuery.refetch()} />
+      <AdminErrorCard message={error} onRetry={() => refetchQuery(campaignsQuery)} />
 
       {paged.length === 0 ? (
         <AdminEmptyStateCard message="No campaigns found." />

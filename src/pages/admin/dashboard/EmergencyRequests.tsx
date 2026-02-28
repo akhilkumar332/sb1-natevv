@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
-import { notify } from 'services/notify.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { doc, updateDoc } from 'firebase/firestore';
 import type { BloodRequest } from '../../../types/database.types';
@@ -13,6 +12,8 @@ import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminEmergencyRequests } from '../../../hooks/admin/useAdminQueries';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
+import { refetchQuery } from '../../../utils/queryRefetch';
+import { runWithFeedback } from '../../../utils/runWithFeedback';
 
 type UrgencyFilter = 'all' | 'critical' | 'high' | 'medium' | 'low';
 type StatusFilter = 'all' | 'active' | 'partially_fulfilled' | 'fulfilled' | 'expired' | 'cancelled';
@@ -94,19 +95,18 @@ function EmergencyRequestsPage() {
 
   const handleStatusUpdate = async (id: string, nextStatus: 'fulfilled' | 'cancelled') => {
     setProcessingId(id);
-    try {
-      await updateDoc(doc(db, 'bloodRequests', id), {
+    await runWithFeedback({
+      action: () => updateDoc(doc(db, 'bloodRequests', id), {
         status: nextStatus,
         updatedAt: getServerTimestamp(),
         ...(nextStatus === 'fulfilled' ? { fulfilledAt: getServerTimestamp() } : {}),
-      });
-      notify.success(`Request marked as ${nextStatus}`);
-      await invalidateAdminRecipe(queryClient, 'emergencyStatusUpdated');
-    } catch (updateError: any) {
-      notify.error(updateError?.message || 'Failed to update request.');
-    } finally {
-      setProcessingId(null);
-    }
+      }),
+      successMessage: `Request marked as ${nextStatus}`,
+      errorMessage: 'Failed to update request.',
+      capture: { scope: 'admin', metadata: { kind: 'admin.emergency.status.update', nextStatus } },
+      invalidate: () => invalidateAdminRecipe(queryClient, 'emergencyStatusUpdated'),
+    });
+    setProcessingId(null);
   };
 
   return (
@@ -118,7 +118,7 @@ function EmergencyRequestsPage() {
             <p className="text-sm text-gray-600">Track and moderate emergency blood requests across the platform.</p>
           </div>
           <AdminRefreshButton
-            onClick={() => void emergencyQuery.refetch()}
+            onClick={() => refetchQuery(emergencyQuery)}
             isRefreshing={emergencyQuery.isFetching}
             label="Refresh emergency requests"
           />
@@ -160,7 +160,7 @@ function EmergencyRequestsPage() {
       />
 
       <AdminRefreshingBanner show={loading} message="Refreshing emergency requests..." />
-      <AdminErrorCard message={error} onRetry={() => void emergencyQuery.refetch()} />
+      <AdminErrorCard message={error} onRetry={() => refetchQuery(emergencyQuery)} />
 
       {paged.length === 0 ? (
         <AdminEmptyStateCard message="No requests found." />

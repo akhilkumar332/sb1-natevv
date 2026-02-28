@@ -18,6 +18,7 @@ import L from 'leaflet';
 import { Timestamp } from 'firebase/firestore';
 import type { NgoDashboardContext } from '../NgoDashboard';
 import { archiveCampaign, deleteCampaign, updateCampaign } from '../../../services/ngo.service';
+import { getCurrentCoordinates, reverseGeocode } from '../../../utils/geolocation.utils';
 
 const emptyForm = {
   title: '',
@@ -116,6 +117,22 @@ function NgoCampaignDetail() {
   const [participantDonors, setParticipantDonors] = useState<any[]>([]);
   const [participantsLoading, setParticipantsLoading] = useState(false);
   const [participantSearch, setParticipantSearch] = useState('');
+
+  const notifyNgoCampaignDetailError = (
+    error: unknown,
+    fallbackMessage: string,
+    toastId: string,
+    kind: string
+  ) => notify.fromError(
+    error,
+    fallbackMessage,
+    { id: toastId },
+    {
+      source: 'frontend',
+      scope: 'ngo',
+      metadata: { page: 'NgoCampaignDetail', kind },
+    }
+  );
 
   const campaign = useMemo(
     () => campaigns.find((item) => item.id === campaignId),
@@ -229,8 +246,13 @@ function NgoCampaignDetail() {
     try {
       await archiveCampaign(campaign.id);
       notify.success('Campaign archived.');
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to archive campaign.');
+    } catch (error: unknown) {
+      notifyNgoCampaignDetailError(
+        error,
+        'Failed to archive campaign.',
+        'ngo-campaign-detail-archive-error',
+        'ngo.campaignDetail.archive'
+      );
     }
   };
 
@@ -239,8 +261,13 @@ function NgoCampaignDetail() {
     try {
       await deleteCampaign(campaign.id);
       notify.success('Campaign deleted.');
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to delete campaign.');
+    } catch (error: unknown) {
+      notifyNgoCampaignDetailError(
+        error,
+        'Failed to delete campaign.',
+        'ngo-campaign-detail-delete-error',
+        'ngo.campaignDetail.delete'
+      );
     } finally {
       setDeleting(false);
       setDeleteOpen(false);
@@ -288,46 +315,37 @@ function NgoCampaignDetail() {
       latitude: pos[0].toFixed(6),
       longitude: pos[1].toFixed(6),
     }));
-    reverseGeocode(pos);
+    void syncAddressFromCoordinates(pos);
   };
 
-  const reverseGeocode = async (pos: [number, number]) => {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos[0]}&lon=${pos[1]}`
-      );
-      const data = await response.json();
-      if (data?.display_name) {
-        setForm((prev) => ({
-          ...prev,
-          address: data.display_name,
-          city: data.address?.city || data.address?.town || data.address?.village || prev.city,
-          state: data.address?.state || prev.state,
-        }));
-      }
-    } catch (error) {
-      notify.error('Could not fetch address for this location');
+  const syncAddressFromCoordinates = async (pos: [number, number]) => {
+    const data = await reverseGeocode(pos[0], pos[1], {
+      scope: 'ngo',
+      errorMessage: 'Could not fetch address for this location',
+    });
+    if (data?.display_name) {
+      setForm((prev) => ({
+        ...prev,
+        address: data.display_name || prev.address,
+        city: data.address?.city || data.address?.town || data.address?.village || prev.city,
+        state: data.address?.state || prev.state,
+      }));
     }
   };
 
-  const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      notify.error('Geolocation not supported in this browser.');
+  const handleUseCurrentLocation = async () => {
+    setLocating(true);
+    const pos = await getCurrentCoordinates({
+      scope: 'ngo',
+      positionErrorMessage: 'Unable to fetch your location.',
+      unsupportedErrorMessage: 'Geolocation not supported in this browser.',
+    });
+    if (!pos) {
+      setLocating(false);
       return;
     }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const pos: [number, number] = [position.coords.latitude, position.coords.longitude];
-        handleMapChange(pos);
-        reverseGeocode(pos);
-        setLocating(false);
-      },
-      () => {
-        notify.error('Unable to fetch your location.');
-        setLocating(false);
-      }
-    );
+    handleMapChange(pos);
+    setLocating(false);
   };
 
   const handleAddressChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -444,8 +462,13 @@ function NgoCampaignDetail() {
       await updateCampaign(campaign.id, payload);
       notify.success('Campaign updated successfully.');
       closeEdit();
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to update campaign.');
+    } catch (error: unknown) {
+      notifyNgoCampaignDetailError(
+        error,
+        'Failed to update campaign.',
+        'ngo-campaign-detail-update-error',
+        'ngo.campaignDetail.update'
+      );
     } finally {
       setSaving(false);
     }

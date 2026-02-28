@@ -8,6 +8,8 @@ import type { NgoDashboardContext } from '../NgoDashboard';
 import { collection, documentId, endBefore, getDocs, limit, limitToLast, orderBy, query, startAfter, where } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import type { DonorSummary } from '../../../hooks/useNgoData';
+import { captureHandledError } from '../../../services/errorLog.service';
+import notify from '../../../services/notify.service';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -239,6 +241,18 @@ function NgoDonors() {
     createdAt: donor.createdAt ? new Date(donor.createdAt) : undefined,
   });
 
+  const reportNgoDonorsError = (error: unknown, kind: string, metadata?: Record<string, unknown>) => {
+    void captureHandledError(error, {
+      source: 'frontend',
+      scope: 'ngo',
+      metadata: {
+        page: 'NgoDonors',
+        kind,
+        ...(metadata || {}),
+      },
+    });
+  };
+
   const loadDonorCache = () => {
     if (typeof window === 'undefined' || !window.sessionStorage) return null;
     const raw = window.sessionStorage.getItem(donorsCacheKey);
@@ -378,7 +392,16 @@ function NgoDonors() {
         });
       }
     } catch (error) {
-      console.error('Error loading donors:', error);
+      reportNgoDonorsError(error, 'ngo.donors.page.fetch', {
+        direction,
+        silent: Boolean(options?.silent),
+        bloodTypeFilter,
+        availabilityFilter,
+        cityFilter,
+      });
+      if (!options?.silent) {
+        notify.fromError(error, 'Unable to load donors right now.', { id: 'ngo-donors-page-load-error' });
+      }
       if (isMountedRef.current && fetchId === donorFetchIdRef.current) {
         setDonors([]);
         setHasNextPage(false);
@@ -525,7 +548,7 @@ function NgoDonors() {
         }
         persistMapCache(publicRows);
       } catch (error) {
-        console.warn('Failed to load public donors for map', error);
+        reportNgoDonorsError(error, 'ngo.donors.map.fetch');
         if (isActive) {
           setMapDonors([]);
         }

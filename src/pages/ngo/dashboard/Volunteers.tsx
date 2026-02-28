@@ -28,6 +28,22 @@ function NgoVolunteers() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [statusTab, setStatusTab] = useState<'active' | 'archived' | 'all'>('active');
 
+  const notifyNgoVolunteersError = (
+    error: unknown,
+    fallbackMessage: string,
+    toastId: string,
+    kind: string
+  ) => notify.fromError(
+    error,
+    fallbackMessage,
+    { id: toastId },
+    {
+      source: 'frontend',
+      scope: 'ngo',
+      metadata: { page: 'NgoVolunteers', kind },
+    }
+  );
+
   const activeCount = useMemo(
     () => volunteers.filter((volunteer) => volunteer.status === 'active').length,
     [volunteers]
@@ -98,8 +114,13 @@ function NgoVolunteers() {
       await archiveVolunteer(volunteerId);
       notify.success('Volunteer archived.');
       await refreshData();
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to archive volunteer.');
+    } catch (error: unknown) {
+      notifyNgoVolunteersError(
+        error,
+        'Failed to archive volunteer.',
+        'ngo-volunteer-archive-error',
+        'ngo.volunteers.archive'
+      );
     }
   };
 
@@ -110,8 +131,13 @@ function NgoVolunteers() {
       notify.success('Volunteer deleted.');
       await refreshData();
       setDeleteCandidate(null);
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to delete volunteer.');
+    } catch (error: unknown) {
+      notifyNgoVolunteersError(
+        error,
+        'Failed to delete volunteer.',
+        'ngo-volunteer-delete-error',
+        'ngo.volunteers.delete'
+      );
     } finally {
       setDeletingId(null);
     }
@@ -166,8 +192,13 @@ function NgoVolunteers() {
       }
 
       closeModal();
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to save volunteer.');
+    } catch (error: unknown) {
+      notifyNgoVolunteersError(
+        error,
+        'Failed to save volunteer.',
+        'ngo-volunteer-save-error',
+        editingVolunteerId ? 'ngo.volunteers.update' : 'ngo.volunteers.create'
+      );
     } finally {
       setSaving(false);
     }

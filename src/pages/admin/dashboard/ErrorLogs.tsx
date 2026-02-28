@@ -5,6 +5,7 @@ import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminErrorLogs } from '../../../hooks/admin/useAdminQueries';
+import { refetchQuery } from '../../../utils/queryRefetch';
 
 type ErrorLogRow = {
   id: string;
@@ -125,7 +126,7 @@ function ErrorLogsPage() {
             <p className="text-sm text-gray-600">Monitor frontend and backend errors across all portal flows.</p>
           </div>
           <AdminRefreshButton
-            onClick={() => void query.refetch()}
+            onClick={() => refetchQuery(query)}
             isRefreshing={query.isFetching}
             label="Refresh error logs"
           />
@@ -199,7 +200,7 @@ function ErrorLogsPage() {
       </div>
 
       <AdminRefreshingBanner show={loading} message="Refreshing error logs..." />
-      <AdminErrorCard message={error} onRetry={() => void query.refetch()} />
+      <AdminErrorCard message={error} onRetry={() => refetchQuery(query)} />
 
       {paged.length === 0 ? (
         <AdminEmptyStateCard message="No error logs found." />

@@ -36,6 +36,22 @@ function NgoVolunteerDetail() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
 
+  const notifyNgoVolunteerDetailError = (
+    error: unknown,
+    fallbackMessage: string,
+    toastId: string,
+    kind: string
+  ) => notify.fromError(
+    error,
+    fallbackMessage,
+    { id: toastId },
+    {
+      source: 'frontend',
+      scope: 'ngo',
+      metadata: { page: 'NgoVolunteerDetail', kind },
+    }
+  );
+
   const volunteer = useMemo(
     () => volunteers.find((item) => item.id === volunteerId),
     [volunteers, volunteerId]
@@ -62,8 +78,13 @@ function NgoVolunteerDetail() {
       await archiveVolunteer(volunteer.id);
       notify.success('Volunteer archived.');
       await refreshData();
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to archive volunteer.');
+    } catch (error: unknown) {
+      notifyNgoVolunteerDetailError(
+        error,
+        'Failed to archive volunteer.',
+        'ngo-volunteer-detail-archive-error',
+        'ngo.volunteerDetail.archive'
+      );
     }
   };
 
@@ -73,8 +94,13 @@ function NgoVolunteerDetail() {
       await deleteVolunteer(volunteer.id);
       notify.success('Volunteer deleted.');
       await refreshData();
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to delete volunteer.');
+    } catch (error: unknown) {
+      notifyNgoVolunteerDetailError(
+        error,
+        'Failed to delete volunteer.',
+        'ngo-volunteer-detail-delete-error',
+        'ngo.volunteerDetail.delete'
+      );
     } finally {
       setDeleting(false);
       setDeleteOpen(false);
@@ -136,8 +162,13 @@ function NgoVolunteerDetail() {
       notify.success('Volunteer updated successfully.');
       await refreshData();
       closeEdit();
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to update volunteer.');
+    } catch (error: unknown) {
+      notifyNgoVolunteerDetailError(
+        error,
+        'Failed to update volunteer.',
+        'ngo-volunteer-detail-update-error',
+        'ngo.volunteerDetail.update'
+      );
     } finally {
       setSaving(false);
     }

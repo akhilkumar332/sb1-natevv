@@ -16,6 +16,7 @@ import { db } from '../firebase';
 import type { User } from '../types/database.types';
 import { DatabaseError, NotFoundError } from '../utils/errorHandler';
 import { logAuditEvent } from './audit.service';
+import { toDateValue } from '../utils/dateValue';
 
 type JsonRecord = Record<string, any>;
 
@@ -87,14 +88,6 @@ type ReferralTrackingEntry = {
 };
 
 export type AdminKpiRange = '7d' | '30d' | '90d' | '12m';
-
-const toDate = (value: any): Date | undefined => {
-  if (!value) return undefined;
-  if (value instanceof Date) return value;
-  if (typeof value?.toDate === 'function') return value.toDate();
-  if (typeof value?.seconds === 'number') return new Date(value.seconds * 1000);
-  return undefined;
-};
 
 const sortByDateDesc = <T extends { createdAt?: Date }>(items: T[]) =>
   [...items].sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
@@ -192,7 +185,7 @@ const countFcmTokens = (data: JsonRecord) => {
 
 const rankUserCandidate = (data: JsonRecord) => {
   const tokenScore = countFcmTokens(data);
-  const updatedAtScore = toDate(data.updatedAt)?.getTime() || 0;
+  const updatedAtScore = toDateValue(data.updatedAt)?.getTime() || 0;
   return { tokenScore, updatedAtScore };
 };
 
@@ -309,7 +302,7 @@ export const getAdminUserSecurity = async (uid: string): Promise<AdminUserSecuri
       devicesById.set(deviceId, {
         deviceId,
         token: typeof details.token === 'string' ? details.token.trim() : undefined,
-        updatedAt: toDate(details.updatedAt),
+        updatedAt: toDateValue(details.updatedAt),
         info: details.info || {},
       });
     });
@@ -372,7 +365,7 @@ export const getAdminUserSecurity = async (uid: string): Promise<AdminUserSecuri
         .map((entry) => ({
           ip: String(entry.ip),
           userAgent: entry.userAgent ? String(entry.userAgent) : undefined,
-          createdAt: toDate(entry.createdAt),
+          createdAt: toDateValue(entry.createdAt),
           source: 'impersonationEvents' as const,
         }));
     } catch (_error) {
@@ -404,7 +397,7 @@ export const getAdminUserSecurity = async (uid: string): Promise<AdminUserSecuri
         .map((entry) => ({
           ip: String(entry.metadata?.ip || entry.ip),
           userAgent: entry.metadata?.userAgent || entry.userAgent,
-          createdAt: toDate(entry.createdAt),
+          createdAt: toDateValue(entry.createdAt),
           source: 'auditLogs' as const,
         }));
     } catch (_error) {
@@ -427,7 +420,7 @@ export const getAdminUserSecurity = async (uid: string): Promise<AdminUserSecuri
     });
 
     const seen = new Set<string>();
-    const lastTokenUpdate = toDate(userData.lastTokenUpdate);
+    const lastTokenUpdate = toDateValue(userData.lastTokenUpdate);
     const activeFcmTokens = [
       ...devices.map((device) => (typeof device.token === 'string' ? device.token.trim() : '')),
       ...legacyTokenCandidates,
@@ -480,8 +473,8 @@ export const getAdminUserKpis = async (
       const requestsReceivedSnap = await getDocs(query(collection(db, 'donorRequests'), where('targetDonorUid', '==', uid), limit(1000)));
       const donations = donationsSnap.docs.map((d) => d.data() as JsonRecord);
       const completed = donations.filter((d) => d.status === 'completed');
-      const completedInRange = filterByRange(completed, (d) => toDate(d.donationDate || d.createdAt), range);
-      const trend = placeInMonthBuckets(completedInRange.map((d) => toDate(d.donationDate || d.createdAt)));
+      const completedInRange = filterByRange(completed, (d) => toDateValue(d.donationDate || d.createdAt), range);
+      const trend = placeInMonthBuckets(completedInRange.map((d) => toDateValue(d.donationDate || d.createdAt)));
       const cohortValue = Number(user.totalDonations || 0);
       return {
         role,
@@ -502,8 +495,8 @@ export const getAdminUserKpis = async (
       const volunteersSnap = await getDocs(query(collection(db, 'volunteers'), where('ngoId', '==', uid), limit(1000)));
       const partnershipsSnap = await getDocs(query(collection(db, 'partnerships'), where('ngoId', '==', uid), limit(1000)));
       const campaigns = campaignsSnap.docs.map((d) => d.data() as JsonRecord);
-      const campaignsInRange = filterByRange(campaigns, (c) => toDate(c.createdAt || c.startDate), range);
-      const trend = placeInMonthBuckets(campaignsInRange.map((c) => toDate(c.createdAt || c.startDate)));
+      const campaignsInRange = filterByRange(campaigns, (c) => toDateValue(c.createdAt || c.startDate), range);
+      const trend = placeInMonthBuckets(campaignsInRange.map((c) => toDateValue(c.createdAt || c.startDate)));
       return {
         role,
         cards: [
@@ -523,8 +516,8 @@ export const getAdminUserKpis = async (
       const inventorySnap = await getDocs(query(collection(db, 'bloodInventory'), where('hospitalId', '==', uid), limit(1000)));
       const appointmentsSnap = await getDocs(query(collection(db, 'appointments'), where('hospitalId', '==', uid), limit(1000)));
       const requests = requestsSnap.docs.map((d) => d.data() as JsonRecord);
-      const requestsInRange = filterByRange(requests, (r) => toDate(r.requestedAt || r.createdAt), range);
-      const trend = placeInMonthBuckets(requestsInRange.map((r) => toDate(r.requestedAt || r.createdAt)));
+      const requestsInRange = filterByRange(requests, (r) => toDateValue(r.requestedAt || r.createdAt), range);
+      const trend = placeInMonthBuckets(requestsInRange.map((r) => toDateValue(r.requestedAt || r.createdAt)));
       return {
         role,
         cards: [
@@ -546,7 +539,7 @@ export const getAdminUserKpis = async (
       cards: [
         { label: 'Audit Events', value: audits.length },
       ],
-      trend: placeInMonthBuckets(filterByRange(audits, (a) => toDate(a.createdAt), range).map((a) => toDate(a.createdAt))),
+      trend: placeInMonthBuckets(filterByRange(audits, (a) => toDateValue(a.createdAt), range).map((a) => toDateValue(a.createdAt))),
       cohort: { label: 'Total Events', value: audits.length },
     };
   } catch (error) {
@@ -583,7 +576,7 @@ export const getAdminUserReferrals = async (
         || refUser.bloodBankName
         || refUser.hospitalName
         || 'User';
-      const referredAt = toDate(entry.referredAt || refUser.createdAt);
+      const referredAt = toDateValue(entry.referredAt || refUser.createdAt);
       return {
         id: entry.id,
         referredUid: String(entry.referredUid || ''),
@@ -636,7 +629,7 @@ export const getAdminUserTimeline = async (
         kind: 'audit' as const,
         title: row.action || 'Audit event',
         description: row.metadata?.reason || row.metadata?.status || undefined,
-        createdAt: toDate(row.createdAt),
+        createdAt: toDateValue(row.createdAt),
         metadata: row.metadata,
       };
     });
@@ -647,7 +640,7 @@ export const getAdminUserTimeline = async (
         kind: 'notification' as const,
         title: row.title || 'Notification',
         description: row.message || '',
-        createdAt: toDate(row.createdAt),
+        createdAt: toDateValue(row.createdAt),
         metadata: row,
       };
     });
@@ -658,7 +651,7 @@ export const getAdminUserTimeline = async (
         kind: 'impersonation' as const,
         title: row.action || 'Impersonation event',
         description: row.reason || row.status || '',
-        createdAt: toDate(row.createdAt),
+        createdAt: toDateValue(row.createdAt),
         metadata: row,
       };
     });

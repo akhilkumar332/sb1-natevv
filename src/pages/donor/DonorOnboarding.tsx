@@ -27,6 +27,7 @@ import { countries, getStatesByCountry, getCitiesByState } from '../../data/loca
 import { db } from '../../firebase';
 import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../../services/referral.service';
 import { getCurrentCoordinates, reverseGeocode } from '../../utils/geolocation.utils';
+import { validateOnboardingStep, type OnboardingValidationRule } from '../../utils/onboardingValidation';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -72,6 +73,14 @@ interface OnboardingFormData {
   privacyPolicyAgreed: boolean;
   termsOfServiceAgreed: boolean;
 }
+
+const donorOnboardingValidationRules: Array<OnboardingValidationRule<OnboardingFormData>> = [
+  { step: 0, required: ['name', 'gender', 'dateOfBirth'], message: 'Please fill in all required personal information' },
+  { step: 1, required: ['email', 'phone', 'address', 'country', 'state', 'city', 'postalCode'], message: 'Please fill in all required contact information' },
+  { step: 2, required: ['bloodType'], message: 'Please select your blood type' },
+  { step: 3, required: ['occupation', 'preferredLanguage', 'howHeardAboutUs'], message: 'Please fill in additional information' },
+  { step: 4, required: ['privacyPolicyAgreed', 'termsOfServiceAgreed'], message: 'Please agree to privacy policy and terms of service' },
+];
 
 const steps = [
   { icon: User, title: 'Personal', subtitle: 'Basic info', color: 'blue' },
@@ -339,39 +348,12 @@ export function DonorOnboarding() {
   };
 
   const validateStep = () => {
-    switch (currentStep) {
-      case 0:
-        if (!formData.name || !formData.gender || !formData.dateOfBirth) {
-          notify.error('Please fill in all required personal information');
-          return false;
-        }
-        break;
-      case 1:
-        if (!formData.email || !formData.phone || !formData.address || !formData.country || !formData.state || !formData.city || !formData.postalCode) {
-          notify.error('Please fill in all required contact information');
-          return false;
-        }
-        break;
-      case 2:
-        if (!formData.bloodType) {
-          notify.error('Please select your blood type');
-          return false;
-        }
-        break;
-      case 3:
-        if (!formData.occupation || !formData.preferredLanguage || !formData.howHeardAboutUs) {
-          notify.error('Please fill in additional information');
-          return false;
-        }
-        break;
-      case 4:
-        if (!formData.privacyPolicyAgreed || !formData.termsOfServiceAgreed) {
-          notify.error('Please agree to privacy policy and terms of service');
-          return false;
-        }
-        break;
-    }
-    return true;
+    return validateOnboardingStep({
+      step: currentStep,
+      data: formData,
+      rules: donorOnboardingValidationRules,
+      onError: (message) => notify.error(message),
+    });
   };
 
   const nextStep = () => {

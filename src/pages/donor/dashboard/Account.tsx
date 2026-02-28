@@ -16,6 +16,8 @@ import { countries, getStatesByCountry, getCitiesByState } from '../../../data/l
 import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import { getCurrentCoordinates, reverseGeocode } from '../../../utils/geolocation.utils';
+import { authMessages } from '../../../constants/messages';
+import { captureHandledError } from '../../../services/errorLog.service';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -103,6 +105,13 @@ const DonorAccount = () => {
   const [phoneUpdateLockedNumber, setPhoneUpdateLockedNumber] = useState('');
   const [pushMessage, setPushMessage] = useState<string | null>(null);
   const [pushEnabled, setPushEnabled] = useState(true);
+  const reportDonorAccountError = (error: unknown, kind: string) => {
+    void captureHandledError(error, {
+      source: 'frontend',
+      scope: 'donor',
+      metadata: { kind, page: 'DonorAccount' },
+    });
+  };
 
   const {
     isLoading,
@@ -329,7 +338,7 @@ const DonorAccount = () => {
         setAddressSuggestions(data);
         setShowAddressSuggestions(data.length > 0);
       } catch (error) {
-        console.error('Address search error:', error);
+        reportDonorAccountError(error, 'donor.account.address.search');
       }
     }, 500);
 
@@ -584,8 +593,8 @@ const DonorAccount = () => {
       notify.success('Profile updated successfully.');
       setIsEditingBasicInfo(false);
     } catch (error: any) {
-      console.error('Failed to update basic info:', error);
-      notify.error(error?.message || 'Failed to update profile.');
+      reportDonorAccountError(error, 'donor.account.basic_info.update');
+      notify.fromError(error, 'Failed to update profile.', { id: 'donor-account-basic-info-save-error' });
     } finally {
       setBasicInfoSaving(false);
     }
@@ -614,11 +623,11 @@ const DonorAccount = () => {
       notify.success('Email updated. Please verify via the email sent.');
       setIsEditingEmail(false);
     } catch (error: any) {
-      console.error('Email update error:', error);
+      reportDonorAccountError(error, 'donor.account.email.update');
       if (error?.code === 'auth/requires-recent-login') {
-        notify.error('Please re-login and try again to update your email.');
+        notify.error(authMessages.relogin.updateEmail);
       } else {
-        notify.error(error?.message || 'Failed to update email.');
+        notify.fromError(error, 'Failed to update email.', { id: 'donor-account-email-update-error' });
       }
     } finally {
       setEmailSaving(false);
@@ -640,8 +649,8 @@ const DonorAccount = () => {
       setPhoneUpdateLockedNumber(normalized);
       notify.success('OTP sent successfully!');
     } catch (error: any) {
-      console.error('Phone update error:', error);
-      notify.error(error?.message || 'Failed to send OTP.');
+      reportDonorAccountError(error, 'donor.account.phone.update_start');
+      notify.fromError(error, 'Failed to send OTP.', { id: 'donor-account-phone-update-start-error' });
     } finally {
       setPhoneUpdateLoading(false);
     }
@@ -674,11 +683,11 @@ const DonorAccount = () => {
       setIsEditingPhone(false);
       notify.success('Phone number updated successfully!');
     } catch (error: any) {
-      console.error('Phone update confirm error:', error);
+      reportDonorAccountError(error, 'donor.account.phone.update_confirm');
       if (error?.code === 'auth/requires-recent-login') {
-        notify.error('Please re-login and try again to update your phone.');
+        notify.error(authMessages.relogin.updatePhone);
       } else {
-        notify.error(error?.message || 'Failed to update phone number.');
+        notify.fromError(error, 'Failed to update phone number.', { id: 'donor-account-phone-update-confirm-error' });
       }
     } finally {
       setPhoneUpdateLoading(false);
@@ -706,10 +715,11 @@ const DonorAccount = () => {
       await logout(navigate, { redirectTo: '/donor/login', showToast: false });
       notify.success('Account deleted successfully.');
     } catch (error: any) {
+      reportDonorAccountError(error, 'donor.account.delete');
       if (error?.code === 'auth/requires-recent-login') {
-        notify.error('Please re-login and try again to delete your account.');
+        notify.error(authMessages.relogin.deleteAccount);
       } else {
-        notify.error('Failed to delete account. Please try again.');
+        notify.fromError(error, 'Failed to delete account. Please try again.', { id: 'donor-account-delete-error' });
       }
     } finally {
       setDeleteLoading(false);

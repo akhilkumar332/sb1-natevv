@@ -9,6 +9,7 @@ import { authStorage } from '../utils/authStorage';
 import { auth } from '../firebase';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../utils/phone';
 import { captureHandledError } from '../services/errorLog.service';
+import { authMessages } from '../constants/messages';
 
 interface LoginFormData {
   identifier: string;
@@ -98,8 +99,8 @@ export const useLogin = () => {
       if (verifiedUser.role !== 'donor') {
         notify.error(
           verifiedUser.role === 'superadmin'
-            ? 'Superadmin can only sign in with Google.'
-            : "You're not a Donor",
+            ? authMessages.superadminGoogleOnly
+            : authMessages.roleMismatch.donor,
           { id: 'role-mismatch-donor' }
         );
         await logout(navigate, { redirectTo: '/donor/login', showToast: false });
@@ -127,11 +128,11 @@ export const useLogin = () => {
           return;
         }
         if (error.code === 'role_mismatch') {
-          notify.error("You're not a Donor", { id: 'role-mismatch-donor' });
+          notify.error(authMessages.roleMismatch.donor, { id: 'role-mismatch-donor' });
           return;
         }
         if (error.code === 'superadmin_google_only') {
-          notify.error('Superadmin can only sign in with Google.');
+          notify.error(authMessages.superadminGoogleOnly);
           return;
         }
         if (error.code === 'link_required') {
@@ -177,7 +178,7 @@ export const useLogin = () => {
       setGoogleLoading(true);
       const result = await loginWithGoogle();
       if (result.user.role !== 'donor' && result.user.role !== 'superadmin') {
-        notify.error("You're not a Donor", { id: 'role-mismatch-donor' });
+        notify.error(authMessages.roleMismatch.donor, { id: 'role-mismatch-donor' });
         await logout(navigate, { redirectTo: '/donor/login', showToast: false });
         return;
       }

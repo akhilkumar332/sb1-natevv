@@ -1118,7 +1118,6 @@ function DonorDashboard() {
         notify.success('Your donor request has been submitted.', { id: PENDING_REQUEST_SUCCESS_TOAST_ID });
       } catch (error) {
         if (!isOfflineFirestoreError(error)) {
-          console.error('Pending donor request submission failed:', error);
           reportDonorDashboardError(error, 'submit_pending_donor_request');
         }
         await clearPendingDonorRequestDoc(user.uid).catch(() => null);
@@ -1131,7 +1130,6 @@ function DonorDashboard() {
     submitPending()
       .catch((error) => {
         if (!isOfflineFirestoreError(error)) {
-          console.error('Pending donor request submission failed:', error);
           reportDonorDashboardError(error, 'submit_pending_donor_request_uncaught');
         }
         pendingRequestProcessedRef.current = null;
@@ -1187,9 +1185,8 @@ function DonorDashboard() {
       await linkGoogleProvider();
       notify.success('Google account linked successfully!');
     } catch (error: any) {
-      console.error('Google link error:', error);
       reportDonorDashboardError(error, 'google_link');
-      notify.error(error?.message || 'Failed to link Google account.');
+      notify.fromError(error, 'Failed to link Google account.', { id: 'donor-google-link-error' });
     } finally {
       setLinkGoogleLoading(false);
     }
@@ -1208,9 +1205,8 @@ function DonorDashboard() {
       await unlinkGoogleProvider();
       notify.success('Google login unlinked.');
     } catch (error: any) {
-      console.error('Google unlink error:', error);
       reportDonorDashboardError(error, 'google_unlink');
-      notify.error(error?.message || 'Failed to unlink Google login.');
+      notify.fromError(error, 'Failed to unlink Google login.', { id: 'donor-google-unlink-error' });
     } finally {
       setUnlinkGoogleLoading(false);
     }
@@ -1229,9 +1225,8 @@ function DonorDashboard() {
       setLinkConfirmation(confirmation);
       notify.success('OTP sent successfully!');
     } catch (error: any) {
-      console.error('Phone link error:', error);
       reportDonorDashboardError(error, 'phone_link_start');
-      notify.error(error?.message || 'Failed to send OTP. Please try again.');
+      notify.fromError(error, 'Failed to send OTP. Please try again.', { id: 'donor-phone-link-start-error' });
     } finally {
       setLinkPhoneLoading(false);
     }
@@ -1260,9 +1255,8 @@ function DonorDashboard() {
       setLinkOtp('');
       notify.success('Phone number linked successfully!');
     } catch (error: any) {
-      console.error('Phone link confirm error:', error);
       reportDonorDashboardError(error, 'phone_link_confirm');
-      notify.error(error?.message || 'Failed to link phone number.');
+      notify.fromError(error, 'Failed to link phone number.', { id: 'donor-phone-link-confirm-error' });
     } finally {
       setLinkPhoneLoading(false);
     }
@@ -1285,9 +1279,8 @@ function DonorDashboard() {
       await unlinkPhoneProvider();
       notify.success('Phone login unlinked.');
     } catch (error: any) {
-      console.error('Phone unlink error:', error);
       reportDonorDashboardError(error, 'phone_unlink');
-      notify.error(error?.message || 'Failed to unlink phone login.');
+      notify.fromError(error, 'Failed to unlink phone login.', { id: 'donor-phone-unlink-error' });
     } finally {
       setUnlinkPhoneLoading(false);
     }
@@ -1386,9 +1379,8 @@ function DonorDashboard() {
       }
       await updateDoc(requestRef, updatePayload);
     } catch (error) {
-      console.error('Failed to update donor request:', error);
       reportDonorDashboardError(error, 'update_donor_request');
-      notify.error('Unable to update request. Please try again.');
+      notify.fromError(error, 'Unable to update request. Please try again.', { id: 'donor-request-update-error' });
       return;
     } finally {
       setDonorRequestActionId(null);
@@ -1477,9 +1469,8 @@ function DonorDashboard() {
       await deleteDoc(requestRef);
       notify.success('Request deleted.');
     } catch (error) {
-      console.error('Failed to delete donor request:', error);
       reportDonorDashboardError(error, 'delete_donor_request');
-      notify.error('Unable to delete request. Please try again.');
+      notify.fromError(error, 'Unable to delete request. Please try again.', { id: 'donor-request-delete-error' });
     } finally {
       setDonorRequestDeleteId(null);
     }
@@ -1634,9 +1625,8 @@ function DonorDashboard() {
       setTimeout(() => setLastDonationSaved(false), 2500);
       notify.success('Last donation date saved.');
     } catch (error: any) {
-      console.error('Last donation update error:', error);
       reportDonorDashboardError(error, 'last_donation_update');
-      notify.error(error?.message || 'Failed to save last donation date.');
+      notify.fromError(error, 'Failed to save last donation date.', { id: 'donor-last-donation-save-error' });
     } finally {
       setLastDonationSaving(false);
     }
@@ -1811,9 +1801,8 @@ function DonorDashboard() {
       notify.success('Donation updated.');
       setEditingDonationId(null);
     } catch (error: any) {
-      console.error('Donation update error:', error);
       reportDonorDashboardError(error, 'donation_update');
-      notify.error(error?.message || 'Failed to update donation.');
+      notify.fromError(error, 'Failed to update donation.', { id: 'donor-donation-update-error' });
     } finally {
       setDonationEditSaving(false);
     }
@@ -1862,9 +1851,8 @@ function DonorDashboard() {
       await updateUserProfile({ lastDonation: latestDonationDate || null });
       notify.success('Donation restored.');
     } catch (error: any) {
-      console.error('Donation restore error:', error);
       reportDonorDashboardError(error, 'donation_restore');
-      notify.error(error?.message || 'Failed to restore donation.');
+      notify.fromError(error, 'Failed to restore donation.', { id: 'donor-donation-restore-error' });
     }
   };
 
@@ -1932,9 +1920,8 @@ function DonorDashboard() {
         </div>
       ), { duration: 5000 });
     } catch (error: any) {
-      console.error('Donation delete error:', error);
       reportDonorDashboardError(error, 'donation_delete');
-      notify.error(error?.message || 'Failed to delete donation.');
+      notify.fromError(error, 'Failed to delete donation.', { id: 'donor-donation-delete-error' });
     } finally {
       setDonationDeleteId(null);
     }
@@ -2026,9 +2013,8 @@ function DonorDashboard() {
       URL.revokeObjectURL(downloadUrl);
       notify.success('Donor card downloaded.');
     } catch (error: any) {
-      console.error('Donor card share error:', error);
       reportDonorDashboardError(error, 'donor_card_share');
-      notify.error(error?.message || 'Unable to share donor card.');
+      notify.fromError(error, 'Unable to share donor card.', { id: 'donor-card-share-error' });
     } finally {
       setShareCardLoading(false);
     }
@@ -2050,10 +2036,9 @@ function DonorDashboard() {
       });
       notify.success(nextValue ? 'Emergency alerts enabled.' : 'Emergency alerts paused.');
     } catch (error: any) {
-      console.error('Emergency alerts update error:', error);
       reportDonorDashboardError(error, 'emergency_alerts_update');
       setEmergencyAlertsEnabled(!nextValue);
-      notify.error(error?.message || 'Failed to update alert preference.');
+      notify.fromError(error, 'Failed to update alert preference.', { id: 'donor-emergency-alerts-update-error' });
     } finally {
       setEmergencyAlertsSaving(false);
     }
@@ -2088,11 +2073,10 @@ function DonorDashboard() {
       }
       notify.success(nextValue ? 'You are now available for requests.' : 'You are on break.');
     } catch (error: any) {
-      console.error('Availability update error:', error);
       reportDonorDashboardError(error, 'availability_update');
       setAvailabilityEnabled(previousAvailability);
       setEmergencyAlertsEnabled(previousAlerts);
-      notify.error(error?.message || 'Failed to update availability.');
+      notify.fromError(error, 'Failed to update availability.', { id: 'donor-availability-update-error' });
     } finally {
       setAvailabilitySaving(false);
     }
@@ -2155,9 +2139,8 @@ function DonorDashboard() {
         notify.success('You are on break for the next 24 hours.');
       }
     } catch (error: any) {
-      console.error('Available today update error:', error);
       reportDonorDashboardError(error, 'available_today_update');
-      notify.error(error?.message || 'Failed to update break status.');
+      notify.fromError(error, 'Failed to update break status.', { id: 'donor-break-status-update-error' });
     } finally {
       setAvailableTodayLoading(false);
     }
@@ -2178,9 +2161,8 @@ function DonorDashboard() {
         },
       });
     } catch (error: any) {
-      console.error('Checklist update error:', error);
       reportDonorDashboardError(error, 'checklist_update');
-      notify.error(error?.message || 'Failed to update checklist.');
+      notify.fromError(error, 'Failed to update checklist.', { id: 'donor-checklist-update-error' });
     } finally {
       setChecklistSaving(false);
     }
@@ -2204,9 +2186,8 @@ function DonorDashboard() {
         },
       });
     } catch (error: any) {
-      console.error('Checklist reset error:', error);
       reportDonorDashboardError(error, 'checklist_reset');
-      notify.error(error?.message || 'Failed to reset checklist.');
+      notify.fromError(error, 'Failed to reset checklist.', { id: 'donor-checklist-reset-error' });
     } finally {
       setChecklistSaving(false);
     }
@@ -2289,9 +2270,8 @@ function DonorDashboard() {
       notify.success('Feedback saved.');
       setFeedbackOpenId(null);
     } catch (error: any) {
-      console.error('Feedback save error:', error);
       reportDonorDashboardError(error, 'feedback_save');
-      notify.error(error?.message || 'Failed to save feedback.');
+      notify.fromError(error, 'Failed to save feedback.', { id: 'donor-feedback-save-error' });
     } finally {
       setFeedbackSaving(false);
     }

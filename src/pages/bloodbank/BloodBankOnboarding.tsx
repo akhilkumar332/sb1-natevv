@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { countries, getStatesByCountry, getCitiesByState } from '../../data/locations';
 import { getCurrentCoordinates, reverseGeocode } from '../../utils/geolocation.utils';
+import { validateOnboardingStep, type OnboardingValidationRule } from '../../utils/onboardingValidation';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -64,6 +65,13 @@ interface OnboardingFormData {
   privacyPolicyAgreed: boolean;
   termsOfServiceAgreed: boolean;
 }
+
+const bloodBankOnboardingValidationRules: Array<OnboardingValidationRule<OnboardingFormData>> = [
+  { step: 0, required: ['hospitalName', 'registrationNumber', 'hospitalType', 'contactPersonName'], message: 'Please fill in all required bloodbank information' },
+  { step: 1, required: ['email', 'phone', 'dateOfBirth', 'address', 'city', 'state', 'postalCode', 'country'], message: 'Please fill in all required contact information' },
+  { step: 2, required: ['numberOfBeds', 'description'], message: 'Please fill in number of beds and description' },
+  { step: 3, required: ['privacyPolicyAgreed', 'termsOfServiceAgreed'], message: 'Please agree to terms and privacy policy' },
+];
 
 const steps = [
   { icon: Building2, title: 'BloodBank', subtitle: 'Basic details', color: 'yellow' },
@@ -326,33 +334,12 @@ export function BloodBankOnboarding() {
   };
 
   const validateStep = () => {
-    switch (currentStep) {
-      case 0:
-        if (!formData.hospitalName || !formData.registrationNumber || !formData.hospitalType || !formData.contactPersonName) {
-          notify.error('Please fill in all required bloodbank information');
-          return false;
-        }
-        break;
-      case 1:
-        if (!formData.email || !formData.phone || !formData.dateOfBirth || !formData.address || !formData.city || !formData.state || !formData.postalCode || !formData.country) {
-          notify.error('Please fill in all required contact information');
-          return false;
-        }
-        break;
-      case 2:
-        if (!formData.numberOfBeds || !formData.description) {
-          notify.error('Please fill in number of beds and description');
-          return false;
-        }
-        break;
-      case 3:
-        if (!formData.privacyPolicyAgreed || !formData.termsOfServiceAgreed) {
-          notify.error('Please agree to terms and privacy policy');
-          return false;
-        }
-        break;
-    }
-    return true;
+    return validateOnboardingStep({
+      step: currentStep,
+      data: formData,
+      rules: bloodBankOnboardingValidationRules,
+      onError: (message) => notify.error(message),
+    });
   };
 
   const handleNext = () => {

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { notify } from 'services/notify.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
@@ -11,6 +10,8 @@ import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminPartnerships, useAdminVolunteers } from '../../../hooks/admin/useAdminQueries';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
+import { refetchQueries } from '../../../utils/queryRefetch';
+import { runWithFeedback } from '../../../utils/runWithFeedback';
 
 type VolunteerRow = {
   id: string;
@@ -113,28 +114,26 @@ function VolunteersPartnershipsPage() {
 
   const updateVolunteerStatus = async (id: string, status: 'active' | 'inactive') => {
     setProcessingId(id);
-    try {
-      await updateDoc(doc(db, 'volunteers', id), { status, updatedAt: getServerTimestamp() });
-      notify.success(`Volunteer marked ${status}`);
-      await invalidateAdminRecipe(queryClient, 'volunteerUpdated');
-    } catch (updateError: any) {
-      notify.error(updateError?.message || 'Failed to update volunteer status.');
-    } finally {
-      setProcessingId(null);
-    }
+    await runWithFeedback({
+      action: () => updateDoc(doc(db, 'volunteers', id), { status, updatedAt: getServerTimestamp() }),
+      successMessage: `Volunteer marked ${status}`,
+      errorMessage: 'Failed to update volunteer status.',
+      capture: { scope: 'admin', metadata: { kind: 'admin.volunteer.status.update', status } },
+      invalidate: () => invalidateAdminRecipe(queryClient, 'volunteerUpdated'),
+    });
+    setProcessingId(null);
   };
 
   const updatePartnershipStatus = async (id: string, status: 'active' | 'pending' | 'inactive') => {
     setProcessingId(id);
-    try {
-      await updateDoc(doc(db, 'partnerships', id), { status, updatedAt: getServerTimestamp() });
-      notify.success(`Partnership marked ${status}`);
-      await invalidateAdminRecipe(queryClient, 'partnershipUpdated');
-    } catch (updateError: any) {
-      notify.error(updateError?.message || 'Failed to update partnership status.');
-    } finally {
-      setProcessingId(null);
-    }
+    await runWithFeedback({
+      action: () => updateDoc(doc(db, 'partnerships', id), { status, updatedAt: getServerTimestamp() }),
+      successMessage: `Partnership marked ${status}`,
+      errorMessage: 'Failed to update partnership status.',
+      capture: { scope: 'admin', metadata: { kind: 'admin.partnership.status.update', status } },
+      invalidate: () => invalidateAdminRecipe(queryClient, 'partnershipUpdated'),
+    });
+    setProcessingId(null);
   };
 
   return (
@@ -146,10 +145,7 @@ function VolunteersPartnershipsPage() {
             <p className="text-sm text-gray-600">Manage volunteer workforce and NGO partnership lifecycle.</p>
           </div>
           <AdminRefreshButton
-            onClick={() => {
-              void volunteersQuery.refetch();
-              void partnershipsQuery.refetch();
-            }}
+            onClick={() => refetchQueries(volunteersQuery, partnershipsQuery)}
             isRefreshing={volunteersQuery.isFetching || partnershipsQuery.isFetching}
             label="Refresh volunteers and partnerships"
           />
@@ -166,10 +162,7 @@ function VolunteersPartnershipsPage() {
       <AdminRefreshingBanner show={loading} message="Refreshing volunteers and partnerships..." />
       <AdminErrorCard
         message={error}
-        onRetry={() => {
-          void volunteersQuery.refetch();
-          void partnershipsQuery.refetch();
-        }}
+        onRetry={() => refetchQueries(volunteersQuery, partnershipsQuery)}
       />
 
       <>

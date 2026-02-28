@@ -9,6 +9,7 @@ import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminUsers } from '../../../hooks/admin/useAdminQueries';
+import { refetchQuery } from '../../../utils/queryRefetch';
 
 type RoleFilter = 'all' | 'donor' | 'ngo' | 'bloodbank';
 type StatusFilter = 'all' | 'active' | 'inactive' | 'suspended' | 'pending_verification';
@@ -132,7 +133,7 @@ export function AdminUsersPage({
             <p className="text-sm text-gray-600">{description}</p>
           </div>
           <AdminRefreshButton
-            onClick={() => void usersQuery.refetch()}
+            onClick={() => refetchQuery(usersQuery)}
             isRefreshing={usersQuery.isFetching}
             label="Refresh users"
           />
@@ -162,7 +163,7 @@ export function AdminUsersPage({
       />
 
       <AdminRefreshingBanner show={loading} message="Refreshing users..." />
-      <AdminErrorCard message={error} onRetry={() => void usersQuery.refetch()} />
+      <AdminErrorCard message={error} onRetry={() => refetchQuery(usersQuery)} />
 
       {pagedUsers.length === 0 ? (
         <AdminEmptyStateCard message="No users found for current filters." />

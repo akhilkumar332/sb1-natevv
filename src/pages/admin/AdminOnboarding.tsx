@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { notify } from 'services/notify.service';
 import { User, Calendar, MapPin, Droplet, Briefcase, Globe, Heart } from 'lucide-react';
+import { validateOnboardingStep, type OnboardingValidationRule } from '../../utils/onboardingValidation';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -28,6 +29,14 @@ interface OnboardingFormData {
   privacyPolicyAgreed: boolean;
   termsOfServiceAgreed: boolean;
 }
+
+const adminOnboardingValidationRules: Array<OnboardingValidationRule<OnboardingFormData>> = [
+  { step: 0, required: ['name', 'gender', 'dateOfBirth'], message: 'Please fill in all required personal information' },
+  { step: 1, required: ['email', 'phone', 'address', 'city', 'state', 'postalCode'], message: 'Please fill in all required contact information' },
+  { step: 2, required: ['bloodType'], message: 'Please select your blood type' },
+  { step: 3, required: ['occupation', 'preferredLanguage'], message: 'Please fill in additional information' },
+  { step: 4, required: ['privacyPolicyAgreed', 'termsOfServiceAgreed'], message: 'Please agree to privacy policy and terms of service' },
+];
 
 export function AdminOnboarding() {
   const navigate = useNavigate();
@@ -80,39 +89,12 @@ export function AdminOnboarding() {
   };
 
   const validateStep = () => {
-    switch (currentStep) {
-      case 0: // Personal Info
-        if (!formData.name || !formData.gender || !formData.dateOfBirth) {
-          notify.error('Please fill in all required personal information');
-          return false;
-        }
-        break;
-      case 1: // Contact Info
-        if (!formData.email || !formData.phone || !formData.address || !formData.city || !formData.state || !formData.postalCode ) {
-          notify.error('Please fill in all required contact information');
-          return false;
-        }
-        break;
-      case 2: // Medical Info
-        if (!formData.bloodType) {
-          notify.error('Please select your blood type');
-          return false;
-        }
-        break;
-      case 3: // Additional Info
-        if (!formData.occupation || !formData.preferredLanguage) {
-          notify.error('Please fill in additional information');
-          return false;
-        }
-        break;
-      case 4: // Consent
-        if (!formData.privacyPolicyAgreed || !formData.termsOfServiceAgreed) {
-          notify.error('Please agree to privacy policy and terms of service');
-          return false;
-        }
-        break;
-    }
-    return true;
+    return validateOnboardingStep({
+      step: currentStep,
+      data: formData,
+      rules: adminOnboardingValidationRules,
+      onError: (message) => notify.error(message),
+    });
   };
 
   const nextStep = () => {

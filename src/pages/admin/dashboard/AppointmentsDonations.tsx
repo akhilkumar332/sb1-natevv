@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { notify } from 'services/notify.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
@@ -11,6 +10,8 @@ import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminAppointments, useAdminDonations } from '../../../hooks/admin/useAdminQueries';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
+import { refetchQueries } from '../../../utils/queryRefetch';
+import { runWithFeedback } from '../../../utils/runWithFeedback';
 
 type AppointmentRow = {
   id: string;
@@ -112,28 +113,26 @@ function AppointmentsDonationsPage() {
 
   const updateAppointmentStatus = async (id: string, status: 'confirmed' | 'completed' | 'cancelled') => {
     setProcessingId(id);
-    try {
-      await updateDoc(doc(db, 'appointments', id), { status, updatedAt: getServerTimestamp() });
-      notify.success(`Appointment marked ${status}`);
-      await invalidateAdminRecipe(queryClient, 'appointmentStatusUpdated');
-    } catch (updateError: any) {
-      notify.error(updateError?.message || 'Failed to update appointment status.');
-    } finally {
-      setProcessingId(null);
-    }
+    await runWithFeedback({
+      action: () => updateDoc(doc(db, 'appointments', id), { status, updatedAt: getServerTimestamp() }),
+      successMessage: `Appointment marked ${status}`,
+      errorMessage: 'Failed to update appointment status.',
+      capture: { scope: 'admin', metadata: { kind: 'admin.appointment.status.update', status } },
+      invalidate: () => invalidateAdminRecipe(queryClient, 'appointmentStatusUpdated'),
+    });
+    setProcessingId(null);
   };
 
   const updateDonationStatus = async (id: string, status: 'completed' | 'rejected' | 'pending') => {
     setProcessingId(id);
-    try {
-      await updateDoc(doc(db, 'donations', id), { status, updatedAt: getServerTimestamp() });
-      notify.success(`Donation marked ${status}`);
-      await invalidateAdminRecipe(queryClient, 'donationStatusUpdated');
-    } catch (updateError: any) {
-      notify.error(updateError?.message || 'Failed to update donation status.');
-    } finally {
-      setProcessingId(null);
-    }
+    await runWithFeedback({
+      action: () => updateDoc(doc(db, 'donations', id), { status, updatedAt: getServerTimestamp() }),
+      successMessage: `Donation marked ${status}`,
+      errorMessage: 'Failed to update donation status.',
+      capture: { scope: 'admin', metadata: { kind: 'admin.donation.status.update', status } },
+      invalidate: () => invalidateAdminRecipe(queryClient, 'donationStatusUpdated'),
+    });
+    setProcessingId(null);
   };
 
   return (
@@ -145,10 +144,7 @@ function AppointmentsDonationsPage() {
             <p className="text-sm text-gray-600">Track operational donor appointments and donation outcomes.</p>
           </div>
           <AdminRefreshButton
-            onClick={() => {
-              void appointmentsQuery.refetch();
-              void donationsQuery.refetch();
-            }}
+            onClick={() => refetchQueries(appointmentsQuery, donationsQuery)}
             isRefreshing={appointmentsQuery.isFetching || donationsQuery.isFetching}
             label="Refresh appointments and donations"
           />
@@ -165,10 +161,7 @@ function AppointmentsDonationsPage() {
       <AdminRefreshingBanner show={loading} message="Refreshing appointments and donations..." />
       <AdminErrorCard
         message={error}
-        onRetry={() => {
-          void appointmentsQuery.refetch();
-          void donationsQuery.refetch();
-        }}
+        onRetry={() => refetchQueries(appointmentsQuery, donationsQuery)}
       />
 
       <>

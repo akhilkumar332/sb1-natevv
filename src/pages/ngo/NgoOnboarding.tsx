@@ -21,6 +21,7 @@ import {
 import { countries, getStatesByCountry, getCitiesByState } from '../../data/locations';
 import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../../services/referral.service';
 import { getCurrentCoordinates, reverseGeocode } from '../../utils/geolocation.utils';
+import { validateOnboardingStep, type OnboardingValidationRule } from '../../utils/onboardingValidation';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -53,6 +54,13 @@ interface OnboardingFormData {
   privacyPolicyAgreed: boolean;
   termsOfServiceAgreed: boolean;
 }
+
+const ngoOnboardingValidationRules: Array<OnboardingValidationRule<OnboardingFormData>> = [
+  { step: 0, required: ['organizationName', 'registrationNumber', 'ngoType', 'contactPersonName'], message: 'Please fill in all required organization information' },
+  { step: 1, required: ['email', 'phone', 'dateOfBirth', 'address', 'city', 'state', 'postalCode', 'country'], message: 'Please fill in all required contact information' },
+  { step: 2, required: ['yearEstablished', 'description'], message: 'Please fill in year established and description' },
+  { step: 3, required: ['privacyPolicyAgreed', 'termsOfServiceAgreed'], message: 'Please agree to terms and privacy policy' },
+];
 
 const steps = [
   { icon: Building2, title: 'Organization', subtitle: 'Basic details', color: 'blue' },
@@ -313,33 +321,12 @@ export function NgoOnboarding() {
   };
 
   const validateStep = () => {
-    switch (currentStep) {
-      case 0:
-        if (!formData.organizationName || !formData.registrationNumber || !formData.ngoType || !formData.contactPersonName) {
-          notify.error('Please fill in all required organization information');
-          return false;
-        }
-        break;
-      case 1:
-        if (!formData.email || !formData.phone || !formData.dateOfBirth || !formData.address || !formData.city || !formData.state || !formData.postalCode || !formData.country) {
-          notify.error('Please fill in all required contact information');
-          return false;
-        }
-        break;
-      case 2:
-        if (!formData.yearEstablished || !formData.description) {
-          notify.error('Please fill in year established and description');
-          return false;
-        }
-        break;
-      case 3:
-        if (!formData.privacyPolicyAgreed || !formData.termsOfServiceAgreed) {
-          notify.error('Please agree to terms and privacy policy');
-          return false;
-        }
-        break;
-    }
-    return true;
+    return validateOnboardingStep({
+      step: currentStep,
+      data: formData,
+      rules: ngoOnboardingValidationRules,
+      onError: (message) => notify.error(message),
+    });
   };
 
   const handleNext = () => {

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { notify } from 'services/notify.service';
 import { FileDown, Gauge } from 'lucide-react';
 import { AdminAnalyticsDashboard } from '../../../components/analytics/AdminAnalyticsDashboard';
 import { generateDailyAnalytics, getSystemHealthReport } from '../../../services/admin.service';
+import { runWithFeedback } from '../../../utils/runWithFeedback';
 
 function AnalyticsReportsPage() {
   const [generating, setGenerating] = useState(false);
@@ -10,26 +10,25 @@ function AnalyticsReportsPage() {
 
   const handleGenerateSnapshot = async () => {
     setGenerating(true);
-    try {
-      const analyticsId = await generateDailyAnalytics();
-      notify.success(`Analytics snapshot generated (${analyticsId})`);
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to generate analytics snapshot.');
-    } finally {
-      setGenerating(false);
-    }
+    await runWithFeedback({
+      action: () => generateDailyAnalytics(),
+      successMessage: (analyticsId) => `Analytics snapshot generated (${analyticsId})`,
+      errorMessage: 'Failed to generate analytics snapshot.',
+      capture: { scope: 'admin', metadata: { kind: 'admin.analytics.snapshot.generate' } },
+    });
+    setGenerating(false);
   };
 
   const handleSystemHealth = async () => {
     setCheckingHealth(true);
-    try {
-      const report = await getSystemHealthReport();
-      notify.success(`System ${report.status}: ${report.alerts.inventoryAlerts} inventory alerts, ${report.alerts.pendingVerifications} pending verifications`);
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to get system health report.');
-    } finally {
-      setCheckingHealth(false);
-    }
+    await runWithFeedback({
+      action: () => getSystemHealthReport(),
+      successMessage: (report) =>
+        `System ${report.status}: ${report.alerts.inventoryAlerts} inventory alerts, ${report.alerts.pendingVerifications} pending verifications`,
+      errorMessage: 'Failed to get system health report.',
+      capture: { scope: 'admin', metadata: { kind: 'admin.analytics.health.check' } },
+    });
+    setCheckingHealth(false);
   };
 
   return (

@@ -6,6 +6,8 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { collection, documentId, endBefore, getDocs, limit, limitToLast, orderBy, query, startAfter, where, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '../../../firebase';
+import { captureHandledError } from '../../../services/errorLog.service';
+import notify from '../../../services/notify.service';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -175,6 +177,18 @@ function BloodBankDonors() {
   });
   const pageSize = 10;
 
+  const reportBloodBankDonorsError = (error: unknown, kind: string, metadata?: Record<string, unknown>) => {
+    void captureHandledError(error, {
+      source: 'frontend',
+      scope: 'bloodbank',
+      metadata: {
+        page: 'BloodBankDonors',
+        kind,
+        ...(metadata || {}),
+      },
+    });
+  };
+
   const activeRate = donorCommunity.totalDonors > 0
     ? Math.round((donorCommunity.activeDonors / donorCommunity.totalDonors) * 100)
     : 0;
@@ -266,7 +280,11 @@ function BloodBankDonors() {
         retentionRate: Math.round(retentionRate * 10) / 10,
       });
     } catch (error) {
-      console.error('Error fetching donor community:', error);
+      reportBloodBankDonorsError(error, 'bloodbank.donors.community.fetch', {
+        bloodTypeFilter,
+        availabilityFilter,
+        cityFilter,
+      });
     }
   };
 
@@ -341,7 +359,13 @@ function BloodBankDonors() {
         setHasNextPage(hasExtra);
       }
     } catch (error) {
-      console.error('Error loading donors:', error);
+      reportBloodBankDonorsError(error, 'bloodbank.donors.page.fetch', {
+        direction,
+        bloodTypeFilter,
+        availabilityFilter,
+        cityFilter,
+      });
+      notify.fromError(error, 'Unable to load donors right now.', { id: 'bloodbank-donors-page-load-error' });
       setDonors([]);
       setHasNextPage(false);
     } finally {
@@ -404,7 +428,7 @@ function BloodBankDonors() {
           setMapDonors(publicRows);
         }
       } catch (error) {
-        console.warn('Failed to load public donors for map', error);
+        reportBloodBankDonorsError(error, 'bloodbank.donors.map.fetch');
         if (isActive) {
           setMapDonors([]);
         }

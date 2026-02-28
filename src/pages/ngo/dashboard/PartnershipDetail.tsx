@@ -36,6 +36,22 @@ function NgoPartnershipDetail() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
 
+  const notifyNgoPartnershipDetailError = (
+    error: unknown,
+    fallbackMessage: string,
+    toastId: string,
+    kind: string
+  ) => notify.fromError(
+    error,
+    fallbackMessage,
+    { id: toastId },
+    {
+      source: 'frontend',
+      scope: 'ngo',
+      metadata: { page: 'NgoPartnershipDetail', kind },
+    }
+  );
+
   const partnership = useMemo(
     () => partnerships.find((item) => item.id === partnershipId),
     [partnerships, partnershipId]
@@ -62,8 +78,13 @@ function NgoPartnershipDetail() {
       await archivePartnership(partnership.id);
       notify.success('Partnership archived.');
       await refreshData();
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to archive partnership.');
+    } catch (error: unknown) {
+      notifyNgoPartnershipDetailError(
+        error,
+        'Failed to archive partnership.',
+        'ngo-partnership-detail-archive-error',
+        'ngo.partnershipDetail.archive'
+      );
     }
   };
 
@@ -73,8 +94,13 @@ function NgoPartnershipDetail() {
       await deletePartnership(partnership.id);
       notify.success('Partnership deleted.');
       await refreshData();
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to delete partnership.');
+    } catch (error: unknown) {
+      notifyNgoPartnershipDetailError(
+        error,
+        'Failed to delete partnership.',
+        'ngo-partnership-detail-delete-error',
+        'ngo.partnershipDetail.delete'
+      );
     } finally {
       setDeleting(false);
       setDeleteOpen(false);
@@ -136,8 +162,13 @@ function NgoPartnershipDetail() {
       notify.success('Partnership updated successfully.');
       await refreshData();
       closeEdit();
-    } catch (error: any) {
-      notify.error(error?.message || 'Failed to update partnership.');
+    } catch (error: unknown) {
+      notifyNgoPartnershipDetailError(
+        error,
+        'Failed to update partnership.',
+        'ngo-partnership-detail-update-error',
+        'ngo.partnershipDetail.update'
+      );
     } finally {
       setSaving(false);
     }

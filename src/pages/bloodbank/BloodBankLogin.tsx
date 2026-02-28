@@ -10,6 +10,7 @@ import PwaInstallCta from '../../components/PwaInstallCta';
 import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
 import { authStorage } from '../../utils/authStorage';
 import { auth } from '../../firebase';
+import { authMessages } from '../../constants/messages';
 
 export function BloodBankLogin() {
   const navigate = useNavigate();
@@ -64,7 +65,7 @@ export function BloodBankLogin() {
     }
 
     if (user.role !== 'bloodbank' && user.role !== 'hospital') {
-      notify.error("You're not a BloodBank Admin", { id: 'role-mismatch-bloodbank' });
+      notify.error(authMessages.roleMismatch.bloodbank, { id: 'role-mismatch-bloodbank' });
       return;
     }
 
@@ -95,7 +96,7 @@ export function BloodBankLogin() {
         return;
       }
       if (response.user.role !== 'bloodbank' && response.user.role !== 'hospital') {
-        notify.error("You're not a BloodBank Admin", { id: 'role-mismatch-bloodbank' });
+        notify.error(authMessages.roleMismatch.bloodbank, { id: 'role-mismatch-bloodbank' });
         await logout(navigate, { redirectTo: '/bloodbank/login', showToast: false });
         return;
       }

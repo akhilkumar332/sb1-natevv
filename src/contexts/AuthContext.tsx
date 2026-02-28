@@ -52,6 +52,7 @@ import { buildPublicDonorPayload } from '../utils/publicDonor';
 import { PhoneAuthError } from '../errors/PhoneAuthError';
 import { authStorage } from '../utils/authStorage';
 import { readFcmTokenMeta, readStoredFcmToken, writeFcmTokenMeta, writeStoredFcmToken } from '../utils/fcmStorage';
+import { authMessages } from '../constants/messages';
 
 const trackImpersonationEvent = (eventName: string, params?: Record<string, any>) => {
   void import('../services/monitoring.service')
@@ -727,7 +728,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const actor = userRef.current;
     setImpersonationTransition('starting');
     if (!actor || actor.role !== 'superadmin') {
-      notify.error('Only superadmins can impersonate users.');
+      notify.error(authMessages.onlySuperadminsCanImpersonate);
       trackImpersonationEvent('impersonation_denied', {
         reason: 'not_superadmin',
       });
@@ -737,7 +738,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const targetUid = target?.uid;
     if (!targetUid) {
-      notify.error('Unable to resolve the selected user.');
+      notify.error(authMessages.unableToResolveSelectedUser);
       trackImpersonationEvent('impersonation_denied', {
         reason: 'missing_target_uid',
       });
@@ -751,7 +752,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const targetUser = response?.targetUser;
       if (!response?.targetToken || !targetUser?.uid) {
-        notify.error('Impersonation failed. Please try again.');
+        notify.error(authMessages.impersonationFailed);
         trackImpersonationEvent('impersonation_failed', {
           reason: 'missing_token',
           targetUid,
@@ -798,7 +799,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return targetUser;
     } catch (error: any) {
       console.error('Failed to start impersonation:', error);
-      notify.error(error?.message || 'Failed to start impersonation.');
+      notify.error(error?.message || authMessages.failedToStartImpersonation);
       updateImpersonationSession(null);
       setImpersonationTransition(null);
       trackImpersonationEvent('impersonation_failed', {
@@ -842,7 +843,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await attemptResume(refreshed.resumeToken);
     } catch (error) {
       console.error('Failed to resume admin session:', error);
-      notify.error('Failed to resume admin session.');
+      notify.error(authMessages.failedToResumeAdminSession);
       trackImpersonationEvent('impersonation_failed', {
         reason: 'resume_failed',
         actorUid: session.actorUid,
@@ -1578,11 +1579,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (matchedUser.role === 'superadmin') {
           await signOut(auth);
-          throw new PhoneAuthError('Superadmin can only sign in with Google.', 'superadmin_google_only');
+          throw new PhoneAuthError(authMessages.superadminGoogleOnly, 'superadmin_google_only');
         }
         if (matchedUser.role && matchedUser.role !== 'donor') {
           await signOut(auth);
-          throw new PhoneAuthError("You're not a Donor", 'role_mismatch');
+          throw new PhoneAuthError(authMessages.roleMismatch.donor, 'role_mismatch');
         }
 
         if (matchedUid && matchedUid !== userCredential.user.uid) {
@@ -1615,7 +1616,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = userDoc.data() as User;
       if (userData.role === 'superadmin') {
         await signOut(auth);
-        throw new PhoneAuthError('Superadmin can only sign in with Google.', 'superadmin_google_only');
+        throw new PhoneAuthError(authMessages.superadminGoogleOnly, 'superadmin_google_only');
       }
       const existingDob = convertTimestampToDate(userData?.dateOfBirth);
       const existingBhId = userData?.bhId;
@@ -1928,7 +1929,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDocData = userDoc.data() as User;
       if (userDocData.role === 'superadmin') {
         await signOut(auth);
-        throw new Error('Superadmin can only sign in with Google.');
+        throw new Error(authMessages.superadminGoogleOnly);
       }
       const existingDob = convertTimestampToDate(userDocData?.dateOfBirth);
       const existingBhId = userDocData?.bhId;

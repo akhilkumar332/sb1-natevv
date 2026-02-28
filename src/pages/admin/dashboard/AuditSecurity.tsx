@@ -8,6 +8,7 @@ import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminAuditLogs } from '../../../hooks/admin/useAdminQueries';
+import { refetchQuery } from '../../../utils/queryRefetch';
 
 type AuditRow = {
   id: string;
@@ -69,7 +70,7 @@ function AuditSecurityPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <AdminRefreshButton
-              onClick={() => void auditQuery.refetch()}
+              onClick={() => refetchQuery(auditQuery)}
               isRefreshing={auditQuery.isFetching}
               label="Refresh audit logs"
             />
@@ -98,7 +99,7 @@ function AuditSecurityPage() {
       />
 
       <AdminRefreshingBanner show={loading} message="Refreshing audit logs..." />
-      <AdminErrorCard message={error} onRetry={() => void auditQuery.refetch()} />
+      <AdminErrorCard message={error} onRetry={() => refetchQuery(auditQuery)} />
 
       {paged.length === 0 ? (
         <AdminEmptyStateCard message="No audit events found." />
