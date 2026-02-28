@@ -33,7 +33,7 @@ import UserReferralTable from '../../../components/admin/UserReferralTable';
 import UserDetailTabSkeleton from '../../../components/admin/UserDetailTabSkeleton';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
-import { refetchQueries } from '../../../utils/queryRefetch';
+import { refetchQuery } from '../../../utils/queryRefetch';
 
 type DetailTab = 'profile' | 'security' | 'kpis' | 'referrals' | 'timeline';
 type PendingActionType = 'verify' | 'active' | 'suspended' | 'inactive' | 'revokeToken' | 'revokeAllTokens';
@@ -133,16 +133,24 @@ function UserDetailPage() {
   const [timelinePage, setTimelinePage] = useState(1);
 
   const userQuery = useAdminUserDetail(safeUid);
-  const securityQuery = useAdminUserSecurity(safeUid);
-  const kpiQuery = useAdminUserKpis(safeUid, userQuery.data?.role, kpiRange);
+  const securityQuery = useAdminUserSecurity(safeUid, {
+    enabled: Boolean(safeUid) && activeTab === 'security',
+  });
+  const kpiQuery = useAdminUserKpis(safeUid, userQuery.data?.role, kpiRange, {
+    enabled: Boolean(safeUid) && activeTab === 'kpis',
+  });
   const referralsQuery = useAdminUserReferrals(safeUid, {
     role: referralRoleFilter,
     status: referralStatusFilter,
     search: referralSearch,
+  }, {
+    enabled: Boolean(safeUid) && activeTab === 'referrals',
   });
   const timelineQuery = useAdminUserTimeline(safeUid, {
     kind: timelineKindFilter,
     search: timelineSearch,
+  }, {
+    enabled: Boolean(safeUid) && activeTab === 'timeline',
   });
 
   const invalidRoute = !uid;
@@ -172,8 +180,9 @@ function UserDetailPage() {
 
   useEffect(() => {
     if (activeTab !== 'security') return;
-    refetchQueries(securityQuery, userQuery);
-  }, [activeTab, securityQuery, userQuery]);
+    refetchQuery(userQuery);
+    refetchQuery(securityQuery);
+  }, [activeTab, safeUid]);
 
   const canModify = useMemo(() => {
     if (!authUser?.uid || !user?.uid) return false;
@@ -287,7 +296,11 @@ function UserDetailPage() {
   }, [safeUid, referrals.length]);
 
   const refreshAll = () => {
-    refetchQueries(userQuery, securityQuery, kpiQuery, referralsQuery, timelineQuery);
+    refetchQuery(userQuery);
+    if (activeTab === 'security') refetchQuery(securityQuery);
+    if (activeTab === 'kpis') refetchQuery(kpiQuery);
+    if (activeTab === 'referrals') refetchQuery(referralsQuery);
+    if (activeTab === 'timeline') refetchQuery(timelineQuery);
   };
 
   const confirmAction = async (reason: string) => {

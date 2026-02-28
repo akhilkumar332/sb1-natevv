@@ -18,6 +18,7 @@ import { db } from '../firebase';
 import { User, Donation, BloodRequest, Campaign } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
 import { countCollection } from '../utils/firestoreCount';
+import { runDedupedRequest } from '../utils/requestDedupe';
 import { DatabaseError } from '../utils/errorHandler';
 
 // ============================================================================
@@ -428,33 +429,35 @@ export const getUserGrowthTrend = async (
  */
 export const getBloodTypeDistribution = async (): Promise<BloodTypeDistribution[]> => {
   try {
-    const BLOOD_TYPE_COLORS: Record<string, string> = {
-      'A+': '#DC2626',
-      'A-': '#EA580C',
-      'B+': '#D97706',
-      'B-': '#16A34A',
-      'O+': '#0891B2',
-      'O-': '#2563EB',
-      'AB+': '#7C3AED',
-      'AB-': '#DB2777',
-    };
-    const bloodTypes = Object.keys(BLOOD_TYPE_COLORS);
-    const counts = await Promise.all(
-      bloodTypes.map((bloodType) => (
-        countCollection('users', where('role', '==', 'donor'), where('bloodType', '==', bloodType))
-      ))
-    );
-    const total = counts.reduce((sum, count) => sum + count, 0);
+    return runDedupedRequest('analytics:bloodTypeDistribution', async () => {
+      const BLOOD_TYPE_COLORS: Record<string, string> = {
+        'A+': '#DC2626',
+        'A-': '#EA580C',
+        'B+': '#D97706',
+        'B-': '#16A34A',
+        'O+': '#0891B2',
+        'O-': '#2563EB',
+        'AB+': '#7C3AED',
+        'AB-': '#DB2777',
+      };
+      const bloodTypes = Object.keys(BLOOD_TYPE_COLORS);
+      const counts = await Promise.all(
+        bloodTypes.map((bloodType) => (
+          countCollection('users', where('role', '==', 'donor'), where('bloodType', '==', bloodType))
+        ))
+      );
+      const total = counts.reduce((sum, count) => sum + count, 0);
 
-    return bloodTypes.map((bloodType, index) => {
-      const count = counts[index] || 0;
-      return ({
-      bloodType,
-      count,
-      percentage: total > 0 ? (count / total) * 100 : 0,
-      color: BLOOD_TYPE_COLORS[bloodType] || '#6B7280',
-      });
-    }).filter((entry) => entry.count > 0);
+      return bloodTypes.map((bloodType, index) => {
+        const count = counts[index] || 0;
+        return ({
+          bloodType,
+          count,
+          percentage: total > 0 ? (count / total) * 100 : 0,
+          color: BLOOD_TYPE_COLORS[bloodType] || '#6B7280',
+        });
+      }).filter((entry) => entry.count > 0);
+    }, 10 * 60 * 1000);
   } catch (error) {
     throw new DatabaseError('Failed to get blood type distribution');
   }
@@ -465,43 +468,45 @@ export const getBloodTypeDistribution = async (): Promise<BloodTypeDistribution[
  */
 export const getGeographicDistribution = async (): Promise<GeographicDistribution[]> => {
   try {
-    const usersSnapshot = await getDocs(collection(db, 'users'));
-    const users = extractQueryData<User>(usersSnapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']);
+    return runDedupedRequest('analytics:geoDistribution', async () => {
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const users = extractQueryData<User>(usersSnapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']);
 
-    const distribution: Record<string, GeographicDistribution> = {};
+      const distribution: Record<string, GeographicDistribution> = {};
 
-    users.forEach(user => {
-      if (user.city && user.state) {
-        const key = `${user.city}, ${user.state}`;
+      users.forEach(user => {
+        if (user.city && user.state) {
+          const key = `${user.city}, ${user.state}`;
 
-        if (!distribution[key]) {
-          distribution[key] = {
-            city: user.city,
-            state: user.state,
-            location: key,
-            count: 0,
-            totalUsers: 0,
-            donors: 0,
-            hospitals: 0,
-            donorCount: 0,
-            hospitalCount: 0,
-          };
+          if (!distribution[key]) {
+            distribution[key] = {
+              city: user.city,
+              state: user.state,
+              location: key,
+              count: 0,
+              totalUsers: 0,
+              donors: 0,
+              hospitals: 0,
+              donorCount: 0,
+              hospitalCount: 0,
+            };
+          }
+
+          distribution[key].count++;
+          distribution[key].totalUsers++;
+
+          if (user.role === 'donor') {
+            distribution[key].donorCount++;
+            distribution[key].donors++;
+          } else if (user.role === 'bloodbank' || user.role === 'hospital') {
+            distribution[key].hospitalCount++;
+            distribution[key].hospitals++;
+          }
         }
+      });
 
-        distribution[key].count++;
-        distribution[key].totalUsers++;
-
-        if (user.role === 'donor') {
-          distribution[key].donorCount++;
-          distribution[key].donors++;
-        } else if (user.role === 'bloodbank' || user.role === 'hospital') {
-          distribution[key].hospitalCount++;
-          distribution[key].hospitals++;
-        }
-      }
-    });
-
-    return Object.values(distribution).sort((a, b) => b.count - a.count);
+      return Object.values(distribution).sort((a, b) => b.count - a.count);
+    }, 10 * 60 * 1000);
   } catch (error) {
     throw new DatabaseError('Failed to get geographic distribution');
   }
@@ -512,43 +517,43 @@ export const getGeographicDistribution = async (): Promise<GeographicDistributio
  */
 export const getTopDonors = async (limitCount: number = 10): Promise<Array<User & { donationCount: number }>> => {
   try {
-    const donationsSnapshot = await getDocs(query(collection(db, 'donations'), where('status', '==', 'completed')));
-    const donations = extractQueryData<Donation>(donationsSnapshot, ['donationDate']);
+    return runDedupedRequest(`analytics:topDonors:${limitCount}`, async () => {
+      const donationsSnapshot = await getDocs(query(collection(db, 'donations'), where('status', '==', 'completed')));
+      const donations = extractQueryData<Donation>(donationsSnapshot, ['donationDate']);
 
-    // Count donations per donor
-    const donorCounts: Record<string, number> = {};
-    donations.forEach(donation => {
-      donorCounts[donation.donorId] = (donorCounts[donation.donorId] || 0) + 1;
-    });
+      const donorCounts: Record<string, number> = {};
+      donations.forEach(donation => {
+        donorCounts[donation.donorId] = (donorCounts[donation.donorId] || 0) + 1;
+      });
 
-    // Get top donor IDs
-    const topDonorIds = Object.entries(donorCounts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, limitCount)
-      .map(([id]) => id);
+      const topDonorIds = Object.entries(donorCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, limitCount)
+        .map(([id]) => id);
 
-    if (topDonorIds.length === 0) return [];
-    const donorChunks: string[][] = [];
-    for (let i = 0; i < topDonorIds.length; i += 10) {
-      donorChunks.push(topDonorIds.slice(i, i + 10));
-    }
-    const userSnapshots = await Promise.all(
-      donorChunks.map((chunk) => getDocs(query(
-        collection(db, 'users'),
-        where(documentId(), 'in', chunk),
-        limit(chunk.length)
-      )))
-    );
-    const users = userSnapshots.flatMap((snapshot) => (
-      extractQueryData<User>(snapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation'])
-    ));
+      if (topDonorIds.length === 0) return [];
+      const donorChunks: string[][] = [];
+      for (let i = 0; i < topDonorIds.length; i += 10) {
+        donorChunks.push(topDonorIds.slice(i, i + 10));
+      }
+      const userSnapshots = await Promise.all(
+        donorChunks.map((chunk) => getDocs(query(
+          collection(db, 'users'),
+          where(documentId(), 'in', chunk),
+          limit(chunk.length)
+        )))
+      );
+      const users = userSnapshots.flatMap((snapshot) => (
+        extractQueryData<User>(snapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation'])
+      ));
 
-    return topDonorIds
-      .map(id => {
-        const user = users.find(u => u.uid === id);
-        return user ? { ...user, donationCount: donorCounts[id] } : null;
-      })
-      .filter(Boolean) as Array<User & { donationCount: number }>;
+      return topDonorIds
+        .map(id => {
+          const user = users.find(u => u.uid === id);
+          return user ? { ...user, donationCount: donorCounts[id] } : null;
+        })
+        .filter(Boolean) as Array<User & { donationCount: number }>;
+    }, 5 * 60 * 1000);
   } catch (error) {
     throw new DatabaseError('Failed to get top donors');
   }

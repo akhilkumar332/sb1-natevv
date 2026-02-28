@@ -230,7 +230,7 @@ export const useAdminUsers = (role: AdminUserRoleFilter = 'all', limitCount: num
     2 * 60 * 1000,
     ['createdAt', 'updatedAt', 'lastLoginAt', 'lastDonation', 'dateOfBirth'],
     () => fetchAdminUsers(role, limitCount),
-    { staleTime: 2 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 3 * 60 * 1000 },
+    { staleTime: 3 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 5 * 60 * 1000 },
   );
 
 export const useAdminOverviewUsers = (limitCount: number = 100) =>
@@ -239,7 +239,7 @@ export const useAdminOverviewUsers = (limitCount: number = 100) =>
     2 * 60 * 1000,
     ['createdAt', 'updatedAt', 'lastLoginAt', 'lastDonation', 'dateOfBirth'],
     () => fetchAdminUsers('all', limitCount),
-    { staleTime: 2 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 2 * 60 * 1000 },
+    { staleTime: 3 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 5 * 60 * 1000 },
   );
 
 export const useAdminVerificationRequests = (limitCount: number = 500) =>
@@ -249,9 +249,9 @@ export const useAdminVerificationRequests = (limitCount: number = 500) =>
     ['submittedAt', 'updatedAt', 'reviewedAt', 'createdAt'],
     () => getVerificationRequests(undefined, limitCount),
     {
-      staleTime: 30 * 1000,
+      staleTime: 60 * 1000,
       gcTime: 5 * 60 * 1000,
-      refetchInterval: 20 * 1000,
+      refetchInterval: 45 * 1000,
       refetchIntervalInBackground: false,
     },
   );
@@ -263,9 +263,9 @@ export const useAdminEmergencyRequests = () =>
     ['requestedAt', 'neededBy', 'expiresAt', 'fulfilledAt', 'createdAt', 'updatedAt'],
     () => getEmergencyRequests(),
     {
-      staleTime: 30 * 1000,
+      staleTime: 60 * 1000,
       gcTime: 5 * 60 * 1000,
-      refetchInterval: 20 * 1000,
+      refetchInterval: 45 * 1000,
       refetchIntervalInBackground: false,
     },
   );
@@ -277,9 +277,9 @@ export const useAdminInventoryAlerts = () =>
     ['lastRestocked', 'updatedAt', 'createdAt'],
     () => getInventoryAlerts(),
     {
-      staleTime: 60 * 1000,
+      staleTime: 2 * 60 * 1000,
       gcTime: 10 * 60 * 1000,
-      refetchInterval: 60 * 1000,
+      refetchInterval: 2 * 60 * 1000,
       refetchIntervalInBackground: false,
     },
   );
@@ -308,7 +308,7 @@ export const useAdminRecentActivity = (limitCount: number = 5) =>
         })),
       };
     },
-    { staleTime: 2 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 2 * 60 * 1000 },
+    { staleTime: 3 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 3 * 60 * 1000 },
   );
 
 export const useAdminPlatformStats = () =>
@@ -317,7 +317,7 @@ export const useAdminPlatformStats = () =>
     10 * 60 * 1000,
     [],
     () => getPlatformStats(),
-    { staleTime: 5 * 60 * 1000, gcTime: 20 * 60 * 1000, refetchInterval: 5 * 60 * 1000 },
+    { staleTime: 10 * 60 * 1000, gcTime: 20 * 60 * 1000, refetchInterval: 10 * 60 * 1000 },
   );
 
 export const useAdminCampaigns = (limitCount: number = 1000) =>
@@ -326,7 +326,7 @@ export const useAdminCampaigns = (limitCount: number = 1000) =>
     10 * 60 * 1000,
     ['startDate', 'endDate', 'createdAt', 'updatedAt'],
     () => fetchCampaigns(limitCount),
-    { staleTime: 5 * 60 * 1000, gcTime: 20 * 60 * 1000, refetchInterval: 5 * 60 * 1000 },
+    { staleTime: 10 * 60 * 1000, gcTime: 20 * 60 * 1000, refetchInterval: 10 * 60 * 1000 },
   );
 
 export const useAdminVolunteers = (limitCount: number = 1000) =>
@@ -335,7 +335,7 @@ export const useAdminVolunteers = (limitCount: number = 1000) =>
     10 * 60 * 1000,
     ['joinDate', 'createdAt', 'updatedAt'],
     () => fetchVolunteers(limitCount),
-    { staleTime: 5 * 60 * 1000, gcTime: 20 * 60 * 1000, refetchInterval: 5 * 60 * 1000 },
+    { staleTime: 10 * 60 * 1000, gcTime: 20 * 60 * 1000, refetchInterval: 10 * 60 * 1000 },
   );
 
 export const useAdminPartnerships = (limitCount: number = 1000) =>
@@ -344,7 +344,7 @@ export const useAdminPartnerships = (limitCount: number = 1000) =>
     10 * 60 * 1000,
     ['since', 'createdAt', 'updatedAt'],
     () => fetchPartnerships(limitCount),
-    { staleTime: 5 * 60 * 1000, gcTime: 20 * 60 * 1000, refetchInterval: 5 * 60 * 1000 },
+    { staleTime: 10 * 60 * 1000, gcTime: 20 * 60 * 1000, refetchInterval: 10 * 60 * 1000 },
   );
 
 export const useAdminAppointments = (limitCount: number = 1000) =>
@@ -353,7 +353,7 @@ export const useAdminAppointments = (limitCount: number = 1000) =>
     5 * 60 * 1000,
     ['scheduledDate', 'completedAt', 'createdAt', 'updatedAt'],
     () => fetchAppointments(limitCount),
-    { staleTime: 2 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 2 * 60 * 1000 },
+    { staleTime: 3 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 3 * 60 * 1000 },
   );
 
 export const useAdminDonations = (limitCount: number = 1000) =>
@@ -362,7 +362,7 @@ export const useAdminDonations = (limitCount: number = 1000) =>
     5 * 60 * 1000,
     ['donationDate', 'createdAt', 'updatedAt'],
     () => fetchDonations(limitCount),
-    { staleTime: 2 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 2 * 60 * 1000 },
+    { staleTime: 3 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 3 * 60 * 1000 },
   );
 
 export const useAdminNotifications = (limitCount: number = 1000) =>
@@ -372,9 +372,9 @@ export const useAdminNotifications = (limitCount: number = 1000) =>
     ['createdAt', 'updatedAt'],
     () => fetchNotifications(limitCount),
     {
-      staleTime: 60 * 1000,
+      staleTime: 2 * 60 * 1000,
       gcTime: 10 * 60 * 1000,
-      refetchInterval: 60 * 1000,
+      refetchInterval: 2 * 60 * 1000,
       refetchIntervalInBackground: false,
     },
   );
@@ -386,9 +386,9 @@ export const useAdminAuditLogs = (limitCount: number = 1000) =>
     ['createdAt', 'updatedAt'],
     () => fetchAuditLogs(limitCount),
     {
-      staleTime: 60 * 1000,
+      staleTime: 2 * 60 * 1000,
       gcTime: 10 * 60 * 1000,
-      refetchInterval: 60 * 1000,
+      refetchInterval: 2 * 60 * 1000,
       refetchIntervalInBackground: false,
     },
   );
@@ -400,14 +400,14 @@ export const useAdminErrorLogs = (limitCount: number = 1000) =>
     ['createdAt', 'updatedAt'],
     () => fetchErrorLogs(limitCount),
     {
-      staleTime: 60 * 1000,
+      staleTime: 2 * 60 * 1000,
       gcTime: 10 * 60 * 1000,
-      refetchInterval: 60 * 1000,
+      refetchInterval: 2 * 60 * 1000,
       refetchIntervalInBackground: false,
     },
   );
 
-export const useAdminUserDetail = (uid: string) =>
+export const useAdminUserDetail = (uid: string, options?: { enabled?: boolean }) =>
   useCachedAdminQuery<User>(
     adminQueryKeys.userDetail(uid),
     0,
@@ -420,11 +420,11 @@ export const useAdminUserDetail = (uid: string) =>
       refetchIntervalInBackground: false,
       refetchOnMount: 'always',
       refetchOnWindowFocus: true,
-      enabled: Boolean(uid),
+      enabled: options?.enabled ?? Boolean(uid),
     },
   );
 
-export const useAdminUserSecurity = (uid: string) =>
+export const useAdminUserSecurity = (uid: string, options?: { enabled?: boolean }) =>
   useCachedAdminQuery<AdminUserSecurity>(
     adminQueryKeys.userSecurity(uid),
     0,
@@ -437,28 +437,34 @@ export const useAdminUserSecurity = (uid: string) =>
       refetchIntervalInBackground: false,
       refetchOnMount: 'always',
       refetchOnWindowFocus: true,
-      enabled: Boolean(uid),
+      enabled: options?.enabled ?? Boolean(uid),
     },
   );
 
-export const useAdminUserKpis = (uid: string, roleHint?: string, range: AdminKpiRange = '90d') =>
+export const useAdminUserKpis = (
+  uid: string,
+  roleHint?: string,
+  range: AdminKpiRange = '90d',
+  options?: { enabled?: boolean },
+) =>
   useCachedAdminQuery<AdminUserKpis>(
     adminQueryKeys.userKpis(uid, range),
     5 * 60 * 1000,
     [],
     () => getAdminUserKpis(uid, roleHint, range),
     {
-      staleTime: 2 * 60 * 1000,
+      staleTime: 5 * 60 * 1000,
       gcTime: 15 * 60 * 1000,
-      refetchInterval: 2 * 60 * 1000,
+      refetchInterval: 5 * 60 * 1000,
       refetchIntervalInBackground: false,
-      enabled: Boolean(uid),
+      enabled: options?.enabled ?? Boolean(uid),
     },
   );
 
 export const useAdminUserReferrals = (
   uid: string,
   filters?: { role?: string; status?: string; search?: string },
+  options?: { enabled?: boolean },
 ) =>
   useCachedAdminQuery<AdminUserReferral[]>(
     adminQueryKeys.userReferrals(uid, filters),
@@ -466,17 +472,18 @@ export const useAdminUserReferrals = (
     ['referredAt', 'createdAt'],
     () => getAdminUserReferrals(uid, filters),
     {
-      staleTime: 2 * 60 * 1000,
+      staleTime: 5 * 60 * 1000,
       gcTime: 15 * 60 * 1000,
-      refetchInterval: 2 * 60 * 1000,
+      refetchInterval: 5 * 60 * 1000,
       refetchIntervalInBackground: false,
-      enabled: Boolean(uid),
+      enabled: options?.enabled ?? Boolean(uid),
     },
   );
 
 export const useAdminUserTimeline = (
   uid: string,
   filters?: { kind?: string; search?: string },
+  options?: { enabled?: boolean },
 ) =>
   useCachedAdminQuery<AdminUserTimelineItem[]>(
     adminQueryKeys.userTimeline(uid, filters),
@@ -484,11 +491,11 @@ export const useAdminUserTimeline = (
     ['createdAt'],
     () => getAdminUserTimeline(uid, filters),
     {
-      staleTime: 60 * 1000,
+      staleTime: 2 * 60 * 1000,
       gcTime: 10 * 60 * 1000,
-      refetchInterval: 60 * 1000,
+      refetchInterval: 2 * 60 * 1000,
       refetchIntervalInBackground: false,
-      enabled: Boolean(uid),
+      enabled: options?.enabled ?? Boolean(uid),
     },
   );
 

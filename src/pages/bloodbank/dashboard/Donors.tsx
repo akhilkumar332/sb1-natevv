@@ -15,6 +15,7 @@ import { EmptyStateCard } from '../../../components/shared/EmptyStateCard';
 import { DonorPaginationFooter } from '../../../components/shared/DonorPaginationFooter';
 import { useScopedErrorReporter } from '../../../hooks/useScopedErrorReporter';
 import { useDonorDirectory } from '../../../hooks/useDonorDirectory';
+import { runDedupedRequest } from '../../../utils/requestDedupe';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -72,50 +73,49 @@ function BloodBankDonors() {
   useEffect(() => {
     const fetchDonorCommunity = async () => {
       try {
-        const donorsRef = collection(db, 'users');
-        const donorsQuery = query(donorsRef, where('role', '==', 'donor'));
-        const allDonorsSnap = await getDocs(donorsQuery);
+        const summary = await runDedupedRequest('bloodbank:donors:community', async () => {
+          const donorsRef = collection(db, 'users');
+          const donorsQuery = query(donorsRef, where('role', '==', 'donor'));
+          const allDonorsSnap = await getDocs(donorsQuery);
 
-        const eligibleDonors = allDonorsSnap.docs
-          .map((doc) => doc.data())
-          .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
-          .filter((data: any) => !data.status || data.status === 'active');
+          const eligibleDonors = allDonorsSnap.docs
+            .map((doc) => doc.data())
+            .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
+            .filter((data: any) => !data.status || data.status === 'active');
 
-        const totalDonors = eligibleDonors.length;
+          const totalDonors = eligibleDonors.length;
 
-        const publicSnap = await getDocs(collection(db, 'publicDonors'));
-        const activeDonors = publicSnap.docs
-          .map((doc) => doc.data())
-          .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
-          .filter((data: any) => data.isAvailable === true).length;
+          const publicSnap = await getDocs(collection(db, 'publicDonors'));
+          const activeDonors = publicSnap.docs
+            .map((doc) => doc.data())
+            .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
+            .filter((data: any) => data.isAvailable === true).length;
 
-        const oneMonthAgo = new Date();
-        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+          const oneMonthAgo = new Date();
+          oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
-        const newThisMonth = eligibleDonors.filter((data: any) => {
-          const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt ? new Date(data.createdAt) : null;
-          return createdAt && createdAt >= oneMonthAgo;
-        }).length;
+          const newThisMonth = eligibleDonors.filter((data: any) => {
+            const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt ? new Date(data.createdAt) : null;
+            return createdAt && createdAt >= oneMonthAgo;
+          }).length;
 
-        const retentionRate = totalDonors > 0 ? (activeDonors / totalDonors) * 100 : 0;
+          const retentionRate = totalDonors > 0 ? (activeDonors / totalDonors) * 100 : 0;
+          return {
+            totalDonors,
+            activeDonors,
+            newThisMonth,
+            retentionRate: Math.round(retentionRate * 10) / 10,
+          };
+        }, 5 * 60 * 1000);
 
-        setDonorCommunity({
-          totalDonors,
-          activeDonors,
-          newThisMonth,
-          retentionRate: Math.round(retentionRate * 10) / 10,
-        });
+        setDonorCommunity(summary);
       } catch (error) {
-        reportBloodBankDonorsError(error, 'bloodbank.donors.community.fetch', {
-          bloodTypeFilter,
-          availabilityFilter,
-          cityFilter,
-        });
+        reportBloodBankDonorsError(error, 'bloodbank.donors.community.fetch');
       }
     };
 
     void fetchDonorCommunity();
-  }, [availabilityFilter, bloodTypeFilter, cityFilter, reportBloodBankDonorsError]);
+  }, [reportBloodBankDonorsError]);
 
   const activeRate = donorCommunity.totalDonors > 0
     ? Math.round((donorCommunity.activeDonors / donorCommunity.totalDonors) * 100)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
   Activity,
@@ -15,15 +15,7 @@ import {
   Shield,
   Users,
 } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
-import { adminQueryKeys } from '../../constants/adminQueryKeys';
-import {
-  getAllUsers,
-  getEmergencyRequests,
-  getInventoryAlerts,
-  getVerificationRequests,
-} from '../../services/admin.service';
 
 type MenuItem = {
   id: string;
@@ -35,7 +27,6 @@ type MenuItem = {
 
 function AdminPortal() {
   const { isSuperAdmin } = useAuth();
-  const queryClient = useQueryClient();
 
   const menuItems = useMemo<MenuItem[]>(() => [
     { id: 'overview', label: 'Overview', to: 'overview', icon: LayoutDashboard },
@@ -58,31 +49,6 @@ function AdminPortal() {
   ], []);
 
   const visibleMenuItems = menuItems.filter((item) => !item.superAdminOnly || isSuperAdmin);
-
-  useEffect(() => {
-    if (import.meta.env.MODE === 'test') return;
-
-    void queryClient.prefetchQuery({
-      queryKey: adminQueryKeys.overviewUsers(100),
-      queryFn: () => getAllUsers(undefined, undefined, 100),
-      staleTime: 2 * 60 * 1000,
-    });
-    void queryClient.prefetchQuery({
-      queryKey: adminQueryKeys.verificationRequests(500),
-      queryFn: () => getVerificationRequests(undefined, 500),
-      staleTime: 30 * 1000,
-    });
-    void queryClient.prefetchQuery({
-      queryKey: adminQueryKeys.emergencyRequests(),
-      queryFn: () => getEmergencyRequests(),
-      staleTime: 30 * 1000,
-    });
-    void queryClient.prefetchQuery({
-      queryKey: adminQueryKeys.inventoryAlerts(),
-      queryFn: () => getInventoryAlerts(),
-      staleTime: 60 * 1000,
-    });
-  }, [queryClient]);
 
   const navItemClass = ({ isActive }: { isActive: boolean }) => (
     `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-all ${

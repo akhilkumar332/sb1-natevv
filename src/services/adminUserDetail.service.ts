@@ -15,6 +15,7 @@ import {
 import { db } from '../firebase';
 import type { User } from '../types/database.types';
 import { DatabaseError, NotFoundError } from '../utils/errorHandler';
+import { runDedupedRequest } from '../utils/requestDedupe';
 import { logAuditEvent } from './audit.service';
 import { toDateValue } from '../utils/dateValue';
 
@@ -190,80 +191,82 @@ const rankUserCandidate = (data: JsonRecord) => {
 };
 
 const resolveUserDoc = async (uidOrDocId: string) => {
-  const directRef = doc(db, 'users', uidOrDocId);
-  let directSnap;
-  try {
-    directSnap = await getDoc(directRef);
-  } catch (_error) {
-    directSnap = null;
-  }
-  let uidDocSnap = null;
-  if (directSnap?.exists?.()) {
-    const directData = directSnap.data() as JsonRecord;
-    const embeddedUid = typeof directData.uid === 'string' ? directData.uid.trim() : '';
-    if (embeddedUid && embeddedUid !== directSnap.id) {
-      try {
-        const candidate = await getDoc(doc(db, 'users', embeddedUid));
-        if (candidate.exists()) {
-          uidDocSnap = candidate;
+  return runDedupedRequest(`adminUserDetail:resolve:${uidOrDocId}`, async () => {
+    const directRef = doc(db, 'users', uidOrDocId);
+    let directSnap;
+    try {
+      directSnap = await getDoc(directRef);
+    } catch (_error) {
+      directSnap = null;
+    }
+    let uidDocSnap = null;
+    if (directSnap?.exists?.()) {
+      const directData = directSnap.data() as JsonRecord;
+      const embeddedUid = typeof directData.uid === 'string' ? directData.uid.trim() : '';
+      if (embeddedUid && embeddedUid !== directSnap.id) {
+        try {
+          const candidate = await getDoc(doc(db, 'users', embeddedUid));
+          if (candidate.exists()) {
+            uidDocSnap = candidate;
+          }
+        } catch (_error) {
+          uidDocSnap = null;
         }
-      } catch (_error) {
-        uidDocSnap = null;
       }
     }
-  }
-  let byUidDocs: Array<{ id: string; data: () => JsonRecord }> = [];
-  try {
-    const byUidSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', uidOrDocId), limit(10)));
-    byUidDocs = byUidSnap.docs;
-  } catch (_error) {
-    byUidDocs = [];
-  }
+    let byUidDocs: Array<{ id: string; data: () => JsonRecord }> = [];
+    try {
+      const byUidSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', uidOrDocId), limit(10)));
+      byUidDocs = byUidSnap.docs;
+    } catch (_error) {
+      byUidDocs = [];
+    }
 
-  const candidates = new Map<string, { id: string; data: JsonRecord; snap: any }>();
-  if (directSnap?.exists?.()) {
-    candidates.set(directSnap.id, {
-      id: directSnap.id,
-      data: directSnap.data() as JsonRecord,
-      snap: directSnap,
+    const candidates = new Map<string, { id: string; data: JsonRecord; snap: any }>();
+    if (directSnap?.exists?.()) {
+      candidates.set(directSnap.id, {
+        id: directSnap.id,
+        data: directSnap.data() as JsonRecord,
+        snap: directSnap,
+      });
+    }
+    if (uidDocSnap?.exists?.()) {
+      candidates.set(uidDocSnap.id, {
+        id: uidDocSnap.id,
+        data: uidDocSnap.data() as JsonRecord,
+        snap: uidDocSnap,
+      });
+    }
+    byUidDocs.forEach((row) => {
+      candidates.set(row.id, {
+        id: row.id,
+        data: row.data() as JsonRecord,
+        snap: row,
+      });
     });
-  }
-  if (uidDocSnap?.exists?.()) {
-    candidates.set(uidDocSnap.id, {
-      id: uidDocSnap.id,
-      data: uidDocSnap.data() as JsonRecord,
-      snap: uidDocSnap,
-    });
-  }
-  byUidDocs.forEach((row) => {
-    candidates.set(row.id, {
-      id: row.id,
-      data: row.data() as JsonRecord,
-      snap: row,
-    });
-  });
-  if (candidates.size === 0) throw new NotFoundError('User not found');
+    if (candidates.size === 0) throw new NotFoundError('User not found');
 
-  const sorted = Array.from(candidates.values()).sort((a, b) => {
-    const aRank = rankUserCandidate(a.data);
-    const bRank = rankUserCandidate(b.data);
-    if (bRank.tokenScore !== aRank.tokenScore) return bRank.tokenScore - aRank.tokenScore;
-    if (bRank.updatedAtScore !== aRank.updatedAtScore) return bRank.updatedAtScore - aRank.updatedAtScore;
-    if (a.id === uidOrDocId) return -1;
-    if (b.id === uidOrDocId) return 1;
-    return 0;
-  });
+    const sorted = Array.from(candidates.values()).sort((a, b) => {
+      const aRank = rankUserCandidate(a.data);
+      const bRank = rankUserCandidate(b.data);
+      if (bRank.tokenScore !== aRank.tokenScore) return bRank.tokenScore - aRank.tokenScore;
+      if (bRank.updatedAtScore !== aRank.updatedAtScore) return bRank.updatedAtScore - aRank.updatedAtScore;
+      if (a.id === uidOrDocId) return -1;
+      if (b.id === uidOrDocId) return 1;
+      return 0;
+    });
 
-  const selected = sorted[0];
-  const resolvedUid = typeof selected.data.uid === 'string' && selected.data.uid.trim()
-    ? selected.data.uid.trim()
-    : selected.id;
-  return {
-    ref: doc(db, 'users', selected.id),
-    snap: selected.snap,
-    data: selected.data,
-    resolvedUid,
-  };
+    const selected = sorted[0];
+    const resolvedUid = typeof selected.data.uid === 'string' && selected.data.uid.trim()
+      ? selected.data.uid.trim()
+      : selected.id;
+    return {
+      ref: doc(db, 'users', selected.id),
+      snap: selected.snap,
+      data: selected.data,
+      resolvedUid,
+    };
+  }, 15 * 1000);
 };
 
 export const getAdminUserDetail = async (uid: string): Promise<User> => {
