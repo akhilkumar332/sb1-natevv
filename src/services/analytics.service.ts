@@ -11,10 +11,13 @@ import {
   getDocs,
   Timestamp,
   orderBy,
+  limit,
+  documentId,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { User, Donation, BloodRequest, Campaign } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
+import { countCollection } from '../utils/firestoreCount';
 import { DatabaseError } from '../utils/errorHandler';
 
 // ============================================================================
@@ -352,33 +355,34 @@ export const getNGOCampaignPerformance = async (
  */
 export const getPlatformStats = async (): Promise<PlatformStats> => {
   try {
-    // Get user counts
-    const usersSnapshot = await getDocs(collection(db, 'users'));
-    const users = extractQueryData<User>(usersSnapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']);
-
-    const totalUsers = users.length;
-    const totalDonors = users.filter(u => u.role === 'donor').length;
-    const totalHospitals = users.filter(u => u.role === 'bloodbank' || u.role === 'hospital').length;
-    const totalNGOs = users.filter(u => u.role === 'ngo').length;
-    const activeDonors = users.filter(u => u.role === 'donor' && u.isAvailable).length;
-    const verifiedUsers = users.filter(u => u.verified).length;
-
-    // Get donation count
-    const donationsSnapshot = await getDocs(collection(db, 'donations'));
-    const totalDonations = donationsSnapshot.size;
-
-    // Get request count
-    const requestsSnapshot = await getDocs(collection(db, 'bloodRequests'));
-    const totalBloodRequests = requestsSnapshot.size;
-
-    // Get campaign count
-    const campaignsSnapshot = await getDocs(collection(db, 'campaigns'));
-    const totalCampaigns = campaignsSnapshot.size;
+    const [
+      totalUsers,
+      totalDonors,
+      bloodbanks,
+      hospitals,
+      totalNGOs,
+      activeDonors,
+      verifiedUsers,
+      totalDonations,
+      totalBloodRequests,
+      totalCampaigns,
+    ] = await Promise.all([
+      countCollection('users'),
+      countCollection('users', where('role', '==', 'donor')),
+      countCollection('users', where('role', '==', 'bloodbank')),
+      countCollection('users', where('role', '==', 'hospital')),
+      countCollection('users', where('role', '==', 'ngo')),
+      countCollection('users', where('role', '==', 'donor'), where('isAvailable', '==', true)),
+      countCollection('users', where('verified', '==', true)),
+      countCollection('donations'),
+      countCollection('bloodRequests'),
+      countCollection('campaigns'),
+    ]);
 
     return {
       totalUsers,
       totalDonors,
-      totalHospitals,
+      totalHospitals: bloodbanks + hospitals,
       totalNGOs,
       totalDonations,
       totalBloodRequests,
@@ -424,23 +428,6 @@ export const getUserGrowthTrend = async (
  */
 export const getBloodTypeDistribution = async (): Promise<BloodTypeDistribution[]> => {
   try {
-    const donorsQuery = query(
-      collection(db, 'users'),
-      where('role', '==', 'donor')
-    );
-
-    const snapshot = await getDocs(donorsQuery);
-    const donors = extractQueryData<User>(snapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']);
-
-    const distribution: Record<string, number> = {};
-    donors.forEach(donor => {
-      if (donor.bloodType) {
-        distribution[donor.bloodType] = (distribution[donor.bloodType] || 0) + 1;
-      }
-    });
-
-    const total = Object.values(distribution).reduce((sum, count) => sum + count, 0);
-
     const BLOOD_TYPE_COLORS: Record<string, string> = {
       'A+': '#DC2626',
       'A-': '#EA580C',
@@ -451,13 +438,23 @@ export const getBloodTypeDistribution = async (): Promise<BloodTypeDistribution[
       'AB+': '#7C3AED',
       'AB-': '#DB2777',
     };
+    const bloodTypes = Object.keys(BLOOD_TYPE_COLORS);
+    const counts = await Promise.all(
+      bloodTypes.map((bloodType) => (
+        countCollection('users', where('role', '==', 'donor'), where('bloodType', '==', bloodType))
+      ))
+    );
+    const total = counts.reduce((sum, count) => sum + count, 0);
 
-    return Object.entries(distribution).map(([bloodType, count]) => ({
+    return bloodTypes.map((bloodType, index) => {
+      const count = counts[index] || 0;
+      return ({
       bloodType,
       count,
       percentage: total > 0 ? (count / total) * 100 : 0,
       color: BLOOD_TYPE_COLORS[bloodType] || '#6B7280',
-    }));
+      });
+    }).filter((entry) => entry.count > 0);
   } catch (error) {
     throw new DatabaseError('Failed to get blood type distribution');
   }
@@ -515,7 +512,7 @@ export const getGeographicDistribution = async (): Promise<GeographicDistributio
  */
 export const getTopDonors = async (limitCount: number = 10): Promise<Array<User & { donationCount: number }>> => {
   try {
-    const donationsSnapshot = await getDocs(collection(db, 'donations'));
+    const donationsSnapshot = await getDocs(query(collection(db, 'donations'), where('status', '==', 'completed')));
     const donations = extractQueryData<Donation>(donationsSnapshot, ['donationDate']);
 
     // Count donations per donor
@@ -530,9 +527,21 @@ export const getTopDonors = async (limitCount: number = 10): Promise<Array<User 
       .slice(0, limitCount)
       .map(([id]) => id);
 
-    // Get donor details
-    const usersSnapshot = await getDocs(collection(db, 'users'));
-    const users = extractQueryData<User>(usersSnapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']);
+    if (topDonorIds.length === 0) return [];
+    const donorChunks: string[][] = [];
+    for (let i = 0; i < topDonorIds.length; i += 10) {
+      donorChunks.push(topDonorIds.slice(i, i + 10));
+    }
+    const userSnapshots = await Promise.all(
+      donorChunks.map((chunk) => getDocs(query(
+        collection(db, 'users'),
+        where(documentId(), 'in', chunk),
+        limit(chunk.length)
+      )))
+    );
+    const users = userSnapshots.flatMap((snapshot) => (
+      extractQueryData<User>(snapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation'])
+    ));
 
     return topDonorIds
       .map(id => {

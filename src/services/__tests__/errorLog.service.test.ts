@@ -99,4 +99,27 @@ describe('errorLog.service', () => {
     expect(route).toContain('token=%5BREDACTED%5D');
     expect(route).toContain('page=1');
   });
+
+  it('sanitizes undefined metadata values to avoid firestore write rejection', async () => {
+    authState.currentUser = { uid: 'user-6' };
+
+    await captureError(new Error('metadata sanitize check'), {
+      metadata: {
+        kind: 'unit.test',
+        topUndefined: undefined,
+        nested: {
+          maybeUndefined: undefined,
+          okay: 'yes',
+        },
+      },
+    });
+
+    expect(addDocMock).toHaveBeenCalledTimes(1);
+    const payload = (addDocMock.mock.calls[0]?.[1] ?? {}) as Record<string, unknown>;
+    const metadata = payload.metadata as Record<string, unknown>;
+    expect(metadata).toBeTruthy();
+    expect(metadata.topUndefined).toBeNull();
+    expect((metadata.nested as Record<string, unknown>).maybeUndefined).toBeNull();
+    expect((metadata.nested as Record<string, unknown>).okay).toBe('yes');
+  });
 });

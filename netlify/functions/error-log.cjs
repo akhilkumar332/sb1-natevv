@@ -163,8 +163,12 @@ const safeMetadata = (metadata) => {
   };
   Object.entries(metadata).slice(0, 30).forEach(([key, value]) => {
     if (key === '__proto__' || key === 'prototype' || key === 'constructor') return;
-    if (value == null) {
-      output[key] = value;
+    if (value === null) {
+      output[key] = null;
+      return;
+    }
+    if (value === undefined) {
+      output[key] = null;
       return;
     }
     if (typeof value === 'string') {

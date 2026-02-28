@@ -172,6 +172,24 @@ const normalizeUserDate = (value?: any): Date | null => {
   return null;
 };
 
+const isSameProfileValue = (current: unknown, next: unknown): boolean => {
+  if (current === next) return true;
+  const currentDate = normalizeUserDate(current);
+  const nextDate = normalizeUserDate(next);
+  if (currentDate || nextDate) {
+    if (!currentDate || !nextDate) return false;
+    return currentDate.getTime() === nextDate.getTime();
+  }
+  if (typeof current === 'object' && typeof next === 'object' && current && next) {
+    try {
+      return JSON.stringify(current) === JSON.stringify(next);
+    } catch {
+      return false;
+    }
+  }
+  return false;
+};
+
 type PortalRole = 'donor' | 'ngo' | 'bloodbank' | 'admin';
 
 type ImpersonationTarget = {
@@ -2330,6 +2348,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const phoneNumberNormalized = sanitizedData.phoneNumber
         ? normalizePhoneNumber(sanitizedData.phoneNumber)
         : undefined;
+
+      const hasMeaningfulPatch = Object.keys(sanitizedData).some((key) => {
+        const typedKey = key as keyof User;
+        return !isSameProfileValue(user[typedKey], sanitizedData[typedKey]);
+      });
+
+      if (!hasMeaningfulPatch && !phoneNumberNormalized && !generatedBhId && user.onboardingCompleted === true) {
+        return;
+      }
 
       await setDoc(
         doc(db, 'users', user.uid),

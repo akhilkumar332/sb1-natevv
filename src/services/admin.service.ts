@@ -35,6 +35,7 @@ import {
   BloodInventory,
 } from '../types/database.types';
 import { extractQueryData, getServerTimestamp } from '../utils/firestore.utils';
+import { countCollection } from '../utils/firestoreCount';
 import { DatabaseError, ValidationError, NotFoundError, PermissionError } from '../utils/errorHandler';
 import { logAuditEvent } from './audit.service';
 import { captureHandledError } from './errorLog.service';
@@ -754,100 +755,136 @@ export const markVerificationUnderReview = async (
  */
 export const getPlatformStats = async () => {
   try {
-    // Get user counts
-    const usersSnapshot = await getDocs(collection(db, 'users'));
-    const users = extractQueryData<User>(usersSnapshot, ['createdAt', 'lastLoginAt', 'lastDonation', 'dateOfBirth']);
+    const [
+      totalUsers,
+      donors,
+      bloodbanks,
+      hospitals,
+      ngos,
+      admins,
+      superadmins,
+      activeUsers,
+      inactiveUsers,
+      suspendedUsers,
+      pendingUsers,
+      totalDonations,
+      completedDonations,
+      totalRequests,
+      activeRequests,
+      fulfilledRequests,
+      partiallyFulfilledRequests,
+      expiredRequests,
+      cancelledRequests,
+      totalCampaigns,
+      activeCampaigns,
+      upcomingCampaigns,
+      completedCampaigns,
+      cancelledCampaigns,
+      totalVerifications,
+      pendingVerifications,
+      underReviewVerifications,
+      approvedVerifications,
+      rejectedVerifications,
+    ] = await Promise.all([
+      countCollection('users'),
+      countCollection('users', where('role', '==', 'donor')),
+      countCollection('users', where('role', '==', 'bloodbank')),
+      countCollection('users', where('role', '==', 'hospital')),
+      countCollection('users', where('role', '==', 'ngo')),
+      countCollection('users', where('role', '==', 'admin')),
+      countCollection('users', where('role', '==', 'superadmin')),
+      countCollection('users', where('status', '==', 'active')),
+      countCollection('users', where('status', '==', 'inactive')),
+      countCollection('users', where('status', '==', 'suspended')),
+      countCollection('users', where('status', '==', 'pending_verification')),
+      countCollection('donations'),
+      countCollection('donations', where('status', '==', 'completed')),
+      countCollection('bloodRequests'),
+      countCollection('bloodRequests', where('status', '==', 'active')),
+      countCollection('bloodRequests', where('status', '==', 'fulfilled')),
+      countCollection('bloodRequests', where('status', '==', 'partially_fulfilled')),
+      countCollection('bloodRequests', where('status', '==', 'expired')),
+      countCollection('bloodRequests', where('status', '==', 'cancelled')),
+      countCollection('campaigns'),
+      countCollection('campaigns', where('status', '==', 'active')),
+      countCollection('campaigns', where('status', '==', 'upcoming')),
+      countCollection('campaigns', where('status', '==', 'completed')),
+      countCollection('campaigns', where('status', '==', 'cancelled')),
+      countCollection('verificationRequests'),
+      countCollection('verificationRequests', where('status', '==', 'pending')),
+      countCollection('verificationRequests', where('status', '==', 'under_review')),
+      countCollection('verificationRequests', where('status', '==', 'approved')),
+      countCollection('verificationRequests', where('status', '==', 'rejected')),
+    ]);
 
-    const usersByRole = {
-      donors: users.filter(u => u.role === 'donor').length,
-      hospitals: users.filter(u => u.role === 'bloodbank' || u.role === 'hospital').length,
-      ngos: users.filter(u => u.role === 'ngo').length,
-      admins: users.filter(u => u.role === 'admin' || u.role === 'superadmin').length,
-    };
-
-    const usersByStatus = {
-      active: users.filter(u => u.status === 'active').length,
-      inactive: users.filter(u => u.status === 'inactive').length,
-      suspended: users.filter(u => u.status === 'suspended').length,
-      pendingVerification: users.filter(u => u.status === 'pending_verification').length,
-    };
-
-    // Get donation counts
-    const donationsSnapshot = await getDocs(collection(db, 'donations'));
-    const donations = extractQueryData<Donation>(donationsSnapshot, ['donationDate', 'createdAt', 'updatedAt']);
-
-    const totalDonations = donations.length;
-    const completedDonations = donations.filter(d => d.status === 'completed').length;
-    const totalUnits = donations
-      .filter(d => d.status === 'completed')
-      .reduce((sum, d) => sum + (d.units || 0), 0);
-
-    // Get blood request counts
-    const requestsSnapshot = await getDocs(collection(db, 'bloodRequests'));
-    const requests = extractQueryData<BloodRequest>(requestsSnapshot, [
-      'requestedAt',
-      'neededBy',
-      'expiresAt',
-      'fulfilledAt',
+    // Keep exact total units behavior by summing completed donations.
+    const completedDonationsSnapshot = await getDocs(
+      query(collection(db, 'donations'), where('status', '==', 'completed'))
+    );
+    const completedDonationRows = extractQueryData<Donation>(completedDonationsSnapshot, [
+      'donationDate',
       'createdAt',
       'updatedAt',
     ]);
+    const totalUnits = completedDonationRows.reduce((sum, d) => sum + (d.units || 0), 0);
+
+    const usersByRole = {
+      donors,
+      hospitals: bloodbanks + hospitals,
+      ngos,
+      admins: admins + superadmins,
+    };
+
+    const usersByStatus = {
+      active: activeUsers,
+      inactive: inactiveUsers,
+      suspended: suspendedUsers,
+      pendingVerification: pendingUsers,
+    };
 
     const requestsByStatus = {
-      active: requests.filter(r => r.status === 'active').length,
-      fulfilled: requests.filter(r => r.status === 'fulfilled').length,
-      partiallyFulfilled: requests.filter(r => r.status === 'partially_fulfilled').length,
-      expired: requests.filter(r => r.status === 'expired').length,
-      cancelled: requests.filter(r => r.status === 'cancelled').length,
+      active: activeRequests,
+      fulfilled: fulfilledRequests,
+      partiallyFulfilled: partiallyFulfilledRequests,
+      expired: expiredRequests,
+      cancelled: cancelledRequests,
     };
-
-    // Get campaign counts
-    const campaignsSnapshot = await getDocs(collection(db, 'campaigns'));
-    const campaigns = extractQueryData<Campaign>(campaignsSnapshot, ['startDate', 'endDate', 'createdAt', 'updatedAt']);
 
     const campaignsByStatus = {
-      active: campaigns.filter(c => c.status === 'active').length,
-      upcoming: campaigns.filter(c => c.status === 'upcoming').length,
-      completed: campaigns.filter(c => c.status === 'completed').length,
-      cancelled: campaigns.filter(c => c.status === 'cancelled').length,
+      active: activeCampaigns,
+      upcoming: upcomingCampaigns,
+      completed: completedCampaigns,
+      cancelled: cancelledCampaigns,
     };
 
-    // Get verification request counts
-    const verificationSnapshot = await getDocs(collection(db, 'verificationRequests'));
-    const verifications = extractQueryData<VerificationRequest>(verificationSnapshot, [
-      'submittedAt',
-      'updatedAt',
-      'reviewedAt',
-    ]);
-
     const verificationsByStatus = {
-      pending: verifications.filter(v => v.status === 'pending').length,
-      underReview: verifications.filter(v => v.status === 'under_review').length,
-      approved: verifications.filter(v => v.status === 'approved').length,
-      rejected: verifications.filter(v => v.status === 'rejected').length,
+      pending: pendingVerifications,
+      underReview: underReviewVerifications,
+      approved: approvedVerifications,
+      rejected: rejectedVerifications,
     };
 
     return {
       users: {
-        total: users.length,
+        total: totalUsers,
         byRole: usersByRole,
         byStatus: usersByStatus,
       },
       donations: {
-        total: totalDonations,
-        completed: completedDonations,
+        total: totalDonations || 0,
+        completed: completedDonations || 0,
         totalUnits,
       },
       requests: {
-        total: requests.length,
+        total: totalRequests,
         byStatus: requestsByStatus,
       },
       campaigns: {
-        total: campaigns.length,
+        total: totalCampaigns,
         byStatus: campaignsByStatus,
       },
       verifications: {
-        total: verifications.length,
+        total: totalVerifications,
         byStatus: verificationsByStatus,
       },
     };
@@ -1098,26 +1135,29 @@ export const getSystemHealthReport = async () => {
     const stats = await getPlatformStats();
     const inventoryAlerts = await getInventoryAlerts();
     const emergencyRequests = await getEmergencyRequests();
+    const activePercentage = stats.users.total > 0
+      ? Math.round((stats.users.byStatus.active / stats.users.total) * 100)
+      : 0;
+    const completionRate = stats.donations.total > 0
+      ? Math.round((stats.donations.completed / stats.donations.total) * 100)
+      : 0;
+    const fulfillmentRate = stats.requests.total > 0
+      ? Math.round((stats.requests.byStatus.fulfilled / stats.requests.total) * 100)
+      : 0;
 
     return {
       status: 'healthy', // Would integrate with monitoring service
       users: {
         total: stats.users.total,
-        activePercentage: Math.round(
-          (stats.users.byStatus.active / stats.users.total) * 100
-        ),
+        activePercentage,
       },
       donations: {
         total: stats.donations.total,
-        completionRate: Math.round(
-          (stats.donations.completed / stats.donations.total) * 100
-        ),
+        completionRate,
       },
       requests: {
         total: stats.requests.total,
-        fulfillmentRate: Math.round(
-          (stats.requests.byStatus.fulfilled / stats.requests.total) * 100
-        ),
+        fulfillmentRate,
       },
       alerts: {
         inventoryAlerts: inventoryAlerts.length,

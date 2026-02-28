@@ -252,7 +252,7 @@ export const useAdminVerificationRequests = (limitCount: number = 500) =>
       staleTime: 30 * 1000,
       gcTime: 5 * 60 * 1000,
       refetchInterval: 20 * 1000,
-      refetchIntervalInBackground: true,
+      refetchIntervalInBackground: false,
     },
   );
 
@@ -266,7 +266,7 @@ export const useAdminEmergencyRequests = () =>
       staleTime: 30 * 1000,
       gcTime: 5 * 60 * 1000,
       refetchInterval: 20 * 1000,
-      refetchIntervalInBackground: true,
+      refetchIntervalInBackground: false,
     },
   );
 
@@ -280,7 +280,7 @@ export const useAdminInventoryAlerts = () =>
       staleTime: 60 * 1000,
       gcTime: 10 * 60 * 1000,
       refetchInterval: 60 * 1000,
-      refetchIntervalInBackground: true,
+      refetchIntervalInBackground: false,
     },
   );
 
@@ -375,7 +375,7 @@ export const useAdminNotifications = (limitCount: number = 1000) =>
       staleTime: 60 * 1000,
       gcTime: 10 * 60 * 1000,
       refetchInterval: 60 * 1000,
-      refetchIntervalInBackground: true,
+      refetchIntervalInBackground: false,
     },
   );
 
@@ -389,7 +389,7 @@ export const useAdminAuditLogs = (limitCount: number = 1000) =>
       staleTime: 60 * 1000,
       gcTime: 10 * 60 * 1000,
       refetchInterval: 60 * 1000,
-      refetchIntervalInBackground: true,
+      refetchIntervalInBackground: false,
     },
   );
 
@@ -403,7 +403,7 @@ export const useAdminErrorLogs = (limitCount: number = 1000) =>
       staleTime: 60 * 1000,
       gcTime: 10 * 60 * 1000,
       refetchInterval: 60 * 1000,
-      refetchIntervalInBackground: true,
+      refetchIntervalInBackground: false,
     },
   );
 
@@ -451,7 +451,7 @@ export const useAdminUserKpis = (uid: string, roleHint?: string, range: AdminKpi
       staleTime: 2 * 60 * 1000,
       gcTime: 15 * 60 * 1000,
       refetchInterval: 2 * 60 * 1000,
-      refetchIntervalInBackground: true,
+      refetchIntervalInBackground: false,
       enabled: Boolean(uid),
     },
   );
@@ -469,7 +469,7 @@ export const useAdminUserReferrals = (
       staleTime: 2 * 60 * 1000,
       gcTime: 15 * 60 * 1000,
       refetchInterval: 2 * 60 * 1000,
-      refetchIntervalInBackground: true,
+      refetchIntervalInBackground: false,
       enabled: Boolean(uid),
     },
   );
@@ -487,20 +487,18 @@ export const useAdminUserTimeline = (
       staleTime: 60 * 1000,
       gcTime: 10 * 60 * 1000,
       refetchInterval: 60 * 1000,
-      refetchIntervalInBackground: true,
+      refetchIntervalInBackground: false,
       enabled: Boolean(uid),
     },
   );
 
 export const useAdminOverviewData = () => {
-  const usersQuery = useAdminOverviewUsers(100);
   const verificationQuery = useAdminVerificationRequests(500);
   const emergencyQuery = useAdminEmergencyRequests();
   const inventoryQuery = useAdminInventoryAlerts();
   const recentActivityQuery = useAdminRecentActivity(5);
   const platformStatsQuery = useAdminPlatformStats();
 
-  const users = usersQuery.data || [];
   const verificationRequests = verificationQuery.data || [];
   const emergencyRequests = emergencyQuery.data || [];
   const inventoryAlerts = inventoryQuery.data || [];
@@ -510,14 +508,14 @@ export const useAdminOverviewData = () => {
     const platform = platformStatsQuery.data;
     if (!platform) {
       return {
-        totalUsers: users.length,
-        totalDonors: users.filter((u) => u.role === 'donor').length,
-        totalHospitals: users.filter((u) => u.role === 'bloodbank' || u.role === 'hospital').length,
-        totalNGOs: users.filter((u) => u.role === 'ngo').length,
-        totalAdmins: users.filter((u) => u.role === 'admin' || u.role === 'superadmin').length,
-        activeUsers: users.filter((u) => u.status === 'active').length,
-        inactiveUsers: users.filter((u) => u.status === 'inactive').length,
-        pendingVerification: users.filter((u) => u.status === 'pending_verification').length,
+        totalUsers: 0,
+        totalDonors: 0,
+        totalHospitals: 0,
+        totalNGOs: 0,
+        totalAdmins: 0,
+        activeUsers: 0,
+        inactiveUsers: 0,
+        pendingVerification: 0,
         totalDonations: 0,
         completedDonations: 0,
         totalBloodUnits: 0,
@@ -553,7 +551,7 @@ export const useAdminOverviewData = () => {
       approvedVerificationRequests: platform.verifications.byStatus.approved,
       rejectedVerificationRequests: platform.verifications.byStatus.rejected,
     };
-  }, [platformStatsQuery.data, users, verificationRequests]);
+  }, [platformStatsQuery.data, verificationRequests]);
 
   const systemAlerts = useMemo<AdminSystemAlert[]>(() => {
     const alerts: AdminSystemAlert[] = inventoryAlerts.slice(0, 20).map((item) => {
@@ -586,7 +584,6 @@ export const useAdminOverviewData = () => {
   }, [inventoryAlerts, verificationRequests]);
 
   const loading = [
-    usersQuery,
     verificationQuery,
     emergencyQuery,
     inventoryQuery,
@@ -594,8 +591,7 @@ export const useAdminOverviewData = () => {
     platformStatsQuery,
   ].some((entry) => entry.isLoading);
 
-  const error = usersQuery.error
-    || verificationQuery.error
+  const error = verificationQuery.error
     || emergencyQuery.error
     || inventoryQuery.error
     || recentActivityQuery.error
@@ -603,7 +599,6 @@ export const useAdminOverviewData = () => {
 
   const refreshData = async () => {
     await Promise.all([
-      usersQuery.refetch(),
       verificationQuery.refetch(),
       emergencyQuery.refetch(),
       inventoryQuery.refetch(),
@@ -613,7 +608,6 @@ export const useAdminOverviewData = () => {
   };
 
   return {
-    users,
     verificationRequests,
     emergencyRequests,
     systemAlerts,

@@ -43,6 +43,7 @@ import { authInputMessages, getOtpValidationError, sanitizeOtp, validateGeneralP
 import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
 import { notifyKeepOneLoginMethod, notifySelfRequestBlocked } from '../../utils/validationFeedback';
 import { useScopedErrorReporter } from '../../hooks/useScopedErrorReporter';
+import { usePageVisibility } from '../../hooks/usePageVisibility';
 
 type ShareOptions = {
   showPhone: boolean;
@@ -80,6 +81,7 @@ function DonorDashboard() {
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const isPageVisible = usePageVisibility();
 
   // State for modals and UI
   const [showAllRequests, setShowAllRequests] = useState(false);
@@ -442,7 +444,7 @@ function DonorDashboard() {
   }, [user?.availableUntil, user?.isAvailable, updateUserProfile]);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || !isPageVisible) return;
     const feedbackQuery = query(
       collection(db, 'DonationFeedback'),
       where('donorId', '==', user.uid)
@@ -469,7 +471,7 @@ function DonorDashboard() {
       reportDonorDashboardError(error, 'donor.dashboard.feedback.load');
     });
     return () => unsubscribe();
-  }, [user?.uid]);
+  }, [isPageVisible, user?.uid]);
 
   useEffect(() => {
     if (!user?.uid || donationTypeBackfillRef.current) return;
@@ -977,7 +979,7 @@ function DonorDashboard() {
   }, [user?.uid]);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || !isPageVisible) return;
     const task = () => {
       void primeRecentDonorRequestCache(user.uid);
     };
@@ -993,7 +995,7 @@ function DonorDashboard() {
     }
     const timer = setTimeout(task, 1200);
     return () => clearTimeout(timer);
-  }, [user?.uid]);
+  }, [isPageVisible, user?.uid]);
 
   useEffect(() => {
     if (!user?.uid) return;

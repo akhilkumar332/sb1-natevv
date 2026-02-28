@@ -173,15 +173,25 @@ const readImpersonationContext = (): { isImpersonating: boolean; impersonationAc
 
 const sanitizeMetadata = (value: unknown, depth: number = 0): unknown => {
   if (depth > 3) return '[MAX_DEPTH]';
-  if (value === null || value === undefined) return value;
+  if (value === null) return null;
+  if (value === undefined) return null;
   if (typeof value === 'string') return truncate(sanitizeText(value), 1000);
   if (typeof value === 'number' || typeof value === 'boolean') return value;
   if (value instanceof Date) return value.toISOString();
-  if (Array.isArray(value)) return value.slice(0, 40).map((item) => sanitizeMetadata(item, depth + 1));
+  if (Array.isArray(value)) {
+    return value.slice(0, 40).map((item) => {
+      const sanitized = sanitizeMetadata(item, depth + 1);
+      return sanitized === undefined ? null : sanitized;
+    });
+  }
   if (typeof value === 'object') {
     const out: Record<string, unknown> = {};
     Object.entries(value as Record<string, unknown>).slice(0, 60).forEach(([key, val]) => {
-      out[key] = sanitizeMetadata(val, depth + 1);
+      if (key === '__proto__' || key === 'prototype' || key === 'constructor') return;
+      const sanitized = sanitizeMetadata(val, depth + 1);
+      if (sanitized !== undefined) {
+        out[key] = sanitized;
+      }
     });
     return out;
   }

@@ -31,6 +31,7 @@ import { db } from '../../../firebase';
 import type { BloodBankDashboardContext } from '../BloodBankDashboard';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { captureHandledError } from '../../../services/errorLog.service';
+import { usePageVisibility } from '../../../hooks/usePageVisibility';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -122,6 +123,7 @@ function BloodBankInventory() {
   const staffRole = user?.staffRole || 'manager';
   const canEdit = staffRole !== 'viewer';
   const canManage = staffRole === 'manager';
+  const isPageVisible = usePageVisibility();
 
   const [filter, setFilter] = useState<'all' | 'critical' | 'low' | 'adequate' | 'surplus'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -379,7 +381,7 @@ function BloodBankInventory() {
   }, [selectedBatch]);
 
   useEffect(() => {
-    if (!baseHospitalId) return;
+    if (!baseHospitalId || !isPageVisible) return;
     const q = query(
       collection(db, 'inventoryTransactions'),
       where('hospitalId', '==', baseHospitalId),
@@ -409,10 +411,10 @@ function BloodBankInventory() {
         reportBloodBankInventoryError(err, 'transactions.listen');
       }
     );
-  }, [baseHospitalId]);
+  }, [baseHospitalId, isPageVisible]);
 
   useEffect(() => {
-    if (!baseHospitalId) return;
+    if (!baseHospitalId || !isPageVisible) return;
 
     const outgoingQuery = query(
       collection(db, 'inventoryTransfers'),
@@ -491,10 +493,10 @@ function BloodBankInventory() {
       unsubscribeOutgoing();
       unsubscribeIncoming();
     };
-  }, [baseHospitalId]);
+  }, [baseHospitalId, isPageVisible]);
 
   useEffect(() => {
-    if (!baseHospitalId) return;
+    if (!baseHospitalId || !isPageVisible) return;
     const loadBloodbanks = async () => {
       try {
         const q = query(
@@ -518,10 +520,10 @@ function BloodBankInventory() {
       }
     };
     loadBloodbanks();
-  }, [baseHospitalId]);
+  }, [baseHospitalId, isPageVisible]);
 
   useEffect(() => {
-    if (!baseHospitalId) return;
+    if (!baseHospitalId || !isPageVisible) return;
     const q = query(
       collection(db, 'bloodbankBranches'),
       where('parentHospitalId', '==', baseHospitalId),
@@ -558,10 +560,10 @@ function BloodBankInventory() {
         reportBloodBankInventoryError(err, 'branches.listen');
       }
     );
-  }, [baseHospitalId]);
+  }, [baseHospitalId, isPageVisible]);
 
   useEffect(() => {
-    if (!baseHospitalId) return;
+    if (!baseHospitalId || !isPageVisible) return;
     const q = query(
       collection(db, 'inventoryAlerts'),
       where('hospitalId', '==', baseHospitalId),
@@ -589,10 +591,10 @@ function BloodBankInventory() {
         reportBloodBankInventoryError(err, 'alerts.listen');
       }
     );
-  }, [baseHospitalId]);
+  }, [baseHospitalId, isPageVisible]);
 
   useEffect(() => {
-    if (!baseHospitalId) return;
+    if (!baseHospitalId || !isPageVisible) return;
     const q = query(
       collection(db, 'inventoryReservations'),
       where('hospitalId', '==', baseHospitalId),
@@ -623,7 +625,7 @@ function BloodBankInventory() {
         reportBloodBankInventoryError(err, 'reservations.listen');
       }
     );
-  }, [baseHospitalId]);
+  }, [baseHospitalId, isPageVisible]);
 
   useEffect(() => {
     if (!showScanModal) return;

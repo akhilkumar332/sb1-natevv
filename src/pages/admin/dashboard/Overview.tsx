@@ -5,7 +5,6 @@ import { AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin
 
 function AdminOverviewPage() {
   const {
-    users,
     verificationRequests,
     emergencyRequests,
     systemAlerts,
@@ -131,7 +130,7 @@ function AdminOverviewPage() {
               <p className="flex items-center justify-between"><span>Donors</span><span className="font-semibold">{stats.totalDonors}</span></p>
               <p className="flex items-center justify-between"><span>BloodBanks</span><span className="font-semibold">{stats.totalHospitals}</span></p>
               <p className="flex items-center justify-between"><span>NGOs</span><span className="font-semibold">{stats.totalNGOs}</span></p>
-              <p className="flex items-center justify-between"><span>Admins</span><span className="font-semibold">{users.filter((u) => u.role === 'admin' || u.role === 'superadmin').length}</span></p>
+              <p className="flex items-center justify-between"><span>Admins</span><span className="font-semibold">{stats.totalAdmins}</span></p>
             </div>
           </div>
 
