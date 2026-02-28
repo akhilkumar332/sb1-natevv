@@ -14,7 +14,7 @@ import { authFlowMessages, authInputMessages, getOtpValidationError, sanitizeOtp
 import { useOtpResendTimer } from './useOtpResendTimer';
 import { clearRecaptchaVerifier } from '../utils/recaptcha';
 import { registerWithGoogleRole } from '../utils/googleRegister';
-import { requireValue } from '../utils/validationFeedback';
+import { notifyMobileAlreadyRegistered, requireValue } from '../utils/validationFeedback';
 
 interface RegisterFormData {
   identifier: string;
@@ -92,7 +92,7 @@ export const useRegister = () => {
       if (userDoc.exists()) {
         // User already exists - sign them out and redirect to login
         await signOut(auth);
-        notify.error('Mobile Number already registered');
+        notifyMobileAlreadyRegistered();
         navigate('/donor/login');
         return;
       }
@@ -105,7 +105,7 @@ export const useRegister = () => {
 
       if (otherMatch) {
         await signOut(auth);
-        notify.error('Mobile Number already registered');
+        notifyMobileAlreadyRegistered();
         navigate('/donor/login');
         return;
       }

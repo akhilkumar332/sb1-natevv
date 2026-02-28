@@ -1,5 +1,5 @@
 // src/pages/bloodbank/BloodBankOnboarding.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../../services/referral.service';
@@ -116,6 +116,7 @@ export function BloodBankOnboarding() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [locationLoading, setLocationLoading] = useState(false);
   const [mapPosition, setMapPosition] = useState<[number, number]>([20.5937, 78.9629]);
+  const isMountedRef = useRef(true);
   const [availableStates, setAvailableStates] = useState(getStatesByCountry('IN'));
   const [availableCities, setAvailableCities] = useState<string[]>([]);
   const reportOnboardingError = (error: unknown, kind: string) => {
@@ -155,6 +156,13 @@ export function BloodBankOnboarding() {
   }, [formData.country]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (formData.state) {
       const cities = getCitiesByState(formData.country, formData.state);
       setAvailableCities(cities);
@@ -177,13 +185,19 @@ export function BloodBankOnboarding() {
   };
 
   const handleAddressSelect = (suggestion: any) => {
+    const lat = parseFloat(suggestion.lat);
+    const lon = parseFloat(suggestion.lon);
+    if (Number.isNaN(lat) || Number.isNaN(lon)) {
+      notify.error('Invalid location selected.');
+      return;
+    }
     setFormData(prev => ({
       ...prev,
       address: suggestion.display_name,
-      latitude: parseFloat(suggestion.lat),
-      longitude: parseFloat(suggestion.lon)
+      latitude: lat,
+      longitude: lon
     }));
-    setMapPosition([parseFloat(suggestion.lat), parseFloat(suggestion.lon)]);
+    setMapPosition([lat, lon]);
     clearSuggestions();
 
     // Try to extract and match state/city from address
@@ -213,6 +227,7 @@ export function BloodBankOnboarding() {
         if (!result) {
           return;
         }
+        if (!isMountedRef.current) return;
 
         const [latitude, longitude] = result.coords;
         setMapPosition([latitude, longitude]);
@@ -239,12 +254,18 @@ export function BloodBankOnboarding() {
       } catch (error) {
         reportOnboardingError(error, 'bloodbank.onboarding.detect_location');
       } finally {
-        setLocationLoading(false);
+        if (isMountedRef.current) {
+          setLocationLoading(false);
+        }
       }
     })();
   };
 
   const handleMapPositionChange = async (newPosition: [number, number]) => {
+    if (!Number.isFinite(newPosition[0]) || !Number.isFinite(newPosition[1])) {
+      notify.error('Invalid map location selected.');
+      return;
+    }
     setMapPosition(newPosition);
     setFormData(prev => ({
       ...prev,
@@ -252,27 +273,32 @@ export function BloodBankOnboarding() {
       longitude: newPosition[1]
     }));
 
-    const result = await resolveFromCoordinates(newPosition, {
-      errorMessage: 'Could not fetch address for this location',
-    });
-    const data = result.geocode;
-
-    if (data && data.address) {
-      const address = data.address;
-      const mapped = mapNominatimAddress({
-        address,
-        availableStates,
-        countryCode: formData.country,
+    try {
+      const result = await resolveFromCoordinates(newPosition, {
+        errorMessage: 'Could not fetch address for this location',
       });
-      setFormData(prev => ({
-        ...prev,
-        address: data.display_name || '',
-        postalCode: mapped.postalCode || prev.postalCode,
-        state: mapped.state || prev.state,
-        city: mapped.city || prev.city,
-      }));
+      const data = result.geocode;
+      if (!isMountedRef.current) return;
 
-      notify.success('Address updated from map location');
+      if (data && data.address) {
+        const address = data.address;
+        const mapped = mapNominatimAddress({
+          address,
+          availableStates,
+          countryCode: formData.country,
+        });
+        setFormData(prev => ({
+          ...prev,
+          address: data.display_name || '',
+          postalCode: mapped.postalCode || prev.postalCode,
+          state: mapped.state || prev.state,
+          city: mapped.city || prev.city,
+        }));
+
+        notify.success('Address updated from map location');
+      }
+    } catch (error) {
+      reportOnboardingError(error, 'bloodbank.onboarding.map_reverse_geocode');
     }
   };
 

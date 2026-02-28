@@ -9,6 +9,7 @@ import { StatusTabs } from '../../../components/shared/StatusTabs';
 import { DeleteConfirmModal } from '../../../components/shared/DeleteConfirmModal';
 import { EmptyStateCard } from '../../../components/shared/EmptyStateCard';
 import { ModalShell } from '../../../components/shared/ModalShell';
+import { requireNgoManagerSession, requireVolunteerRequiredFields } from '../../../utils/ngoValidation';
 
 const emptyForm = {
   name: '',
@@ -135,13 +136,11 @@ function NgoVolunteers() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!user) {
-      notify.error('You must be logged in to manage volunteers.');
+    if (!requireNgoManagerSession(user, 'volunteers')) {
       return;
     }
 
-    if (!form.name || !form.email) {
-      notify.error('Please enter volunteer name and email.');
+    if (!requireVolunteerRequiredFields(form)) {
       return;
     }
 

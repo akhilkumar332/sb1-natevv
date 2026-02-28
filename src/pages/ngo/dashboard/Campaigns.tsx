@@ -25,6 +25,7 @@ import { getCampaignTargetLabel, getCampaignTypeLabel } from '../../../utils/cam
 import { EmptyStateCard } from '../../../components/shared/EmptyStateCard';
 import { ModalShell } from '../../../components/shared/ModalShell';
 import { useLocationResolver } from '../../../hooks/useLocationResolver';
+import { requireCampaignRequiredFields, requireNgoManagerSession } from '../../../utils/ngoValidation';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -174,6 +175,10 @@ function NgoCampaigns() {
   };
 
   const handleMapChange = (pos: [number, number]) => {
+    if (!Number.isFinite(pos[0]) || !Number.isFinite(pos[1])) {
+      notify.error('Invalid map location selected.');
+      return;
+    }
     setMapPosition(pos);
     setForm((prev) => ({
       ...prev,
@@ -184,17 +189,26 @@ function NgoCampaigns() {
   };
 
   const syncAddressFromCoordinates = async (pos: [number, number]) => {
-    const result = await resolveFromCoordinates(pos, {
-      errorMessage: 'Could not fetch address for this location',
-    });
-    const data = result.geocode;
-    if (data?.display_name) {
-      setForm((prev) => ({
-        ...prev,
-        address: data.display_name || prev.address,
-        city: data.address?.city || data.address?.town || data.address?.village || prev.city,
-        state: data.address?.state || prev.state,
-      }));
+    try {
+      const result = await resolveFromCoordinates(pos, {
+        errorMessage: 'Could not fetch address for this location',
+      });
+      const data = result.geocode;
+      if (data?.display_name) {
+        setForm((prev) => ({
+          ...prev,
+          address: data.display_name || prev.address,
+          city: data.address?.city || data.address?.town || data.address?.village || prev.city,
+          state: data.address?.state || prev.state,
+        }));
+      }
+    } catch (error) {
+      notifyNgoCampaignsError(
+        error,
+        'Could not fetch address for this location.',
+        { id: 'ngo-campaign-location-map-sync-error' },
+        'ngo.campaigns.location.map_sync'
+      );
     }
   };
 
@@ -230,6 +244,10 @@ function NgoCampaigns() {
   const handleAddressSelect = (suggestion: any) => {
     const lat = parseFloat(suggestion.lat);
     const lon = parseFloat(suggestion.lon);
+    if (Number.isNaN(lat) || Number.isNaN(lon)) {
+      notify.error('Invalid location selected.');
+      return;
+    }
     setForm((prev) => ({
       ...prev,
       address: suggestion.display_name,
@@ -283,13 +301,11 @@ function NgoCampaigns() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!user) {
-      notify.error('You must be logged in to manage campaigns.');
+    if (!requireNgoManagerSession(user, 'campaigns')) {
       return;
     }
 
-    if (!form.title || !form.startDate || !form.endDate || !form.city || !form.state) {
-      notify.error('Please fill out the required fields.');
+    if (!requireCampaignRequiredFields(form)) {
       return;
     }
 

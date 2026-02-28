@@ -18,9 +18,9 @@ import {
   TrendingUp,
   XCircle,
 } from 'lucide-react';
-import { getCurrentCoordinates, reverseGeocode } from '../../../utils/geolocation.utils';
 import { captureHandledError } from '../../../services/errorLog.service';
 import { LeafletClickMarker, LeafletMapUpdater } from '../../../components/shared/leaflet/LocationMapPrimitives';
+import { useLocationResolver } from '../../../hooks/useLocationResolver';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -53,6 +53,7 @@ function LocationPicker({
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRequestIdRef = useRef(0);
   const mountedRef = useRef(true);
+  const { resolveCurrentLocation, resolveFromCoordinates } = useLocationResolver('donor');
 
   const handleAddressChange = (event: ChangeEvent<HTMLInputElement>) => {
     const inputValue = event.target.value;
@@ -96,7 +97,13 @@ function LocationPicker({
   };
 
   const handleSuggestionSelect = (suggestion: any) => {
-    const nextPosition: MapPosition = [parseFloat(suggestion.lat), parseFloat(suggestion.lon)];
+    const lat = parseFloat(suggestion.lat);
+    const lon = parseFloat(suggestion.lon);
+    if (Number.isNaN(lat) || Number.isNaN(lon)) {
+      notify.error('Invalid location selected.');
+      return;
+    }
+    const nextPosition: MapPosition = [lat, lon];
     onChange(suggestion.display_name);
     onPositionChange(nextPosition);
     setShowSuggestions(false);
@@ -107,33 +114,51 @@ function LocationPicker({
   const handleUseCurrentLocation = () => {
     void (async () => {
       setIsLocating(true);
-      const coords = await getCurrentCoordinates({ scope: 'donor' });
-      if (!coords) {
-        if (mountedRef.current) setIsLocating(false);
-        return;
-      }
-      if (!mountedRef.current) return;
-      onPositionChange(coords);
-      const data = await reverseGeocode(coords[0], coords[1], { scope: 'donor' });
-      if (!mountedRef.current) return;
-      if (data?.display_name) {
-        onChange(data.display_name);
-      }
-      if (mountedRef.current) {
-        setIsLocating(false);
+      try {
+        const result = await resolveCurrentLocation();
+        if (!result?.coords) return;
+        if (!mountedRef.current) return;
+        onPositionChange(result.coords);
+        const data = result.geocode;
+        if (!mountedRef.current) return;
+        if (data?.display_name) {
+          onChange(data.display_name);
+        }
+      } catch (error) {
+        void captureHandledError(error, {
+          source: 'frontend',
+          scope: 'donor',
+          metadata: { page: 'DonorJourney', kind: 'donor.journey.location.current' },
+        });
+      } finally {
+        if (mountedRef.current) {
+          setIsLocating(false);
+        }
       }
     })();
   };
 
   const handleMapPositionChange = async (pos: MapPosition) => {
+    if (!Number.isFinite(pos[0]) || !Number.isFinite(pos[1])) {
+      notify.error('Invalid map location selected.');
+      return;
+    }
     onPositionChange(pos);
-    const data = await reverseGeocode(pos[0], pos[1], {
-      errorMessage: 'Could not fetch address for this location',
-      scope: 'donor',
-    });
-    if (!mountedRef.current) return;
-    if (data?.display_name) {
-      onChange(data.display_name);
+    try {
+      const result = await resolveFromCoordinates(pos, {
+        errorMessage: 'Could not fetch address for this location',
+      });
+      const data = result.geocode;
+      if (!mountedRef.current) return;
+      if (data?.display_name) {
+        onChange(data.display_name);
+      }
+    } catch (error) {
+      void captureHandledError(error, {
+        source: 'frontend',
+        scope: 'donor',
+        metadata: { page: 'DonorJourney', kind: 'donor.journey.location.mapPick' },
+      });
     }
   };
 

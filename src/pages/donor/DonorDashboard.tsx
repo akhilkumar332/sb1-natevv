@@ -42,6 +42,7 @@ import type { ConfirmationResult } from 'firebase/auth';
 import { captureHandledError } from '../../services/errorLog.service';
 import { authInputMessages, getOtpValidationError, sanitizeOtp, validateGeneralPhoneInput } from '../../utils/authInputValidation';
 import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
+import { notifyKeepOneLoginMethod, notifySelfRequestBlocked } from '../../utils/validationFeedback';
 
 type ShareOptions = {
   showPhone: boolean;
@@ -1102,7 +1103,7 @@ function DonorDashboard() {
         const selfKey = `self:${payload.createdAt}`;
         if (pendingRequestProcessedRef.current !== selfKey) {
           pendingRequestProcessedRef.current = selfKey;
-          notify.error('You cannot request yourself.', { id: 'self-request' });
+          notifySelfRequestBlocked({ id: 'self-request' });
         }
         await clearPendingDonorRequestDoc(user.uid);
         return;
@@ -1195,7 +1196,7 @@ function DonorDashboard() {
 
   const handleGoogleUnlink = async () => {
     if (!canUnlinkGoogle) {
-      notify.error('At least one login method must remain linked.');
+      notifyKeepOneLoginMethod();
       return;
     }
     if (!window.confirm('Unlink Google login from your account?')) {
@@ -1266,7 +1267,7 @@ function DonorDashboard() {
 
   const handlePhoneUnlink = async () => {
     if (!canUnlinkPhone) {
-      notify.error('At least one login method must remain linked.');
+      notifyKeepOneLoginMethod();
       return;
     }
     if (!window.confirm('Unlink phone login from your account?')) {

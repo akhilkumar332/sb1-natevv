@@ -25,9 +25,10 @@ import {
   type PendingDonorRequestPayload,
 } from '../services/donorRequest.service';
 import { notify } from 'services/notify.service';
-import { getCurrentCoordinates } from '../utils/geolocation.utils';
 import { useScopedErrorReporter } from '../hooks/useScopedErrorReporter';
 import { filterSelfTargets, getPendingCooldownHours } from '../services/donorRequestGuard.service';
+import { notifySelfRequestBlocked } from '../utils/validationFeedback';
+import { useLocationResolver } from '../hooks/useLocationResolver';
 
 interface Donor {
   id: string;
@@ -103,44 +104,65 @@ function FindDonors() {
   const pendingExpiryRef = useRef<Set<string>>(new Set());
   const sliderTrackRef = useRef<HTMLDivElement | null>(null);
   const sliderValueRef = useRef(0);
+  const isMountedRef = useRef(true);
+  const locationRequestInFlightRef = useRef(false);
   const REQUEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
   const reportFindDonorsError = useScopedErrorReporter({
     scope: 'donor',
     metadata: { page: 'FindDonors' },
   });
+  const { resolveCurrentLocation } = useLocationResolver('donor');
 
   const requestLocation = async () => {
+    if (locationRequestInFlightRef.current) return;
+    locationRequestInFlightRef.current = true;
     setLocationRequesting(true);
     setLocationError(null);
-    const coords = await getCurrentCoordinates({
-      scope: 'donor',
-      enableHighAccuracy: true,
-      timeout: 8000,
-      maximumAge: 60000,
-      onErrorMessage: setLocationError,
-      unsupportedErrorMessage: 'Location services are not supported in this browser.',
-      positionErrorMessages: {
-        permissionDenied: 'Location access is blocked. Please enable location to find donors.',
-        positionUnavailable: 'Unable to determine your location. Please try again.',
-        timeout: 'Location request timed out. Please try again.',
-        default: 'Enable location to use Find Donors.',
-      },
-    });
-    if (coords) {
-      setViewerLocation({
-        latitude: coords[0],
-        longitude: coords[1],
+    try {
+      const result = await resolveCurrentLocation({
+        enableHighAccuracy: true,
+        timeout: 8000,
+        maximumAge: 60000,
+        skipReverseGeocode: true,
+        onErrorMessage: setLocationError,
+        unsupportedErrorMessage: 'Location services are not supported in this browser.',
+        positionErrorMessages: {
+          permissionDenied: 'Location access is blocked. Please enable location to find donors.',
+          positionUnavailable: 'Unable to determine your location. Please try again.',
+          timeout: 'Location request timed out. Please try again.',
+          default: 'Enable location to use Find Donors.',
+        },
       });
-      setLocationEnabled(true);
-      setLocationRequesting(false);
-      return;
+      if (result?.coords) {
+        if (!isMountedRef.current) return;
+        setViewerLocation({
+          latitude: result.coords[0],
+          longitude: result.coords[1],
+        });
+        setLocationEnabled(true);
+        return;
+      }
+      if (!isMountedRef.current) return;
+      setLocationEnabled(false);
+    } catch (error) {
+      reportFindDonorsError(error, 'find_donors.location.resolve');
+      if (!isMountedRef.current) return;
+      setLocationEnabled(false);
+      setLocationError('Unable to determine your location. Please try again.');
+    } finally {
+      locationRequestInFlightRef.current = false;
+      if (isMountedRef.current) {
+        setLocationRequesting(false);
+      }
     }
-    setLocationEnabled(false);
-    setLocationRequesting(false);
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     void requestLocation();
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const updateURL = () => {
@@ -677,7 +699,7 @@ function FindDonors() {
         const selfKey = `self:${payload.createdAt}`;
         if (selfRequestToastRef.current !== selfKey) {
           selfRequestToastRef.current = selfKey;
-          notify.error('You cannot request yourself.', { id: 'self-request' });
+          notifySelfRequestBlocked({ id: 'self-request' });
         }
         await clearPendingDonorRequestDoc(user.uid);
         return;
@@ -727,7 +749,7 @@ function FindDonors() {
   const addToTray = (donor: Donor) => {
     setTrayDonors((prev) => {
       if (user?.uid && donor.id === user.uid) {
-        notify.error('You cannot request yourself.');
+        notifySelfRequestBlocked();
         return prev;
       }
       if (prev.find((item) => item.id === donor.id)) {
@@ -856,7 +878,7 @@ function FindDonors() {
     if (user?.uid) {
       const filtered = filterSelfTargets(recipients, user.uid);
       if (filtered.length !== recipients.length) {
-        notify.error('You cannot request yourself.');
+        notifySelfRequestBlocked();
       }
       safeRecipients = filtered;
     }

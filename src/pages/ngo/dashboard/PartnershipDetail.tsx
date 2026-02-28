@@ -15,6 +15,7 @@ import { archivePartnership, deletePartnership, updatePartnership } from '../../
 import { ArchiveDeleteActions } from '../../../components/shared/ArchiveDeleteActions';
 import { DeleteConfirmModal } from '../../../components/shared/DeleteConfirmModal';
 import { ModalShell } from '../../../components/shared/ModalShell';
+import { requirePartnershipRequiredFields } from '../../../utils/ngoValidation';
 
 const emptyForm = {
   partnerName: '',
@@ -122,8 +123,7 @@ function NgoPartnershipDetail() {
 
   const handleUpdate = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form.partnerName || !form.startDate) {
-      notify.error('Please fill out the required fields.');
+    if (!requirePartnershipRequiredFields(form)) {
       return;
     }
 

@@ -16,6 +16,7 @@ import { archiveVolunteer, deleteVolunteer, updateVolunteer } from '../../../ser
 import { ArchiveDeleteActions } from '../../../components/shared/ArchiveDeleteActions';
 import { DeleteConfirmModal } from '../../../components/shared/DeleteConfirmModal';
 import { ModalShell } from '../../../components/shared/ModalShell';
+import { requireVolunteerRequiredFields } from '../../../utils/ngoValidation';
 
 const emptyForm = {
   name: '',
@@ -121,8 +122,7 @@ function NgoVolunteerDetail() {
 
   const handleUpdate = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form.name || !form.email) {
-      notify.error('Please enter volunteer name and email.');
+    if (!requireVolunteerRequiredFields(form)) {
       return;
     }
 

@@ -9,6 +9,7 @@ import { StatusTabs } from '../../../components/shared/StatusTabs';
 import { DeleteConfirmModal } from '../../../components/shared/DeleteConfirmModal';
 import { EmptyStateCard } from '../../../components/shared/EmptyStateCard';
 import { ModalShell } from '../../../components/shared/ModalShell';
+import { requireNgoManagerSession, requirePartnershipRequiredFields } from '../../../utils/ngoValidation';
 
 const emptyForm = {
   partnerName: '',
@@ -142,13 +143,11 @@ function NgoPartnerships() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!user) {
-      notify.error('You must be logged in to manage partnerships.');
+    if (!requireNgoManagerSession(user, 'partnerships')) {
       return;
     }
 
-    if (!form.partnerName || !form.startDate) {
-      notify.error('Please fill out the required fields.');
+    if (!requirePartnershipRequiredFields(form)) {
       return;
     }
 
