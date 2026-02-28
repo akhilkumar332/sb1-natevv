@@ -10,12 +10,141 @@ import swaggerJsdoc from 'swagger-jsdoc';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 
 // Load environment variables
 dotenv.config();
 
 // Get the directory name of the current module
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const LOG_DEDUPE_WINDOW_MS = 30 * 1000;
+const MAX_REDACTION_DEPTH = 5;
+const recentLogFingerprints = new Map();
+
+const SENSITIVE_KEY_PATTERNS = [
+  /password/i,
+  /token/i,
+  /authorization/i,
+  /cookie/i,
+  /secret/i,
+  /private.?key/i,
+  /api.?key/i,
+  /session/i,
+  /email/i,
+  /phone/i,
+  /idtoken/i,
+  /access.?token/i,
+  /refresh.?token/i,
+];
+
+const shouldRedactKey = (key) => SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(String(key || '')));
+
+const sanitizeForLog = (value, depth = 0, seen = new WeakSet()) => {
+  if (depth > MAX_REDACTION_DEPTH) return '[TruncatedDepth]';
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'string') {
+    return value.length > 1000 ? `${value.slice(0, 1000)}...` : value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) {
+    return value.slice(0, 50).map((item) => sanitizeForLog(item, depth + 1, seen));
+  }
+  if (typeof value === 'object') {
+    if (seen.has(value)) return '[Circular]';
+    seen.add(value);
+    const result = {};
+    Object.entries(value).slice(0, 100).forEach(([key, nestedValue]) => {
+      if (shouldRedactKey(key)) {
+        result[key] = '[REDACTED]';
+      } else {
+        result[key] = sanitizeForLog(nestedValue, depth + 1, seen);
+      }
+    });
+    if (Object.keys(value).length > 100) {
+      result.__truncatedKeys = Object.keys(value).length - 100;
+    }
+    return result;
+  }
+  return String(value);
+};
+
+const serializeError = (error) => {
+  if (!error) return null;
+  const errObj = error instanceof Error ? error : new Error(String(error));
+  const stack = typeof errObj.stack === 'string'
+    ? errObj.stack.split('\n').slice(0, 10).join('\n')
+    : undefined;
+  const code = error && typeof error === 'object' && 'code' in error
+    ? error.code
+    : undefined;
+  return sanitizeForLog({
+    name: errObj.name,
+    message: errObj.message,
+    code,
+    stack,
+  });
+};
+
+const buildFingerprint = ({ event, level, error, meta }) => {
+  const payload = {
+    event,
+    level,
+    error: serializeError(error),
+    meta: sanitizeForLog(meta),
+  };
+  return crypto.createHash('sha1').update(JSON.stringify(payload)).digest('hex');
+};
+
+const shouldEmitLog = (fingerprint, dedupe) => {
+  if (!dedupe) return true;
+  const now = Date.now();
+  const previous = recentLogFingerprints.get(fingerprint);
+  if (previous && now - previous < LOG_DEDUPE_WINDOW_MS) {
+    return false;
+  }
+  recentLogFingerprints.set(fingerprint, now);
+
+  // Trim stale entries so map does not grow forever.
+  if (recentLogFingerprints.size > 1000) {
+    for (const [key, ts] of recentLogFingerprints.entries()) {
+      if (now - ts > LOG_DEDUPE_WINDOW_MS * 2) {
+        recentLogFingerprints.delete(key);
+      }
+    }
+  }
+  return true;
+};
+
+const logEvent = ({ level = 'info', event, error, meta, dedupe = true }) => {
+  try {
+    const fingerprint = buildFingerprint({ event, level, error, meta });
+    if (!shouldEmitLog(fingerprint, dedupe)) return;
+    const payload = {
+      ts: new Date().toISOString(),
+      level,
+      event,
+      fingerprint,
+      meta: sanitizeForLog(meta),
+      error: serializeError(error),
+    };
+    const line = JSON.stringify(payload);
+    if (level === 'error') {
+      console.error(line);
+    } else if (level === 'warn') {
+      console.warn(line);
+    } else {
+      console.log(line);
+    }
+  } catch (logError) {
+    console.error(JSON.stringify({
+      ts: new Date().toISOString(),
+      level: 'error',
+      event: 'logger.failure',
+      error: serializeError(logError),
+    }));
+  }
+};
 
 const resolveServiceAccountPath = () => {
   const envPath = process.env.FIREBASE_ADMIN_SDK_PATH || process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -45,7 +174,12 @@ const loadServiceAccount = () => {
     }
     return data;
   } catch (error) {
-    console.warn('Failed to load service account file:', error);
+    logEvent({
+      level: 'warn',
+      event: 'firebase.service_account.load_failed',
+      error,
+      meta: { filePath },
+    });
     return null;
   }
 };
@@ -77,7 +211,11 @@ if (!admin.apps.length) {
       admin.initializeApp();
     }
   } catch (error) {
-    console.warn('Firebase Admin init failed, falling back to default credentials:', error);
+    logEvent({
+      level: 'warn',
+      event: 'firebase.admin.init_fallback',
+      error,
+    });
     admin.initializeApp();
   }
 }
@@ -120,7 +258,17 @@ app.use(express.urlencoded({ extended: true }));
 
 // Logging middleware
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
+  logEvent({
+    level: 'info',
+    event: 'http.request',
+    dedupe: false,
+    meta: {
+      method: req.method,
+      path: req.path,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    },
+  });
   next();
 });
 
@@ -224,7 +372,16 @@ app.post('/api/v1/auth/login', async (req, res) => {
     
     res.status(200).json({ idToken });
   } catch (error) {
-    console.error('Login error:', error);
+    logEvent({
+      level: 'error',
+      event: 'auth.login.failed',
+      error,
+      meta: {
+        path: req.path,
+        method: req.method,
+        email: typeof email === 'string' ? email : null,
+      },
+    });
     res.status(400).json({ message: 'Invalid credentials' });
   }
 });
@@ -275,7 +432,16 @@ const listDonorsHandler = async (req, res) => {
         : await usersRef.limit(200).get();
     } catch (error) {
       if (bloodType) {
-        console.warn('Blood type filtered query failed, falling back to unfiltered query:', error);
+        logEvent({
+          level: 'warn',
+          event: 'donors.list.filtered_query_failed_fallback',
+          error,
+          meta: {
+            bloodType,
+            path: req.path,
+            method: req.method,
+          },
+        });
         snapshot = await usersRef.limit(200).get();
       } else {
         throw error;
@@ -315,7 +481,16 @@ const listDonorsHandler = async (req, res) => {
 
     res.status(200).json(donors);
   } catch (error) {
-    console.error('Failed to fetch donors:', error);
+    logEvent({
+      level: 'error',
+      event: 'donors.list.failed',
+      error,
+      meta: {
+        path: req.path,
+        method: req.method,
+        bloodType: typeof req.body?.bloodType === 'string' ? req.body.bloodType : null,
+      },
+    });
     res.status(500).json({
       message: 'Failed to fetch donors',
       details: process.env.NODE_ENV === 'production' ? undefined : String(error?.message || error),
@@ -560,13 +735,27 @@ export const donorRequestExpiryJob = functions.pubsub
       lastDoc = snapshot.docs[snapshot.docs.length - 1];
     }
 
-    console.log(`Expired ${expiredCount} donor requests with lapsed contact window.`);
+    logEvent({
+      level: 'info',
+      event: 'jobs.donor_request_expiry.completed',
+      dedupe: false,
+      meta: { expiredCount },
+    });
     return null;
   });
 
 // 404 handling
 app.use((req, res) => {
-  console.log('404 Not Found:', req.originalUrl);
+  logEvent({
+    level: 'warn',
+    event: 'http.404',
+    dedupe: false,
+    meta: {
+      path: req.originalUrl,
+      method: req.method,
+      ip: req.ip,
+    },
+  });
   res.status(404).json({
     error: 'Not Found',
     message: `Route ${req.originalUrl} not found`,
@@ -581,7 +770,18 @@ app.use((req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error occurred:', err);
+  logEvent({
+    level: 'error',
+    event: 'http.unhandled_error',
+    error: err,
+    meta: {
+      path: req.originalUrl || req.path,
+      method: req.method,
+      ip: req.ip,
+      body: req.body,
+      query: req.query,
+    },
+  });
   res.status(500).json({
     error : 'Internal Server Error',
     message: err.message,
@@ -593,8 +793,15 @@ app.use((err, req, res, next) => {
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 5001;
   app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    console.log(`Swagger docs available at http://localhost:${PORT}/v1/api-docs`);
+    logEvent({
+      level: 'info',
+      event: 'server.started',
+      dedupe: false,
+      meta: {
+        port: PORT,
+        swaggerUrl: `http://localhost:${PORT}/v1/api-docs`,
+      },
+    });
   });
 }
 

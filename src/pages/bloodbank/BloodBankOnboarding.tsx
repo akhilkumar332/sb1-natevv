@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../../services/referral.service';
-import { captureHandledError } from '../../services/errorLog.service';
 import { notify } from 'services/notify.service';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
@@ -24,8 +23,17 @@ import { countries, getStatesByCountry, getCitiesByState } from '../../data/loca
 import { validateOnboardingStep, type OnboardingValidationRule } from '../../utils/onboardingValidation';
 import { LeafletClickMarker, LeafletMapUpdater } from '../../components/shared/leaflet/LocationMapPrimitives';
 import { useAddressAutocomplete } from '../../hooks/useAddressAutocomplete';
-import { mapNominatimAddress } from '../../utils/addressMapping';
 import { useLocationResolver } from '../../hooks/useLocationResolver';
+import { useScopedErrorReporter } from '../../hooks/useScopedErrorReporter';
+import {
+  notifyInvalidLocationSuggestion,
+  notifyInvalidMapLocation,
+  notifyLocationDetected,
+  notifyMapAddressUpdated,
+} from '../../utils/locationFeedback';
+import { isValidCoordinatePair } from '../../utils/locationSelection';
+import { buildGeocodeLocationPatch, buildSuggestionLocationUpdate } from '../../utils/locationController';
+import { resolveOnboardingSubmitErrorMessage } from '../../utils/onboardingFeedback';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -119,13 +127,10 @@ export function BloodBankOnboarding() {
   const isMountedRef = useRef(true);
   const [availableStates, setAvailableStates] = useState(getStatesByCountry('IN'));
   const [availableCities, setAvailableCities] = useState<string[]>([]);
-  const reportOnboardingError = (error: unknown, kind: string) => {
-    void captureHandledError(error, {
-      source: 'frontend',
-      scope: 'bloodbank',
-      metadata: { kind, page: 'BloodBankOnboarding' },
-    });
-  };
+  const reportOnboardingError = useScopedErrorReporter({
+    scope: 'bloodbank',
+    metadata: { page: 'BloodBankOnboarding' },
+  });
   const {
     suggestions: addressSuggestions,
     showSuggestions: showAddressSuggestions,
@@ -185,38 +190,21 @@ export function BloodBankOnboarding() {
   };
 
   const handleAddressSelect = (suggestion: any) => {
-    const lat = parseFloat(suggestion.lat);
-    const lon = parseFloat(suggestion.lon);
-    if (Number.isNaN(lat) || Number.isNaN(lon)) {
-      notify.error('Invalid location selected.');
+    const update = buildSuggestionLocationUpdate({
+      suggestion,
+      availableStates,
+      countryCode: formData.country,
+      current: formData,
+      coordinateMode: 'number',
+      includePostalCode: true,
+    });
+    if (!update) {
+      notifyInvalidLocationSuggestion();
       return;
     }
-    setFormData(prev => ({
-      ...prev,
-      address: suggestion.display_name,
-      latitude: lat,
-      longitude: lon
-    }));
-    setMapPosition([lat, lon]);
+    setFormData(prev => ({ ...prev, ...update.patch }));
+    setMapPosition(update.coords);
     clearSuggestions();
-
-    // Try to extract and match state/city from address
-    if (suggestion.address) {
-      const mapped = mapNominatimAddress({
-        address: suggestion.address,
-        availableStates,
-        countryCode: formData.country,
-      });
-      if (mapped.state) {
-        setFormData(prev => ({ ...prev, state: mapped.state }));
-      }
-      if (mapped.city) {
-        setFormData(prev => ({ ...prev, city: mapped.city }));
-      }
-      if (mapped.postalCode) {
-        setFormData(prev => ({ ...prev, postalCode: mapped.postalCode }));
-      }
-    }
   };
 
   const getCurrentLocation = () => {
@@ -233,23 +221,16 @@ export function BloodBankOnboarding() {
         setMapPosition([latitude, longitude]);
         setFormData(prev => ({ ...prev, latitude, longitude }));
 
-        const data = result.geocode;
-        if (data && data.address) {
-          const address = data.address;
-          const mapped = mapNominatimAddress({
-            address,
-            availableStates,
-            countryCode: formData.country,
-          });
-          setFormData(prev => ({
-            ...prev,
-            address: data.display_name || '',
-            postalCode: mapped.postalCode || prev.postalCode,
-            state: mapped.state || prev.state,
-            city: mapped.city || prev.city,
-          }));
-
-          notify.success('Location detected successfully!');
+        const patch = buildGeocodeLocationPatch({
+          geocode: result.geocode,
+          availableStates,
+          countryCode: formData.country,
+          current: formData,
+          includePostalCode: true,
+        });
+        if (patch) {
+          setFormData(prev => ({ ...prev, ...patch }));
+          notifyLocationDetected();
         }
       } catch (error) {
         reportOnboardingError(error, 'bloodbank.onboarding.detect_location');
@@ -262,8 +243,8 @@ export function BloodBankOnboarding() {
   };
 
   const handleMapPositionChange = async (newPosition: [number, number]) => {
-    if (!Number.isFinite(newPosition[0]) || !Number.isFinite(newPosition[1])) {
-      notify.error('Invalid map location selected.');
+    if (!isValidCoordinatePair(newPosition)) {
+      notifyInvalidMapLocation();
       return;
     }
     setMapPosition(newPosition);
@@ -277,25 +258,18 @@ export function BloodBankOnboarding() {
       const result = await resolveFromCoordinates(newPosition, {
         errorMessage: 'Could not fetch address for this location',
       });
-      const data = result.geocode;
       if (!isMountedRef.current) return;
 
-      if (data && data.address) {
-        const address = data.address;
-        const mapped = mapNominatimAddress({
-          address,
-          availableStates,
-          countryCode: formData.country,
-        });
-        setFormData(prev => ({
-          ...prev,
-          address: data.display_name || '',
-          postalCode: mapped.postalCode || prev.postalCode,
-          state: mapped.state || prev.state,
-          city: mapped.city || prev.city,
-        }));
-
-        notify.success('Address updated from map location');
+      const patch = buildGeocodeLocationPatch({
+        geocode: result.geocode,
+        availableStates,
+        countryCode: formData.country,
+        current: formData,
+        includePostalCode: true,
+      });
+      if (patch) {
+        setFormData(prev => ({ ...prev, ...patch }));
+        notifyMapAddressUpdated();
       }
     } catch (error) {
       reportOnboardingError(error, 'bloodbank.onboarding.map_reverse_geocode');
@@ -366,12 +340,7 @@ export function BloodBankOnboarding() {
       navigate('/bloodbank/dashboard');
     } catch (error) {
       reportOnboardingError(error, 'bloodbank.onboarding.submit');
-      const message = error instanceof Error ? error.message : '';
-      if (message.toLowerCase().includes('permission')) {
-        notify.error('Permission denied while saving your profile. Please sign in again.');
-      } else {
-        notify.error('Failed to complete onboarding. Please try again.');
-      }
+      notify.error(resolveOnboardingSubmitErrorMessage(error, 'bloodbank'));
     } finally {
       setIsLoading(false);
     }

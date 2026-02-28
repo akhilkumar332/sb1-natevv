@@ -4,7 +4,7 @@
  * Real-time donation monitoring using Firebase onSnapshot
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   collection,
   query,
@@ -17,6 +17,8 @@ import { db } from '../firebase';
 import { Donation } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
 import { failRealtimeLoad } from '../utils/realtimeError';
+import { useSyncedRef } from './useSyncedRef';
+import { notifyNewestItem } from '../utils/realtimeEvents';
 
 interface UseRealtimeDonationsOptions {
   donorId?: string;
@@ -48,16 +50,8 @@ export const useRealtimeDonations = ({
   const [donations, setDonations] = useState<Donation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const donationsRef = useRef<Donation[]>([]);
-  const onNewDonationRef = useRef<typeof onNewDonation>(onNewDonation);
-
-  useEffect(() => {
-    donationsRef.current = donations;
-  }, [donations]);
-
-  useEffect(() => {
-    onNewDonationRef.current = onNewDonation;
-  }, [onNewDonation]);
+  const donationsRef = useSyncedRef(donations);
+  const onNewDonationRef = useSyncedRef(onNewDonation);
 
   useEffect(() => {
     setLoading(true);
@@ -95,15 +89,11 @@ export const useRealtimeDonations = ({
           ]);
 
           // Detect new donations
-          const previousDonations = donationsRef.current;
-          if (previousDonations.length > 0 && donationData.length > 0) {
-            const latestDonation = donationData[0];
-            const wasNew = !previousDonations.find(d => d.id === latestDonation.id);
-
-            if (wasNew && onNewDonationRef.current) {
-              onNewDonationRef.current(latestDonation);
-            }
-          }
+          notifyNewestItem({
+            previous: donationsRef.current,
+            current: donationData,
+            onNew: onNewDonationRef.current ?? undefined,
+          });
 
           setDonations(donationData);
           setLoading(false);

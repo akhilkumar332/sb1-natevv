@@ -5,7 +5,7 @@
  */
 import { captureHandledError } from '../services/errorLog.service';
 
-const isLocalhost = Boolean(
+const isLocalhost = typeof window !== 'undefined' && Boolean(
   window.location.hostname === 'localhost' ||
     window.location.hostname === '[::1]' ||
     window.location.hostname.match(
@@ -13,12 +13,19 @@ const isLocalhost = Boolean(
     )
 );
 
+const debugSwLog = (...args: unknown[]) => {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+};
+
 type Config = {
   onSuccess?: (registration: ServiceWorkerRegistration) => void;
   onUpdate?: (registration: ServiceWorkerRegistration) => void;
 };
 
 export function register(config?: Config) {
+  if (typeof window === 'undefined') return;
   if (import.meta.env.PROD && 'serviceWorker' in navigator) {
     const publicUrl = new URL(import.meta.env.BASE_URL, window.location.href);
     if (publicUrl.origin !== window.location.origin) {
@@ -31,7 +38,7 @@ export function register(config?: Config) {
       if (isLocalhost) {
         checkValidServiceWorker(swUrl, config);
         navigator.serviceWorker.ready.then(() => {
-          console.log(
+          debugSwLog(
             'This web app is being served cache-first by a service worker.'
           );
         });
@@ -57,14 +64,14 @@ function registerValidSW(swUrl: string, config?: Config) {
         installingWorker.onstatechange = () => {
           if (installingWorker.state === 'installed') {
             if (navigator.serviceWorker.controller) {
-              console.log(
+              debugSwLog(
                 'New content is available and will be used when all tabs are closed.'
               );
               if (config && config.onUpdate) {
                 config.onUpdate(registration);
               }
             } else {
-              console.log('Content is cached for offline use.');
+              debugSwLog('Content is cached for offline use.');
               if (config && config.onSuccess) {
                 config.onSuccess(registration);
               }
@@ -102,11 +109,12 @@ function checkValidServiceWorker(swUrl: string, config?: Config) {
       }
     })
     .catch(() => {
-      console.log('No internet connection found. App is running in offline mode.');
+      debugSwLog('No internet connection found. App is running in offline mode.');
     });
 }
 
 export function unregister() {
+  if (typeof window === 'undefined') return;
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.ready
       .then((registration) => {

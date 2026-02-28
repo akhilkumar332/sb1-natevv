@@ -16,12 +16,18 @@ import { countries, getStatesByCountry, getCitiesByState } from '../../../data/l
 import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import { authMessages } from '../../../constants/messages';
-import { captureHandledError } from '../../../services/errorLog.service';
 import { LeafletClickMarker, LeafletMapUpdater } from '../../../components/shared/leaflet/LocationMapPrimitives';
 import { useAddressAutocomplete } from '../../../hooks/useAddressAutocomplete';
 import { authInputMessages, getOtpValidationError, sanitizeOtp, validateGeneralPhoneInput } from '../../../utils/authInputValidation';
-import { mapNominatimAddress } from '../../../utils/addressMapping';
 import { useLocationResolver } from '../../../hooks/useLocationResolver';
+import { useScopedErrorReporter } from '../../../hooks/useScopedErrorReporter';
+import { isValidCoordinatePair } from '../../../utils/locationSelection';
+import {
+  notifyInvalidLocationSuggestion,
+  notifyInvalidMapLocation,
+  notifyLocationDetected,
+} from '../../../utils/locationFeedback';
+import { buildGeocodeLocationPatch, buildSuggestionLocationUpdate } from '../../../utils/locationController';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -89,13 +95,10 @@ const DonorAccount = () => {
   const [phoneUpdateLockedNumber, setPhoneUpdateLockedNumber] = useState('');
   const [pushMessage, setPushMessage] = useState<string | null>(null);
   const [pushEnabled, setPushEnabled] = useState(true);
-  const reportDonorAccountError = (error: unknown, kind: string) => {
-    void captureHandledError(error, {
-      source: 'frontend',
-      scope: 'donor',
-      metadata: { kind, page: 'DonorAccount' },
-    });
-  };
+  const reportDonorAccountError = useScopedErrorReporter({
+    scope: 'donor',
+    metadata: { page: 'DonorAccount' },
+  });
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -313,45 +316,30 @@ const DonorAccount = () => {
   };
 
   const handleAddressSelect = (suggestion: any) => {
-    const lat = parseFloat(suggestion.lat);
-    const lon = parseFloat(suggestion.lon);
-    if (Number.isNaN(lat) || Number.isNaN(lon)) {
-      notify.error('Invalid location selected.');
+    const update = buildSuggestionLocationUpdate({
+      suggestion,
+      availableStates,
+      countryCode: basicInfoForm.country || 'IN',
+      current: basicInfoForm,
+      coordinateMode: 'number',
+      includePostalCode: true,
+    });
+    if (!update) {
+      notifyInvalidLocationSuggestion();
       return;
     }
-    setBasicInfoForm(prev => ({
-      ...prev,
-      address: suggestion.display_name,
-      latitude: lat,
-      longitude: lon,
-    }));
-    setMapPosition([lat, lon]);
+    setBasicInfoForm(prev => ({ ...prev, ...update.patch }));
+    setMapPosition(update.coords);
     clearSuggestions();
 
-    if (suggestion.address) {
-      const mapped = mapNominatimAddress({
-        address: suggestion.address,
-        availableStates,
-        countryCode: basicInfoForm.country || 'IN',
+    if (basicInfoErrors.state || basicInfoErrors.city || basicInfoErrors.postalCode) {
+      setBasicInfoErrors(prev => {
+        const next = { ...prev };
+        delete next.state;
+        delete next.city;
+        delete next.postalCode;
+        return next;
       });
-      if (mapped.state) {
-        setBasicInfoForm(prev => ({ ...prev, state: mapped.state }));
-      }
-      if (mapped.city) {
-        setBasicInfoForm(prev => ({ ...prev, city: mapped.city }));
-      }
-      if (mapped.postalCode) {
-        setBasicInfoForm(prev => ({ ...prev, postalCode: mapped.postalCode }));
-      }
-      if (basicInfoErrors.state || basicInfoErrors.city || basicInfoErrors.postalCode) {
-        setBasicInfoErrors(prev => {
-          const next = { ...prev };
-          delete next.state;
-          delete next.city;
-          delete next.postalCode;
-          return next;
-        });
-      }
     }
   };
 
@@ -369,21 +357,15 @@ const DonorAccount = () => {
         setMapPosition([latitude, longitude]);
         setBasicInfoForm(prev => ({ ...prev, latitude, longitude }));
 
-        const data = result.geocode;
-        if (data && data.address) {
-          const address = data.address;
-          const mapped = mapNominatimAddress({
-            address,
-            availableStates,
-            countryCode: basicInfoForm.country || 'IN',
-          });
-          setBasicInfoForm(prev => ({
-            ...prev,
-            address: data.display_name || prev.address,
-            postalCode: mapped.postalCode || prev.postalCode,
-            state: mapped.state || prev.state,
-            city: mapped.city || prev.city,
-          }));
+        const patch = buildGeocodeLocationPatch({
+          geocode: result.geocode,
+          availableStates,
+          countryCode: basicInfoForm.country || 'IN',
+          current: basicInfoForm,
+          includePostalCode: true,
+        });
+        if (patch) {
+          setBasicInfoForm(prev => ({ ...prev, ...patch }));
           if (basicInfoErrors.address || basicInfoErrors.postalCode) {
             setBasicInfoErrors(prev => {
               const next = { ...prev };
@@ -393,7 +375,7 @@ const DonorAccount = () => {
             });
           }
 
-          notify.success('Location detected successfully!');
+          notifyLocationDetected();
         }
       } catch (error) {
         reportDonorAccountError(error, 'donor.account.location.current');
@@ -406,8 +388,8 @@ const DonorAccount = () => {
   };
 
   const handleMapPositionChange = async (newPosition: [number, number]) => {
-    if (!Number.isFinite(newPosition[0]) || !Number.isFinite(newPosition[1])) {
-      notify.error('Invalid map location selected.');
+    if (!isValidCoordinatePair(newPosition)) {
+      notifyInvalidMapLocation();
       return;
     }
     setMapPosition(newPosition);
@@ -421,23 +403,17 @@ const DonorAccount = () => {
       const result = await resolveFromCoordinates(newPosition, {
         errorMessage: 'Could not fetch address for this location',
       });
-      const data = result.geocode;
       if (!isMountedRef.current) return;
 
-      if (data && data.address) {
-        const address = data.address;
-        const mapped = mapNominatimAddress({
-          address,
-          availableStates,
-          countryCode: basicInfoForm.country || 'IN',
-        });
-        setBasicInfoForm(prev => ({
-          ...prev,
-          address: data.display_name || prev.address,
-          postalCode: mapped.postalCode || prev.postalCode,
-          state: mapped.state || prev.state,
-          city: mapped.city || prev.city,
-        }));
+      const patch = buildGeocodeLocationPatch({
+        geocode: result.geocode,
+        availableStates,
+        countryCode: basicInfoForm.country || 'IN',
+        current: basicInfoForm,
+        includePostalCode: true,
+      });
+      if (patch) {
+        setBasicInfoForm(prev => ({ ...prev, ...patch }));
         if (basicInfoErrors.address || basicInfoErrors.postalCode) {
           setBasicInfoErrors(prev => {
             const next = { ...prev };

@@ -28,6 +28,7 @@ const reportMetric = (metric: { name: string; value: number; rating?: string }) 
  * Measure First Contentful Paint (FCP)
  */
 export const measureFCP = () => {
+  if (typeof window === 'undefined') return;
   if ('PerformanceObserver' in window) {
     const observer = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
@@ -49,6 +50,7 @@ export const measureFCP = () => {
  * Measure Largest Contentful Paint (LCP)
  */
 export const measureLCP = () => {
+  if (typeof window === 'undefined') return;
   if ('PerformanceObserver' in window) {
     const observer = new PerformanceObserver((list) => {
       const entries = list.getEntries();
@@ -67,6 +69,7 @@ export const measureLCP = () => {
  * Measure First Input Delay (FID)
  */
 export const measureFID = () => {
+  if (typeof window === 'undefined') return;
   if ('PerformanceObserver' in window) {
     const observer = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
@@ -88,6 +91,7 @@ export const measureFID = () => {
  * Measure Cumulative Layout Shift (CLS)
  */
 export const measureCLS = () => {
+  if (typeof window === 'undefined') return;
   if ('PerformanceObserver' in window) {
     let clsScore = 0;
     const observer = new PerformanceObserver((list) => {
@@ -116,6 +120,7 @@ export const measureCLS = () => {
  * Measure Time to First Byte (TTFB)
  */
 export const measureTTFB = () => {
+  if (typeof window === 'undefined') return;
   if ('performance' in window && 'timing' in performance) {
     const timing = performance.timing;
     const ttfb = timing.responseStart - timing.requestStart;
@@ -131,6 +136,7 @@ export const measureTTFB = () => {
  * Measure Navigation Timing
  */
 export const measureNavigationTiming = () => {
+  if (typeof window === 'undefined') return;
   if ('performance' in window && 'timing' in performance) {
     const timing = performance.timing;
     const metrics = {
@@ -142,7 +148,9 @@ export const measureNavigationTiming = () => {
       pageLoad: timing.loadEventEnd - timing.loadEventStart,
     };
 
-    console.log('[Navigation Timing]', metrics);
+    if (import.meta.env.DEV) {
+      console.log('[Navigation Timing]', metrics);
+    }
     return metrics;
   }
 };
@@ -151,6 +159,7 @@ export const measureNavigationTiming = () => {
  * Measure Resource Timing
  */
 export const measureResourceTiming = () => {
+  if (typeof window === 'undefined') return;
   if ('performance' in window) {
     const resources = performance.getEntriesByType('resource');
     const slowResources = resources
@@ -172,6 +181,7 @@ export const measureResourceTiming = () => {
  * Measure Bundle Size
  */
 export const measureBundleSize = () => {
+  if (typeof window === 'undefined') return;
   if ('performance' in window) {
     const resources = performance.getEntriesByType('resource');
     const jsResources = resources.filter((resource: any) =>
@@ -186,10 +196,12 @@ export const measureBundleSize = () => {
     const metrics = {
       totalJsSize: totalSize,
       totalJsRequests: jsResources.length,
-      averageJsSize: totalSize / jsResources.length,
+      averageJsSize: jsResources.length > 0 ? totalSize / jsResources.length : 0,
     };
 
-    console.log('[Bundle Size]', metrics);
+    if (import.meta.env.DEV) {
+      console.log('[Bundle Size]', metrics);
+    }
     return metrics;
   }
 };
@@ -223,6 +235,7 @@ export const initPerformanceMonitoring = () => {
  * Measure component render time
  */
 export const measureComponentRender = (componentName: string, startTime: number) => {
+  if (typeof performance === 'undefined') return 0;
   const endTime = performance.now();
   const duration = endTime - startTime;
 
@@ -238,6 +251,7 @@ export const measureComponentRender = (componentName: string, startTime: number)
  * Create performance mark
  */
 export const performanceMark = (name: string) => {
+  if (typeof window === 'undefined') return;
   if ('performance' in window && 'mark' in performance) {
     performance.mark(name);
   }
@@ -247,14 +261,17 @@ export const performanceMark = (name: string) => {
  * Measure between two performance marks
  */
 export const performanceMeasure = (name: string, startMark: string, endMark: string) => {
+  if (typeof window === 'undefined') return 0;
   if ('performance' in window && 'measure' in performance) {
     performance.measure(name, startMark, endMark);
     const measure = performance.getEntriesByName(name)[0];
+    if (!measure) return 0;
     if (import.meta.env.DEV) {
       console.log(`[Performance Measure] ${name}: ${measure.duration.toFixed(2)}ms`);
     }
     return measure.duration;
   }
+  return 0;
 };
 
 export default {

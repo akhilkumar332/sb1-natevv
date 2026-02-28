@@ -4,7 +4,7 @@
  * Real-time blood request monitoring using Firebase onSnapshot
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   collection,
   query,
@@ -17,6 +17,8 @@ import { db } from '../firebase';
 import { BloodRequest } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
 import { failRealtimeLoad, reportRealtimeError } from '../utils/realtimeError';
+import { useSyncedRef } from './useSyncedRef';
+import { notifyNewestItem } from '../utils/realtimeEvents';
 
 interface UseRealtimeBloodRequestsOptions {
   status?: 'active' | 'fulfilled' | 'partially_fulfilled' | 'expired' | 'cancelled';
@@ -48,16 +50,8 @@ export const useRealtimeBloodRequests = ({
   const [requests, setRequests] = useState<BloodRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const requestsRef = useRef<BloodRequest[]>([]);
-  const onNewRequestRef = useRef<typeof onNewRequest>(onNewRequest);
-
-  useEffect(() => {
-    requestsRef.current = requests;
-  }, [requests]);
-
-  useEffect(() => {
-    onNewRequestRef.current = onNewRequest;
-  }, [onNewRequest]);
+  const requestsRef = useSyncedRef(requests);
+  const onNewRequestRef = useSyncedRef(onNewRequest);
 
   useEffect(() => {
     setLoading(true);
@@ -102,15 +96,11 @@ export const useRealtimeBloodRequests = ({
           ]);
 
           // Detect new requests
-          const previousRequests = requestsRef.current;
-          if (previousRequests.length > 0 && requestData.length > 0) {
-            const latestRequest = requestData[0];
-            const wasNew = !previousRequests.find(r => r.id === latestRequest.id);
-
-            if (wasNew && onNewRequestRef.current) {
-              onNewRequestRef.current(latestRequest);
-            }
-          }
+          notifyNewestItem({
+            previous: requestsRef.current,
+            current: requestData,
+            onNew: onNewRequestRef.current ?? undefined,
+          });
 
           setRequests(requestData);
           setLoading(false);

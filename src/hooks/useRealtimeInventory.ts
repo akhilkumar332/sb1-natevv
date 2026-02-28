@@ -4,7 +4,7 @@
  * Real-time blood inventory monitoring using Firebase onSnapshot
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   collection,
   query,
@@ -15,6 +15,7 @@ import { db } from '../firebase';
 import { BloodInventory } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
 import { failRealtimeLoad, reportRealtimeError } from '../utils/realtimeError';
+import { useSyncedRef } from './useSyncedRef';
 
 interface UseRealtimeInventoryOptions {
   hospitalId: string;
@@ -46,31 +47,11 @@ export const useRealtimeInventory = ({
   const [lowStockItems, setLowStockItems] = useState<BloodInventory[]>([]);
   const [criticalStockItems, setCriticalStockItems] = useState<BloodInventory[]>([]);
   const [totalUnits, setTotalUnits] = useState(0);
-  const inventoryRef = useRef<BloodInventory[]>([]);
-  const lowStockItemsRef = useRef<BloodInventory[]>([]);
-  const criticalStockItemsRef = useRef<BloodInventory[]>([]);
-  const onLowStockRef = useRef<typeof onLowStock>(onLowStock);
-  const onCriticalStockRef = useRef<typeof onCriticalStock>(onCriticalStock);
-
-  useEffect(() => {
-    inventoryRef.current = inventory;
-  }, [inventory]);
-
-  useEffect(() => {
-    lowStockItemsRef.current = lowStockItems;
-  }, [lowStockItems]);
-
-  useEffect(() => {
-    criticalStockItemsRef.current = criticalStockItems;
-  }, [criticalStockItems]);
-
-  useEffect(() => {
-    onLowStockRef.current = onLowStock;
-  }, [onLowStock]);
-
-  useEffect(() => {
-    onCriticalStockRef.current = onCriticalStock;
-  }, [onCriticalStock]);
+  const inventoryRef = useSyncedRef(inventory);
+  const lowStockItemsRef = useSyncedRef(lowStockItems);
+  const criticalStockItemsRef = useSyncedRef(criticalStockItems);
+  const onLowStockRef = useSyncedRef(onLowStock);
+  const onCriticalStockRef = useSyncedRef(onCriticalStock);
 
   useEffect(() => {
     if (!hospitalId) {

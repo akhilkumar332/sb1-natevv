@@ -4,7 +4,7 @@
  * Real-time campaign monitoring using Firebase onSnapshot
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   collection,
   query,
@@ -17,7 +17,9 @@ import { db } from '../firebase';
 import { Campaign } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
 import { failRealtimeLoad, reportRealtimeError } from '../utils/realtimeError';
-import { readCacheWithTtl, writeCache } from '../utils/cacheLifecycle';
+import { readDashboardCache, writeDashboardCache } from '../utils/dashboardCache';
+import { useSyncedRef } from './useSyncedRef';
+import { notifyNewestItem } from '../utils/realtimeEvents';
 
 interface UseRealtimeCampaignsOptions {
   ngoId?: string;
@@ -47,21 +49,13 @@ export const useRealtimeCampaigns = ({
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const campaignsRef = useRef<Campaign[]>([]);
-  const onNewCampaignRef = useRef<typeof onNewCampaign>(onNewCampaign);
+  const campaignsRef = useSyncedRef(campaigns);
+  const onNewCampaignRef = useSyncedRef(onNewCampaign);
   const cacheKey = useMemo(() => {
     const key = [ngoId || 'all', status || 'all', city || 'all', limitCount].join('|');
     return `campaigns_cache_${encodeURIComponent(key)}`;
   }, [ngoId, status, city, limitCount]);
   const cacheTTL = 5 * 60 * 1000;
-
-  useEffect(() => {
-    campaignsRef.current = campaigns;
-  }, [campaigns]);
-
-  useEffect(() => {
-    onNewCampaignRef.current = onNewCampaign;
-  }, [onNewCampaign]);
 
   const serializeCampaigns = (items: Campaign[]) =>
     items.map((item) => ({
@@ -85,18 +79,14 @@ export const useRealtimeCampaigns = ({
     setLoading(true);
     setError(null);
     let usedCache = false;
-    const cachedCampaigns = readCacheWithTtl<{ campaigns: any[] }, Campaign[]>({
+    const cachedCampaigns = readDashboardCache<{ campaigns: any[] }, Campaign[]>({
       storage: 'session',
       key: cacheKey,
       ttlMs: cacheTTL,
       kindPrefix: 'campaigns.cache',
-      onError: (err) => {
-        reportRealtimeError(
-          { scope: 'unknown', hook: 'useRealtimeCampaigns' },
-          err,
-          'campaigns.cache.hydrate'
-        );
-      },
+      reportError: (err, kind) =>
+        reportRealtimeError({ scope: 'unknown', hook: 'useRealtimeCampaigns' }, err, kind),
+      reportKind: 'campaigns.cache.hydrate',
       hydrate: (payload) => hydrateCampaigns(payload?.campaigns || []),
     });
     if (cachedCampaigns) {
@@ -138,34 +128,26 @@ export const useRealtimeCampaigns = ({
           ]);
 
           // Detect new campaigns
-          const previousCampaigns = campaignsRef.current;
-          if (previousCampaigns.length > 0 && campaignData.length > 0) {
-            const latestCampaign = campaignData[0];
-            const wasNew = !previousCampaigns.find(c => c.id === latestCampaign.id);
-
-            if (wasNew && onNewCampaignRef.current) {
-              onNewCampaignRef.current(latestCampaign);
-            }
-          }
+          notifyNewestItem({
+            previous: campaignsRef.current,
+            current: campaignData,
+            onNew: onNewCampaignRef.current ?? undefined,
+          });
 
           setCampaigns(campaignData);
           if (!usedCache) {
             setLoading(false);
           }
-          writeCache({
+          writeDashboardCache({
             storage: 'session',
             key: cacheKey,
             data: {
               campaigns: serializeCampaigns(campaignData),
             },
             kindPrefix: 'campaigns.cache',
-            onError: (err) => {
-              reportRealtimeError(
-                { scope: 'unknown', hook: 'useRealtimeCampaigns' },
-                err,
-                'campaigns.cache.write'
-              );
-            },
+            reportError: (err, kind) =>
+              reportRealtimeError({ scope: 'unknown', hook: 'useRealtimeCampaigns' }, err, kind),
+            reportKind: 'campaigns.cache.write',
           });
         } catch (err) {
           failRealtimeLoad(

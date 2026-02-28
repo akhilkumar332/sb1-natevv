@@ -21,6 +21,11 @@ import {
 import { captureHandledError } from '../../../services/errorLog.service';
 import { LeafletClickMarker, LeafletMapUpdater } from '../../../components/shared/leaflet/LocationMapPrimitives';
 import { useLocationResolver } from '../../../hooks/useLocationResolver';
+import {
+  notifyInvalidLocationSuggestion,
+  notifyInvalidMapLocation,
+} from '../../../utils/locationFeedback';
+import { isValidCoordinatePair, parseSuggestionCoordinatePair } from '../../../utils/locationSelection';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -97,12 +102,12 @@ function LocationPicker({
   };
 
   const handleSuggestionSelect = (suggestion: any) => {
-    const lat = parseFloat(suggestion.lat);
-    const lon = parseFloat(suggestion.lon);
-    if (Number.isNaN(lat) || Number.isNaN(lon)) {
-      notify.error('Invalid location selected.');
+    const coords = parseSuggestionCoordinatePair(suggestion);
+    if (!coords) {
+      notifyInvalidLocationSuggestion();
       return;
     }
+    const [lat, lon] = coords;
     const nextPosition: MapPosition = [lat, lon];
     onChange(suggestion.display_name);
     onPositionChange(nextPosition);
@@ -139,8 +144,8 @@ function LocationPicker({
   };
 
   const handleMapPositionChange = async (pos: MapPosition) => {
-    if (!Number.isFinite(pos[0]) || !Number.isFinite(pos[1])) {
-      notify.error('Invalid map location selected.');
+    if (!isValidCoordinatePair(pos)) {
+      notifyInvalidMapLocation();
       return;
     }
     onPositionChange(pos);

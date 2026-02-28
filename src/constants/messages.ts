@@ -16,5 +16,11 @@ export const authMessages = {
     updatePhone: 'Please re-login and try again to update your phone.',
     deleteAccount: 'Please re-login and try again to delete your account.',
   },
+  recaptchaExpired: 'reCAPTCHA expired. Please try again.',
 } as const;
 
+export const referralMessages = {
+  unableToGenerateLink: 'Unable to generate referral link.',
+  unableToCopyLink: 'Unable to copy link. Please try again.',
+  unableToGenerateQr: 'Unable to generate QR code.',
+} as const;

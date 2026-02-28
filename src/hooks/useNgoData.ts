@@ -8,7 +8,7 @@ import { collection, query, where, limit, onSnapshot, getDocs, documentId, write
 import { db } from '../firebase';
 import { getServerTimestamp } from '../utils/firestore.utils';
 import { captureHandledError } from '../services/errorLog.service';
-import { readCacheWithTtl, writeCache } from '../utils/cacheLifecycle';
+import { readDashboardCache, writeDashboardCache } from '../utils/dashboardCache';
 
 export interface Campaign {
   id: string;
@@ -497,12 +497,13 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
             try {
               const legacy = JSON.parse(legacyRaw);
               const sanitized = sanitizeCache(legacy);
-              writeCache({
+              writeDashboardCache({
                 storage: 'session',
                 key: cacheKey,
                 data: sanitized,
                 kindPrefix: 'ngo.dashboard.cache',
-                onError: (err) => reportNgoDataError(err, 'cache_migrate_ngo_dashboard'),
+                reportError: reportNgoDataError,
+                reportKind: 'cache_migrate_ngo_dashboard',
               });
             } catch (err) {
               reportNgoDataError(err, 'cache_migrate_ngo_dashboard');
@@ -511,12 +512,13 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
           }
         }
 
-        const cached = readCacheWithTtl<any>({
+        const cached = readDashboardCache<any>({
           storage: 'session',
           key: cacheKey,
           ttlMs: cacheTTL,
           kindPrefix: 'ngo.dashboard.cache',
-          onError: (err) => reportNgoDataError(err, 'cache_hydrate_ngo_dashboard'),
+          reportError: reportNgoDataError,
+          reportKind: 'cache_hydrate_ngo_dashboard',
           sanitize: sanitizeCache,
         });
         if (cached) {
@@ -635,12 +637,13 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       donorCommunity,
       stats,
     };
-    writeCache({
+    writeDashboardCache({
       storage: 'session',
       key: cacheKey,
       data: payload,
       kindPrefix: 'ngo.dashboard.cache',
-      onError: (err) => reportNgoDataError(err, 'cache_write_ngo_dashboard'),
+      reportError: reportNgoDataError,
+      reportKind: 'cache_write_ngo_dashboard',
     });
   }, [cacheKey, loading, campaigns, volunteers, partnerships, donorCommunity, stats]);
 

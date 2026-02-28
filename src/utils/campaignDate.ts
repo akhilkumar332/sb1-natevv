@@ -33,3 +33,18 @@ export const validateCampaignDateRangeInput = (startInput: string, endInput: str
   }
   return null;
 };
+
+export const resolveCampaignDateRangeInput = (startInput: string, endInput: string) => {
+  const error = validateCampaignDateRangeInput(startInput, endInput);
+  if (error) {
+    return { error, startDate: null, endDate: null } as const;
+  }
+
+  const startDate = parseLocalDate(startInput);
+  const endDate = parseLocalDate(endInput);
+  if (!startDate || !endDate) {
+    return { error: 'Please enter valid dates.', startDate: null, endDate: null } as const;
+  }
+
+  return { error: null, startDate, endDate } as const;
+};

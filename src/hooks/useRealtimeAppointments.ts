@@ -4,7 +4,7 @@
  * Real-time appointment monitoring using Firebase onSnapshot
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   collection,
   query,
@@ -18,6 +18,8 @@ import { db } from '../firebase';
 import { Appointment } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
 import { failRealtimeLoad, reportRealtimeError } from '../utils/realtimeError';
+import { useSyncedRef } from './useSyncedRef';
+import { notifyNewestItem } from '../utils/realtimeEvents';
 
 interface UseRealtimeAppointmentsOptions {
   donorId?: string;
@@ -49,16 +51,8 @@ export const useRealtimeAppointments = ({
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const appointmentsRef = useRef<Appointment[]>([]);
-  const onNewAppointmentRef = useRef<typeof onNewAppointment>(onNewAppointment);
-
-  useEffect(() => {
-    appointmentsRef.current = appointments;
-  }, [appointments]);
-
-  useEffect(() => {
-    onNewAppointmentRef.current = onNewAppointment;
-  }, [onNewAppointment]);
+  const appointmentsRef = useSyncedRef(appointments);
+  const onNewAppointmentRef = useSyncedRef(onNewAppointment);
 
   useEffect(() => {
     setLoading(true);
@@ -102,15 +96,11 @@ export const useRealtimeAppointments = ({
           ]);
 
           // Detect new appointments
-          const previousAppointments = appointmentsRef.current;
-          if (previousAppointments.length > 0 && appointmentData.length > 0) {
-            const latestAppointment = appointmentData[0];
-            const wasNew = !previousAppointments.find(a => a.id === latestAppointment.id);
-
-            if (wasNew && onNewAppointmentRef.current) {
-              onNewAppointmentRef.current(latestAppointment);
-            }
-          }
+          notifyNewestItem({
+            previous: appointmentsRef.current,
+            current: appointmentData,
+            onNew: onNewAppointmentRef.current ?? undefined,
+          });
 
           setAppointments(appointmentData);
           setLoading(false);

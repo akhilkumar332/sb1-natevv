@@ -7,7 +7,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { collection, query, where, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useScopedErrorReporter } from './useScopedErrorReporter';
-import { readCacheWithTtl, writeCache } from '../utils/cacheLifecycle';
+import { readDashboardCache, writeDashboardCache } from '../utils/dashboardCache';
 
 export interface BloodInventoryItem {
   id: string;
@@ -618,12 +618,13 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
 
       let usedCache = false;
       if (cacheKey) {
-        const cached = readCacheWithTtl<any>({
+        const cached = readDashboardCache<any>({
           storage: 'local',
           key: cacheKey,
           ttlMs: cacheTTL,
           kindPrefix: 'bloodbank.dashboard.cache',
-          onError: (err) => reportBloodBankDataError(err, 'cache_hydrate_dashboard'),
+          reportError: reportBloodBankDataError,
+          reportKind: 'cache_hydrate_dashboard',
           sanitize: (raw) => {
             const safe = { ...(raw as any) };
             delete safe.appointments;
@@ -743,12 +744,13 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
       bloodRequests: serializeRequests(bloodRequests),
       stats: buildCacheStats(),
     };
-    writeCache({
+    writeDashboardCache({
       storage: 'local',
       key: cacheKey,
       data: payload,
       kindPrefix: 'bloodbank.dashboard.cache',
-      onError: (err) => reportBloodBankDataError(err, 'cache_write_dashboard'),
+      reportError: reportBloodBankDataError,
+      reportKind: 'cache_write_dashboard',
     });
   }, [cacheKey, loading, inventory, bloodRequests]);
 

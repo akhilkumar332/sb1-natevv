@@ -5,6 +5,7 @@ import { db } from '../firebase';
 import { REFERRAL_RULES, computeReferralStatus } from '../utils/referralRules';
 import { ensureReferralNotificationsForReferrer } from '../services/referral.service';
 import { useScopedErrorReporter } from './useScopedErrorReporter';
+import { referralMessages } from '../constants/messages';
 
 type ReferralEntry = {
   id: string;
@@ -100,7 +101,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
   const copyInviteLink = async () => {
     const inviteLink = buildInviteLink();
     if (!inviteLink) {
-      notify.error('Unable to generate referral link.');
+      notify.error(referralMessages.unableToGenerateLink);
       return;
     }
     try {
@@ -112,14 +113,14 @@ export const useReferrals = (user: any): UseReferralsResult => {
       throw new Error('Clipboard not available');
     } catch (error) {
       reportReferralsError(error, 'copy_invite_link');
-      notify.error('Unable to copy link. Please try again.');
+      notify.error(referralMessages.unableToCopyLink);
     }
   };
 
   const shareInviteLink = async () => {
     const inviteLink = buildInviteLink();
     if (!inviteLink) {
-      notify.error('Unable to generate referral link.');
+      notify.error(referralMessages.unableToGenerateLink);
       return;
     }
     const message = 'Join BloodHub and save lives. Use my referral link to get started.';
@@ -141,7 +142,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
   const openWhatsAppInvite = () => {
     const inviteLink = buildInviteLink();
     if (!inviteLink) {
-      notify.error('Unable to generate referral link.');
+      notify.error(referralMessages.unableToGenerateLink);
       return;
     }
     const text = `Join BloodHub and save lives. Use my referral link to get started: ${inviteLink}`;
@@ -169,7 +170,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
       setReferralQrDataUrl(dataUrl);
     } catch (error) {
       reportReferralsError(error, 'generate_referral_qr');
-      notify.error('Unable to generate QR code.');
+      notify.error(referralMessages.unableToGenerateQr);
     } finally {
       setReferralQrLoading(false);
     }

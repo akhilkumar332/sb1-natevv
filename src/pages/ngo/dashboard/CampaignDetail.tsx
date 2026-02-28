@@ -19,12 +19,13 @@ import { archiveCampaign, deleteCampaign, updateCampaign } from '../../../servic
 import { useAddressAutocomplete } from '../../../hooks/useAddressAutocomplete';
 import { LeafletClickMarker, LeafletMapUpdater } from '../../../components/shared/leaflet/LocationMapPrimitives';
 import { ArchiveDeleteActions } from '../../../components/shared/ArchiveDeleteActions';
-import { formatDateRange, parseLocalDate, toInputDate, validateCampaignDateRangeInput } from '../../../utils/campaignDate';
+import { formatDateRange, resolveCampaignDateRangeInput, toInputDate } from '../../../utils/campaignDate';
 import { DeleteConfirmModal } from '../../../components/shared/DeleteConfirmModal';
 import { getCampaignTargetLabel, getCampaignTypeLabel } from '../../../utils/campaignLabels';
 import { ModalShell } from '../../../components/shared/ModalShell';
 import { useLocationResolver } from '../../../hooks/useLocationResolver';
 import { requireCampaignRequiredFields, requireNgoManagerSession } from '../../../utils/ngoValidation';
+import { useNgoCampaignLocationController } from '../../../hooks/useNgoCampaignLocationController';
 
 const emptyForm = {
   title: '',
@@ -60,7 +61,6 @@ function NgoCampaignDetail() {
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
   const [mapPosition, setMapPosition] = useState<[number, number]>([20.5937, 78.9629]);
-  const [locating, setLocating] = useState(false);
   const {
     suggestions: addressSuggestions,
     showSuggestions,
@@ -77,6 +77,21 @@ function NgoCampaignDetail() {
   const [participantSearch, setParticipantSearch] = useState('');
 
   const notifyNgoCampaignDetailError = createScopedErrorNotifier({ scope: 'ngo', page: 'NgoCampaignDetail' });
+  const { locating, handleMapChange, handleUseCurrentLocation, handleAddressSelect } =
+    useNgoCampaignLocationController({
+      form,
+      setForm,
+      setMapPosition,
+      clearSuggestions,
+      resolveFromCoordinates,
+      resolveCurrentLocation,
+      notifyScopedError: notifyNgoCampaignDetailError,
+      kindPrefix: 'ngo.campaignDetail.location',
+      toastIds: {
+        mapSync: 'ngo-campaign-detail-location-map-sync-error',
+        currentLocation: 'ngo-campaign-detail-location-error',
+      },
+    });
 
   const campaign = useMemo(
     () => campaigns.find((item) => item.id === campaignId),
@@ -249,92 +264,10 @@ function NgoCampaignDetail() {
     clearSuggestions();
   };
 
-  const handleMapChange = (pos: [number, number]) => {
-    if (!Number.isFinite(pos[0]) || !Number.isFinite(pos[1])) {
-      notify.error('Invalid map location selected.');
-      return;
-    }
-    setMapPosition(pos);
-    setForm((prev) => ({
-      ...prev,
-      latitude: pos[0].toFixed(6),
-      longitude: pos[1].toFixed(6),
-    }));
-    void syncAddressFromCoordinates(pos);
-  };
-
-  const syncAddressFromCoordinates = async (pos: [number, number]) => {
-    try {
-      const result = await resolveFromCoordinates(pos, {
-        errorMessage: 'Could not fetch address for this location',
-      });
-      const data = result.geocode;
-      if (data?.display_name) {
-        setForm((prev) => ({
-          ...prev,
-          address: data.display_name || prev.address,
-          city: data.address?.city || data.address?.town || data.address?.village || prev.city,
-          state: data.address?.state || prev.state,
-        }));
-      }
-    } catch (error) {
-      notifyNgoCampaignDetailError(
-        error,
-        'Could not fetch address for this location.',
-        { id: 'ngo-campaign-detail-location-map-sync-error' },
-        'ngo.campaignDetail.location.map_sync'
-      );
-    }
-  };
-
-  const handleUseCurrentLocation = async () => {
-    try {
-      setLocating(true);
-      const result = await resolveCurrentLocation({
-        positionErrorMessage: 'Unable to fetch your location.',
-        unsupportedErrorMessage: 'Geolocation not supported in this browser.',
-      });
-      if (!result) {
-        return;
-      }
-      handleMapChange(result.coords);
-    } catch (error) {
-      notifyNgoCampaignDetailError(
-        error,
-        'Unable to fetch your location.',
-        { id: 'ngo-campaign-detail-location-error' },
-        'ngo.campaignDetail.location.current'
-      );
-    } finally {
-      setLocating(false);
-    }
-  };
-
   const handleAddressChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setForm((prev) => ({ ...prev, address: value }));
     searchSuggestions(value);
-  };
-
-  const handleAddressSelect = (suggestion: any) => {
-    const lat = parseFloat(suggestion.lat);
-    const lon = parseFloat(suggestion.lon);
-    if (Number.isNaN(lat) || Number.isNaN(lon)) {
-      notify.error('Invalid location selected.');
-      return;
-    }
-    setForm((prev) => ({
-      ...prev,
-      address: suggestion.display_name,
-      city: suggestion.address?.city || suggestion.address?.town || suggestion.address?.village || prev.city,
-      state: suggestion.address?.state || prev.state,
-      latitude: lat.toFixed(6),
-      longitude: lon.toFixed(6),
-    }));
-    if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-      setMapPosition([lat, lon]);
-    }
-    clearSuggestions();
   };
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -352,13 +285,11 @@ function NgoCampaignDetail() {
       return;
     }
 
-    const dateError = validateCampaignDateRangeInput(form.startDate, form.endDate);
-    if (dateError) {
-      notify.error(dateError);
+    const { error: dateError, startDate, endDate } = resolveCampaignDateRangeInput(form.startDate, form.endDate);
+    if (dateError || !startDate || !endDate) {
+      notify.error(dateError || 'Please enter valid dates.');
       return;
     }
-    const startDate = parseLocalDate(form.startDate) as Date;
-    const endDate = parseLocalDate(form.endDate) as Date;
 
     setSaving(true);
     try {

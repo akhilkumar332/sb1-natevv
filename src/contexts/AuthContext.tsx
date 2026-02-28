@@ -1539,7 +1539,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'size': 'invisible',
         'callback': () => {},
         'expired-callback': () => {
-          notify.error('reCAPTCHA expired. Please try again.');
+          notify.error(authMessages.recaptchaExpired);
         }
       });
 
@@ -1742,7 +1742,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       'size': 'invisible',
       'callback': () => {},
       'expired-callback': () => {
-        notify.error('reCAPTCHA expired. Please try again.');
+        notify.error(authMessages.recaptchaExpired);
       }
     });
 
@@ -1820,7 +1820,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       'size': 'invisible',
       'callback': () => {},
       'expired-callback': () => {
-        notify.error('reCAPTCHA expired. Please try again.');
+        notify.error(authMessages.recaptchaExpired);
       }
     });
 

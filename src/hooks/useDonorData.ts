@@ -20,7 +20,7 @@ import {
 import { db } from '../firebase';
 import { gamificationService } from '../services/gamification.service';
 import { useScopedErrorReporter } from './useScopedErrorReporter';
-import { readCacheWithTtl, writeCache } from '../utils/cacheLifecycle';
+import { readDashboardCache, writeDashboardCache } from '../utils/dashboardCache';
 
 export interface DonationHistory {
   id: string;
@@ -668,12 +668,13 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       setError(null);
       let usedCache = false;
       if (cacheKey) {
-        const cached = readCacheWithTtl<any>({
+        const cached = readDashboardCache<any>({
           storage: 'session',
           key: cacheKey,
           ttlMs: cacheTTL,
           kindPrefix: 'donor.dashboard.cache',
-          onError: (err) => reportDonorDataError(err, 'cache_hydrate_donor_dashboard'),
+          reportError: reportDonorDataError,
+          reportKind: 'cache_hydrate_donor_dashboard',
         });
         if (cached) {
           if (cached.donationHistory) {
@@ -791,12 +792,13 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
       stats: serializeStats(stats),
       badges: serializeBadges(badges),
     };
-    writeCache({
+    writeDashboardCache({
       storage: 'session',
       key: cacheKey,
       data: payload,
       kindPrefix: 'donor.dashboard.cache',
-      onError: (err) => reportDonorDataError(err, 'cache_write_donor_dashboard'),
+      reportError: reportDonorDataError,
+      reportKind: 'cache_write_donor_dashboard',
     });
   }, [cacheKey, loading, donationHistory, firstDonationDate, emergencyRequests, bloodCamps, stats, badges]);
 

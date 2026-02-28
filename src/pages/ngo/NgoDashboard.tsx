@@ -24,7 +24,7 @@ import {
   Users,
 } from 'lucide-react';
 import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
-import { captureHandledError } from '../../services/errorLog.service';
+import { useScopedErrorReporter } from '../../hooks/useScopedErrorReporter';
 
 export type NgoDashboardContext = {
   user: any;
@@ -57,13 +57,10 @@ export type NgoDashboardContext = {
 
 function NgoDashboard() {
   const { user } = useAuth();
-  const reportNgoDashboardError = (err: unknown, kind: string) => {
-    void captureHandledError(err, {
-      source: 'frontend',
-      scope: 'ngo',
-      metadata: { kind, page: 'NgoDashboard' },
-    });
-  };
+  const reportNgoDashboardError = useScopedErrorReporter({
+    scope: 'ngo',
+    metadata: { page: 'NgoDashboard' },
+  });
 
   const {
     campaigns,

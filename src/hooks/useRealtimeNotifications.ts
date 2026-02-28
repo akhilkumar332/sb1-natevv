@@ -17,6 +17,13 @@ import { auth, db } from '../firebase';
 import { Notification } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
 import { failRealtimeLoad, reportRealtimeError } from '../utils/realtimeError';
+import { useSyncedRef } from './useSyncedRef';
+import { notifyNewestItem } from '../utils/realtimeEvents';
+import {
+  clearRealtimeRetryTimeout,
+  isTransientRealtimeCode,
+  scheduleRealtimeRetry,
+} from '../utils/realtimeRetry';
 
 interface UseRealtimeNotificationsOptions {
   userId: string;
@@ -48,30 +55,29 @@ export const useRealtimeNotifications = ({
   const [error, setError] = useState<string | null>(null);
   const [useFallback, setUseFallback] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const notificationsRef = useRef<Notification[]>([]);
+  const notificationsRef = useSyncedRef(notifications);
+  const onNewNotificationRef = useSyncedRef(onNewNotification);
   const retryTimeoutRef = useRef<number | null>(null);
 
   const maxRetryAttempts = 4;
   const retryDelayMs = 1200;
 
   useEffect(() => {
-    notificationsRef.current = notifications;
-  }, [notifications]);
-
-  useEffect(() => {
     setUseFallback(false);
     setRetryCount(0);
-    if (retryTimeoutRef.current) {
-      window.clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
-    }
+    clearRealtimeRetryTimeout(retryTimeoutRef);
   }, [userId]);
 
   useEffect(() => {
     if (!userId) {
+      setNotifications([]);
+      setUnreadCount(0);
+      setUseFallback(false);
+      setRetryCount(0);
       setLoading(false);
       setReconnecting(false);
       setError(null);
+      clearRealtimeRetryTimeout(retryTimeoutRef);
       return;
     }
 
@@ -97,10 +103,7 @@ export const useRealtimeNotifications = ({
     };
     const isTransientError = (err: any) => {
       const code = err?.code;
-      if (['unavailable', 'deadline-exceeded', 'aborted', 'internal', 'cancelled'].includes(code)) {
-        return true;
-      }
-      if (code === 'already-exists') {
+      if (isTransientRealtimeCode(code)) {
         return true;
       }
 
@@ -132,14 +135,11 @@ export const useRealtimeNotifications = ({
           }
 
           // Detect new notifications
-          if (notificationsRef.current.length > 0 && notificationData.length > 0) {
-            const latestNotification = notificationData[0];
-            const wasNew = !notificationsRef.current.find(n => n.id === latestNotification.id);
-
-            if (wasNew && onNewNotification) {
-              onNewNotification(latestNotification);
-            }
-          }
+          notifyNewestItem({
+            previous: notificationsRef.current,
+            current: notificationData,
+            onNew: onNewNotificationRef.current ?? undefined,
+          });
 
           setNotifications(notificationData);
           setUnreadCount(notificationData.filter(n => !n.read).length);
@@ -174,12 +174,13 @@ export const useRealtimeNotifications = ({
         }
 
         if (isTransientError(err) && retryCount < maxRetryAttempts) {
-          if (retryTimeoutRef.current) {
-            window.clearTimeout(retryTimeoutRef.current);
-          }
-          retryTimeoutRef.current = window.setTimeout(() => {
-            setRetryCount((prev) => prev + 1);
-          }, retryDelayMs);
+          scheduleRealtimeRetry({
+            timeoutRef: retryTimeoutRef,
+            delayMs: retryDelayMs,
+            onRetry: () => {
+              setRetryCount((prev) => prev + 1);
+            },
+          });
           setLoading(true);
           setReconnecting(true);
           return;
@@ -203,12 +204,9 @@ export const useRealtimeNotifications = ({
     // Cleanup listener on unmount
     return () => {
       unsubscribe();
-      if (retryTimeoutRef.current) {
-        window.clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
-      }
+      clearRealtimeRetryTimeout(retryTimeoutRef);
     };
-  }, [userId, limitCount, useFallback, onNewNotification, retryCount]);
+  }, [userId, limitCount, useFallback, retryCount]);
 
   return {
     notifications,
@@ -230,10 +228,9 @@ export const useUnreadNotificationCount = (userId: string): number => {
 
   useEffect(() => {
     if (!userId) {
-      if (retryTimeoutRef.current) {
-        window.clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
-      }
+      setUnreadCount(0);
+      setRetryCount(0);
+      clearRealtimeRetryTimeout(retryTimeoutRef);
       return;
     }
 
@@ -260,14 +257,15 @@ export const useUnreadNotificationCount = (userId: string): number => {
         }
       },
       (err) => {
-        const isTransient = ['already-exists', 'unavailable', 'deadline-exceeded', 'aborted', 'internal', 'cancelled'].includes(err?.code);
+        const isTransient = isTransientRealtimeCode(err?.code);
         if (isTransient && retryCount < 3) {
-          if (retryTimeoutRef.current) {
-            window.clearTimeout(retryTimeoutRef.current);
-          }
-          retryTimeoutRef.current = window.setTimeout(() => {
-            setRetryCount((prev) => prev + 1);
-          }, 1000);
+          scheduleRealtimeRetry({
+            timeoutRef: retryTimeoutRef,
+            delayMs: 1000,
+            onRetry: () => {
+              setRetryCount((prev) => prev + 1);
+            },
+          });
           return;
         }
         reportRealtimeError(
@@ -280,10 +278,7 @@ export const useUnreadNotificationCount = (userId: string): number => {
 
     return () => {
       unsubscribe();
-      if (retryTimeoutRef.current) {
-        window.clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
-      }
+      clearRealtimeRetryTimeout(retryTimeoutRef);
     };
   }, [userId, retryCount]);
 
@@ -300,10 +295,9 @@ export const useEmergencyNotifications = (userId: string): Notification[] => {
 
   useEffect(() => {
     if (!userId) {
-      if (retryTimeoutRef.current) {
-        window.clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
-      }
+      setEmergencyNotifications([]);
+      setRetryCount(0);
+      clearRealtimeRetryTimeout(retryTimeoutRef);
       return;
     }
 
@@ -338,14 +332,15 @@ export const useEmergencyNotifications = (userId: string): Notification[] => {
         }
       },
       (err) => {
-        const isTransient = ['already-exists', 'unavailable', 'deadline-exceeded', 'aborted', 'internal', 'cancelled'].includes(err?.code);
+        const isTransient = isTransientRealtimeCode(err?.code);
         if (isTransient && retryCount < 3) {
-          if (retryTimeoutRef.current) {
-            window.clearTimeout(retryTimeoutRef.current);
-          }
-          retryTimeoutRef.current = window.setTimeout(() => {
-            setRetryCount((prev) => prev + 1);
-          }, 1000);
+          scheduleRealtimeRetry({
+            timeoutRef: retryTimeoutRef,
+            delayMs: 1000,
+            onRetry: () => {
+              setRetryCount((prev) => prev + 1);
+            },
+          });
           return;
         }
         reportRealtimeError(
@@ -358,10 +353,7 @@ export const useEmergencyNotifications = (userId: string): Notification[] => {
 
     return () => {
       unsubscribe();
-      if (retryTimeoutRef.current) {
-        window.clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
-      }
+      clearRealtimeRetryTimeout(retryTimeoutRef);
     };
   }, [userId, retryCount]);
 

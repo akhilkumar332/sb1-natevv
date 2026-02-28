@@ -39,10 +39,10 @@ import {
 } from '../../services/donorRequest.service';
 import { filterSelfTargets } from '../../services/donorRequestGuard.service';
 import type { ConfirmationResult } from 'firebase/auth';
-import { captureHandledError } from '../../services/errorLog.service';
 import { authInputMessages, getOtpValidationError, sanitizeOtp, validateGeneralPhoneInput } from '../../utils/authInputValidation';
 import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
 import { notifyKeepOneLoginMethod, notifySelfRequestBlocked } from '../../utils/validationFeedback';
+import { useScopedErrorReporter } from '../../hooks/useScopedErrorReporter';
 
 type ShareOptions = {
   showPhone: boolean;
@@ -133,13 +133,10 @@ function DonorDashboard() {
   const locationBackfillRef = useRef(false);
   const pendingRequestProcessedRef = useRef<string | null>(null);
   const allowPendingAutoSubmitRef = useRef(false);
-  const reportDonorDashboardError = (err: unknown, kind: string) => {
-    void captureHandledError(err, {
-      source: 'frontend',
-      scope: 'donor',
-      metadata: { kind, page: 'DonorDashboard' },
-    });
-  };
+  const reportDonorDashboardError = useScopedErrorReporter({
+    scope: 'donor',
+    metadata: { page: 'DonorDashboard' },
+  });
   const [eligibilityChecklist, setEligibilityChecklist] = useState({
     hydrated: false,
     weightOk: false,
