@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { MailCheck, MailOpen, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { deleteField, doc, updateDoc, writeBatch } from 'firebase/firestore';
@@ -40,6 +40,7 @@ function ContactSubmissionsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
@@ -292,7 +293,19 @@ function ContactSubmissionsPage() {
                   </span>
                 </div>
                 <p className="mt-2 text-sm font-medium text-gray-800">Subject: {entry.subject}</p>
-                <p className="mt-1 text-sm text-gray-600 whitespace-pre-wrap break-words">{entry.message}</p>
+                <p className="mt-1 text-sm text-gray-600 break-words line-clamp-3">{entry.message}</p>
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+                  className="mt-2 rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  {expandedId === entry.id ? 'Hide' : 'View'}
+                </button>
+                {expandedId === entry.id && (
+                  <pre className="mt-2 max-h-56 overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 whitespace-pre-wrap">
+                    {entry.message}
+                  </pre>
+                )}
                 <div className="mt-3 text-xs text-gray-600 space-y-1">
                   <p>Phone: <span className="font-semibold text-gray-800">{entry.phone || '-'}</span></p>
                   <p>Received: <span className="font-semibold text-gray-800">{entry.createdAt ? entry.createdAt.toLocaleString() : 'N/A'}</span></p>
@@ -354,63 +367,87 @@ function ContactSubmissionsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {paged.map((entry) => (
-                    <tr key={entry.id} className={`hover:bg-red-50/40 ${entry.status === CONTACT_SUBMISSION_STATUS.unread ? 'bg-red-50/30' : ''}`}>
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={isSelected(entry.id)}
-                          onChange={() => toggleSelected(entry.id)}
-                          className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
-                          aria-label={`Select submission from ${entry.name}`}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-gray-900">{entry.name}</p>
-                        <p className="text-xs text-gray-500">{entry.email}</p>
-                        <p className="text-xs text-gray-500">{entry.phone || '-'}</p>
-                      </td>
-                      <td className="px-4 py-3 text-gray-700">{entry.subject}</td>
-                      <td className="px-4 py-3 text-gray-600 max-w-[380px] truncate">{entry.message}</td>
-                      <td className="px-4 py-3 text-gray-600">{entry.createdAt ? entry.createdAt.toLocaleString() : 'N/A'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${entry.status === CONTACT_SUBMISSION_STATUS.read ? 'bg-gray-100 text-gray-700' : 'bg-red-100 text-red-700'}`}>
-                          {entry.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => void markStatus(entry, CONTACT_SUBMISSION_STATUS.read)}
-                            disabled={processingId === entry.id || entry.status === CONTACT_SUBMISSION_STATUS.read || deletingId === entry.id || bulkDeleting}
-                            className="rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
-                          >
-                            <MailCheck className="mr-1 inline h-3.5 w-3.5" />
-                            Read
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void markStatus(entry, CONTACT_SUBMISSION_STATUS.unread)}
-                            disabled={processingId === entry.id || entry.status === CONTACT_SUBMISSION_STATUS.unread || deletingId === entry.id || bulkDeleting}
-                            className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                          >
-                            <MailOpen className="mr-1 inline h-3.5 w-3.5" />
-                            Unread
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void deleteSingle(entry)}
-                            disabled={deletingId === entry.id || bulkDeleting || processingId === entry.id}
-                            className="rounded-md border border-red-300 px-2 py-1 text-xs font-semibold text-red-800 hover:bg-red-50 disabled:opacity-50"
-                          >
-                            <Trash2 className="mr-1 inline h-3.5 w-3.5" />
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {paged.map((entry) => {
+                    const isExpanded = expandedId === entry.id;
+                    return (
+                      <Fragment key={entry.id}>
+                        <tr className={`hover:bg-red-50/40 ${entry.status === CONTACT_SUBMISSION_STATUS.unread ? 'bg-red-50/30' : ''}`}>
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={isSelected(entry.id)}
+                              onChange={() => toggleSelected(entry.id)}
+                              className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                              aria-label={`Select submission from ${entry.name}`}
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-gray-900">{entry.name}</p>
+                            <p className="text-xs text-gray-500">{entry.email}</p>
+                            <p className="text-xs text-gray-500">{entry.phone || '-'}</p>
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">{entry.subject}</td>
+                          <td className="px-4 py-3 text-gray-600 max-w-[380px]">
+                            <p className="line-clamp-2">{entry.message}</p>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">{entry.createdAt ? entry.createdAt.toLocaleString() : 'N/A'}</td>
+                          <td className="px-4 py-3">
+                            <span className={`rounded-full px-2 py-1 text-xs font-semibold ${entry.status === CONTACT_SUBMISSION_STATUS.read ? 'bg-gray-100 text-gray-700' : 'bg-red-100 text-red-700'}`}>
+                              {entry.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setExpandedId(isExpanded ? null : entry.id)}
+                                className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                              >
+                                {isExpanded ? 'Hide' : 'View'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void markStatus(entry, CONTACT_SUBMISSION_STATUS.read)}
+                                disabled={processingId === entry.id || entry.status === CONTACT_SUBMISSION_STATUS.read || deletingId === entry.id || bulkDeleting}
+                                className="rounded-md border border-emerald-200 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                              >
+                                <MailCheck className="mr-1 inline h-3.5 w-3.5" />
+                                Read
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void markStatus(entry, CONTACT_SUBMISSION_STATUS.unread)}
+                                disabled={processingId === entry.id || entry.status === CONTACT_SUBMISSION_STATUS.unread || deletingId === entry.id || bulkDeleting}
+                                className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                              >
+                                <MailOpen className="mr-1 inline h-3.5 w-3.5" />
+                                Unread
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void deleteSingle(entry)}
+                                disabled={deletingId === entry.id || bulkDeleting || processingId === entry.id}
+                                className="rounded-md border border-red-300 px-2 py-1 text-xs font-semibold text-red-800 hover:bg-red-50 disabled:opacity-50"
+                              >
+                                <Trash2 className="mr-1 inline h-3.5 w-3.5" />
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr className="bg-gray-50/70">
+                            <td colSpan={7} className="px-4 py-4">
+                              <p className="text-xs font-semibold text-gray-800">Message</p>
+                              <pre className="mt-1 max-h-56 overflow-auto rounded-lg border border-gray-200 bg-white p-3 text-[11px] text-gray-700 whitespace-pre-wrap">
+                                {entry.message}
+                              </pre>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
