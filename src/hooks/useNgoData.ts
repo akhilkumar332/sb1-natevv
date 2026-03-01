@@ -387,22 +387,14 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
 
   const fetchDonorCommunity = async () => {
     try {
-      const donorsRef = collection(db, 'users');
-      const donorsQuery = query(donorsRef, where('role', '==', 'donor'));
-      const allDonorsSnap = await getDocs(donorsQuery);
-
-      const eligibleDonors = allDonorsSnap.docs
+      const publicSnap = await getDocs(collection(db, 'publicDonors'));
+      const eligibleDonors = publicSnap.docs
         .map((doc) => doc.data())
         .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
         .filter((data: any) => !data.status || data.status === 'active');
 
       const totalDonors = eligibleDonors.length;
-
-      const publicSnap = await getDocs(collection(db, 'publicDonors'));
-      const activeDonors = publicSnap.docs
-        .map((doc) => doc.data())
-        .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
-        .filter((data: any) => data.isAvailable === true).length;
+      const activeDonors = eligibleDonors.filter((data: any) => data.isAvailable === true).length;
 
       const oneMonthAgo = new Date();
       oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
@@ -685,46 +677,78 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
     }
 
     const donors: DonorSummary[] = [];
+    const donorMap = new Map<string, DonorSummary>();
     const chunks: string[][] = [];
     for (let index = 0; index < normalized.length; index += 10) {
       chunks.push(normalized.slice(index, index + 10));
     }
+
+    const mapToDonorSummary = (id: string, data: any): DonorSummary => ({
+      id,
+      name: data.displayName || data.name || 'Donor',
+      email: data.email,
+      phone: data.phoneNumber || data.phone,
+      bloodType: data.bloodType,
+      city: data.city,
+      state: data.state,
+      latitude: typeof data.latitude === 'number'
+        ? data.latitude
+        : typeof data.location?.latitude === 'number'
+          ? data.location.latitude
+          : undefined,
+      longitude: typeof data.longitude === 'number'
+        ? data.longitude
+        : typeof data.location?.longitude === 'number'
+          ? data.location.longitude
+          : undefined,
+      isAvailable: data.isAvailable,
+      lastDonation: data.lastDonation?.toDate ? data.lastDonation.toDate() : data.lastDonation ? new Date(data.lastDonation) : undefined,
+      totalDonations: data.totalDonations,
+      createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt ? new Date(data.createdAt) : undefined,
+    });
+
     try {
-      const queries = chunks.map((chunk) =>
-        getDocs(query(collection(db, 'users'), where(documentId(), 'in', chunk)))
+      // Primary source for participant directory rows.
+      const publicQueries = chunks.map((chunk) =>
+        getDocs(query(collection(db, 'publicDonors'), where(documentId(), 'in', chunk)))
       );
-      const snapshots = await Promise.all(queries);
-      snapshots.forEach((snapshot) => {
+      const publicSnapshots = await Promise.all(publicQueries);
+      publicSnapshots.forEach((snapshot) => {
         snapshot.docs.forEach((docSnap) => {
-          const data = docSnap.data();
-          donors.push({
-            id: docSnap.id,
-            name: data.displayName || data.name || 'Donor',
-            email: data.email,
-            phone: data.phoneNumber,
-            bloodType: data.bloodType,
-            city: data.city,
-            state: data.state,
-            latitude: typeof data.latitude === 'number'
-              ? data.latitude
-              : typeof data.location?.latitude === 'number'
-                ? data.location.latitude
-                : undefined,
-            longitude: typeof data.longitude === 'number'
-              ? data.longitude
-              : typeof data.location?.longitude === 'number'
-                ? data.location.longitude
-                : undefined,
-            isAvailable: data.isAvailable,
-            lastDonation: data.lastDonation?.toDate ? data.lastDonation.toDate() : data.lastDonation ? new Date(data.lastDonation) : undefined,
-            totalDonations: data.totalDonations,
-            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt ? new Date(data.createdAt) : undefined,
-          });
+          donorMap.set(docSnap.id, mapToDonorSummary(docSnap.id, docSnap.data()));
         });
       });
+
+      // Fallback for IDs missing in publicDonors (legacy data), best-effort only.
+      const missingIds = normalized.filter((id) => !donorMap.has(id));
+      if (missingIds.length > 0) {
+        const missingChunks: string[][] = [];
+        for (let index = 0; index < missingIds.length; index += 10) {
+          missingChunks.push(missingIds.slice(index, index + 10));
+        }
+        try {
+          const userQueries = missingChunks.map((chunk) =>
+            getDocs(query(collection(db, 'users'), where(documentId(), 'in', chunk)))
+          );
+          const userSnapshots = await Promise.all(userQueries);
+          userSnapshots.forEach((snapshot) => {
+            snapshot.docs.forEach((docSnap) => {
+              if (donorMap.has(docSnap.id)) return;
+              donorMap.set(docSnap.id, mapToDonorSummary(docSnap.id, docSnap.data()));
+            });
+          });
+        } catch (fallbackError) {
+          const code = String((fallbackError as any)?.code || '').toLowerCase();
+          if (code !== 'permission-denied' && code !== 'unauthenticated') {
+            reportNgoDataError(fallbackError, 'load_participant_donors.users_fallback');
+          }
+        }
+      }
     } catch (error) {
       reportNgoDataError(error, 'load_participant_donors');
     }
+
+    donors.push(...Array.from(donorMap.values()));
 
     const ordered = normalized
       .map((id) => donors.find((donor) => donor.id === id))

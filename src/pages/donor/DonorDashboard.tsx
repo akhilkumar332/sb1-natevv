@@ -79,7 +79,6 @@ const isExpectedNetworkFetchError = (error: unknown): boolean => {
 function DonorDashboard() {
   const {
     user,
-    profileResolved,
     updateUserProfile,
     linkGoogleProvider,
     startPhoneLink,
@@ -175,7 +174,9 @@ function DonorDashboard() {
   const incomingAcceptedExpiryRef = useRef<Set<string>>(new Set());
 
   // Use custom hook to fetch all donor data
-  const canLoadDashboardData = Boolean(profileResolved && user?.uid);
+  // Start dashboard hydration as soon as we have a UID.
+  // Individual hooks already handle cache-first + background refresh behavior.
+  const canLoadDashboardData = Boolean(user?.uid);
   const {
     donationHistory,
     firstDonationDate,

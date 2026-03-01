@@ -128,7 +128,7 @@ service cloud.firestore {
      * Restrict non-owner user-profile reads to active, non-break-glass accounts.
      */
     function isReadableDirectoryProfile() {
-      return resource.data.status == 'active'
+      return (resource.data.status == 'active' || !resource.data.keys().hasAny(['status']))
         && !(resource.data.breakGlass == true)
         && (
           (resource.data.role == 'donor' && resource.data.onboardingCompleted != false) ||
@@ -317,6 +317,11 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (
         isOwner(userId) ||
         isAdmin() ||
+        (
+          // Any authenticated session can read donor-backed user profiles
+          // when the donor is present in publicDonors.
+          exists(/databases/$(database)/documents/publicDonors/$(userId))
+        ) ||
         isReadableDirectoryProfile()
       );
 

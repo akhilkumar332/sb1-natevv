@@ -171,6 +171,8 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
         referrerBhId,
         referrerRole,
         referredRole,
+        referredDisplayName: getReferredDisplayName(referredData),
+        referredBhId: referredData?.bhId || null,
         referredAt: serverTimestamp(),
         status: 'registered',
         createdAt: serverTimestamp(),
@@ -242,6 +244,15 @@ const buildNotificationContent = (
     message: `${name} has an update on their referral status.`,
   };
 };
+
+const getReferredDisplayName = (referredUser?: any) => (
+  referredUser?.organizationName
+  || referredUser?.bloodBankName
+  || referredUser?.hospitalName
+  || referredUser?.displayName
+  || referredUser?.name
+  || null
+);
 
 const sendReferralNotification = async (
   referrerUid: string,
@@ -318,6 +329,8 @@ export const ensureReferralTrackingForExistingReferral = async (user: any): Prom
       referrerBhId: user.referredByBhId,
       referrerRole,
       referredRole: user?.role,
+      referredDisplayName: getReferredDisplayName(user),
+      referredBhId: user?.bhId || null,
       referredAt: serverTimestamp(),
       status: 'registered',
       createdAt: serverTimestamp(),

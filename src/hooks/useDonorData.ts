@@ -658,8 +658,19 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     } catch (err) {
       if (!isOfflineFirestoreError(err)) {
         reportDonorDataError(err, 'fetch_stats_and_badges');
-        setError('Failed to load donor stats');
       }
+      // Stats enrichment should not block dashboard rendering.
+      // Keep previous stats if present, otherwise provide a safe fallback.
+      setStats((prev) => prev ?? {
+        totalDonations: 0,
+        livesSaved: 0,
+        nextEligibleDate: null,
+        daysUntilEligible: 0,
+        impactScore: 0,
+        streak: 0,
+        emergencyResponses: 0,
+        badges: [],
+      });
     }
   };
 

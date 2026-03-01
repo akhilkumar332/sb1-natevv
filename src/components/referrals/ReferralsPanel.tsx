@@ -270,7 +270,7 @@ const ReferralsPanel = ({
                 const referredUser = referral.user || {};
                 const roleKey = String(referral.referredRole || referredUser.role || '').toLowerCase();
                 const roleLabel = ROLE_LABELS[roleKey];
-                const displayName =
+                const liveDisplayName =
                   referredUser.organizationName
                   || referredUser.bloodBankName
                   || referredUser.hospitalName
@@ -281,6 +281,10 @@ const ReferralsPanel = ({
                     : roleKey === 'bloodbank' || roleKey === 'hospital'
                       ? 'New Blood Bank'
                       : 'New User');
+                const isDeletedReferral = referral.referralStatus === 'deleted' || referral.isDeleted;
+                const displayName = isDeletedReferral
+                  ? (referral.referredDisplayName || liveDisplayName)
+                  : liveDisplayName;
                 const initials = displayName
                   .split(' ')
                   .filter(Boolean)
@@ -308,9 +312,9 @@ const ReferralsPanel = ({
                                 {roleLabel}
                               </span>
                             )}
-                            {referredUser.bhId && (
+                            {(referredUser.bhId || referral.referredBhId) && (
                               <span className={`rounded-full border ${theme.badgeBorder} bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${theme.badgeText}`}>
-                                {referredUser.bhId}
+                                {referredUser.bhId || referral.referredBhId}
                               </span>
                             )}
                             {referredUser.bloodType && (

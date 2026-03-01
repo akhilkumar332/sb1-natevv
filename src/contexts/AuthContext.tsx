@@ -28,7 +28,6 @@ import {
   doc,
   setDoc, 
   getDoc, 
-  getDocFromServer,
   updateDoc, 
   serverTimestamp, 
   DocumentReference,
@@ -503,14 +502,8 @@ type UserFetchResult = {
 };
 
 const getUserDocSnapshot = async (userRef: DocumentReference): Promise<DocumentSnapshot> => {
-  try {
-    return await getDocFromServer(userRef);
-  } catch (error: any) {
-    if (error?.code === 'permission-denied') {
-      throw error;
-    }
-    return await getDoc(userRef);
-  }
+  // Prefer standard getDoc so Firestore can use cache when network channels are unstable.
+  return await getDoc(userRef);
 };
 
 const updateUserInFirestore = async (

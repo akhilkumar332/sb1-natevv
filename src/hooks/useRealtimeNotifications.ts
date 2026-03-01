@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
   query,
@@ -39,6 +40,26 @@ interface UseRealtimeNotificationsResult {
   error: string | null;
 }
 
+const useAuthUidMatch = (userId: string) => {
+  const [authReady, setAuthReady] = useState<boolean>(() => Boolean(auth.currentUser));
+  const [authUid, setAuthUid] = useState<string | null>(() => auth.currentUser?.uid ?? null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setAuthReady(true);
+      setAuthUid(firebaseUser?.uid ?? null);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  return {
+    authReady,
+    authUid,
+    canListen: Boolean(userId) && authReady && authUid === userId,
+  };
+};
+
 /**
  * Hook for real-time notifications
  * Automatically updates when new notifications arrive
@@ -58,6 +79,7 @@ export const useRealtimeNotifications = ({
   const notificationsRef = useSyncedRef(notifications);
   const onNewNotificationRef = useSyncedRef(onNewNotification);
   const retryTimeoutRef = useRef<number | null>(null);
+  const { canListen, authReady } = useAuthUidMatch(userId);
 
   const maxRetryAttempts = 4;
   const retryDelayMs = 1200;
@@ -75,6 +97,19 @@ export const useRealtimeNotifications = ({
       setUseFallback(false);
       setRetryCount(0);
       setLoading(false);
+      setReconnecting(false);
+      setError(null);
+      clearRealtimeRetryTimeout(retryTimeoutRef);
+      return;
+    }
+
+    if (!canListen) {
+      const waitingForAuthHydration = !authReady;
+      if (!waitingForAuthHydration) {
+        setNotifications([]);
+        setUnreadCount(0);
+      }
+      setLoading(waitingForAuthHydration);
       setReconnecting(false);
       setError(null);
       clearRealtimeRetryTimeout(retryTimeoutRef);
@@ -206,7 +241,7 @@ export const useRealtimeNotifications = ({
       unsubscribe();
       clearRealtimeRetryTimeout(retryTimeoutRef);
     };
-  }, [userId, limitCount, useFallback, retryCount]);
+  }, [userId, limitCount, useFallback, retryCount, canListen, authReady]);
 
   return {
     notifications,
@@ -225,11 +260,19 @@ export const useUnreadNotificationCount = (userId: string): number => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
   const retryTimeoutRef = useRef<number | null>(null);
+  const { canListen, authReady } = useAuthUidMatch(userId);
 
   useEffect(() => {
     if (!userId) {
       setUnreadCount(0);
       setRetryCount(0);
+      clearRealtimeRetryTimeout(retryTimeoutRef);
+      return;
+    }
+    if (!canListen) {
+      if (authReady) {
+        setUnreadCount(0);
+      }
       clearRealtimeRetryTimeout(retryTimeoutRef);
       return;
     }
@@ -280,7 +323,7 @@ export const useUnreadNotificationCount = (userId: string): number => {
       unsubscribe();
       clearRealtimeRetryTimeout(retryTimeoutRef);
     };
-  }, [userId, retryCount]);
+  }, [userId, retryCount, canListen, authReady]);
 
   return unreadCount;
 };
@@ -292,11 +335,19 @@ export const useEmergencyNotifications = (userId: string): Notification[] => {
   const [emergencyNotifications, setEmergencyNotifications] = useState<Notification[]>([]);
   const [retryCount, setRetryCount] = useState(0);
   const retryTimeoutRef = useRef<number | null>(null);
+  const { canListen, authReady } = useAuthUidMatch(userId);
 
   useEffect(() => {
     if (!userId) {
       setEmergencyNotifications([]);
       setRetryCount(0);
+      clearRealtimeRetryTimeout(retryTimeoutRef);
+      return;
+    }
+    if (!canListen) {
+      if (authReady) {
+        setEmergencyNotifications([]);
+      }
       clearRealtimeRetryTimeout(retryTimeoutRef);
       return;
     }
@@ -355,7 +406,7 @@ export const useEmergencyNotifications = (userId: string): Notification[] => {
       unsubscribe();
       clearRealtimeRetryTimeout(retryTimeoutRef);
     };
-  }, [userId, retryCount]);
+  }, [userId, retryCount, canListen, authReady]);
 
   return emergencyNotifications;
 };

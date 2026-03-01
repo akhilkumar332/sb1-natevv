@@ -33,6 +33,27 @@ export const useLogin = () => {
   const location = useLocation();
   const { loginWithGoogle, loginWithPhone, verifyOTP, logout, user, authLoading } = useAuth();
 
+  const navigateAfterDonorLogin = (loggedInUser: { onboardingCompleted?: boolean }) => {
+    const pendingParams = new URLSearchParams(location.search);
+    const rawReturnTo = pendingParams.get('returnTo') || '';
+    const returnTo = rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//') ? rawReturnTo : '';
+    pendingParams.delete('returnTo');
+    const pendingSearch = pendingParams.toString();
+    const hasPendingRequest = pendingParams.has('pendingRequest') || pendingParams.has('pendingRequestKey');
+    if (loggedInUser.onboardingCompleted === true) {
+      const destination = returnTo || (hasPendingRequest ? '/donor/dashboard/requests' : '/donor/dashboard');
+      const target = pendingSearch
+        ? `${destination}${destination.includes('?') ? '&' : '?'}${pendingSearch}`
+        : destination;
+      navigate(target);
+      return;
+    }
+    const onboardingTarget = pendingSearch
+      ? `/donor/onboarding?${pendingSearch}`
+      : '/donor/onboarding';
+    navigate(onboardingTarget);
+  };
+
   const handleIdentifierChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -96,6 +117,7 @@ export const useLogin = () => {
         throw new Error('No token received');
       }
 
+      navigateAfterDonorLogin(verifiedUser);
       notify.success('Login successful!');
     } catch (error) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.otp.verify' } });
@@ -181,24 +203,7 @@ export const useLogin = () => {
         notify.success('Successfully logged in with Google!');
 
         // Navigate based on onboarding status - if not explicitly true, go to onboarding
-        const pendingParams = new URLSearchParams(location.search);
-        const rawReturnTo = pendingParams.get('returnTo') || '';
-        const returnTo = rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//') ? rawReturnTo : '';
-        pendingParams.delete('returnTo');
-        const pendingSearch = pendingParams.toString();
-        const hasPendingRequest = pendingParams.has('pendingRequest') || pendingParams.has('pendingRequestKey');
-        if (result.user.onboardingCompleted === true) {
-          const destination = returnTo || (hasPendingRequest ? '/donor/dashboard/requests' : '/donor/dashboard');
-          const target = pendingSearch
-            ? `${destination}${destination.includes('?') ? '&' : '?'}${pendingSearch}`
-            : destination;
-          navigate(target);
-        } else {
-          const onboardingTarget = pendingSearch
-            ? `/donor/onboarding?${pendingSearch}`
-            : '/donor/onboarding';
-          navigate(onboardingTarget);
-        }
+        navigateAfterDonorLogin(result.user);
       } else {
         throw new Error('No token received');
       }

@@ -14,6 +14,8 @@ type ReferralEntry = {
   status?: string;
   referrerBhId?: string;
   referredRole?: string;
+  referredDisplayName?: string | null;
+  referredBhId?: string | null;
 };
 
 type ReferralMilestone = {
@@ -68,6 +70,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
     scope: 'donor',
     metadata: { hook: 'useReferrals' },
   });
+  const isPrivilegedUser = user?.role === 'admin' || user?.role === 'superadmin';
 
   useEffect(() => {
     fallbackReferralAppliedRef.current = false;
@@ -205,6 +208,8 @@ export const useReferrals = (user: any): UseReferralsResult => {
           status: data?.status,
           referrerBhId: data?.referrerBhId,
           referredRole: data?.referredRole,
+          referredDisplayName: data?.referredDisplayName || null,
+          referredBhId: data?.referredBhId || null,
         } as ReferralEntry;
       }).filter(entry => Boolean(entry.referredUid));
       nextEntries.sort((a, b) => (b.referredAt?.getTime() || 0) - (a.referredAt?.getTime() || 0));
@@ -220,7 +225,6 @@ export const useReferrals = (user: any): UseReferralsResult => {
 
   useEffect(() => {
     if (!user?.uid) return;
-    if (user?.role !== 'admin' && user?.role !== 'superadmin') return;
     if (referralLoading) return;
     if (referralEntries.length > 0) return;
     if (fallbackReferralAppliedRef.current) return;
@@ -228,38 +232,106 @@ export const useReferrals = (user: any): UseReferralsResult => {
     setFallbackReferralLoading(true);
     const fetchFallbackReferrals = async () => {
       try {
-        const fallbackQuery = query(
-          collection(db, 'users'),
-          where('referredByUid', '==', user.uid)
-        );
-        const snapshot = await getDocs(fallbackQuery);
-        if (!isActive) return;
-        if (snapshot.empty) {
-          return;
+        const mergedByUid = new Map<string, ReferralEntry>();
+
+        // 1) Pull historical referral rows first (includes deleted/legacy statuses when present).
+        try {
+          const trackingSnapshot = await getDocs(
+            query(collection(db, 'ReferralTracking'), where('referrerUid', '==', user.uid))
+          );
+          trackingSnapshot.docs.forEach((docSnapshot) => {
+            const data = docSnapshot.data() as any;
+            const referredAt = data?.referredAt?.toDate
+              ? data.referredAt.toDate()
+              : typeof data?.referredAt?.seconds === 'number'
+                ? new Date(data.referredAt.seconds * 1000)
+                : null;
+            const referredUid = String(data?.referredUid || '').trim();
+            if (!referredUid) return;
+            mergedByUid.set(referredUid, {
+              id: docSnapshot.id,
+              referredUid,
+              referredAt,
+              status: data?.status,
+              referrerBhId: data?.referrerBhId,
+              referredRole: data?.referredRole,
+              referredDisplayName: data?.referredDisplayName || null,
+              referredBhId: data?.referredBhId || null,
+            });
+          });
+        } catch (trackingError) {
+          const code = String((trackingError as any)?.code || '').toLowerCase();
+          if (code !== 'permission-denied' && code !== 'unauthenticated') {
+            reportReferralsError(trackingError, 'referrals.fallback.tracking_fetch');
+          }
         }
-        const fallbackEntries = snapshot.docs.map((docSnapshot) => {
+
+        // 2) Backfill from users for referrals that may predate ReferralTracking rows.
+        const userFallbackQuery = isPrivilegedUser
+          ? query(
+              collection(db, 'users'),
+              where('referredByUid', '==', user.uid)
+            )
+          : query(
+              collection(db, 'users'),
+              where('referredByUid', '==', user.uid),
+              where('role', '==', 'donor'),
+              where('onboardingCompleted', '==', true)
+            );
+
+        let usersSnapshot;
+        try {
+          usersSnapshot = await getDocs(userFallbackQuery);
+        } catch (fallbackError) {
+          const code = String((fallbackError as any)?.code || '').toLowerCase();
+          if (!isPrivilegedUser && code === 'permission-denied') {
+            // Safe retry for strict directory-readable donor profiles.
+            usersSnapshot = await getDocs(query(
+              collection(db, 'users'),
+              where('referredByUid', '==', user.uid),
+              where('role', '==', 'donor'),
+              where('status', '==', 'active'),
+              where('onboardingCompleted', '==', true)
+            ));
+          } else {
+            throw fallbackError;
+          }
+        }
+
+        if (!isActive) return;
+
+        usersSnapshot?.docs.forEach((docSnapshot) => {
           const data = docSnapshot.data() as any;
           const createdAt = data?.createdAt?.toDate
             ? data.createdAt.toDate()
             : typeof data?.createdAt?.seconds === 'number'
               ? new Date(data.createdAt.seconds * 1000)
               : null;
-          return {
+          const referredUid = String(docSnapshot.id || '').trim();
+          if (!referredUid || mergedByUid.has(referredUid)) return;
+          mergedByUid.set(referredUid, {
             id: `fallback_${docSnapshot.id}`,
-            referredUid: docSnapshot.id,
+            referredUid,
             referredAt: createdAt,
-            status: data?.onboardingCompleted ? 'onboarded' : 'registered',
+            status: data?.status === 'deleted' ? 'deleted' : (data?.onboardingCompleted ? 'onboarded' : 'registered'),
             referrerBhId: user.bhId,
             referredRole: data?.role,
-          } as ReferralEntry;
-        }).filter(entry => Boolean(entry.referredUid));
+            referredDisplayName: data?.organizationName || data?.bloodBankName || data?.hospitalName || data?.displayName || data?.name || null,
+            referredBhId: data?.bhId || null,
+          });
+        });
+
+        const fallbackEntries = Array.from(mergedByUid.values());
         if (fallbackEntries.length > 0) {
           fallbackEntries.sort((a, b) => (b.referredAt?.getTime() || 0) - (a.referredAt?.getTime() || 0));
           setReferralEntries(fallbackEntries);
           setReferralCount(fallbackEntries.length);
         }
       } catch (error) {
-        reportReferralsError(error, 'referrals.fallback.fetch');
+        const code = String((error as any)?.code || '').toLowerCase();
+        if (code !== 'permission-denied' && code !== 'unauthenticated') {
+          reportReferralsError(error, 'referrals.fallback.fetch');
+        }
       } finally {
         if (isActive) {
           fallbackReferralAppliedRef.current = true;
@@ -271,7 +343,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
     return () => {
       isActive = false;
     };
-  }, [user?.uid, user?.role, referralLoading, referralEntries.length, user?.bhId]);
+  }, [user?.uid, isPrivilegedUser, referralLoading, referralEntries.length, user?.bhId]);
 
   useEffect(() => {
     if (referralEntries.length === 0) {
@@ -290,7 +362,10 @@ export const useReferrals = (user: any): UseReferralsResult => {
           chunks.push(uniqueIds.slice(i, i + chunkSize));
         }
         const results = await Promise.all(chunks.map(async (chunk) => {
-          const usersQuery = query(collection(db, 'users'), where(documentId(), 'in', chunk));
+          const usersQuery = query(
+            collection(db, isPrivilegedUser ? 'users' : 'publicDonors'),
+            where(documentId(), 'in', chunk)
+          );
           const usersSnapshot = await getDocs(usersQuery);
           const map: Record<string, any> = {};
           usersSnapshot.forEach((userDoc) => {
@@ -302,7 +377,10 @@ export const useReferrals = (user: any): UseReferralsResult => {
         const merged = results.reduce((acc, current) => ({ ...acc, ...current }), {} as Record<string, any>);
         setReferralUsers(merged);
       } catch (error) {
-        reportReferralsError(error, 'referrals.users.fetch');
+        const code = String((error as any)?.code || '').toLowerCase();
+        if (code !== 'permission-denied' && code !== 'unauthenticated') {
+          reportReferralsError(error, 'referrals.users.fetch');
+        }
       } finally {
         if (isActive) {
           setReferralUsersLoading(false);
@@ -313,7 +391,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
     return () => {
       isActive = false;
     };
-  }, [referralEntries]);
+  }, [referralEntries, isPrivilegedUser]);
 
   const referralDetails = useMemo(() => referralEntries.map((entry) => {
     const referredUser = referralUsers[entry.referredUid];
@@ -328,6 +406,8 @@ export const useReferrals = (user: any): UseReferralsResult => {
       ...entry,
       user: referredUser,
       referredRole: resolvedRole,
+      referredDisplayName: entry.referredDisplayName || null,
+      referredBhId: entry.referredBhId || null,
       referralAgeDays: computed.ageDays,
       remainingDays: computed.remainingDays,
       isEligible: computed.isEligible,

@@ -18,7 +18,6 @@ import {
   BarChart3,
   Handshake,
   Heart,
-  Loader2,
   Share2,
   Settings,
   Target,
@@ -212,17 +211,6 @@ function NgoDashboard() {
     shareInviteLink,
     openWhatsAppInvite,
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-amber-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-10 h-10 text-red-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 font-semibold">Loading NGO dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (

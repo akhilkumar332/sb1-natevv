@@ -10,7 +10,6 @@ import {
   BarChart3,
   Calendar,
   Heart,
-  Loader2,
   Package,
   Share2,
   Settings,
@@ -150,17 +149,6 @@ function BloodBankDashboard() {
     shareInviteLink,
     openWhatsAppInvite,
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-yellow-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-10 h-10 text-red-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 font-semibold">Loading BloodBank dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (

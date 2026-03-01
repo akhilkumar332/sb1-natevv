@@ -16,7 +16,9 @@ const ProtectedRoute = () => {
     bloodbank: authMessages.roleMismatch.bloodbank,
   };
 
-  if (authLoading || loading) {
+  // Allow rendering protected shells when a user is already available.
+  // This avoids post-login blocking while profile refresh continues in the background.
+  if (authLoading || (loading && !user)) {
     return <Loading />;
   }
 

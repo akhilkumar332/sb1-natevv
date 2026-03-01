@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { collection, documentId, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { collection, doc, documentId, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
+import { auth } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import type { DonorSummary } from './useNgoData';
 import {
   buildDonorQueryConstraints,
@@ -56,11 +58,29 @@ const hydrateDonor = (donor: any): DonorSummary => ({
 
 const sanitizeDonor = (donor: DonorSummary): SerializedDonor => ({
   ...donor,
-  email: undefined,
-  phone: undefined,
   lastDonation: donor.lastDonation ? donor.lastDonation.toISOString() : undefined,
   createdAt: donor.createdAt ? donor.createdAt.toISOString() : undefined,
 });
+
+const waitForAuthResolution = async (timeoutMs = 5000): Promise<void> => {
+  if (auth.currentUser) return;
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    const unsubscribe = onAuthStateChanged(auth, () => {
+      clearTimeout(timer);
+      unsubscribe();
+      finish();
+    });
+  });
+};
+
+
 
 export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
   const lowBandwidthMode = Boolean(options.lowBandwidthMode);
@@ -79,12 +99,14 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
   const [hasNextPage, setHasNextPage] = useState(false);
   const [firstDocId, setFirstDocId] = useState<string | null>(null);
   const [lastDocId, setLastDocId] = useState<string | null>(null);
+  const [authReadyKey, setAuthReadyKey] = useState<string>(() => auth.currentUser?.uid || '');
 
   const isMountedRef = useRef(true);
   const donorFetchIdRef = useRef(0);
   const firstDocIdRef = useRef<string | null>(null);
   const lastDocIdRef = useRef<string | null>(null);
   const onPageLoadErrorRef = useRef<UseDonorDirectoryOptions['onPageLoadError']>(options.onPageLoadError);
+  const shouldEnrichContacts = options.scope === 'ngo' || options.scope === 'bloodbank';
 
   const pageCacheKey = useMemo(() => {
     if (!options.cache?.pageCacheKeyPrefix) return null;
@@ -114,6 +136,82 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
     onPageLoadErrorRef.current = options.onPageLoadError;
   }, [options.onPageLoadError]);
 
+  const enrichDonorContacts = useCallback(async (rows: DonorSummary[]): Promise<DonorSummary[]> => {
+    if (!shouldEnrichContacts || rows.length === 0) return rows;
+    try {
+      if (!auth.currentUser) {
+        await waitForAuthResolution();
+      }
+      const donorIds = Array.from(new Set(rows.map((donor) => donor.id).filter(Boolean)));
+      const contactMap = new Map<string, { email?: string; phone?: string }>();
+      // Primary path: batched query reads from users by explicit donor IDs.
+      // This mirrors prior "query users collection" behavior while keeping page source publicDonors.
+      for (let i = 0; i < donorIds.length; i += 30) {
+        const chunk = donorIds.slice(i, i + 30);
+        try {
+          const snap = await getDocs(
+            query(collection(db, 'users'), where(documentId(), 'in', chunk))
+          );
+          snap.docs.forEach((docSnap) => {
+            const data = docSnap.data() as any;
+            contactMap.set(docSnap.id, {
+              email: data?.email,
+              phone: data?.phoneNumber || data?.phone,
+            });
+          });
+        } catch {
+          // Fall back to per-doc reads for this chunk.
+        }
+      }
+
+      // Fallback path: per-doc reads for any IDs still unresolved.
+      if (contactMap.size < donorIds.length) {
+        // Retry unresolved IDs a few times because Firestore channels can be flaky
+        // right after login/session restore on some networks.
+        let unresolved = donorIds.filter((id) => !contactMap.has(id));
+        for (let attempt = 0; attempt < 3 && unresolved.length > 0; attempt += 1) {
+          const detailResults = await Promise.allSettled(
+            unresolved.map((id) => getDoc(doc(db, 'users', id)))
+          );
+          detailResults.forEach((result, index) => {
+            if (result.status !== 'fulfilled' || !result.value.exists()) return;
+            const id = unresolved[index];
+            try {
+              const docSnap = result.value;
+              const data = docSnap.data() as any;
+              contactMap.set(id, {
+                email: data?.email,
+                phone: data?.phoneNumber || data?.phone,
+              });
+            } catch {
+              // Ignore malformed profile rows and keep public donor data.
+            }
+          });
+          unresolved = donorIds.filter((id) => !contactMap.has(id));
+          if (unresolved.length > 0 && attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+          }
+        }
+      }
+
+      return rows.map((donor) => {
+        const contact = contactMap.get(donor.id);
+        if (!contact) return donor;
+        return {
+          ...donor,
+          email: contact.email || donor.email,
+          phone: contact.phone || donor.phone,
+        };
+      });
+    } catch (error) {
+      const code = String((error as any)?.code || '').toLowerCase();
+      if (code !== 'permission-denied' && code !== 'unauthenticated') {
+        reportError(error, `${options.scope}.donors.contacts.fetch`);
+      }
+      return rows;
+    }
+  }, [options.scope, reportError, shouldEnrichContacts]);
+
   const cityOptions = useMemo(() => {
     const set = new Set(donors.map((donor) => donor.city).filter(Boolean) as string[]);
     return Array.from(set).sort();
@@ -137,6 +235,13 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
     return () => {
       isMountedRef.current = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setAuthReadyKey(firebaseUser?.uid || '');
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -179,6 +284,12 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
           setLastDocId(cached.lastDocId);
           setHasNextPage(cached.hasNextPage);
           setLoadingDonors(false);
+          if (shouldEnrichContacts && cached.donors.length > 0) {
+            void enrichDonorContacts(cached.donors).then((enriched) => {
+              if (!isMountedRef.current || fetchId !== donorFetchIdRef.current) return;
+              setDonors(enriched);
+            });
+          }
           return;
         }
       }
@@ -199,7 +310,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
         if (hasExtra) {
           docs = direction === 'prev' ? docs.slice(docs.length - pageSize) : docs.slice(0, pageSize);
         }
-        const donorList = docs.map(mapDocToDonorSummary);
+        const donorList = await enrichDonorContacts(docs.map(mapDocToDonorSummary));
         if (!isMountedRef.current || fetchId !== donorFetchIdRef.current) return;
         setDonors(donorList);
         setFirstDocId(docs[0]?.id || null);
@@ -251,6 +362,8 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
       pageCacheKey,
       pageSize,
       reportError,
+      enrichDonorContacts,
+      shouldEnrichContacts,
     ]
   );
 
@@ -303,7 +416,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
 
   useEffect(() => {
     void fetchDonorPage('initial');
-  }, [fetchDonorPage, pageCacheKey]);
+  }, [fetchDonorPage, pageCacheKey, authReadyKey]);
 
   useEffect(() => {
     if (!pageCacheKey || !enablePrefetch) return;

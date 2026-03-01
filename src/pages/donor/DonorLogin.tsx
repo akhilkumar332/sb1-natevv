@@ -50,7 +50,12 @@ export function DonorLogin() {
       return;
     }
 
-    if (!profileResolved && !isImpersonating && impersonationTransition !== 'stopping') {
+    if (
+      !profileResolved
+      && user.role === 'superadmin'
+      && !isImpersonating
+      && impersonationTransition !== 'stopping'
+    ) {
       return;
     }
 
