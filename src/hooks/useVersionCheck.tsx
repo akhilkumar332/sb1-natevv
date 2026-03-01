@@ -11,6 +11,11 @@ type VersionPayload = {
   commit?: string;
 };
 
+const isExpectedNetworkFetchError = (error: unknown) => {
+  const message = String((error as any)?.message || '').toLowerCase();
+  return message.includes('failed to fetch') || message.includes('networkerror');
+};
+
 const clearCaches = async () => {
   if (!('caches' in window)) {
     return;
@@ -145,6 +150,9 @@ export const useVersionCheck = () => {
           }
         }
       } catch (error) {
+        if (isExpectedNetworkFetchError(error)) {
+          return;
+        }
         void captureHandledError(error, {
           source: 'frontend',
           scope: 'unknown',

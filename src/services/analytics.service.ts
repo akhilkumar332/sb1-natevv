@@ -249,6 +249,25 @@ export const getBloodRequestTrend = async (
 
     return groupByMonth(requests, 'requestedAt');
   } catch (error) {
+    const code = String((error as any)?.code || '').toLowerCase();
+    // Fallback for missing composite indexes or transient permission races during auth hydration.
+    if (code === 'failed-precondition' || code === 'permission-denied' || code === 'unauthenticated') {
+      try {
+        const fallbackQuery = query(
+          collection(db, 'bloodRequests'),
+          where('requesterId', '==', hospitalId)
+        );
+        const fallbackSnap = await getDocs(fallbackQuery);
+        const requests = extractQueryData<BloodRequest>(fallbackSnap, ['requestedAt', 'neededBy']).filter((item) => {
+          const requestedAt = item.requestedAt instanceof Date ? item.requestedAt : item.requestedAt?.toDate?.();
+          if (!requestedAt) return false;
+          return requestedAt >= dateRange.startDate && requestedAt <= dateRange.endDate;
+        });
+        return groupByMonth(requests, 'requestedAt');
+      } catch {
+        return [];
+      }
+    }
     throw new DatabaseError('Failed to get blood request trend');
   }
 };

@@ -46,8 +46,9 @@ export type BloodBankDashboardContext = {
 };
 
 function BloodBankDashboard() {
-  const { user } = useAuth();
-  const baseHospitalId = user?.parentHospitalId || user?.uid || '';
+  const { user, profileResolved } = useAuth();
+  const canLoadDashboardData = Boolean(profileResolved && user?.uid);
+  const baseHospitalId = canLoadDashboardData ? (user?.parentHospitalId || user?.uid || '') : '';
 
   const {
     inventory,
@@ -74,7 +75,7 @@ function BloodBankDashboard() {
     copyInviteLink,
     shareInviteLink,
     openWhatsAppInvite,
-  } = useReferrals(user);
+  } = useReferrals(canLoadDashboardData ? user : null);
 
   const menuItems = [
     { id: 'overview', label: 'Overview', to: 'overview', icon: Activity },

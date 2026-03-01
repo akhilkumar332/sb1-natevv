@@ -271,8 +271,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
       const q = query(
         requestsRef,
         where('requesterId', '==', bloodBankId),
-        orderBy('requestedAt', 'desc'),
-        limit(50)
+        limit(120)
       );
       const unsubscribe = onSnapshot(
         q,
@@ -311,6 +310,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
               },
             };
           });
+          requestsList.sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime());
           setBloodRequests(requestsList);
         },
         (err) => {
@@ -331,8 +331,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
       const q = query(
         appointmentsRef,
         where('hospitalId', '==', bloodBankId),
-        orderBy('scheduledDate', 'desc'),
-        limit(50)
+        limit(120)
       );
 
       const snapshot = await getDocs(q);
@@ -354,6 +353,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
           createdAt: data.createdAt?.toDate() || new Date(),
         };
       });
+      appointmentsList.sort((a, b) => b.scheduledDate.getTime() - a.scheduledDate.getTime());
       setAppointments(appointmentsList);
     } catch (err) {
       reportBloodBankDataError(err, 'fetch_appointments');
@@ -429,8 +429,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
     const q = query(
       requestsRef,
       where('requesterId', '==', bloodBankId),
-      orderBy('requestedAt', 'desc'),
-      limit(50)
+      limit(120)
     );
     const snapshot = await getDocs(q);
     const requestsList: BloodRequest[] = snapshot.docs.map(doc => {
@@ -467,6 +466,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
         },
       };
     });
+    requestsList.sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime());
     setBloodRequests(requestsList);
   };
 

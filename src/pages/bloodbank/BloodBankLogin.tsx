@@ -111,7 +111,7 @@ export function BloodBankLogin() {
     navigateToPortalDashboard(navigate, role);
   };
 
-  if (user && !profileResolved) {
+  if (user && isSuperAdmin && !profileResolved) {
     return <AuthStatusScreen message="Checking account…" />;
   }
 

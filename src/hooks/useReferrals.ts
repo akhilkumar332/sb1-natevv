@@ -220,6 +220,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
 
   useEffect(() => {
     if (!user?.uid) return;
+    if (user?.role !== 'admin' && user?.role !== 'superadmin') return;
     if (referralLoading) return;
     if (referralEntries.length > 0) return;
     if (fallbackReferralAppliedRef.current) return;
@@ -270,7 +271,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
     return () => {
       isActive = false;
     };
-  }, [user?.uid, referralLoading, referralEntries.length, user?.bhId]);
+  }, [user?.uid, user?.role, referralLoading, referralEntries.length, user?.bhId]);
 
   useEffect(() => {
     if (referralEntries.length === 0) {

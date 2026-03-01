@@ -168,6 +168,11 @@ class GamificationService {
     return code === 'unavailable' || message.includes('client is offline');
   }
 
+  private isAuthPermissionError(error: any): boolean {
+    const code = String(error?.code || '').toLowerCase();
+    return code === 'permission-denied' || code === 'unauthenticated';
+  }
+
   private buildDefaultStats(userId: string, overrides: Partial<UserStats> = {}): UserStats {
     return {
       userId,
@@ -188,7 +193,7 @@ class GamificationService {
       const userSnap = await getDoc(userRef);
       return userSnap.exists() ? (userSnap.data() as User) : null;
     } catch (error) {
-      if (!this.isOfflineFirestoreError(error)) {
+      if (!this.isOfflineFirestoreError(error) && !this.isAuthPermissionError(error)) {
         this.reportError(error, 'gamification.user_profile.fetch');
       }
       return null;
@@ -359,7 +364,7 @@ class GamificationService {
         points,
       };
     } catch (error) {
-      if (!this.isOfflineFirestoreError(error)) {
+      if (!this.isOfflineFirestoreError(error) && !this.isAuthPermissionError(error)) {
         this.reportError(error, 'gamification.stats.derive_from_donations');
       }
       return fallback;
@@ -403,7 +408,7 @@ class GamificationService {
 
       return initialStats;
     } catch (error) {
-      if (!this.isOfflineFirestoreError(error)) {
+      if (!this.isOfflineFirestoreError(error) && !this.isAuthPermissionError(error)) {
         this.reportError(error, 'gamification.user_stats.fetch');
       }
       return this.buildStatsFromProfile(userId);
@@ -476,7 +481,7 @@ class GamificationService {
 
       return badges;
     } catch (error) {
-      if (!this.isOfflineFirestoreError(error)) {
+      if (!this.isOfflineFirestoreError(error) && !this.isAuthPermissionError(error)) {
         this.reportError(error, 'gamification.badges.fetch');
       }
       return this.buildBadgeList(stats, userData);

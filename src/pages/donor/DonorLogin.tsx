@@ -94,12 +94,8 @@ export function DonorLogin() {
     user,
   ]);
 
-  if (user && !profileResolved) {
+  if (user && isSuperAdmin && !profileResolved) {
     return <AuthStatusScreen message="Checking account…" />;
-  }
-
-  if (user && user.role === 'donor' && !isSuperAdmin) {
-    return <AuthStatusScreen message="Signing you in…" />;
   }
 
   const handlePortalSelect = (role: 'donor' | 'ngo' | 'bloodbank' | 'admin') => {

@@ -71,9 +71,15 @@ const isOfflineFirestoreError = (error: any): boolean => {
   return code === 'unavailable' || message.includes('client is offline');
 };
 
+const isExpectedNetworkFetchError = (error: unknown): boolean => {
+  const message = String((error as any)?.message || '').toLowerCase();
+  return message.includes('failed to fetch') || message.includes('networkerror');
+};
+
 function DonorDashboard() {
   const {
     user,
+    profileResolved,
     updateUserProfile,
     linkGoogleProvider,
     startPhoneLink,
@@ -169,6 +175,7 @@ function DonorDashboard() {
   const incomingAcceptedExpiryRef = useRef<Set<string>>(new Set());
 
   // Use custom hook to fetch all donor data
+  const canLoadDashboardData = Boolean(profileResolved && user?.uid);
   const {
     donationHistory,
     firstDonationDate,
@@ -180,7 +187,7 @@ function DonorDashboard() {
     error,
     refreshData,
   } = useDonorData(
-    user?.uid || '',
+    canLoadDashboardData ? (user?.uid || '') : '',
     user?.bloodType,
     user?.city
   );
@@ -199,7 +206,7 @@ function DonorDashboard() {
     copyInviteLink,
     shareInviteLink,
     openWhatsAppInvite,
-  } = useReferrals(user);
+  } = useReferrals(canLoadDashboardData ? user : null);
 
   const { respondToRequest, responding } = useBloodRequest();
 
@@ -1551,7 +1558,9 @@ function DonorDashboard() {
         }
       })
       .catch((error) => {
-        reportDonorDashboardError(error, 'donor.dashboard.qr.generate');
+        if (!isExpectedNetworkFetchError(error)) {
+          reportDonorDashboardError(error, 'donor.dashboard.qr.generate');
+        }
         if (active) {
           setQrCodeDataUrl(null);
         }

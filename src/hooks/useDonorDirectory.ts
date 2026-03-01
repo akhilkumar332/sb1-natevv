@@ -193,7 +193,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
           firstCursor: firstDocIdRef.current,
           lastCursor: lastDocIdRef.current,
         });
-        const snapshot = await getDocs(query(collection(db, 'users'), ...constraints));
+        const snapshot = await getDocs(query(collection(db, 'publicDonors'), ...constraints));
         let docs = snapshot.docs;
         const hasExtra = docs.length > pageSize;
         if (hasExtra) {

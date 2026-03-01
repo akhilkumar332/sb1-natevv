@@ -97,12 +97,8 @@ export function NgoLogin() {
     }
   };
 
-  if (user && !profileResolved) {
+  if (user && isSuperAdmin && !profileResolved) {
     return <AuthStatusScreen message="Checking account…" />;
-  }
-
-  if (user && user.role === 'ngo' && !isSuperAdmin) {
-    return <AuthStatusScreen message="Signing you in…" />;
   }
 
   const handlePortalSelect = (role: 'donor' | 'ngo' | 'bloodbank' | 'admin') => {

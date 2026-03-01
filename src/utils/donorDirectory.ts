@@ -62,7 +62,8 @@ export const mapDocToDonorSummary = (docOrRow: any): DonorSummary => {
 };
 
 export const buildDonorQueryConstraints = (options: BuildConstraintsOptions): QueryConstraint[] => {
-  const constraints: QueryConstraint[] = [where('role', '==', 'donor')];
+  // Donor directory for NGO/BloodBank is backed by publicDonors, so no role filter is needed.
+  const constraints: QueryConstraint[] = [];
 
   if (options.bloodTypeFilter !== 'all') {
     constraints.push(where('bloodType', '==', options.bloodTypeFilter));

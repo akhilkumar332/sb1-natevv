@@ -516,6 +516,11 @@ function BloodBankInventory() {
           .filter((entry) => entry.id !== baseHospitalId);
         setBloodbanks(list);
       } catch (error) {
+        const code = String((error as any)?.code || '').toLowerCase();
+        if (code === 'permission-denied' || code === 'unauthenticated') {
+          setBloodbanks([]);
+          return;
+        }
         reportBloodBankInventoryError(error, 'bloodbanks.fetch');
       }
     };

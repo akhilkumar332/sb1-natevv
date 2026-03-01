@@ -4,7 +4,7 @@ import { Heart, Users, TrendingUp, ChevronRight, Search, MapPin } from 'lucide-r
 import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import notify from '../../../services/notify.service';
 import { donorCsvHeaders, donorCsvObjects } from '../../../utils/donorDirectory';
@@ -77,22 +77,14 @@ function BloodBankDonors() {
     const fetchDonorCommunity = async () => {
       try {
         const summary = await runDedupedRequest('bloodbank:donors:community', async () => {
-          const donorsRef = collection(db, 'users');
-          const donorsQuery = query(donorsRef, where('role', '==', 'donor'));
-          const allDonorsSnap = await getDocs(donorsQuery);
-
-          const eligibleDonors = allDonorsSnap.docs
+          const publicSnap = await getDocs(collection(db, 'publicDonors'));
+          const eligibleDonors = publicSnap.docs
             .map((doc) => doc.data())
             .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
             .filter((data: any) => !data.status || data.status === 'active');
 
           const totalDonors = eligibleDonors.length;
-
-          const publicSnap = await getDocs(collection(db, 'publicDonors'));
-          const activeDonors = publicSnap.docs
-            .map((doc) => doc.data())
-            .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
-            .filter((data: any) => data.isAvailable === true).length;
+          const activeDonors = eligibleDonors.filter((data: any) => data.isAvailable === true).length;
 
           const oneMonthAgo = new Date();
           oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);

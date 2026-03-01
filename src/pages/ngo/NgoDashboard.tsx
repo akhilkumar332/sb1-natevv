@@ -57,7 +57,8 @@ export type NgoDashboardContext = {
 };
 
 function NgoDashboard() {
-  const { user } = useAuth();
+  const { user, profileResolved } = useAuth();
+  const canLoadDashboardData = Boolean(profileResolved && user?.uid);
   const reportNgoDashboardError = useScopedErrorReporter({
     scope: 'ngo',
     metadata: { page: 'NgoDashboard' },
@@ -73,7 +74,7 @@ function NgoDashboard() {
     loading,
     error,
     refreshData,
-  } = useNgoData(user?.uid || '');
+  } = useNgoData(canLoadDashboardData ? (user?.uid || '') : '');
 
   const {
     referralLoading,
@@ -89,10 +90,10 @@ function NgoDashboard() {
     copyInviteLink,
     shareInviteLink,
     openWhatsAppInvite,
-  } = useReferrals(user);
+  } = useReferrals(canLoadDashboardData ? user : null);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!canLoadDashboardData || !user?.uid) return;
     if (typeof window === 'undefined' || !window.sessionStorage) return;
     const prefetchKey = `ngo_dashboard_prefetch_${user.uid}`;
     const lastPrefetch = window.sessionStorage.getItem(prefetchKey);
@@ -120,7 +121,7 @@ function NgoDashboard() {
     }
     const timer = setTimeout(task, 1200);
     return () => clearTimeout(timer);
-  }, [user?.uid, refreshData]);
+  }, [canLoadDashboardData, user?.uid, refreshData]);
 
   const menuItems = [
     { id: 'overview', label: 'Overview', to: 'overview', icon: Activity },
