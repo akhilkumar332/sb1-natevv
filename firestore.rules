@@ -817,7 +817,7 @@ service cloud.firestore {
       allow update: if isAdmin() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'readAt', 'readBy', 'updatedAt']) &&
         request.resource.data.status in ['read', 'unread'];
-      allow delete: if false;
+      allow delete: if isAdmin();
     }
 
     // ========================================================================
