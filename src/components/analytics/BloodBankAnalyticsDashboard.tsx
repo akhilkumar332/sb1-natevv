@@ -22,6 +22,7 @@ import {
   type BloodTypeDistribution,
 } from '../../services/analytics.service';
 import { captureHandledError } from '../../services/errorLog.service';
+import { CHART_PALETTE } from '../../constants/theme';
 
 interface BloodBankAnalyticsDashboardProps {
   bloodBankId: string;
@@ -195,7 +196,7 @@ export const BloodBankAnalyticsDashboard: React.FC<BloodBankAnalyticsDashboardPr
         <LineChart
           data={trendData}
           title="Blood Request Trend"
-          color="#2563EB"
+          color={CHART_PALETTE.secondary}
         />
 
         {/* Inventory Distribution */}
@@ -217,7 +218,7 @@ export const BloodBankAnalyticsDashboard: React.FC<BloodBankAnalyticsDashboardPr
             value: d.count,
           }))}
           title="Inventory by Blood Type"
-          color="#2563EB"
+          color={CHART_PALETTE.secondary}
           height={250}
           horizontal={true}
         />

@@ -31,7 +31,17 @@ import { notifySelfRequestBlocked } from '../utils/validationFeedback';
 import { useLocationResolver } from '../hooks/useLocationResolver';
 import { useNetworkStatus } from '../contexts/NetworkStatusContext';
 import { isOnlineRequiredError, runOnlineTransaction } from '../utils/onlineOnlyTransaction';
-
+import { COLLECTIONS } from '../constants/firestore';
+import { ROUTES } from '../constants/routes';
+import {
+  EIGHT_HUNDRED_MS,
+  EIGHT_SECONDS_MS,
+  FIVE_MINUTES_MS,
+  ONE_DAY_MS,
+  ONE_MINUTE_MS,
+  TWO_MINUTES_MS,
+  ZERO_MS,
+} from '../constants/time';
 interface Donor {
   id: string;
   bhId?: string;
@@ -92,7 +102,7 @@ function FindDonors() {
   const [undoingBatchId, setUndoingBatchId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 12;
-  const cacheTTL = isLowBandwidth ? 5 * 60 * 1000 : 120000;
+  const cacheTTL = isLowBandwidth ? FIVE_MINUTES_MS : TWO_MINUTES_MS;
   const [rawDonorsVersion, setRawDonorsVersion] = useState(0);
   const rawDonorsRef = useRef<any[] | null>(null);
   const rawDonorSourceRef = useRef<'publicDonors' | 'users' | null>(null);
@@ -109,7 +119,7 @@ function FindDonors() {
   const sliderValueRef = useRef(0);
   const isMountedRef = useRef(true);
   const locationRequestInFlightRef = useRef(false);
-  const REQUEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+  const REQUEST_COOLDOWN_MS = ONE_DAY_MS;
   const reportFindDonorsError = useScopedErrorReporter({
     scope: 'donor',
     metadata: { page: 'FindDonors' },
@@ -124,8 +134,8 @@ function FindDonors() {
     try {
       const result = await resolveCurrentLocation({
         enableHighAccuracy: true,
-        timeout: 8000,
-        maximumAge: 60000,
+        timeout: EIGHT_SECONDS_MS,
+        maximumAge: ONE_MINUTE_MS,
         skipReverseGeocode: true,
         onErrorMessage: setLocationError,
         unsupportedErrorMessage: 'Location services are not supported in this browser.',
@@ -223,7 +233,7 @@ function FindDonors() {
         }
       };
     }
-    const timer = setTimeout(task, 800);
+    const timer = setTimeout(task, EIGHT_HUNDRED_MS);
     return () => clearTimeout(timer);
   }, [user?.uid, reportFindDonorsError]);
 
@@ -240,9 +250,9 @@ function FindDonors() {
       const expires = toDate(data?.connectionExpiresAt);
       if (expires) return expires;
       const respondedAt = toDate(data?.respondedAt);
-      if (respondedAt) return new Date(respondedAt.getTime() + 24 * 60 * 60 * 1000);
+      if (respondedAt) return new Date(respondedAt.getTime() + ONE_DAY_MS);
       const requestedAt = toDate(data?.requestedAt);
-      if (requestedAt) return new Date(requestedAt.getTime() + 24 * 60 * 60 * 1000);
+      if (requestedAt) return new Date(requestedAt.getTime() + ONE_DAY_MS);
       return null;
     };
     const buildRequestedAt = (data: any) => {
@@ -321,12 +331,12 @@ function FindDonors() {
     };
 
     const requesterQuery = query(
-      collection(db, 'donorRequests'),
+      collection(db, COLLECTIONS.DONOR_REQUESTS),
       where('requesterUid', '==', user.uid),
       limit(200)
     );
     const targetQuery = query(
-      collection(db, 'donorRequests'),
+      collection(db, COLLECTIONS.DONOR_REQUESTS),
       where('targetDonorUid', '==', user.uid),
       limit(200)
     );
@@ -554,7 +564,7 @@ function FindDonors() {
             }
             appendRawDonors(next.rows, next.lastDoc, next.hasMore);
             writeCachedDonors(source, rawDonorsRef.current || []);
-            await new Promise((resolve) => setTimeout(resolve, 0));
+            await new Promise((resolve) => setTimeout(resolve, ZERO_MS));
           }
         };
         void fetchMore();
@@ -654,7 +664,7 @@ function FindDonors() {
 
     const submitPending = async () => {
       if (pendingFromSearch) {
-        if (pendingFromSearch.returnTo === '/donor/dashboard/requests') {
+        if (pendingFromSearch.returnTo === ROUTES.portal.donor.dashboard.requests) {
           const nextParams = new URLSearchParams(location.search);
           if (pendingKey) {
             nextParams.set('pendingRequestKey', pendingKey);
@@ -662,7 +672,7 @@ function FindDonors() {
             nextParams.set('pendingRequest', encoded);
           }
           nextParams.delete('returnTo');
-          navigate({ pathname: '/donor/dashboard/requests', search: nextParams.toString() }, { replace: true });
+          navigate({ pathname: ROUTES.portal.donor.dashboard.requests, search: nextParams.toString() }, { replace: true });
           return;
         }
         await savePendingDonorRequestDoc(user.uid, pendingFromSearch);
@@ -910,17 +920,17 @@ function FindDonors() {
       donationType: requestDonationType,
       message: safeMessage,
       createdAt: Date.now(),
-      returnTo: '/donor/dashboard/requests',
+      returnTo: ROUTES.portal.donor.dashboard.requests,
     };
 
     if (!user || user.role !== 'donor') {
       notify.error('Please login as a donor to send a request.');
       const pendingKey = savePendingDonorRequestToSession(payload as PendingDonorRequestPayload);
       if (pendingKey) {
-        navigate(`/donor/login?returnTo=${encodeURIComponent('/donor/dashboard/requests')}&pendingRequestKey=${encodeURIComponent(pendingKey)}`);
+        navigate(`${ROUTES.portal.donor.login}?returnTo=${encodeURIComponent(ROUTES.portal.donor.dashboard.requests)}&pendingRequestKey=${encodeURIComponent(pendingKey)}`);
       } else {
         const encoded = encodePendingDonorRequest(payload as PendingDonorRequestPayload);
-        navigate(`/donor/login?returnTo=${encodeURIComponent('/donor/dashboard/requests')}&pendingRequest=${encodeURIComponent(encoded)}`);
+        navigate(`${ROUTES.portal.donor.login}?returnTo=${encodeURIComponent(ROUTES.portal.donor.dashboard.requests)}&pendingRequest=${encodeURIComponent(encoded)}`);
       }
       return;
     }
@@ -928,10 +938,10 @@ function FindDonors() {
     if (!user.onboardingCompleted) {
       const pendingKey = savePendingDonorRequestToSession(payload as PendingDonorRequestPayload);
       if (pendingKey) {
-        navigate(`/donor/onboarding?returnTo=${encodeURIComponent('/donor/dashboard/requests')}&pendingRequestKey=${encodeURIComponent(pendingKey)}`);
+        navigate(`${ROUTES.portal.donor.onboarding}?returnTo=${encodeURIComponent(ROUTES.portal.donor.dashboard.requests)}&pendingRequestKey=${encodeURIComponent(pendingKey)}`);
       } else {
         const encoded = encodePendingDonorRequest(payload as PendingDonorRequestPayload);
-        navigate(`/donor/onboarding?returnTo=${encodeURIComponent('/donor/dashboard/requests')}&pendingRequest=${encodeURIComponent(encoded)}`);
+        navigate(`${ROUTES.portal.donor.onboarding}?returnTo=${encodeURIComponent(ROUTES.portal.donor.dashboard.requests)}&pendingRequest=${encodeURIComponent(encoded)}`);
       }
       return;
     }
@@ -987,7 +997,7 @@ function FindDonors() {
     try {
       setUndoingBatchId(batchId);
       const requestsQuery = query(
-        collection(db, 'donorRequests'),
+        collection(db, COLLECTIONS.DONOR_REQUESTS),
         where('requestBatchId', '==', batchId)
       );
       const snapshot = await getDocs(requestsQuery);
@@ -1002,7 +1012,7 @@ function FindDonors() {
       await deleteBatch.commit();
 
       const deletedCount = snapshot.size;
-      const batchRef = doc(db, 'donorRequestBatches', batchId);
+      const batchRef = doc(db, COLLECTIONS.DONOR_REQUEST_BATCHES, batchId);
       await runOnlineTransaction(async (transaction) => {
         const batchSnap = await transaction.get(batchRef);
         if (!batchSnap.exists()) return;
@@ -1825,7 +1835,7 @@ function FindDonors() {
             <h2 className="text-4xl font-bold mb-4">Want to Become a Donor?</h2>
             <p className="text-xl mb-8 opacity-90">Join our community of life-savers and make a difference</p>
             <button
-              onClick={() => navigate('/donor/register')}
+              onClick={() => navigate(ROUTES.portal.donor.register)}
               className="px-8 py-4 bg-white text-red-600 rounded-full font-bold text-lg hover:shadow-2xl transform hover:scale-105 transition-all"
             >
               Register as a Donor

@@ -16,6 +16,8 @@ import { countries, getStatesByCountry, getCitiesByState } from '../../../data/l
 import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import { authMessages } from '../../../constants/messages';
+import { COLLECTIONS } from '../../../constants/firestore';
+import { ROUTES } from '../../../constants/routes';
 import { LeafletClickMarker, LeafletMapUpdater } from '../../../components/shared/leaflet/LocationMapPrimitives';
 import { useAddressAutocomplete } from '../../../hooks/useAddressAutocomplete';
 import { authInputMessages, getOtpValidationError, sanitizeOtp, validateGeneralPhoneInput } from '../../../utils/authInputValidation';
@@ -616,13 +618,13 @@ const DonorAccount = () => {
     setDeleteLoading(true);
     try {
       const currentUserId = auth.currentUser.uid;
-      await updateDoc(doc(db, 'users', currentUserId), {
+      await updateDoc(doc(db, COLLECTIONS.USERS, currentUserId), {
         status: 'deleted',
         deletedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
       await deleteUser(auth.currentUser);
-      await logout(navigate, { redirectTo: '/donor/login', showToast: false });
+      await logout(navigate, { redirectTo: ROUTES.portal.donor.login, showToast: false });
       notify.success('Account deleted successfully.');
     } catch (error: any) {
       reportDonorAccountError(error, 'donor.account.delete');

@@ -5,6 +5,7 @@ import { Heart, Building2, Users, Globe, Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNgoRegister } from '../../hooks/useNgoRegister';
 import LogoMark from '../../components/LogoMark';
+import { ROUTES } from '../../constants/routes';
 
 export function NgoRegister() {
   const navigate = useNavigate();
@@ -19,9 +20,9 @@ export function NgoRegister() {
     if (user && !hasNavigated.current) {
       hasNavigated.current = true;
       if (!user.onboardingCompleted) {
-        navigate('/ngo/onboarding');
+        navigate(ROUTES.portal.ngo.onboarding);
       } else if (user.role === 'ngo') {
-        navigate('/ngo/dashboard');
+        navigate(ROUTES.portal.ngo.dashboard.root);
       }
     }
   }, [user, navigate]);
@@ -145,7 +146,7 @@ export function NgoRegister() {
                 <p className="text-center text-sm text-gray-600">
                   Already registered?{' '}
                   <Link
-                    to="/ngo/login"
+                    to={ROUTES.portal.ngo.login}
                     className="font-semibold text-red-600 hover:text-red-700 transition-colors"
                   >
                     Login now

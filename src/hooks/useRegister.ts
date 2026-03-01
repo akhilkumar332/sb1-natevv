@@ -15,6 +15,8 @@ import { useOtpResendTimer } from './useOtpResendTimer';
 import { clearRecaptchaVerifier } from '../utils/recaptcha';
 import { registerWithGoogleRole } from '../utils/googleRegister';
 import { notifyMobileAlreadyRegistered, requireValue } from '../utils/validationFeedback';
+import { COLLECTIONS } from '../constants/firestore';
+import { ROUTES } from '../constants/routes';
 
 interface RegisterFormData {
   identifier: string;
@@ -86,14 +88,14 @@ export const useRegister = () => {
       const { normalized: normalizedPhone } = validateGeneralPhoneInput(formData.identifier);
 
       // Check if user already registered by uid as a fallback
-      const userRef = doc(db, 'users', userCredential.user.uid);
+      const userRef = doc(db, COLLECTIONS.USERS, userCredential.user.uid);
       const userDoc = await getDoc(userRef);
 
       if (userDoc.exists()) {
         // User already exists - sign them out and redirect to login
         await signOut(auth);
         notifyMobileAlreadyRegistered();
-        navigate('/donor/login');
+        navigate(ROUTES.portal.donor.login);
         return;
       }
 
@@ -106,7 +108,7 @@ export const useRegister = () => {
       if (otherMatch) {
         await signOut(auth);
         notifyMobileAlreadyRegistered();
-        navigate('/donor/login');
+        navigate(ROUTES.portal.donor.login);
         return;
       }
 
@@ -138,7 +140,7 @@ export const useRegister = () => {
       authStorage.setAuthToken(token);
 
       notify.success('Registration successful!');
-      navigate('/donor/onboarding');
+      navigate(ROUTES.portal.donor.onboarding);
     } catch (error: any) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.otp.verify' } });
 
@@ -175,8 +177,8 @@ export const useRegister = () => {
       setGoogleLoading(true);
       await registerWithGoogleRole({
         role: 'donor',
-        loginPath: '/donor/login',
-        onboardingPath: '/donor/onboarding',
+        loginPath: ROUTES.portal.donor.login,
+        onboardingPath: ROUTES.portal.donor.onboarding,
         scope: 'auth',
         kind: 'auth.register.google',
         navigate,

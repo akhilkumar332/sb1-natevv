@@ -6,6 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { X, Bell, AlertCircle, CheckCircle } from 'lucide-react';
+import { THREE_HUNDRED_MS } from '../../constants/time';
 
 interface NotificationToastProps {
   title: string;
@@ -35,7 +36,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
     if (duration > 0) {
       const timer = setTimeout(() => {
         setVisible(false);
-        setTimeout(() => onClose?.(), 300);
+        setTimeout(() => onClose?.(), THREE_HUNDRED_MS);
       }, duration);
 
       return () => clearTimeout(timer);
@@ -44,7 +45,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
 
   const handleClose = () => {
     setVisible(false);
-    setTimeout(() => onClose?.(), 300);
+    setTimeout(() => onClose?.(), THREE_HUNDRED_MS);
   };
 
   const handleAction = () => {

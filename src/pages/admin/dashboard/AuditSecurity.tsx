@@ -9,6 +9,7 @@ import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useAdminAuditLogs } from '../../../hooks/admin/useAdminQueries';
 import { refetchQuery } from '../../../utils/queryRefetch';
+import { ROUTES } from '../../../constants/routes';
 
 type AuditRow = {
   id: string;
@@ -75,7 +76,7 @@ function AuditSecurityPage() {
               label="Refresh audit logs"
             />
             <Link
-              to="/admin/dashboard/impersonation-audit"
+              to={ROUTES.portal.admin.dashboard.impersonationAudit}
               className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
             >
               <UserCog className="h-4 w-4" />

@@ -13,6 +13,8 @@ import { useOtpResendTimer } from './useOtpResendTimer';
 import { clearRecaptchaVerifier } from '../utils/recaptcha';
 import { registerWithGoogleRole } from '../utils/googleRegister';
 import { requireValue } from '../utils/validationFeedback';
+import { COLLECTIONS } from '../constants/firestore';
+import { ROUTES } from '../constants/routes';
 
 interface RegisterFormData {
   identifier: string;
@@ -81,14 +83,14 @@ export const useNgoRegister = () => {
       clearRecaptchaVerifier();
 
       // Check if user already registered
-      const userRef = doc(db, 'users', userCredential.user.uid);
+      const userRef = doc(db, COLLECTIONS.USERS, userCredential.user.uid);
       const userDoc = await getDoc(userRef);
 
       if (userDoc.exists()) {
         // User already exists - sign them out and redirect to login
         await signOut(auth);
         notify.error('Phone number already registered. Please use the login page.');
-        navigate('/ngo/login');
+        navigate(ROUTES.portal.ngo.login);
         return;
       }
 
@@ -113,7 +115,7 @@ export const useNgoRegister = () => {
       await applyReferralTrackingForUser(userCredential.user.uid);
 
       notify.success('Registration successful!');
-      navigate('/ngo/onboarding');
+      navigate(ROUTES.portal.ngo.onboarding);
     } catch (error: any) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.ngo.otp.verify' } });
 
@@ -151,8 +153,8 @@ export const useNgoRegister = () => {
       setGoogleLoading(true);
       await registerWithGoogleRole({
         role: 'ngo',
-        loginPath: '/ngo/login',
-        onboardingPath: '/ngo/onboarding',
+        loginPath: ROUTES.portal.ngo.login,
+        onboardingPath: ROUTES.portal.ngo.onboarding,
         scope: 'auth',
         kind: 'auth.register.ngo.google',
         navigate,

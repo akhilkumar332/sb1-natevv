@@ -1,3 +1,4 @@
+import { ZERO_MS } from '../constants/time';
 /**
  * Performance Monitoring Utility
  *
@@ -226,7 +227,7 @@ export const initPerformanceMonitoring = () => {
         measureNavigationTiming();
         measureResourceTiming();
         measureBundleSize();
-      }, 0);
+      }, ZERO_MS);
     });
   }
 };

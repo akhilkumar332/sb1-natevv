@@ -9,6 +9,8 @@ import {
 } from '../utils/referralTracking';
 import { REFERRAL_RULES, computeReferralStatus, normalizeReferralDate } from '../utils/referralRules';
 import { captureHandledError } from './errorLog.service';
+import { COLLECTIONS } from '../constants/firestore';
+import { ROUTES } from '../constants/routes';
 
 type ReferralApplyResult = {
   referrerUid: string;
@@ -52,7 +54,7 @@ const buildReferralNotificationId = (
 const resolveReferrerByBhId = async (bhId?: string | null): Promise<ResolveResult | null> => {
   if (!bhId) return null;
   const referrerSnapshot = await getDocs(query(
-    collection(db, 'users'),
+    collection(db, COLLECTIONS.USERS),
     where('bhId', '==', bhId),
     limit(1)
   ));
@@ -95,7 +97,7 @@ export const resolveReferralContext = async (newUserUid: string): Promise<Referr
 
   if (referrerUid) {
     try {
-      const referrerDoc = await getDoc(doc(db, 'users', referrerUid));
+      const referrerDoc = await getDoc(doc(db, COLLECTIONS.USERS, referrerUid));
       if (referrerDoc.exists()) {
         const referrerData = referrerDoc.data();
         referrerBhId = referrerData?.bhId || referrerBhId;
@@ -142,9 +144,9 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
     const { referrerUid, referrerBhId, referrerRole } = resolved;
 
     const referralDocId = `${referrerUid}_${newUserUid}`;
-    const referralRef = doc(db, 'ReferralTracking', referralDocId);
+    const referralRef = doc(db, COLLECTIONS.REFERRAL_TRACKING, referralDocId);
     const referralExisting = await getDoc(referralRef);
-    const userRef = doc(db, 'users', newUserUid);
+    const userRef = doc(db, COLLECTIONS.USERS, newUserUid);
     const referredSnap = await getDoc(userRef);
     const referredData = referredSnap.exists() ? referredSnap.data() : undefined;
     const referredRole = referredData?.role;
@@ -264,7 +266,7 @@ const sendReferralNotification = async (
 ): Promise<boolean> => {
   try {
     const notificationId = buildReferralNotificationId(referrerUid, referredUid, status);
-    const notificationRef = doc(db, 'notifications', notificationId);
+    const notificationRef = doc(db, COLLECTIONS.NOTIFICATIONS, notificationId);
     if (createdByUid && createdByUid === referrerUid) {
       const existing = await getDoc(notificationRef);
       if (existing.exists()) {
@@ -275,10 +277,10 @@ const sendReferralNotification = async (
     const referralId = `${referrerUid}_${referredUid}`;
     const resolvedRole = referrerRole || 'donor';
     const actionUrl = resolvedRole === 'ngo'
-      ? '/ngo/dashboard/referrals'
+      ? ROUTES.portal.ngo.dashboard.referrals
       : resolvedRole === 'bloodbank' || resolvedRole === 'hospital'
-        ? '/bloodbank/dashboard/referrals'
-        : '/donor/dashboard/referrals';
+        ? ROUTES.portal.bloodbank.dashboard.referrals
+        : ROUTES.portal.donor.dashboard.referrals;
     await setDoc(notificationRef, {
       userId: referrerUid,
       userRole: resolvedRole,
@@ -310,7 +312,7 @@ export const ensureReferralTrackingForExistingReferral = async (user: any): Prom
   if (!referrerUid || !user?.uid) return;
   let referrerRole: string | undefined;
   try {
-    const referrerDoc = await getDoc(doc(db, 'users', referrerUid));
+    const referrerDoc = await getDoc(doc(db, COLLECTIONS.USERS, referrerUid));
     if (referrerDoc.exists()) {
       referrerRole = referrerDoc.data()?.role;
     }
@@ -319,7 +321,7 @@ export const ensureReferralTrackingForExistingReferral = async (user: any): Prom
   }
 
   const referralDocId = `${referrerUid}_${user.uid}`;
-  const referralRef = doc(db, 'ReferralTracking', referralDocId);
+  const referralRef = doc(db, COLLECTIONS.REFERRAL_TRACKING, referralDocId);
   const referralSnap = await getDoc(referralRef);
 
   if (!referralSnap.exists()) {
@@ -370,7 +372,7 @@ export const ensureReferralNotificationsForReferrer = async (
   if (!referrerUid || referrals.length === 0) return;
   let referrerRole: string | undefined;
   try {
-    const referrerDoc = await getDoc(doc(db, 'users', referrerUid));
+    const referrerDoc = await getDoc(doc(db, COLLECTIONS.USERS, referrerUid));
     if (referrerDoc.exists()) {
       referrerRole = referrerDoc.data()?.role;
     }

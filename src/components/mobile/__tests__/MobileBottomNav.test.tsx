@@ -2,11 +2,12 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import MobileBottomNav from '../MobileBottomNav';
+import { ROUTES } from '../../../constants/routes';
 
 describe('MobileBottomNav', () => {
   it('renders donor dashboard bottom nav when enabled', () => {
     render(
-      <MemoryRouter initialEntries={['/donor/dashboard/overview']}>
+      <MemoryRouter initialEntries={[ROUTES.portal.donor.dashboard.overview]}>
         <MobileBottomNav enabled />
       </MemoryRouter>
     );
@@ -18,7 +19,7 @@ describe('MobileBottomNav', () => {
 
   it('does not render outside dashboard routes', () => {
     render(
-      <MemoryRouter initialEntries={['/about']}>
+      <MemoryRouter initialEntries={[ROUTES.about]}>
         <MobileBottomNav enabled />
       </MemoryRouter>
     );

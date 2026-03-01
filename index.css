@@ -3,6 +3,48 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-surface-base: #f9fafb;
+    --color-surface-card: #ffffff;
+    --color-surface-muted: #f3f4f6;
+    --color-surface-overlay: rgba(255, 255, 255, 0.85);
+    --color-text-primary: #111827;
+    --color-text-secondary: #374151;
+    --color-text-muted: #6b7280;
+    --color-brand-50: #fef2f2;
+    --color-brand-100: #fee2e2;
+    --color-brand-200: #fecaca;
+    --color-brand-500: #ef4444;
+    --color-brand-600: #dc2626;
+    --color-brand-700: #b91c1c;
+    --color-brand-800: #991b1b;
+    --color-status-success: #16a34a;
+    --color-status-warning: #d97706;
+    --color-status-danger: #dc2626;
+    --color-status-info: #2563eb;
+  }
+
+  .dark {
+    --color-surface-base: #070b12;
+    --color-surface-card: #0b1220;
+    --color-surface-muted: #172033;
+    --color-surface-overlay: rgba(11, 18, 32, 0.92);
+    --color-text-primary: #f8fafc;
+    --color-text-secondary: #e2e8f0;
+    --color-text-muted: #b7c6dc;
+    --color-brand-50: rgba(239, 68, 68, 0.14);
+    --color-brand-100: rgba(239, 68, 68, 0.2);
+    --color-brand-200: rgba(239, 68, 68, 0.26);
+    --color-brand-500: #ef4444;
+    --color-brand-600: #fca5a5;
+    --color-brand-700: #fecaca;
+    --color-brand-800: #fee2e2;
+    --color-status-success: #22c55e;
+    --color-status-warning: #facc15;
+    --color-status-danger: #fca5a5;
+    --color-status-info: #60a5fa;
+  }
+
   html,
   body,
   #root {
@@ -10,12 +52,13 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900;
+    background-color: var(--color-surface-base);
+    color: var(--color-text-primary);
   }
 
   .dark body {
-    background-color: #070b12;
-    color: #f1f5f9;
+    background-color: var(--color-surface-base);
+    color: var(--color-text-primary);
   }
 }
 

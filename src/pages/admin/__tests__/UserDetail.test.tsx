@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import UserDetailPage from '../dashboard/UserDetail';
+import { ROUTES } from '../../../constants/routes';
 
 const useAuthMock = vi.fn();
 const userDetailMock = vi.fn();
@@ -103,9 +104,9 @@ describe('Admin UserDetail page', () => {
 
     render(
       <QueryClientProvider client={createClient()}>
-        <MemoryRouter initialEntries={['/admin/dashboard/users/u1?tab=security']}>
+        <MemoryRouter initialEntries={[`${ROUTES.portal.admin.dashboard.users}/u1?tab=security`]}>
           <Routes>
-            <Route path="/admin/dashboard/users/:uid" element={<UserDetailPage />} />
+            <Route path={`${ROUTES.portal.admin.dashboard.users}/:uid`} element={<UserDetailPage />} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>
@@ -120,9 +121,9 @@ describe('Admin UserDetail page', () => {
 
     render(
       <QueryClientProvider client={createClient()}>
-        <MemoryRouter initialEntries={['/admin/dashboard/users/u1?tab=profile']}>
+        <MemoryRouter initialEntries={[`${ROUTES.portal.admin.dashboard.users}/u1?tab=profile`]}>
           <Routes>
-            <Route path="/admin/dashboard/users/:uid" element={<UserDetailPage />} />
+            <Route path={`${ROUTES.portal.admin.dashboard.users}/:uid`} element={<UserDetailPage />} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>
@@ -145,9 +146,9 @@ describe('Admin UserDetail page', () => {
 
     render(
       <QueryClientProvider client={createClient()}>
-        <MemoryRouter initialEntries={['/admin/dashboard/users/u1?tab=profile']}>
+        <MemoryRouter initialEntries={[`${ROUTES.portal.admin.dashboard.users}/u1?tab=profile`]}>
           <Routes>
-            <Route path="/admin/dashboard/users/:uid" element={<UserDetailPage />} />
+            <Route path={`${ROUTES.portal.admin.dashboard.users}/:uid`} element={<UserDetailPage />} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>
@@ -189,9 +190,9 @@ describe('Admin UserDetail page', () => {
 
     render(
       <QueryClientProvider client={createClient()}>
-        <MemoryRouter initialEntries={['/admin/dashboard/users/u1?tab=security']}>
+        <MemoryRouter initialEntries={[`${ROUTES.portal.admin.dashboard.users}/u1?tab=security`]}>
           <Routes>
-            <Route path="/admin/dashboard/users/:uid" element={<UserDetailPage />} />
+            <Route path={`${ROUTES.portal.admin.dashboard.users}/:uid`} element={<UserDetailPage />} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>

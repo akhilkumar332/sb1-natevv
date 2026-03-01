@@ -1,6 +1,8 @@
 import { addDoc, collection, doc, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { NotificationType } from '../types/database.types';
+import { COLLECTIONS } from '../constants/firestore';
+import { ROUTES } from '../constants/routes';
 
 type FcmPayload = {
   messageId?: string;
@@ -46,12 +48,12 @@ const normalizeType = (value?: string) => {
 const resolveDefaultActionUrl = (role?: string) => {
   switch (role) {
     case 'ngo':
-      return '/ngo/dashboard?panel=notifications';
+      return `${ROUTES.portal.ngo.dashboard.root}?panel=notifications`;
     case 'bloodbank':
-      return '/bloodbank/dashboard?panel=notifications';
+      return `${ROUTES.portal.bloodbank.dashboard.root}?panel=notifications`;
     case 'donor':
     default:
-      return '/donor/dashboard?panel=notifications';
+      return `${ROUTES.portal.donor.dashboard.root}?panel=notifications`;
   }
 };
 
@@ -92,10 +94,10 @@ export const saveFcmNotification = async (
   const docId = buildDocId(userId, payload, fallbackId);
 
   if (docId) {
-    await setDoc(doc(db, 'notifications', docId), docData, { merge: true });
+    await setDoc(doc(db, COLLECTIONS.NOTIFICATIONS, docId), docData, { merge: true });
     return docId;
   }
 
-  const docRef = await addDoc(collection(db, 'notifications'), docData);
+  const docRef = await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), docData);
   return docRef.id;
 };

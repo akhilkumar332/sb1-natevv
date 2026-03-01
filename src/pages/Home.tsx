@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Droplet, Users, Building2, ArrowRight, MapPin, Shield, Award, Clock, Zap, TrendingUp, Star, Gift, Bell, CheckCircle } from 'lucide-react';
+import { ROUTES } from '../constants/routes';
 
 function StatCard({ icon, value, label, gradient }: { icon: React.ReactNode; value: string; label: string; gradient: string }) {
   return (
@@ -42,29 +43,29 @@ function Home() {
       badge: { icon: <Droplet className="w-5 h-5 text-red-600 mr-2" />, text: "A growing blood donation community in India" },
       title: { gradient: "Every Drop Counts,", normal: "Every Life Matters" },
       description: "Join a growing community of donors and supporters. Your contribution can help when it matters most.",
-      primaryBtn: { to: "/donor/register", icon: <Droplet className="w-5 h-5 mr-2" />, text: "Become a Donor" },
-      secondaryBtn: { to: "/request-blood", icon: <Heart className="w-5 h-5 mr-2" />, text: "Request Blood" }
+      primaryBtn: { to: ROUTES.portal.donor.register, icon: <Droplet className="w-5 h-5 mr-2" />, text: "Become a Donor" },
+      secondaryBtn: { to: ROUTES.requestBlood, icon: <Heart className="w-5 h-5 mr-2" />, text: "Request Blood" }
     },
     {
       badge: { icon: <Bell className="w-5 h-5 text-red-600 mr-2 animate-pulse" />, text: "When Blood Is Needed" },
       title: { gradient: "Someone Needs Help,", normal: "Right Now" },
       description: "In urgent moments, quick connections can make a real difference.",
-      primaryBtn: { to: "/donors", icon: <MapPin className="w-5 h-5 mr-2" />, text: "Find Nearby Requests" },
-      secondaryBtn: { to: "/donor/register", icon: <Droplet className="w-5 h-5 mr-2" />, text: "Register to Help" }
+      primaryBtn: { to: ROUTES.donors, icon: <MapPin className="w-5 h-5 mr-2" />, text: "Find Nearby Requests" },
+      secondaryBtn: { to: ROUTES.portal.donor.register, icon: <Droplet className="w-5 h-5 mr-2" />, text: "Register to Help" }
     },
     {
       badge: { icon: <Gift className="w-5 h-5 text-red-600 mr-2" />, text: "Recognition & Gratitude" },
       title: { gradient: "Donate Blood,", normal: "Be Recognized" },
       description: "We aim to celebrate donors with community recognition and meaningful milestones.",
-      primaryBtn: { to: "/donor/register", icon: <Star className="w-5 h-5 mr-2" />, text: "Explore Recognition" },
-      secondaryBtn: { to: "/about", icon: <Award className="w-5 h-5 mr-2" />, text: "Learn More" }
+      primaryBtn: { to: ROUTES.portal.donor.register, icon: <Star className="w-5 h-5 mr-2" />, text: "Explore Recognition" },
+      secondaryBtn: { to: ROUTES.about, icon: <Award className="w-5 h-5 mr-2" />, text: "Learn More" }
     },
     {
       badge: { icon: <Users className="w-5 h-5 text-red-600 mr-2" />, text: "Community Impact" },
       title: { gradient: "Lives Changed,", normal: "Together" },
       description: "Be part of a growing community working to make blood access more reliable.",
-      primaryBtn: { to: "/donor/register", icon: <Heart className="w-5 h-5 mr-2" />, text: "Join Our Community" },
-      secondaryBtn: { to: "/about", icon: <TrendingUp className="w-5 h-5 mr-2" />, text: "View Impact" }
+      primaryBtn: { to: ROUTES.portal.donor.register, icon: <Heart className="w-5 h-5 mr-2" />, text: "Join Our Community" },
+      secondaryBtn: { to: ROUTES.about, icon: <TrendingUp className="w-5 h-5 mr-2" />, text: "View Impact" }
     }
   ];
 
@@ -321,7 +322,7 @@ function Home() {
                 </div>
 
                 <Link
-                  to="/request-blood"
+                  to={ROUTES.requestBlood}
                   className="inline-flex items-center mt-8 px-8 py-4 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-full text-lg font-bold hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
                 >
                   <Bell className="w-5 h-5 mr-2" />
@@ -369,7 +370,7 @@ function Home() {
             <h2 className="text-5xl md:text-6xl font-bold mb-6">Ready to Make a Difference?</h2>
             <p className="text-xl md:text-2xl mb-12 opacity-90">Join a growing community of donors and supporters.</p>
             <Link
-              to="/donor/register"
+              to={ROUTES.portal.donor.register}
               className="inline-flex items-center px-10 py-5 bg-white text-red-600 rounded-full text-xl font-bold hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
             >
               <Droplet className="w-6 h-6 mr-3" />
@@ -423,7 +424,7 @@ function Home() {
 
             <div className="relative flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                to="/donor/register"
+                to={ROUTES.portal.donor.register}
                 className="group/btn relative px-10 py-5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-full text-lg font-bold hover:shadow-2xl transform hover:scale-105 hover:-translate-y-1 transition-all duration-500 inline-flex items-center justify-center overflow-hidden"
                 style={{ boxShadow: '0 10px 30px rgba(220, 38, 38, 0.3)' }}
               >
@@ -433,7 +434,7 @@ function Home() {
                 <ArrowRight className="ml-2 relative z-10 group-hover/btn:translate-x-1 transition-transform duration-300" />
               </Link>
               <Link
-                to="/request-blood"
+                to={ROUTES.requestBlood}
                 className="group/btn px-10 py-5 bg-white/80 backdrop-blur-xl text-red-600 rounded-full text-lg font-bold border-2 border-red-600 hover:bg-red-600 hover:text-white hover:shadow-2xl transform hover:scale-105 hover:-translate-y-1 transition-all duration-500 inline-flex items-center justify-center"
               >
                 <Heart className="w-5 h-5 mr-2" />

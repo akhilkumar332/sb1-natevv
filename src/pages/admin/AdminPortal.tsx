@@ -18,6 +18,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { ROUTES } from '../../constants/routes';
 
 type MenuItem = {
   id: string;
@@ -107,7 +108,7 @@ function AdminPortal() {
   const OverviewIcon = overviewItem.icon;
 
   useEffect(() => {
-    const currentPath = location.pathname.replace('/admin/dashboard/', '');
+    const currentPath = location.pathname.replace(`${ROUTES.portal.admin.dashboard.root}/`, '');
     setExpandedGroups((prev) => {
       const next: Record<string, boolean> = {};
       menuGroups.forEach((group) => {

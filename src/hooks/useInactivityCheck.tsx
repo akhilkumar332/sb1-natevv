@@ -4,9 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { authStorage } from '../utils/authStorage';
 import WarningModal from '../components/WarningModal';
+import { FIVE_MINUTES_MS, FOUR_MINUTES_MS } from '../constants/time';
 
-const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes 5 * 60 * 1000
-const WARNING_TIMEOUT = 4 * 60 * 1000; // 4 minutes 4 * 60 * 1000
+const INACTIVITY_TIMEOUT = FIVE_MINUTES_MS; // 5 minutes FIVE_MINUTES_MS
+const WARNING_TIMEOUT = FOUR_MINUTES_MS; // 4 minutes FOUR_MINUTES_MS
 const CHECK_INTERVAL = 30000; // Check every 30 seconds
 
 export const useInactivityCheck = () => {

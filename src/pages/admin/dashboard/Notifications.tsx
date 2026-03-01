@@ -13,6 +13,7 @@ import { useAdminNotifications } from '../../../hooks/admin/useAdminQueries';
 import { refetchQuery } from '../../../utils/queryRefetch';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { runWithFeedback } from '../../../utils/runWithFeedback';
+import { COLLECTIONS } from '../../../constants/firestore';
 
 type NotificationRow = {
   id: string;
@@ -84,7 +85,7 @@ function NotificationsPage() {
   const toggleRead = async (entry: NotificationRow, read: boolean) => {
     setProcessingId(entry.id);
     await runWithFeedback({
-      action: () => updateDoc(doc(db, 'notifications', entry.id), {
+      action: () => updateDoc(doc(db, COLLECTIONS.NOTIFICATIONS, entry.id), {
         read,
         updatedAt: getServerTimestamp(),
       }),

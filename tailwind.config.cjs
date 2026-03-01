@@ -4,6 +4,34 @@ const config = {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      colors: {
+        brand: {
+          50: 'var(--color-brand-50)',
+          100: 'var(--color-brand-100)',
+          200: 'var(--color-brand-200)',
+          500: 'var(--color-brand-500)',
+          600: 'var(--color-brand-600)',
+          700: 'var(--color-brand-700)',
+          800: 'var(--color-brand-800)',
+        },
+        surface: {
+          base: 'var(--color-surface-base)',
+          card: 'var(--color-surface-card)',
+          muted: 'var(--color-surface-muted)',
+          overlay: 'var(--color-surface-overlay)',
+        },
+        text: {
+          primary: 'var(--color-text-primary)',
+          secondary: 'var(--color-text-secondary)',
+          muted: 'var(--color-text-muted)',
+        },
+        status: {
+          success: 'var(--color-status-success)',
+          warning: 'var(--color-status-warning)',
+          danger: 'var(--color-status-danger)',
+          info: 'var(--color-status-info)',
+        },
+      },
       animation: {
         float1: 'float1 6s ease-in-out infinite',
         float2: 'float2 8s ease-in-out infinite',

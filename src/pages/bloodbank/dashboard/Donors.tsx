@@ -17,6 +17,10 @@ import { useScopedErrorReporter } from '../../../hooks/useScopedErrorReporter';
 import { useDonorDirectory } from '../../../hooks/useDonorDirectory';
 import { runDedupedRequest } from '../../../utils/requestDedupe';
 import { useNetworkStatus } from '../../../contexts/NetworkStatusContext';
+import { COLLECTIONS } from '../../../constants/firestore';
+import { ROUTES } from '../../../constants/routes';
+import { FIVE_MINUTES_MS } from '../../../constants/time';
+import { MAP_CLUSTER_COLORS } from '../../../constants/theme';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -63,7 +67,7 @@ function BloodBankDonors() {
     scope: 'bloodbank',
     page: 'BloodBankDonors',
     cache: {
-      ttlMs: 5 * 60 * 1000,
+      ttlMs: FIVE_MINUTES_MS,
       enablePrefetch: false,
     },
     lowBandwidthMode: isLowBandwidth,
@@ -77,7 +81,7 @@ function BloodBankDonors() {
     const fetchDonorCommunity = async () => {
       try {
         const summary = await runDedupedRequest('bloodbank:donors:community', async () => {
-          const publicSnap = await getDocs(collection(db, 'publicDonors'));
+          const publicSnap = await getDocs(collection(db, COLLECTIONS.PUBLIC_DONORS));
           const eligibleDonors = publicSnap.docs
             .map((doc) => doc.data())
             .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
@@ -101,7 +105,7 @@ function BloodBankDonors() {
             newThisMonth,
             retentionRate: Math.round(retentionRate * 10) / 10,
           };
-        }, 5 * 60 * 1000);
+        }, FIVE_MINUTES_MS);
 
         setDonorCommunity(summary);
       } catch (error) {
@@ -211,14 +215,14 @@ function BloodBankDonors() {
           </p>
           <div className="mt-5 space-y-3">
             <Link
-              to="/bloodbank/dashboard/requests"
+              to={ROUTES.portal.bloodbank.dashboard.requests}
               className="flex items-center justify-between rounded-xl bg-white/15 px-4 py-3 text-sm font-semibold"
             >
               Create blood request
               <ChevronRight className="w-4 h-4" />
             </Link>
             <Link
-              to="/bloodbank/dashboard/appointments"
+              to={ROUTES.portal.bloodbank.dashboard.appointments}
               className="flex items-center justify-between rounded-xl bg-white/15 px-4 py-3 text-sm font-semibold"
             >
               Schedule appointments
@@ -387,8 +391,8 @@ function BloodBankDonors() {
                   typeof donor.latitude === 'number' &&
                   typeof donor.longitude === 'number'
               )}
-              singleFillColor="#facc15"
-              clusterFillColor="#eab308"
+              singleFillColor={MAP_CLUSTER_COLORS.bloodbank.single}
+              clusterFillColor={MAP_CLUSTER_COLORS.bloodbank.cluster}
             />
           </MapContainer>
         </div>

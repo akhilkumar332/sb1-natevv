@@ -8,6 +8,7 @@ import PhoneInput from 'react-phone-number-input';
 import { useRegister } from '../../hooks/useRegister';
 import 'react-phone-number-input/style.css';
 import LogoMark from '../../components/LogoMark';
+import { ROUTES } from '../../constants/routes';
 
 export function DonorRegister() {
   const navigate = useNavigate();
@@ -32,9 +33,9 @@ export function DonorRegister() {
     if (user && !hasNavigated.current) {
       hasNavigated.current = true;
       if (!user.onboardingCompleted) {
-        navigate('/donor/onboarding');
+        navigate(ROUTES.portal.donor.onboarding);
       } else if (user.role === 'donor') {
-        navigate('/donor/dashboard');
+        navigate(ROUTES.portal.donor.dashboard.root);
       }
     }
   }, [user, navigate]);
@@ -286,7 +287,7 @@ export function DonorRegister() {
                 <p className="text-center text-sm text-gray-600">
                   Already have an account?{' '}
                   <Link
-                    to="/donor/login"
+                    to={ROUTES.portal.donor.login}
                     className="font-semibold text-red-600 hover:text-red-700 transition-colors"
                   >
                     Login now

@@ -5,6 +5,7 @@ import { Building2, Activity, MapPin, Shield } from 'lucide-react';
 import { useBloodBankRegister } from '../../hooks/useBloodBankRegister';
 import { useAuth } from '../../contexts/AuthContext';
 import LogoMark from '../../components/LogoMark';
+import { ROUTES } from '../../constants/routes';
 
 export function BloodBankRegister() {
   const navigate = useNavigate();
@@ -16,7 +17,7 @@ export function BloodBankRegister() {
 
   useEffect(() => {
     if (user && user.role === 'bloodbank') {
-      navigate('/bloodbank/dashboard');
+      navigate(ROUTES.portal.bloodbank.dashboard.root);
     }
   }, [user, navigate]);
 
@@ -138,7 +139,7 @@ export function BloodBankRegister() {
                 <p className="text-center text-sm text-gray-600">
                   Already have an account?{' '}
                   <Link
-                    to="/bloodbank/login"
+                    to={ROUTES.portal.bloodbank.login}
                     className="font-semibold text-red-600 hover:text-red-700 transition-colors"
                   >
                     Log in

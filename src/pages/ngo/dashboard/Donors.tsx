@@ -14,6 +14,9 @@ import { DonorPaginationFooter } from '../../../components/shared/DonorPaginatio
 import { useScopedErrorReporter } from '../../../hooks/useScopedErrorReporter';
 import { useDonorDirectory } from '../../../hooks/useDonorDirectory';
 import { useNetworkStatus } from '../../../contexts/NetworkStatusContext';
+import { ROUTES } from '../../../constants/routes';
+import { FIVE_MINUTES_MS } from '../../../constants/time';
+import { MAP_CLUSTER_COLORS } from '../../../constants/theme';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -56,7 +59,7 @@ function NgoDonors() {
     cache: {
       pageCacheKeyPrefix: 'ngo_donors_cache',
       mapCacheKey: 'ngo_donors_map_cache',
-      ttlMs: 5 * 60 * 1000,
+      ttlMs: FIVE_MINUTES_MS,
       enablePrefetch: true,
     },
     lowBandwidthMode: isLowBandwidth,
@@ -165,14 +168,14 @@ function NgoDonors() {
           </p>
           <div className="mt-5 space-y-3">
             <Link
-              to="/ngo/dashboard/campaigns"
+              to={ROUTES.portal.ngo.dashboard.campaigns}
               className="flex items-center justify-between rounded-xl bg-white/15 px-4 py-3 text-sm font-semibold"
             >
               Create outreach campaign
               <ChevronRight className="w-4 h-4" />
             </Link>
             <Link
-              to="/ngo/dashboard/volunteers"
+              to={ROUTES.portal.ngo.dashboard.volunteers}
               className="flex items-center justify-between rounded-xl bg-white/15 px-4 py-3 text-sm font-semibold"
             >
               Invite volunteers
@@ -341,8 +344,8 @@ function NgoDonors() {
                   typeof donor.latitude === 'number' &&
                   typeof donor.longitude === 'number'
               )}
-              singleFillColor="#f97316"
-              clusterFillColor="#f59e0b"
+              singleFillColor={MAP_CLUSTER_COLORS.ngo.single}
+              clusterFillColor={MAP_CLUSTER_COLORS.ngo.cluster}
             />
           </MapContainer>
         </div>

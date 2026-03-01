@@ -31,6 +31,7 @@ import {
   notifyLocationDetected,
   notifyMapAddressUpdated,
 } from '../../utils/locationFeedback';
+import { ROUTES } from '../../constants/routes';
 import { isValidCoordinatePair } from '../../utils/locationSelection';
 import { buildGeocodeLocationPatch, buildSuggestionLocationUpdate } from '../../utils/locationController';
 import { resolveOnboardingSubmitErrorMessage } from '../../utils/onboardingFeedback';
@@ -337,7 +338,7 @@ export function BloodBankOnboarding() {
         }
       }
       notify.success('BloodBank profile completed successfully!');
-      navigate('/bloodbank/dashboard');
+      navigate(ROUTES.portal.bloodbank.dashboard.root);
     } catch (error) {
       reportOnboardingError(error, 'bloodbank.onboarding.submit');
       notify.error(resolveOnboardingSubmitErrorMessage(error, 'bloodbank'));

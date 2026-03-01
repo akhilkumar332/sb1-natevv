@@ -6,8 +6,10 @@
 import { useMemo, useState, useEffect } from 'react';
 import { collection, query, where, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import { COLLECTIONS } from '../constants/firestore';
 import { useScopedErrorReporter } from './useScopedErrorReporter';
 import { readDashboardCache, writeDashboardCache } from '../utils/dashboardCache';
+import { FIVE_MINUTES_MS, SEVEN_DAYS_MS, THIRTY_DAYS_MS, ZERO_MS } from '../constants/time';
 
 export interface BloodInventoryItem {
   id: string;
@@ -155,7 +157,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
   const [error, setError] = useState<string | null>(null);
 
   const cacheKey = useMemo(() => (bloodBankId ? `bloodbank_dashboard_cache_${bloodBankId}` : ''), [bloodBankId]);
-  const cacheTTL = 5 * 60 * 1000;
+  const cacheTTL = FIVE_MINUTES_MS;
   const reportBloodBankDataError = useScopedErrorReporter({
     scope: 'bloodbank',
     metadata: { hook: 'useBloodBankData' },
@@ -215,7 +217,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
 
   const fetchInventory = async () => {
     try {
-      const inventoryRef = collection(db, 'bloodInventory');
+      const inventoryRef = collection(db, COLLECTIONS.BLOOD_INVENTORY);
       const q = query(inventoryRef, where('hospitalId', '==', bloodBankId));
       const unsubscribe = onSnapshot(
         q,
@@ -267,7 +269,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
 
   const fetchRequests = async () => {
     try {
-      const requestsRef = collection(db, 'bloodRequests');
+      const requestsRef = collection(db, COLLECTIONS.BLOOD_REQUESTS);
       const q = query(
         requestsRef,
         where('requesterId', '==', bloodBankId),
@@ -327,7 +329,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
 
   const fetchAppointments = async () => {
     try {
-      const appointmentsRef = collection(db, 'appointments');
+      const appointmentsRef = collection(db, COLLECTIONS.APPOINTMENTS);
       const q = query(
         appointmentsRef,
         where('hospitalId', '==', bloodBankId),
@@ -362,7 +364,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
 
   const fetchDonations = async () => {
     try {
-      const donationsRef = collection(db, 'donations');
+      const donationsRef = collection(db, COLLECTIONS.DONATIONS);
       const q = query(
         donationsRef,
         where('hospitalId', '==', bloodBankId),
@@ -396,7 +398,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
   };
 
   const fetchInventoryOnce = async () => {
-    const inventoryRef = collection(db, 'bloodInventory');
+    const inventoryRef = collection(db, COLLECTIONS.BLOOD_INVENTORY);
     const q = query(inventoryRef, where('hospitalId', '==', bloodBankId));
     const snapshot = await getDocs(q);
     const inventoryList: BloodInventoryItem[] = snapshot.docs.map(doc => {
@@ -425,7 +427,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
   };
 
   const fetchRequestsOnce = async () => {
-    const requestsRef = collection(db, 'bloodRequests');
+    const requestsRef = collection(db, COLLECTIONS.BLOOD_REQUESTS);
     const q = query(
       requestsRef,
       where('requesterId', '==', bloodBankId),
@@ -477,8 +479,8 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
     const adequateTypes = inventory.filter(item => item.status === 'adequate' || item.status === 'surplus').length;
 
     const now = new Date();
-    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const sevenDaysFromNow = new Date(now.getTime() + SEVEN_DAYS_MS);
+    const thirtyDaysFromNow = new Date(now.getTime() + THIRTY_DAYS_MS);
 
     let expiringIn7Days = 0;
     let expiringIn30Days = 0;
@@ -558,8 +560,8 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
     const adequateTypes = inventory.filter(item => item.status === 'adequate' || item.status === 'surplus').length;
 
     const now = new Date();
-    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const sevenDaysFromNow = new Date(now.getTime() + SEVEN_DAYS_MS);
+    const thirtyDaysFromNow = new Date(now.getTime() + THIRTY_DAYS_MS);
 
     let expiringIn7Days = 0;
     let expiringIn30Days = 0;
@@ -656,7 +658,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
         if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
           idleBackgroundId = (window as any).requestIdleCallback(task);
         } else {
-          timeoutBackgroundId = setTimeout(task, 0);
+          timeoutBackgroundId = setTimeout(task, ZERO_MS);
         }
       };
 
@@ -690,7 +692,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
       } else {
         timeoutFetchId = setTimeout(() => {
           void runFetch();
-        }, 0);
+        }, ZERO_MS);
       }
     };
 
@@ -727,7 +729,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
       }
       void fetchAppointments();
       void fetchDonations();
-    }, 5 * 60 * 1000);
+    }, FIVE_MINUTES_MS);
     return () => clearInterval(interval);
   }, [bloodBankId]);
 

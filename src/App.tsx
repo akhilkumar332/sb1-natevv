@@ -20,6 +20,9 @@ import AppLaunchSplash from './components/mobile/AppLaunchSplash';
 import MobileRouteTransition from './components/mobile/MobileRouteTransition';
 import MobileBottomNav from './components/mobile/MobileBottomNav';
 import NetworkStatusBadge from './components/shared/NetworkStatusBadge';
+import { APP_ROUTE_PREFIXES_WITH_LEGACY, ROUTES } from './constants/routes';
+import { TOAST_THEME_TOKENS } from './constants/theme';
+import { FIVE_SECONDS_MS, ONE_MINUTE_MS, THREE_SECONDS_MS } from './constants/time';
 
 function App() {
   useAuthSync();
@@ -31,42 +34,42 @@ function App() {
   const { WarningComponent } = useInactivityCheck();
   const location = useLocation();
 
-  const mobileOnlyRoutes = new Set([
-    '/donor/login',
-    '/donor/register',
-    '/ngo/login',
-    '/ngo/register',
-    '/bloodbank/login',
-    '/bloodbank/register',
+  const mobileOnlyRoutes = new Set<string>([
+    ROUTES.portal.donor.login,
+    ROUTES.portal.donor.register,
+    ROUTES.portal.ngo.login,
+    ROUTES.portal.ngo.register,
+    ROUTES.portal.bloodbank.login,
+    ROUTES.portal.bloodbank.register,
   ]);
-  const noFooterRoutes = new Set([
-    '/donor/dashboard',
-    '/ngo/dashboard',
-    '/bloodbank/dashboard',
-    '/admin/dashboard',
-    '/donor/onboarding',
-    '/ngo/onboarding',
-    '/bloodbank/onboarding',
+  const noFooterRoutes = new Set<string>([
+    ROUTES.portal.donor.dashboard.root,
+    ROUTES.portal.ngo.dashboard.root,
+    ROUTES.portal.bloodbank.dashboard.root,
+    ROUTES.portal.admin.dashboard.root,
+    ROUTES.portal.donor.onboarding,
+    ROUTES.portal.ngo.onboarding,
+    ROUTES.portal.bloodbank.onboarding,
   ]);
   const noFooterPrefixes = [
-    '/donor/dashboard',
-    '/ngo/dashboard',
-    '/bloodbank/dashboard',
-    '/admin/dashboard',
+    ROUTES.portal.donor.dashboard.root,
+    ROUTES.portal.ngo.dashboard.root,
+    ROUTES.portal.bloodbank.dashboard.root,
+    ROUTES.portal.admin.dashboard.root,
   ];
 
   const hideCompletely = noFooterRoutes.has(location.pathname)
     || noFooterPrefixes.some(prefix => location.pathname.startsWith(prefix));
   const hideOnMobile = mobileOnlyRoutes.has(location.pathname);
-  const appLikePrefixes = ['/donor', '/ngo', '/bloodbank', '/admin'];
-  const publicMobileAppRoutes = new Set([
-    '/',
-    '/donors',
-    '/request-blood',
-    '/about',
-    '/contact',
+  const appLikePrefixes = APP_ROUTE_PREFIXES_WITH_LEGACY;
+  const publicMobileAppRoutes = new Set<string>([
+    ROUTES.home,
+    ROUTES.donors,
+    ROUTES.requestBlood,
+    ROUTES.about,
+    ROUTES.contact,
   ]);
-  const dashboardPrefixes = ['/donor/dashboard', '/ngo/dashboard', '/bloodbank/dashboard', '/admin/dashboard'];
+  const dashboardPrefixes = [ROUTES.portal.donor.dashboard.root, ROUTES.portal.ngo.dashboard.root, ROUTES.portal.bloodbank.dashboard.root, ROUTES.portal.admin.dashboard.root];
   const isAppLikeRoute = appLikePrefixes.some(prefix => location.pathname.startsWith(prefix));
   const isPublicFrontendRoute = publicMobileAppRoutes.has(location.pathname);
   const isDashboardRoute = dashboardPrefixes.some(prefix => location.pathname.startsWith(prefix));
@@ -126,38 +129,38 @@ function App() {
         <Toaster
           position="top-right"
           toastOptions={{
-            duration: 5000,
+            duration: FIVE_SECONDS_MS,
             style: {
-              background: isDark ? '#334155' : '#ffffff',
-              color: isDark ? '#f3f4f6' : '#000000',
+              background: isDark ? TOAST_THEME_TOKENS.surface.dark : TOAST_THEME_TOKENS.surface.light,
+              color: isDark ? TOAST_THEME_TOKENS.text.dark : TOAST_THEME_TOKENS.text.light,
               boxShadow: isDark
-                ? '0 6px 20px rgba(0, 0, 0, 0.45), 0 0 1px rgba(255, 255, 255, 0.06)'
-                : '0 4px 12px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1)',
+                ? TOAST_THEME_TOKENS.shadow.dark
+                : TOAST_THEME_TOKENS.shadow.light,
               borderRadius: '8px',
               padding: '16px',
-              border: isDark ? '1px solid rgba(148, 163, 184, 0.55)' : '1px solid rgba(0, 0, 0, 0.05)',
+              border: isDark ? TOAST_THEME_TOKENS.border.dark : TOAST_THEME_TOKENS.border.light,
             },
             success: {
-              duration: 3000,
+              duration: THREE_SECONDS_MS,
               iconTheme: {
-                primary: '#10B981', // green-500
-                secondary: '#ffffff',
+                primary: TOAST_THEME_TOKENS.icon.success,
+                secondary: TOAST_THEME_TOKENS.icon.secondary,
               },
             },
             error: {
-              duration: 3000,
+              duration: THREE_SECONDS_MS,
               iconTheme: {
-                primary: '#EF4444', // red-500
-                secondary: '#ffffff',
+                primary: TOAST_THEME_TOKENS.icon.error,
+                secondary: TOAST_THEME_TOKENS.icon.secondary,
               },
             },
             // Add custom styling for warning toasts
             custom: {
-              duration: 60000,
+              duration: ONE_MINUTE_MS,
               style: {
-                background: isDark ? '#3f2d0d' : '#FEF3C7',
-                color: isDark ? '#fde68a' : '#92400E',
-                border: isDark ? '1px solid #b45309' : '1px solid #FCD34D',
+                background: isDark ? TOAST_THEME_TOKENS.warning.bgDark : TOAST_THEME_TOKENS.warning.bgLight,
+                color: isDark ? TOAST_THEME_TOKENS.warning.textDark : TOAST_THEME_TOKENS.warning.textLight,
+                border: isDark ? TOAST_THEME_TOKENS.warning.borderDark : TOAST_THEME_TOKENS.warning.borderLight,
               },
             },
           }}

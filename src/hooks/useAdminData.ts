@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, orderBy, limit, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { COLLECTIONS } from '../constants/firestore';
 import { captureHandledError } from '../services/errorLog.service';
 
 export interface UserRecord {
@@ -177,7 +178,7 @@ export const useAdminData = (): UseAdminDataReturn => {
   // Fetch recent users
   const fetchUsers = async () => {
     try {
-      const usersRef = collection(db, 'users');
+      const usersRef = collection(db, COLLECTIONS.USERS);
       const q = query(usersRef, orderBy('createdAt', 'desc'), limit(100));
 
       const snapshot = await getDocs(q);
@@ -206,7 +207,7 @@ export const useAdminData = (): UseAdminDataReturn => {
   // Fetch verification requests
   const fetchVerificationRequests = async () => {
     try {
-      const verificationsRef = collection(db, 'verificationRequests');
+      const verificationsRef = collection(db, COLLECTIONS.VERIFICATION_REQUESTS);
       const q = query(verificationsRef, orderBy('submittedAt', 'desc'), limit(50));
 
       const unsubscribe = onSnapshot(
@@ -249,7 +250,7 @@ export const useAdminData = (): UseAdminDataReturn => {
   // Fetch emergency requests
   const fetchEmergencyRequests = async () => {
     try {
-      const requestsRef = collection(db, 'bloodRequests');
+      const requestsRef = collection(db, COLLECTIONS.BLOOD_REQUESTS);
       const q = query(
         requestsRef,
         where('isEmergency', '==', true),
@@ -295,7 +296,7 @@ export const useAdminData = (): UseAdminDataReturn => {
   // Fetch system alerts (inventory alerts)
   const fetchSystemAlerts = async () => {
     try {
-      const inventoryRef = collection(db, 'bloodInventory');
+      const inventoryRef = collection(db, COLLECTIONS.BLOOD_INVENTORY);
       const q = query(
         inventoryRef,
         where('status', 'in', ['low', 'critical']),
@@ -343,7 +344,7 @@ export const useAdminData = (): UseAdminDataReturn => {
     try {
       // Recent donations
       const donationsQuery = query(
-        collection(db, 'donations'),
+        collection(db, COLLECTIONS.DONATIONS),
         orderBy('donationDate', 'desc'),
         limit(5)
       );
@@ -362,7 +363,7 @@ export const useAdminData = (): UseAdminDataReturn => {
 
       // Recent requests
       const requestsQuery = query(
-        collection(db, 'bloodRequests'),
+        collection(db, COLLECTIONS.BLOOD_REQUESTS),
         orderBy('requestedAt', 'desc'),
         limit(5)
       );
@@ -381,7 +382,7 @@ export const useAdminData = (): UseAdminDataReturn => {
 
       // Recent campaigns
       const campaignsQuery = query(
-        collection(db, 'campaigns'),
+        collection(db, COLLECTIONS.CAMPAIGNS),
         orderBy('startDate', 'desc'),
         limit(5)
       );
@@ -417,7 +418,7 @@ export const useAdminData = (): UseAdminDataReturn => {
       const pendingVerification = users.filter(u => u.status === 'pending_verification').length;
 
       // Donation stats
-      const donationsSnapshot = await getDocs(collection(db, 'donations'));
+      const donationsSnapshot = await getDocs(collection(db, COLLECTIONS.DONATIONS));
       const totalDonations = donationsSnapshot.size;
       const completedDonations = donationsSnapshot.docs.filter(doc => doc.data().status === 'completed').length;
       const totalBloodUnits = donationsSnapshot.docs
@@ -425,12 +426,12 @@ export const useAdminData = (): UseAdminDataReturn => {
         .reduce((sum, doc) => sum + (doc.data().units || 0), 0);
 
       // Request stats
-      const requestsSnapshot = await getDocs(collection(db, 'bloodRequests'));
+      const requestsSnapshot = await getDocs(collection(db, COLLECTIONS.BLOOD_REQUESTS));
       const activeRequests = requestsSnapshot.docs.filter(doc => doc.data().status === 'active').length;
       const fulfilledRequests = requestsSnapshot.docs.filter(doc => doc.data().status === 'fulfilled').length;
 
       // Campaign stats
-      const campaignsSnapshot = await getDocs(collection(db, 'campaigns'));
+      const campaignsSnapshot = await getDocs(collection(db, COLLECTIONS.CAMPAIGNS));
       const totalCampaigns = campaignsSnapshot.size;
       const activeCampaigns = campaignsSnapshot.docs.filter(doc => doc.data().status === 'active').length;
       const completedCampaigns = campaignsSnapshot.docs.filter(doc => doc.data().status === 'completed').length;

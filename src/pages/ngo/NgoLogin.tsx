@@ -9,6 +9,7 @@ import PwaInstallCta from '../../components/PwaInstallCta';
 import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
 import AuthStatusScreen from '../../components/auth/AuthStatusScreen';
 import { authMessages } from '../../constants/messages';
+import { ROUTES } from '../../constants/routes';
 import { handleRoleGoogleLogin } from '../../utils/roleGoogleLogin';
 import { navigateToPortalDashboard, resolveImpersonationRole, resolvePortalRole } from '../../utils/portalNavigation';
 import { notifyRoleMismatch } from '../../utils/authNotifications';
@@ -59,7 +60,9 @@ export function NgoLogin() {
       return;
     }
 
-    const targetPath = user.onboardingCompleted ? '/ngo/dashboard' : '/ngo/onboarding';
+    const targetPath = user.onboardingCompleted
+      ? ROUTES.portal.ngo.dashboard.root
+      : ROUTES.portal.ngo.onboarding;
     hasRedirected.current = true;
     navigate(targetPath);
   }, [
@@ -84,10 +87,10 @@ export function NgoLogin() {
         expectedRoles: ['ngo'],
         roleMismatchMessage: authMessages.roleMismatch.ngo,
         roleMismatchId: 'role-mismatch-ngo',
-        mismatchRedirectTo: '/ngo/login',
+        mismatchRedirectTo: ROUTES.portal.ngo.login,
         successMessage: 'Successfully logged in as NGO!',
-        dashboardPath: '/ngo/dashboard',
-        onboardingPath: '/ngo/onboarding',
+        dashboardPath: ROUTES.portal.ngo.dashboard.root,
+        onboardingPath: ROUTES.portal.ngo.onboarding,
         persistTokenOnSuccess: true,
         scope: 'ngo',
         page: 'NgoLogin',
@@ -266,7 +269,7 @@ export function NgoLogin() {
                 <p className="text-center text-sm text-gray-600">
                   Don't have an account?{' '}
                   <Link
-                    to="/ngo/register"
+                    to={ROUTES.portal.ngo.register}
                     className="font-semibold text-red-600 hover:text-red-700 transition-colors"
                   >
                     Register now

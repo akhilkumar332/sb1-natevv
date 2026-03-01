@@ -12,6 +12,7 @@ import { formatRelativeTime } from '../../utils/dataTransform';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useScopedErrorReporter } from '../../hooks/useScopedErrorReporter';
+import { COLLECTIONS } from '../../constants/firestore';
 
 interface NotificationCenterProps {
   isOpen: boolean;
@@ -50,7 +51,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     setMarkingRead((prev) => new Set(prev).add(notificationId));
 
     try {
-      const notifRef = doc(db, 'notifications', notificationId);
+      const notifRef = doc(db, COLLECTIONS.NOTIFICATIONS, notificationId);
       await updateDoc(notifRef, {
         read: true,
         readAt: new Date(),

@@ -13,6 +13,7 @@ import PwaInstallCta from '../../components/PwaInstallCta';
 import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
 import AuthStatusScreen from '../../components/auth/AuthStatusScreen';
 import { navigateToPortalDashboard, resolveImpersonationRole, resolvePortalRole } from '../../utils/portalNavigation';
+import { ROUTES } from '../../constants/routes';
 
 export function DonorLogin() {
   const navigate = useNavigate();
@@ -374,7 +375,7 @@ export function DonorLogin() {
                 <p className="text-center text-sm text-gray-600">
                   Don't have an account?{' '}
                   <Link
-                    to="/donor/register"
+                    to={ROUTES.portal.donor.register}
                     className="font-semibold text-red-600 hover:text-red-700 transition-colors"
                   >
                     Register now

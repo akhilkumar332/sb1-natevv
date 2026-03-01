@@ -5,6 +5,7 @@ import type { BloodBankDashboardContext } from '../BloodBankDashboard';
 import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import { updateUserNotificationPreferences } from '../../../services/offlineMutationOutbox.service';
 import { captureHandledError } from '../../../services/errorLog.service';
+import { ROUTES } from '../../../constants/routes';
 
 function BloodBankAccount() {
   const { user } = useOutletContext<BloodBankDashboardContext>();
@@ -135,7 +136,7 @@ function BloodBankAccount() {
 
             <div className="mt-4">
               <Link
-                to="/bloodbank/onboarding"
+                to={ROUTES.portal.bloodbank.onboarding}
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-yellow-600 px-4 py-2 text-xs font-semibold text-white shadow-lg hover:from-red-700 hover:to-yellow-700"
               >
                 Update blood bank profile

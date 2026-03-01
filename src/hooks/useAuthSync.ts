@@ -6,9 +6,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../firebase';
 import { authStorage } from '../utils/authStorage';
 import { captureHandledError } from '../services/errorLog.service';
+import { FIVE_MINUTES_MS, ONE_DAY_MS } from '../constants/time';
 
-const CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes instead of every minute
-const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const CHECK_INTERVAL = FIVE_MINUTES_MS; // Check every 5 minutes instead of every minute
+const SESSION_DURATION = ONE_DAY_MS; // 24 hours
 
 export const useAuthSync = () => {
   const { user, logout, impersonationSession } = useAuth();

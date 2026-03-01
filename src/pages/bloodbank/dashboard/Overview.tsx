@@ -5,6 +5,8 @@ import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestor
 import { db } from '../../../firebase';
 import type { BloodBankDashboardContext } from '../BloodBankDashboard';
 import { captureHandledError } from '../../../services/errorLog.service';
+import { COLLECTIONS } from '../../../constants/firestore';
+import { ROUTES } from '../../../constants/routes';
 
 type BloodBankBranch = {
   id: string;
@@ -47,7 +49,7 @@ function BloodBankOverview() {
   useEffect(() => {
     if (!baseHospitalId) return;
     const q = query(
-      collection(db, 'bloodbankBranches'),
+      collection(db, COLLECTIONS.BLOODBANK_BRANCHES),
       where('parentHospitalId', '==', baseHospitalId),
       orderBy('createdAt', 'asc')
     );
@@ -170,7 +172,7 @@ function BloodBankOverview() {
               <h2 className="text-2xl font-bold text-gray-900">Branch inventory snapshot</h2>
             </div>
             <Link
-              to="/bloodbank/dashboard/inventory"
+              to={ROUTES.portal.bloodbank.dashboard.inventory}
               className="text-sm font-semibold text-red-600 hover:text-red-700 flex items-center gap-2"
             >
               Manage inventory
@@ -204,7 +206,7 @@ function BloodBankOverview() {
               <h2 className="text-2xl font-bold text-gray-900">Stock alerts</h2>
             </div>
             <Link
-              to="/bloodbank/dashboard/inventory"
+              to={ROUTES.portal.bloodbank.dashboard.inventory}
               className="text-sm font-semibold text-red-600 hover:text-red-700 flex items-center gap-2"
             >
               View inventory
@@ -265,7 +267,7 @@ function BloodBankOverview() {
               )}
             </div>
             <Link
-              to="/bloodbank/dashboard/appointments"
+              to={ROUTES.portal.bloodbank.dashboard.appointments}
               className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-white/90"
             >
               View appointments
@@ -293,7 +295,7 @@ function BloodBankOverview() {
             </div>
             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
               <span>{referralCount} total referrals</span>
-              <Link to="/bloodbank/dashboard/referrals" className="inline-flex items-center gap-1 font-semibold text-yellow-600 hover:text-yellow-700">
+              <Link to={ROUTES.portal.bloodbank.dashboard.referrals} className="inline-flex items-center gap-1 font-semibold text-yellow-600 hover:text-yellow-700">
                 View details
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
@@ -309,7 +311,7 @@ function BloodBankOverview() {
             <h2 className="text-2xl font-bold text-gray-900">Active blood requests</h2>
           </div>
           <Link
-            to="/bloodbank/dashboard/requests"
+            to={ROUTES.portal.bloodbank.dashboard.requests}
             className="text-sm font-semibold text-yellow-600 hover:text-yellow-700 flex items-center gap-2"
           >
             View all

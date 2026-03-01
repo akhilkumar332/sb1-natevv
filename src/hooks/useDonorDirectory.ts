@@ -10,7 +10,9 @@ import {
   mapDocToDonorSummary,
 } from '../utils/donorDirectory';
 import { readCacheWithTtl, writeCache } from '../utils/cacheLifecycle';
+import { COLLECTIONS } from '../constants/firestore';
 
+import { FIVE_MINUTES_MS, TWELVE_HUNDRED_MS } from '../constants/time';
 type DonorDirectoryScope = 'ngo' | 'bloodbank';
 type Direction = 'initial' | 'next' | 'prev';
 
@@ -87,7 +89,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
   const pageSize = options.pageSize ?? (lowBandwidthMode ? 6 : 10);
   const mapFetchLimit = options.mapFetchLimit ?? (lowBandwidthMode ? 80 : 200);
   const enablePrefetch = Boolean(options.cache?.enablePrefetch) && !lowBandwidthMode;
-  const cacheTtlMs = options.cache?.ttlMs ?? 5 * 60 * 1000;
+  const cacheTtlMs = options.cache?.ttlMs ?? FIVE_MINUTES_MS;
   const [searchTerm, setSearchTerm] = useState('');
   const [bloodTypeFilter, setBloodTypeFilter] = useState('all');
   const [availabilityFilter, setAvailabilityFilter] = useState('all');
@@ -150,7 +152,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
         const chunk = donorIds.slice(i, i + 30);
         try {
           const snap = await getDocs(
-            query(collection(db, 'users'), where(documentId(), 'in', chunk))
+            query(collection(db, COLLECTIONS.USERS), where(documentId(), 'in', chunk))
           );
           snap.docs.forEach((docSnap) => {
             const data = docSnap.data() as any;
@@ -171,7 +173,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
         let unresolved = donorIds.filter((id) => !contactMap.has(id));
         for (let attempt = 0; attempt < 3 && unresolved.length > 0; attempt += 1) {
           const detailResults = await Promise.allSettled(
-            unresolved.map((id) => getDoc(doc(db, 'users', id)))
+            unresolved.map((id) => getDoc(doc(db, COLLECTIONS.USERS, id)))
           );
           detailResults.forEach((result, index) => {
             if (result.status !== 'fulfilled' || !result.value.exists()) return;
@@ -304,7 +306,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
           firstCursor: firstDocIdRef.current,
           lastCursor: lastDocIdRef.current,
         });
-        const snapshot = await getDocs(query(collection(db, 'publicDonors'), ...constraints));
+        const snapshot = await getDocs(query(collection(db, COLLECTIONS.PUBLIC_DONORS), ...constraints));
         let docs = snapshot.docs;
         const hasExtra = docs.length > pageSize;
         if (hasExtra) {
@@ -386,7 +388,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
 
       try {
         const publicSnap = await getDocs(
-          query(collection(db, 'publicDonors'), orderBy(documentId()), limit(mapFetchLimit))
+          query(collection(db, COLLECTIONS.PUBLIC_DONORS), orderBy(documentId()), limit(mapFetchLimit))
         );
         const publicRows = publicSnap.docs
           .map(mapDocToDonorSummary)
@@ -444,7 +446,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
         if (typeof cancel === 'function') cancel(id);
       };
     }
-    const timer = setTimeout(task, 1200);
+    const timer = setTimeout(task, TWELVE_HUNDRED_MS);
     return () => clearTimeout(timer);
   }, [cacheTtlMs, enablePrefetch, fetchDonorPage, options.scope, pageCacheKey, reportError]);
 
@@ -476,7 +478,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
         if (typeof idle === 'function') {
           idleId = idle(task);
         } else {
-          timerId = setTimeout(task, 1200);
+          timerId = setTimeout(task, TWELVE_HUNDRED_MS);
         }
       }
     }

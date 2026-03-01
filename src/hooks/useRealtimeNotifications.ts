@@ -17,8 +17,9 @@ import {
 import { auth, db } from '../firebase';
 import { Notification } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
-import { failRealtimeLoad, reportRealtimeError } from '../utils/realtimeError';
+import { reportRealtimeError } from '../utils/realtimeError';
 import { useSyncedRef } from './useSyncedRef';
+import { COLLECTIONS } from '../constants/firestore';
 import { notifyNewestItem } from '../utils/realtimeEvents';
 import {
   clearRealtimeRetryTimeout,
@@ -60,6 +61,241 @@ const useAuthUidMatch = (userId: string) => {
   };
 };
 
+type SharedNotificationState = UseRealtimeNotificationsResult;
+
+type SharedNotificationListener = (state: SharedNotificationState) => void;
+
+interface SharedNotificationEntry {
+  userId: string;
+  limitCount: number;
+  listeners: Set<SharedNotificationListener>;
+  state: SharedNotificationState;
+  unsubscribe: (() => void) | null;
+  retryTimeout: number | null;
+  retryCount: number;
+  useFallback: boolean;
+  listenEpoch: number;
+}
+
+const sharedNotificationStreams = new Map<string, SharedNotificationEntry>();
+const maxRetryAttempts = 4;
+const retryDelayMs = 1200;
+const immediateRetryDelayMs = 0;
+
+const makeSharedState = (): SharedNotificationState => ({
+  notifications: [],
+  unreadCount: 0,
+  loading: true,
+  reconnecting: false,
+  error: null,
+});
+
+const emitSharedNotificationState = (entry: SharedNotificationEntry) => {
+  for (const listener of entry.listeners) {
+    listener(entry.state);
+  }
+};
+
+const updateSharedNotificationState = (
+  entry: SharedNotificationEntry,
+  partial: Partial<SharedNotificationState>
+) => {
+  entry.state = { ...entry.state, ...partial };
+  emitSharedNotificationState(entry);
+};
+
+const clearSharedRetryTimeout = (entry: SharedNotificationEntry) => {
+  if (entry.retryTimeout !== null) {
+    globalThis.clearTimeout(entry.retryTimeout);
+    entry.retryTimeout = null;
+  }
+};
+
+const scheduleSharedStreamRestart = (entry: SharedNotificationEntry, epoch: number, delayMs: number) => {
+  clearSharedRetryTimeout(entry);
+  entry.retryTimeout = globalThis.setTimeout(() => {
+    if (entry.listenEpoch !== epoch) return;
+    startSharedNotificationStream(entry);
+  }, delayMs) as unknown as number;
+};
+
+const isIndexError = (err: any) => {
+  const message = err?.message || '';
+  return err?.code === 'failed-precondition' || message.includes('requires an index');
+};
+
+const isTransientError = (err: any, userId: string) => {
+  const code = err?.code;
+  if (isTransientRealtimeCode(code)) {
+    return true;
+  }
+
+  // During page refresh, auth may not be fully hydrated when listener starts.
+  if (code === 'permission-denied' || code === 'unauthenticated') {
+    return !auth.currentUser || auth.currentUser.uid !== userId;
+  }
+
+  return false;
+};
+
+const startSharedNotificationStream = (entry: SharedNotificationEntry) => {
+  entry.listenEpoch += 1;
+  const epoch = entry.listenEpoch;
+
+  if (entry.unsubscribe) {
+    entry.unsubscribe();
+    entry.unsubscribe = null;
+  }
+  clearSharedRetryTimeout(entry);
+
+  const orderedQuery = query(
+    collection(db, COLLECTIONS.NOTIFICATIONS),
+    where('userId', '==', entry.userId),
+    orderBy('createdAt', 'desc'),
+    limit(entry.limitCount)
+  );
+  const fallbackQuery = query(
+    collection(db, COLLECTIONS.NOTIFICATIONS),
+    where('userId', '==', entry.userId)
+  );
+
+  const q = entry.useFallback ? fallbackQuery : orderedQuery;
+
+  entry.unsubscribe = onSnapshot(
+    q,
+    (snapshot) => {
+      if (entry.listenEpoch !== epoch) return;
+      try {
+        let notificationData = extractQueryData<Notification>(snapshot, [
+          'createdAt',
+          'readAt',
+          'expiresAt',
+        ]);
+
+        if (entry.useFallback) {
+          notificationData = notificationData
+            .sort((a, b) => {
+              const aTime = a.createdAt instanceof Date
+                ? a.createdAt.getTime()
+                : a.createdAt?.toDate?.().getTime?.() || 0;
+              const bTime = b.createdAt instanceof Date
+                ? b.createdAt.getTime()
+                : b.createdAt?.toDate?.().getTime?.() || 0;
+              return bTime - aTime;
+            })
+            .slice(0, entry.limitCount);
+        }
+
+        if (entry.retryCount > 0) {
+          entry.retryCount = 0;
+        }
+        updateSharedNotificationState(entry, {
+          notifications: notificationData,
+          unreadCount: notificationData.filter((notification) => !notification.read).length,
+          loading: false,
+          reconnecting: false,
+          error: null,
+        });
+      } catch (err) {
+        reportRealtimeError(
+          { scope: 'unknown', hook: 'useRealtimeNotifications' },
+          err,
+          'notifications.process'
+        );
+        updateSharedNotificationState(entry, {
+          loading: false,
+          reconnecting: false,
+          error: 'Failed to load notifications',
+        });
+      }
+    },
+    (err) => {
+      if (entry.listenEpoch !== epoch) return;
+
+      if (!entry.useFallback && isIndexError(err)) {
+        reportRealtimeError(
+          { scope: 'unknown', hook: 'useRealtimeNotifications' },
+          err,
+          'notifications.index_fallback'
+        );
+        entry.useFallback = true;
+        updateSharedNotificationState(entry, {
+          loading: true,
+          reconnecting: false,
+          error: null,
+        });
+        scheduleSharedStreamRestart(entry, epoch, immediateRetryDelayMs);
+        return;
+      }
+
+      if (isTransientError(err, entry.userId) && entry.retryCount < maxRetryAttempts) {
+        entry.retryCount += 1;
+        updateSharedNotificationState(entry, {
+          loading: true,
+          reconnecting: true,
+        });
+        scheduleSharedStreamRestart(entry, epoch, retryDelayMs);
+        return;
+      }
+
+      reportRealtimeError(
+        { scope: 'unknown', hook: 'useRealtimeNotifications' },
+        err,
+        'notifications.listen'
+      );
+      updateSharedNotificationState(entry, {
+        loading: false,
+        reconnecting: false,
+        error: 'Failed to listen to notifications',
+      });
+    }
+  );
+};
+
+const subscribeToSharedNotifications = (
+  userId: string,
+  limitCount: number,
+  listener: SharedNotificationListener
+) => {
+  const key = `${userId}:${limitCount}`;
+  let entry = sharedNotificationStreams.get(key);
+
+  if (!entry) {
+    entry = {
+      userId,
+      limitCount,
+      listeners: new Set<SharedNotificationListener>(),
+      state: makeSharedState(),
+      unsubscribe: null,
+      retryTimeout: null,
+      retryCount: 0,
+      useFallback: false,
+      listenEpoch: 0,
+    };
+    sharedNotificationStreams.set(key, entry);
+    startSharedNotificationStream(entry);
+  }
+
+  entry.listeners.add(listener);
+  listener(entry.state);
+
+  return () => {
+    const current = sharedNotificationStreams.get(key);
+    if (!current) return;
+
+    current.listeners.delete(listener);
+    if (current.listeners.size > 0) return;
+
+    current.listenEpoch += 1;
+    if (current.unsubscribe) {
+      current.unsubscribe();
+      current.unsubscribe = null;
+    }
+    clearSharedRetryTimeout(current);
+    sharedNotificationStreams.delete(key);
+  };
+};
+
 /**
  * Hook for real-time notifications
  * Automatically updates when new notifications arrive
@@ -74,32 +310,25 @@ export const useRealtimeNotifications = ({
   const [loading, setLoading] = useState(true);
   const [reconnecting, setReconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [useFallback, setUseFallback] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
   const notificationsRef = useSyncedRef(notifications);
   const onNewNotificationRef = useSyncedRef(onNewNotification);
-  const retryTimeoutRef = useRef<number | null>(null);
+  const mountedRef = useRef(true);
   const { canListen, authReady } = useAuthUidMatch(userId);
 
-  const maxRetryAttempts = 4;
-  const retryDelayMs = 1200;
-
   useEffect(() => {
-    setUseFallback(false);
-    setRetryCount(0);
-    clearRealtimeRetryTimeout(retryTimeoutRef);
-  }, [userId]);
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!userId) {
       setNotifications([]);
       setUnreadCount(0);
-      setUseFallback(false);
-      setRetryCount(0);
       setLoading(false);
       setReconnecting(false);
       setError(null);
-      clearRealtimeRetryTimeout(retryTimeoutRef);
       return;
     }
 
@@ -112,136 +341,29 @@ export const useRealtimeNotifications = ({
       setLoading(waitingForAuthHydration);
       setReconnecting(false);
       setError(null);
-      clearRealtimeRetryTimeout(retryTimeoutRef);
       return;
     }
 
-    setLoading(true);
-    setReconnecting(retryCount > 0);
-    if (retryCount === 0) {
-      setError(null);
-    }
+    let isFirstEmission = true;
+    return subscribeToSharedNotifications(userId, limitCount, (state) => {
+      if (!mountedRef.current) return;
 
-    const orderedQuery = query(
-      collection(db, 'notifications'),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc'),
-      limit(limitCount)
-    );
-    const fallbackQuery = query(
-      collection(db, 'notifications'),
-      where('userId', '==', userId)
-    );
-    const isIndexError = (err: any) => {
-      const message = err?.message || '';
-      return err?.code === 'failed-precondition' || message.includes('requires an index');
-    };
-    const isTransientError = (err: any) => {
-      const code = err?.code;
-      if (isTransientRealtimeCode(code)) {
-        return true;
+      if (!isFirstEmission) {
+        notifyNewestItem({
+          previous: notificationsRef.current,
+          current: state.notifications,
+          onNew: onNewNotificationRef.current ?? undefined,
+        });
       }
+      isFirstEmission = false;
 
-      // During page refresh, auth may not be fully hydrated when listener starts.
-      if (code === 'permission-denied' || code === 'unauthenticated') {
-        return !auth.currentUser || auth.currentUser.uid !== userId;
-      }
-
-      return false;
-    };
-
-    const q = useFallback ? fallbackQuery : orderedQuery;
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        try {
-          let notificationData = extractQueryData<Notification>(snapshot, [
-            'createdAt',
-            'readAt',
-            'expiresAt',
-          ]);
-
-          if (useFallback) {
-            notificationData = notificationData.sort((a, b) => {
-              const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : a.createdAt?.toDate?.().getTime?.() || 0;
-              const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : b.createdAt?.toDate?.().getTime?.() || 0;
-              return bTime - aTime;
-            }).slice(0, limitCount);
-          }
-
-          // Detect new notifications
-          notifyNewestItem({
-            previous: notificationsRef.current,
-            current: notificationData,
-            onNew: onNewNotificationRef.current ?? undefined,
-          });
-
-          setNotifications(notificationData);
-          setUnreadCount(notificationData.filter(n => !n.read).length);
-          if (retryCount > 0) {
-            setRetryCount(0);
-          }
-          setReconnecting(false);
-          setError(null);
-          setLoading(false);
-        } catch (err) {
-          failRealtimeLoad(
-            { scope: 'unknown', hook: 'useRealtimeNotifications' },
-            {
-              error: err,
-              kind: 'notifications.process',
-              fallbackMessage: 'Failed to load notifications',
-              setError,
-              setLoading,
-            }
-          );
-        }
-      },
-      (err) => {
-        if (!useFallback && isIndexError(err)) {
-          reportRealtimeError(
-            { scope: 'unknown', hook: 'useRealtimeNotifications' },
-            err,
-            'notifications.index_fallback'
-          );
-          setUseFallback(true);
-          return;
-        }
-
-        if (isTransientError(err) && retryCount < maxRetryAttempts) {
-          scheduleRealtimeRetry({
-            timeoutRef: retryTimeoutRef,
-            delayMs: retryDelayMs,
-            onRetry: () => {
-              setRetryCount((prev) => prev + 1);
-            },
-          });
-          setLoading(true);
-          setReconnecting(true);
-          return;
-        }
-
-        setReconnecting(false);
-        failRealtimeLoad(
-          { scope: 'unknown', hook: 'useRealtimeNotifications' },
-          {
-            error: err,
-            kind: 'notifications.listen',
-            fallbackMessage: 'Failed to listen to notifications',
-            setError,
-            setLoading,
-            metadata: { useFallback },
-          }
-        );
-      }
-    );
-
-    // Cleanup listener on unmount
-    return () => {
-      unsubscribe();
-      clearRealtimeRetryTimeout(retryTimeoutRef);
-    };
-  }, [userId, limitCount, useFallback, retryCount, canListen, authReady]);
+      setNotifications(state.notifications);
+      setUnreadCount(state.unreadCount);
+      setLoading(state.loading);
+      setReconnecting(state.reconnecting);
+      setError(state.error);
+    });
+  }, [userId, limitCount, canListen, authReady]);
 
   return {
     notifications,
@@ -278,7 +400,7 @@ export const useUnreadNotificationCount = (userId: string): number => {
     }
 
     const q = query(
-      collection(db, 'notifications'),
+      collection(db, COLLECTIONS.NOTIFICATIONS),
       where('userId', '==', userId),
       where('read', '==', false)
     );
@@ -353,7 +475,7 @@ export const useEmergencyNotifications = (userId: string): Notification[] => {
     }
 
     const q = query(
-      collection(db, 'notifications'),
+      collection(db, COLLECTIONS.NOTIFICATIONS),
       where('userId', '==', userId),
       where('type', '==', 'emergency_request'),
       where('read', '==', false),

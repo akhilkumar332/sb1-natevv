@@ -29,6 +29,7 @@ const emptyForm = {
   availability: '',
 };
 
+import { ROUTES } from '../../../constants/routes';
 function NgoVolunteerDetail() {
   const { volunteerId } = useParams();
   const { volunteers, getStatusColor, refreshData } = useOutletContext<NgoDashboardContext>();
@@ -51,7 +52,7 @@ function NgoVolunteerDetail() {
         <h2 className="text-2xl font-bold text-gray-900">Volunteer not found</h2>
         <p className="text-gray-500 mt-2">Return to the volunteer list.</p>
         <Link
-          to="/ngo/dashboard/volunteers"
+          to={ROUTES.portal.ngo.dashboard.volunteers}
           className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-red-600"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -167,7 +168,7 @@ function NgoVolunteerDetail() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <Link
-              to="/ngo/dashboard/volunteers"
+              to={ROUTES.portal.ngo.dashboard.volunteers}
               className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-700"
             >
               <ArrowLeft className="w-4 h-4" />

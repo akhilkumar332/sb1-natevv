@@ -7,6 +7,7 @@
 import React from 'react';
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { captureHandledError } from '../services/errorLog.service';
+import { QUERY_DEFAULTS } from '../constants/query';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -35,11 +36,11 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       // Cache data for 5 minutes
-      staleTime: 5 * 60 * 1000,
+      staleTime: QUERY_DEFAULTS.staleTime,
       // Keep cached data for 10 minutes
-      gcTime: 10 * 60 * 1000,
+      gcTime: QUERY_DEFAULTS.gcTime,
       // Retry failed requests 1 time
-      retry: 1,
+      retry: QUERY_DEFAULTS.retry,
       // Refetch on window focus in development only
       refetchOnWindowFocus: import.meta.env.DEV,
       // Refetch on reconnect
@@ -47,7 +48,7 @@ const queryClient = new QueryClient({
     },
     mutations: {
       // Retry failed mutations 1 time
-      retry: 1,
+      retry: QUERY_DEFAULTS.retry,
     },
   },
 });

@@ -8,6 +8,7 @@ import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
 import AuthStatusScreen from '../../components/auth/AuthStatusScreen';
 import type { ImpersonationUser } from '../../services/admin.service';
 import { authMessages } from '../../constants/messages';
+import { ROUTES } from '../../constants/routes';
 import { handleRoleGoogleLogin } from '../../utils/roleGoogleLogin';
 import { navigateToPortalDashboard, resolveImpersonationRole, resolvePortalRole } from '../../utils/portalNavigation';
 import { notifyRoleMismatch } from '../../utils/authNotifications';
@@ -58,7 +59,9 @@ export function AdminLogin() {
       return;
     }
 
-    const targetPath = user.onboardingCompleted ? '/admin/dashboard' : '/admin/onboarding';
+    const targetPath = user.onboardingCompleted
+      ? ROUTES.portal.admin.dashboard.root
+      : ROUTES.portal.admin.onboarding;
     hasRedirected.current = true;
     navigate(targetPath);
   }, [
@@ -83,10 +86,10 @@ export function AdminLogin() {
         expectedRoles: ['admin'],
         roleMismatchMessage: authMessages.roleMismatch.admin,
         roleMismatchId: 'role-mismatch-admin',
-        mismatchRedirectTo: '/admin/login',
+        mismatchRedirectTo: ROUTES.portal.admin.login,
         successMessage: 'Successfully logged in as Admin!',
-        dashboardPath: '/admin/dashboard',
-        onboardingPath: '/admin/onboarding',
+        dashboardPath: ROUTES.portal.admin.dashboard.root,
+        onboardingPath: ROUTES.portal.admin.onboarding,
         scope: 'admin',
         page: 'AdminLogin',
       });

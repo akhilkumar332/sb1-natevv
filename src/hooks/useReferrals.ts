@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { collection, doc, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where, documentId } from 'firebase/firestore';
 import { notify } from 'services/notify.service';
 import { db } from '../firebase';
+import { COLLECTIONS } from '../constants/firestore';
 import { REFERRAL_RULES, computeReferralStatus } from '../utils/referralRules';
 import { ensureReferralNotificationsForReferrer } from '../services/referral.service';
 import { useScopedErrorReporter } from './useScopedErrorReporter';
@@ -190,7 +191,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
     }
     setReferralLoading(true);
     const referralQuery = query(
-      collection(db, 'ReferralTracking'),
+      collection(db, COLLECTIONS.REFERRAL_TRACKING),
       where('referrerUid', '==', user.uid)
     );
     const unsubscribe = onSnapshot(referralQuery, (snapshot) => {
@@ -237,7 +238,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
         // 1) Pull historical referral rows first (includes deleted/legacy statuses when present).
         try {
           const trackingSnapshot = await getDocs(
-            query(collection(db, 'ReferralTracking'), where('referrerUid', '==', user.uid))
+            query(collection(db, COLLECTIONS.REFERRAL_TRACKING), where('referrerUid', '==', user.uid))
           );
           trackingSnapshot.docs.forEach((docSnapshot) => {
             const data = docSnapshot.data() as any;
@@ -269,11 +270,11 @@ export const useReferrals = (user: any): UseReferralsResult => {
         // 2) Backfill from users for referrals that may predate ReferralTracking rows.
         const userFallbackQuery = isPrivilegedUser
           ? query(
-              collection(db, 'users'),
+              collection(db, COLLECTIONS.USERS),
               where('referredByUid', '==', user.uid)
             )
           : query(
-              collection(db, 'users'),
+              collection(db, COLLECTIONS.USERS),
               where('referredByUid', '==', user.uid),
               where('role', '==', 'donor'),
               where('onboardingCompleted', '==', true)
@@ -287,7 +288,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
           if (!isPrivilegedUser && code === 'permission-denied') {
             // Safe retry for strict directory-readable donor profiles.
             usersSnapshot = await getDocs(query(
-              collection(db, 'users'),
+              collection(db, COLLECTIONS.USERS),
               where('referredByUid', '==', user.uid),
               where('role', '==', 'donor'),
               where('status', '==', 'active'),
@@ -492,7 +493,7 @@ export const useReferrals = (user: any): UseReferralsResult => {
     let isActive = true;
     (async () => {
       await Promise.allSettled(pending.map((entry) => {
-        const referralRef = doc(db, 'ReferralTracking', entry.id);
+        const referralRef = doc(db, COLLECTIONS.REFERRAL_TRACKING, entry.id);
         return updateDoc(referralRef, {
           status: entry.referralStatus,
           updatedAt: serverTimestamp(),

@@ -1,6 +1,7 @@
 import { useOutletContext } from 'react-router-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle, Droplet, Loader2, MapPin, MessageCircle, PhoneCall } from 'lucide-react';
+import { ONE_DAY_MS, ONE_MINUTE_MS } from '../../../constants/time';
 
 const DonorRequests = () => {
   const dashboard = useOutletContext<any>();
@@ -28,7 +29,7 @@ const DonorRequests = () => {
   const outreachFilterTouchedRef = useRef(false);
 
   useEffect(() => {
-    const interval = window.setInterval(() => setNow(Date.now()), 60 * 1000);
+    const interval = window.setInterval(() => setNow(Date.now()), ONE_MINUTE_MS);
     return () => window.clearInterval(interval);
   }, []);
 
@@ -46,7 +47,7 @@ const DonorRequests = () => {
     if (status === 'cancelled') return 'bg-gray-100 text-gray-600';
     return 'bg-amber-100 text-amber-700';
   };
-  const contactWindowMs = 24 * 60 * 60 * 1000;
+  const contactWindowMs = ONE_DAY_MS;
   const getContactWindow = (respondedAt?: any) => {
     if (!respondedAt) return null;
     const respondedDate = respondedAt instanceof Date ? respondedAt : new Date(respondedAt);
@@ -61,7 +62,7 @@ const DonorRequests = () => {
   };
   const formatContactCountdown = (remainingMs: number) => {
     if (remainingMs <= 0) return 'Expired';
-    const minutes = Math.ceil(remainingMs / (60 * 1000));
+    const minutes = Math.ceil(remainingMs / (ONE_MINUTE_MS));
     if (minutes < 60) return `${minutes}m`;
     const hours = Math.ceil(minutes / 60);
     return `${hours}h`;

@@ -1,12 +1,11 @@
-export type PortalRole = 'donor' | 'ngo' | 'bloodbank' | 'admin';
+import {
+  type PortalRole,
+  getPortalDashboardPath,
+  toPortalRole,
+} from '../constants/routes';
 
 const normalizePortalRole = (role?: string | null): PortalRole | null => {
-  if (!role) return null;
-  if (role === 'hospital') return 'bloodbank';
-  if (role === 'donor' || role === 'ngo' || role === 'bloodbank' || role === 'admin') {
-    return role;
-  }
-  return null;
+  return toPortalRole(role);
 };
 
 export const resolvePortalRole = (
@@ -15,7 +14,7 @@ export const resolvePortalRole = (
 ): PortalRole => normalizePortalRole(role) || fallback;
 
 export const roleDashboardPath = (role: PortalRole) =>
-  role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`;
+  getPortalDashboardPath(role);
 
 export const navigateToPortalDashboard = (
   navigate: (to: string) => void,

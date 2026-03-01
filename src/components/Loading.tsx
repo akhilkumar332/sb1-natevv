@@ -3,10 +3,10 @@ import React from 'react';
 
 const Loading: React.FC = () => {
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-overlay backdrop-blur-sm">
       <div className="flex flex-col items-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-red-500 mb-4"></div>
-        <div className="text-red-500 text-lg font-semibold">Loading...</div>
+        <div className="mb-4 h-16 w-16 animate-spin rounded-full border-b-2 border-t-2 border-brand-500" />
+        <div className="text-lg font-semibold text-brand-500">Loading...</div>
       </div>
     </div>
   );

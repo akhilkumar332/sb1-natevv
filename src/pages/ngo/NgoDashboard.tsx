@@ -26,6 +26,7 @@ import {
 import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
 import { useScopedErrorReporter } from '../../hooks/useScopedErrorReporter';
 
+import { FIVE_MINUTES_MS, TWELVE_HUNDRED_MS } from '../../constants/time';
 export type NgoDashboardContext = {
   user: any;
   campaigns: Campaign[];
@@ -96,7 +97,7 @@ function NgoDashboard() {
     if (typeof window === 'undefined' || !window.sessionStorage) return;
     const prefetchKey = `ngo_dashboard_prefetch_${user.uid}`;
     const lastPrefetch = window.sessionStorage.getItem(prefetchKey);
-    if (lastPrefetch && Date.now() - Number(lastPrefetch) < 5 * 60 * 1000) {
+    if (lastPrefetch && Date.now() - Number(lastPrefetch) < FIVE_MINUTES_MS) {
       return;
     }
     const task = () => {
@@ -118,7 +119,7 @@ function NgoDashboard() {
         }
       };
     }
-    const timer = setTimeout(task, 1200);
+    const timer = setTimeout(task, TWELVE_HUNDRED_MS);
     return () => clearTimeout(timer);
   }, [canLoadDashboardData, user?.uid, refreshData]);
 

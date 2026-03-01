@@ -13,6 +13,7 @@ import { authFlowMessages, authInputMessages, getOtpValidationError, sanitizeOtp
 import { useOtpResendTimer } from './useOtpResendTimer';
 import { requireValue } from '../utils/validationFeedback';
 import { notifyGoogleSignInFailure, notifyRoleMismatch } from '../utils/authNotifications';
+import { ROUTES } from '../constants/routes';
 
 interface LoginFormData {
   identifier: string;
@@ -41,7 +42,7 @@ export const useLogin = () => {
     const pendingSearch = pendingParams.toString();
     const hasPendingRequest = pendingParams.has('pendingRequest') || pendingParams.has('pendingRequestKey');
     if (loggedInUser.onboardingCompleted === true) {
-      const destination = returnTo || (hasPendingRequest ? '/donor/dashboard/requests' : '/donor/dashboard');
+      const destination = returnTo || (hasPendingRequest ? ROUTES.portal.donor.dashboard.requests : ROUTES.portal.donor.dashboard.root);
       const target = pendingSearch
         ? `${destination}${destination.includes('?') ? '&' : '?'}${pendingSearch}`
         : destination;
@@ -49,8 +50,8 @@ export const useLogin = () => {
       return;
     }
     const onboardingTarget = pendingSearch
-      ? `/donor/onboarding?${pendingSearch}`
-      : '/donor/onboarding';
+      ? `${ROUTES.portal.donor.onboarding}?${pendingSearch}`
+      : ROUTES.portal.donor.onboarding;
     navigate(onboardingTarget);
   };
 
@@ -106,7 +107,7 @@ export const useLogin = () => {
             : authMessages.roleMismatch.donor,
           { id: 'role-mismatch-donor' }
         );
-        await logout(navigate, { redirectTo: '/donor/login', showToast: false });
+        await logout(navigate, { redirectTo: ROUTES.portal.donor.login, showToast: false });
         return;
       }
 
@@ -125,7 +126,7 @@ export const useLogin = () => {
       if (error instanceof PhoneAuthError) {
         if (error.code === 'not_registered') {
           notify.error('Mobile Number not registered. Please sign up.');
-          navigate('/donor/register');
+          navigate(ROUTES.portal.donor.register);
           return;
         }
         if (error.code === 'multiple_accounts') {
@@ -188,7 +189,7 @@ export const useLogin = () => {
       const result = await loginWithGoogle();
       if (result.user.role !== 'donor' && result.user.role !== 'superadmin') {
         notifyRoleMismatch('donor');
-        await logout(navigate, { redirectTo: '/donor/login', showToast: false });
+        await logout(navigate, { redirectTo: ROUTES.portal.donor.login, showToast: false });
         return;
       }
       if (result.user.role === 'superadmin') {

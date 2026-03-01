@@ -10,6 +10,11 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { timestampToDate } from './firestore.utils';
 import { captureHandledError } from '../services/errorLog.service';
+import {
+  getDashboardRouteByUserRole,
+  getOnboardingRouteByUserRole,
+} from '../constants/routes';
+import { COLLECTIONS } from '../constants/firestore';
 
 // ============================================================================
 // ROLE CHECKING FUNCTIONS
@@ -280,22 +285,7 @@ export const hasCompletedOnboarding = (user: User | null): boolean => {
  */
 export const getDashboardRoute = (user: User | null): string => {
   if (!user) return '/';
-
-  switch (user.role) {
-    case 'donor':
-      return '/donor/dashboard';
-    case 'bloodbank':
-    case 'hospital':
-      return '/bloodbank/dashboard';
-    case 'ngo':
-      return '/ngo/dashboard';
-    case 'admin':
-      return '/admin/dashboard';
-    case 'superadmin':
-      return '/admin/dashboard';
-    default:
-      return '/';
-  }
+  return getDashboardRouteByUserRole(user.role);
 };
 
 /**
@@ -305,22 +295,7 @@ export const getDashboardRoute = (user: User | null): string => {
  */
 export const getOnboardingRoute = (user: User | null): string => {
   if (!user) return '/';
-
-  switch (user.role) {
-    case 'donor':
-      return '/donor/onboarding';
-    case 'bloodbank':
-    case 'hospital':
-      return '/bloodbank/onboarding';
-    case 'ngo':
-      return '/ngo/onboarding';
-    case 'admin':
-      return '/admin/onboarding';
-    case 'superadmin':
-      return '/admin/onboarding';
-    default:
-      return '/';
-  }
+  return getOnboardingRouteByUserRole(user.role);
 };
 
 // ============================================================================
@@ -375,7 +350,7 @@ export const getUserInitials = (user: User | null): string => {
  */
 export const fetchUserByUid = async (uid: string): Promise<User | null> => {
   try {
-    const userRef = doc(db, 'users', uid);
+    const userRef = doc(db, COLLECTIONS.USERS, uid);
     const userSnap = await getDoc(userRef);
 
     if (userSnap.exists()) {

@@ -1,3 +1,4 @@
+import { FIVE_MINUTES_MS, ONE_DAY_MS, TWELVE_HUNDRED_MS, TWO_POINT_FIVE_SECONDS_MS } from '../../constants/time';
 // src/pages/donor/DonorDashboard.tsx
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -21,6 +22,8 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { notify } from 'services/notify.service';
 import { addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
+import { COLLECTIONS } from '../../constants/firestore';
+import { ROUTES } from '../../constants/routes';
 import { useReferrals } from '../../hooks/useReferrals';
 import PortalNotificationBridge from '../../components/shared/PortalNotificationBridge';
 import {
@@ -163,8 +166,8 @@ function DonorDashboard() {
   });
   const [donationFeedbackMap, setDonationFeedbackMap] = useState<Record<string, DonationFeedback>>({});
   const requestCacheKey = useMemo(() => (user?.uid ? `donor_requests_cache_${user.uid}` : ''), [user?.uid]);
-  const requestCacheTTL = 5 * 60 * 1000;
-  const requestCooldownMs = 24 * 60 * 60 * 1000;
+  const requestCacheTTL = FIVE_MINUTES_MS;
+  const requestCooldownMs = ONE_DAY_MS;
   const incomingRequestsRef = useRef<any[]>([]);
   const outgoingRequestsRef = useRef<any[]>([]);
   const requestBatchesRef = useRef<any[]>([]);
@@ -456,7 +459,7 @@ function DonorDashboard() {
   useEffect(() => {
     if (!user?.uid || !isPageVisible) return;
     const feedbackQuery = query(
-      collection(db, 'DonationFeedback'),
+      collection(db, COLLECTIONS.DONATION_FEEDBACK),
       where('donorId', '==', user.uid)
     );
     const unsubscribe = onSnapshot(feedbackQuery, (snapshot) => {
@@ -489,7 +492,7 @@ function DonorDashboard() {
 
     const backfillDonationTypes = async () => {
       try {
-        const historyRef = doc(db, 'DonationHistory', user.uid);
+        const historyRef = doc(db, COLLECTIONS.DONATION_HISTORY, user.uid);
         const historySnapshot = await getDoc(historyRef);
         if (!historySnapshot.exists()) return;
         const existingDonations = Array.isArray(historySnapshot.data().donations)
@@ -556,7 +559,7 @@ function DonorDashboard() {
 
     const backfillLocations = async () => {
       try {
-        const historyRef = doc(db, 'DonationHistory', user.uid);
+        const historyRef = doc(db, COLLECTIONS.DONATION_HISTORY, user.uid);
         const historySnapshot = await getDoc(historyRef);
         if (!historySnapshot.exists()) return;
         const existingDonations = Array.isArray(historySnapshot.data().donations)
@@ -770,15 +773,15 @@ function DonorDashboard() {
     }
 
     const incomingQuery = query(
-      collection(db, 'donorRequests'),
+      collection(db, COLLECTIONS.DONOR_REQUESTS),
       where('targetDonorUid', '==', user.uid)
     );
     const outgoingQuery = query(
-      collection(db, 'donorRequests'),
+      collection(db, COLLECTIONS.DONOR_REQUESTS),
       where('requesterUid', '==', user.uid)
     );
     const batchesQuery = query(
-      collection(db, 'donorRequestBatches'),
+      collection(db, COLLECTIONS.DONOR_REQUEST_BATCHES),
       where('requesterUid', '==', user.uid)
     );
 
@@ -820,7 +823,7 @@ function DonorDashboard() {
         if (now - requestedAt.getTime() < requestCooldownMs) return;
         if (refGuard.current.has(item.id)) return;
         refGuard.current.add(item.id);
-        updateDoc(doc(db, 'donorRequests', item.id), {
+        updateDoc(doc(db, COLLECTIONS.DONOR_REQUESTS, item.id), {
           status: 'expired',
           expiredAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -840,7 +843,7 @@ function DonorDashboard() {
         if (now < expiresAt.getTime()) return;
         if (refGuard.current.has(item.id)) return;
         refGuard.current.add(item.id);
-        updateDoc(doc(db, 'donorRequests', item.id), {
+        updateDoc(doc(db, COLLECTIONS.DONOR_REQUESTS, item.id), {
           status: 'expired',
           expiredAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -1003,7 +1006,7 @@ function DonorDashboard() {
         }
       };
     }
-    const timer = setTimeout(task, 1200);
+    const timer = setTimeout(task, TWELVE_HUNDRED_MS);
     return () => clearTimeout(timer);
   }, [isPageVisible, user?.uid]);
 
@@ -1012,7 +1015,7 @@ function DonorDashboard() {
     if (typeof window === 'undefined' || !window.sessionStorage) return;
     const prefetchKey = `donor_dashboard_prefetch_${user.uid}`;
     const lastPrefetch = window.sessionStorage.getItem(prefetchKey);
-    if (lastPrefetch && Date.now() - Number(lastPrefetch) < 5 * 60 * 1000) {
+    if (lastPrefetch && Date.now() - Number(lastPrefetch) < FIVE_MINUTES_MS) {
       return;
     }
     const task = () => {
@@ -1034,7 +1037,7 @@ function DonorDashboard() {
         }
       };
     }
-    const timer = setTimeout(task, 1200);
+    const timer = setTimeout(task, TWELVE_HUNDRED_MS);
     return () => clearTimeout(timer);
   }, [user?.uid, refreshData]);
 
@@ -1061,8 +1064,8 @@ function DonorDashboard() {
       if (pendingFromSearch) {
         const rawReturnTo = pendingFromSearch.returnTo || '';
         const isSafePath = rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//');
-        const isDashboardPath = isSafePath && rawReturnTo.startsWith('/donor/dashboard');
-        const targetReturnTo = isDashboardPath ? rawReturnTo : '/donor/dashboard/requests';
+        const isDashboardPath = isSafePath && rawReturnTo.startsWith(ROUTES.portal.donor.dashboard.root);
+        const targetReturnTo = isDashboardPath ? rawReturnTo : ROUTES.portal.donor.dashboard.requests;
         try {
           await savePendingDonorRequestDoc(user.uid, pendingFromSearch as PendingDonorRequestPayload);
         } catch (error) {
@@ -1353,7 +1356,7 @@ function DonorDashboard() {
       return;
     }
     setDonorRequestActionId(requestId);
-    const requestRef = doc(db, 'donorRequests', requestId);
+    const requestRef = doc(db, COLLECTIONS.DONOR_REQUESTS, requestId);
     let requestData: any;
     try {
       const requestSnap = await getDoc(requestRef);
@@ -1377,7 +1380,7 @@ function DonorDashboard() {
         updatedAt: serverTimestamp(),
       };
       if (decision === 'accepted') {
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        const expiresAt = new Date(Date.now() + ONE_DAY_MS);
         const donorPhone = user.phoneNumber || user.phoneNumberNormalized;
         if (donorPhone) {
           updatePayload.targetDonorPhone = donorPhone;
@@ -1394,7 +1397,7 @@ function DonorDashboard() {
       setDonorRequestActionId(null);
     }
 
-    const requesterNotification = addDoc(collection(db, 'notifications'), {
+    const requesterNotification = addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
       userId: requestData.requesterUid,
       userRole: 'donor',
       type: 'donor_request',
@@ -1404,12 +1407,12 @@ function DonorDashboard() {
       priority: 'high',
       relatedId: requestId,
       relatedType: 'donor_request',
-      actionUrl: '/donor/dashboard/requests',
+      actionUrl: ROUTES.portal.donor.dashboard.requests,
       createdAt: serverTimestamp(),
       createdBy: user.uid,
     });
 
-    const selfNotification = addDoc(collection(db, 'notifications'), {
+    const selfNotification = addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
       userId: user.uid,
       userRole: 'donor',
       type: 'donor_request',
@@ -1419,7 +1422,7 @@ function DonorDashboard() {
       priority: 'low',
       relatedId: requestId,
       relatedType: 'donor_request',
-      actionUrl: '/donor/dashboard/requests',
+      actionUrl: ROUTES.portal.donor.dashboard.requests,
       createdAt: serverTimestamp(),
       createdBy: user.uid,
     });
@@ -1443,7 +1446,7 @@ function DonorDashboard() {
     }
     try {
       setDonorRequestDeleteId(requestId);
-      const requestRef = doc(db, 'donorRequests', requestId);
+      const requestRef = doc(db, COLLECTIONS.DONOR_REQUESTS, requestId);
       const requestSnap = await getDoc(requestRef);
       if (!requestSnap.exists()) {
         notify.error('Request not found.');
@@ -1457,7 +1460,7 @@ function DonorDashboard() {
       }
       const batchId = requestData.requestBatchId as string | undefined;
       if (batchId) {
-        const batchRef = doc(db, 'donorRequestBatches', batchId);
+        const batchRef = doc(db, COLLECTIONS.DONOR_REQUEST_BATCHES, batchId);
         await runOnlineTransaction(async (transaction) => {
           const batchSnap = await transaction.get(batchRef);
           if (!batchSnap.exists()) return;
@@ -1490,7 +1493,7 @@ function DonorDashboard() {
 
   // Handler functions for all interactive elements
   const handleBookDonation = () => {
-    navigate('/donor/dashboard/requests');
+    navigate(ROUTES.portal.donor.dashboard.requests);
   };
 
   const handleEmergencyRequests = () => {
@@ -1498,7 +1501,7 @@ function DonorDashboard() {
   };
 
   const handleFindDonors = () => {
-    navigate('/donors');
+    navigate(ROUTES.donors);
   };
 
   const handleInviteFriends = async () => {
@@ -1584,7 +1587,7 @@ function DonorDashboard() {
         throw new Error('User not available.');
       }
 
-      const historyRef = doc(db, 'DonationHistory', user.uid);
+      const historyRef = doc(db, COLLECTIONS.DONATION_HISTORY, user.uid);
       const historySnapshot = await getDoc(historyRef);
       const existingDonations = historySnapshot.exists() && Array.isArray(historySnapshot.data().donations)
         ? historySnapshot.data().donations
@@ -1636,7 +1639,7 @@ function DonorDashboard() {
 
       await updateUserProfile({ lastDonation: parsedDate });
       setLastDonationSaved(true);
-      setTimeout(() => setLastDonationSaved(false), 2500);
+      setTimeout(() => setLastDonationSaved(false), TWO_POINT_FIVE_SECONDS_MS);
       notify.success('Last donation date saved.');
     } catch (error: any) {
       reportDonorDashboardError(error, 'last_donation_update');
@@ -1663,7 +1666,7 @@ function DonorDashboard() {
     if (!(donationDate instanceof Date) || Number.isNaN(donationDate.getTime())) {
       throw new Error('Invalid donation date.');
     }
-    const historyRef = doc(db, 'DonationHistory', user.uid);
+    const historyRef = doc(db, COLLECTIONS.DONATION_HISTORY, user.uid);
     const historySnapshot = await getDoc(historyRef);
     const existingDonations = historySnapshot.exists() && Array.isArray(historySnapshot.data().donations)
       ? historySnapshot.data().donations
@@ -1772,7 +1775,7 @@ function DonorDashboard() {
         : donationType === 'plasma'
           ? 'Plasma'
           : '450ml';
-      const historyRef = doc(db, 'DonationHistory', user.uid);
+      const historyRef = doc(db, COLLECTIONS.DONATION_HISTORY, user.uid);
       const historySnapshot = await getDoc(historyRef);
       if (!historySnapshot.exists()) {
         throw new Error('Donation history not found.');
@@ -1825,7 +1828,7 @@ function DonorDashboard() {
   const handleUndoDonationDelete = async (entry: any) => {
     if (!user?.uid || !entry) return;
     try {
-      const historyRef = doc(db, 'DonationHistory', user.uid);
+      const historyRef = doc(db, COLLECTIONS.DONATION_HISTORY, user.uid);
       const historySnapshot = await getDoc(historyRef);
       if (!historySnapshot.exists()) {
         throw new Error('Donation history not found.');
@@ -1878,7 +1881,7 @@ function DonorDashboard() {
     }
     try {
       setDonationDeleteId(donationId);
-      const historyRef = doc(db, 'DonationHistory', user.uid);
+      const historyRef = doc(db, COLLECTIONS.DONATION_HISTORY, user.uid);
       const historySnapshot = await getDoc(historyRef);
       if (!historySnapshot.exists()) {
         throw new Error('Donation history not found.');
@@ -2076,7 +2079,7 @@ function DonorDashboard() {
       });
       if (user?.uid) {
         await setDoc(
-          doc(db, 'publicDonors', user.uid),
+          doc(db, COLLECTIONS.PUBLIC_DONORS, user.uid),
           {
             isAvailable: nextValue,
             availableUntil: null,
@@ -2121,7 +2124,7 @@ function DonorDashboard() {
           },
         });
         await setDoc(
-          doc(db, 'publicDonors', user.uid),
+          doc(db, COLLECTIONS.PUBLIC_DONORS, user.uid),
           {
             isAvailable: true,
             availableUntil: null,
@@ -2131,7 +2134,7 @@ function DonorDashboard() {
         );
         notify.success('You are now available.');
       } else {
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        const expiresAt = new Date(Date.now() + ONE_DAY_MS);
         setAvailabilityEnabled(false);
         setEmergencyAlertsEnabled(false);
         await updateUserProfile({
@@ -2142,7 +2145,7 @@ function DonorDashboard() {
           },
         });
         await setDoc(
-          doc(db, 'publicDonors', user.uid),
+          doc(db, COLLECTIONS.PUBLIC_DONORS, user.uid),
           {
             isAvailable: false,
             availableUntil: expiresAt,
@@ -2230,7 +2233,7 @@ function DonorDashboard() {
     }
     try {
       setFeedbackSaving(true);
-      const historyRef = doc(db, 'DonationHistory', user.uid);
+      const historyRef = doc(db, COLLECTIONS.DONATION_HISTORY, user.uid);
       const historySnapshot = await getDoc(historyRef);
       if (!historySnapshot.exists()) {
         throw new Error('Donation history not found.');
@@ -2245,7 +2248,7 @@ function DonorDashboard() {
       if (!donationExists) {
         throw new Error('Donation no longer exists.');
       }
-      const feedbackRef = doc(db, 'DonationFeedback', `${user.uid}_${donationId}`);
+      const feedbackRef = doc(db, COLLECTIONS.DONATION_FEEDBACK, `${user.uid}_${donationId}`);
       const existing = donationFeedbackMap[donationId];
       await setDoc(
         feedbackRef,

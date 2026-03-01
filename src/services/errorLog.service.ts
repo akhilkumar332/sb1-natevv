@@ -1,5 +1,8 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { COLLECTIONS } from '../constants/firestore';
+import { LEGACY_ROUTE_PREFIXES, PORTAL_PATH_PREFIXES } from '../constants/routes';
+import { THIRTY_SECONDS_MS, ONE_MINUTE_MS } from '../constants/time';
 
 type ErrorLogSource = 'frontend' | 'functions' | 'netlify' | 'unknown';
 type ErrorLogScope = 'auth' | 'donor' | 'ngo' | 'bloodbank' | 'admin' | 'unknown';
@@ -41,13 +44,13 @@ const MAX_MESSAGE_LEN = 600;
 const MAX_STACK_LEN = 4000;
 const MAX_METADATA_JSON_LEN = 6000;
 const MAX_ROUTE_LEN = 320;
-const DEDUPE_WINDOW_MS = 30_000;
+const DEDUPE_WINDOW_MS = THIRTY_SECONDS_MS;
 const inMemoryDedupe = new Map<string, number>();
 const MAX_DEDUPE_ENTRIES = 1500;
-const QUEUE_FLUSH_INTERVAL_MS = 60_000;
+const QUEUE_FLUSH_INTERVAL_MS = ONE_MINUTE_MS;
 let lastQueueFlushAt = 0;
 let queueFlushInFlight = false;
-const CONSOLE_RATE_WINDOW_MS = 60_000;
+const CONSOLE_RATE_WINDOW_MS = ONE_MINUTE_MS;
 const CONSOLE_RATE_LIMIT = 40;
 const noisyMessagePatterns = [
   'react router future flag warning',
@@ -84,10 +87,10 @@ const truncate = (value: string, maxLen: number): string => {
 
 const inferScopeFromPath = (pathname?: string | null): ErrorLogScope => {
   if (!pathname) return 'unknown';
-  if (pathname.startsWith('/donor')) return 'donor';
-  if (pathname.startsWith('/ngo')) return 'ngo';
-  if (pathname.startsWith('/bloodbank') || pathname.startsWith('/hospital')) return 'bloodbank';
-  if (pathname.startsWith('/admin')) return 'admin';
+  if (pathname.startsWith(PORTAL_PATH_PREFIXES.donor)) return 'donor';
+  if (pathname.startsWith(PORTAL_PATH_PREFIXES.ngo)) return 'ngo';
+  if (pathname.startsWith(PORTAL_PATH_PREFIXES.bloodbank) || pathname.startsWith(LEGACY_ROUTE_PREFIXES.hospital)) return 'bloodbank';
+  if (pathname.startsWith(PORTAL_PATH_PREFIXES.admin)) return 'admin';
   return 'unknown';
 };
 
@@ -363,7 +366,7 @@ const writePayload = async (payload: ErrorLogPayload): Promise<void> => {
   const compactPayload = Object.fromEntries(
     Object.entries(payload).filter(([, value]) => value !== null && value !== undefined)
   );
-  await addDoc(collection(db, 'errorLogs'), {
+  await addDoc(collection(db, COLLECTIONS.ERROR_LOGS), {
     ...compactPayload,
     createdAt: serverTimestamp(),
   });

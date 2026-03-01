@@ -2,6 +2,7 @@
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { normalizePhoneNumber } from './phone';
+import { COLLECTIONS } from '../constants/firestore';
 
 type UserRecord = Record<string, any> & { id: string };
 
@@ -54,7 +55,7 @@ export const findUsersByPhone = async (phoneNumber: string): Promise<UserRecord[
     return [];
   }
 
-  const usersRef = collection(db, 'users');
+  const usersRef = collection(db, COLLECTIONS.USERS);
   const matches = new Map<string, UserRecord>();
 
   const addDocs = (snapshot: any) => {

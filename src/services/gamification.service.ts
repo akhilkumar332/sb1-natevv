@@ -1,3 +1,4 @@
+import { COLLECTIONS } from '../constants/firestore';
 /**
  * Gamification Service
  *
@@ -189,7 +190,7 @@ class GamificationService {
 
   private async getUserProfile(userId: string): Promise<User | null> {
     try {
-      const userRef = doc(db, 'users', userId);
+      const userRef = doc(db, COLLECTIONS.USERS, userId);
       const userSnap = await getDoc(userRef);
       return userSnap.exists() ? (userSnap.data() as User) : null;
     } catch (error) {
@@ -314,10 +315,10 @@ class GamificationService {
     try {
       const [donationsSnap, historySnap] = await Promise.all([
         getDocs(query(
-          collection(db, 'donations'),
+          collection(db, COLLECTIONS.DONATIONS),
           where('donorId', '==', userId)
         )),
-        getDoc(doc(db, 'DonationHistory', userId))
+        getDoc(doc(db, COLLECTIONS.DONATION_HISTORY, userId))
       ]);
 
       const seenKeys = new Set<string>();
@@ -375,7 +376,7 @@ class GamificationService {
    * Get or create user stats
    */
   async getUserStats(userId: string): Promise<UserStats> {
-    const userStatsRef = doc(db, 'userStats', userId);
+    const userStatsRef = doc(db, COLLECTIONS.USER_STATS, userId);
     try {
       const userStatsSnap = await getDoc(userStatsRef);
 
@@ -423,7 +424,7 @@ class GamificationService {
     const userData = await this.getUserProfile(userId);
 
     try {
-      const userBadgesRef = collection(db, 'userBadges');
+      const userBadgesRef = collection(db, COLLECTIONS.USER_BADGES);
       const q = query(userBadgesRef, where('userId', '==', userId));
       const userBadgesSnap = await getDocs(q);
 
@@ -442,7 +443,7 @@ class GamificationService {
       if (missingEarned.length > 0) {
         const batch = writeBatch(db);
         missingEarned.forEach((badge) => {
-          const userBadgeRef = doc(collection(db, 'userBadges'));
+          const userBadgeRef = doc(collection(db, COLLECTIONS.USER_BADGES));
           batch.set(userBadgeRef, {
             userId,
             badgeId: badge.id,
@@ -460,7 +461,7 @@ class GamificationService {
 
       if (derivedStats !== stats && derivedStats) {
         try {
-          const userStatsRef = doc(db, 'userStats', userId);
+          const userStatsRef = doc(db, COLLECTIONS.USER_STATS, userId);
           await setDoc(
             userStatsRef,
             {
@@ -492,7 +493,7 @@ class GamificationService {
    * Award points to user
    */
   async awardPoints(userId: string, points: number, reason: string): Promise<void> {
-    const userStatsRef = doc(db, 'userStats', userId);
+    const userStatsRef = doc(db, COLLECTIONS.USER_STATS, userId);
 
     await updateDoc(userStatsRef, {
       points: increment(points),
@@ -500,7 +501,7 @@ class GamificationService {
     });
 
     // Log point transaction
-    const transactionRef = doc(collection(db, 'pointTransactions'));
+    const transactionRef = doc(collection(db, COLLECTIONS.POINT_TRANSACTIONS));
     await setDoc(transactionRef, {
       userId,
       points,
@@ -519,7 +520,7 @@ class GamificationService {
     for (const badge of badges) {
       if (!badge.earned && (badge.progress || 0) >= badge.requirement) {
         // Award the badge
-        const userBadgeRef = doc(collection(db, 'userBadges'));
+        const userBadgeRef = doc(collection(db, COLLECTIONS.USER_BADGES));
         await setDoc(userBadgeRef, {
           userId,
           badgeId: badge.id,
@@ -545,7 +546,7 @@ class GamificationService {
    * Record donation and update stats
    */
   async recordDonation(userId: string): Promise<void> {
-    const userStatsRef = doc(db, 'userStats', userId);
+    const userStatsRef = doc(db, COLLECTIONS.USER_STATS, userId);
     const currentStats = await this.getUserStats(userId);
 
     // Update donation count
@@ -567,7 +568,7 @@ class GamificationService {
    * Record emergency response
    */
   async recordEmergencyResponse(userId: string): Promise<void> {
-    const userStatsRef = doc(db, 'userStats', userId);
+    const userStatsRef = doc(db, COLLECTIONS.USER_STATS, userId);
 
     await updateDoc(userStatsRef, {
       emergencyResponses: increment(1),
@@ -585,7 +586,7 @@ class GamificationService {
    * Get leaderboard (global or by city)
    */
   async getLeaderboard(city?: string, limitCount: number = 10): Promise<LeaderboardEntry[]> {
-    const statsRef = collection(db, 'userStats');
+    const statsRef = collection(db, COLLECTIONS.USER_STATS);
     let q = query(statsRef, orderBy('points', 'desc'), limit(limitCount));
 
     const statsSnap = await getDocs(q);
@@ -597,7 +598,7 @@ class GamificationService {
       const userId = statDoc.id;
 
       // Get user details
-      const userRef = doc(db, 'users', userId);
+      const userRef = doc(db, COLLECTIONS.USERS, userId);
       const userSnap = await getDoc(userRef);
       const userData = userSnap.data();
 
@@ -626,7 +627,7 @@ class GamificationService {
    */
   async getUserRank(userId: string): Promise<number> {
     const userStats = await this.getUserStats(userId);
-    const statsRef = collection(db, 'userStats');
+    const statsRef = collection(db, COLLECTIONS.USER_STATS);
     const q = query(
       statsRef,
       where('points', '>', userStats.points),

@@ -3,6 +3,7 @@ import { lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import { captureHandledError } from './services/errorLog.service';
+import { ROUTES } from './constants/routes';
 
 const LAZY_RELOAD_KEY = 'bh_lazy_reload_attempted';
 
@@ -126,27 +127,27 @@ const AppRoutes = () => {
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<Home />} />
-      <Route path="/donors" element={<FindDonors />} />
-      <Route path="/request-blood" element={<RequestBlood />} />
-      <Route path="/about" element={<About />} />
-      <Route path="/contact" element={<Contact />} />
+      <Route path={ROUTES.home} element={<Home />} />
+      <Route path={ROUTES.donors} element={<FindDonors />} />
+      <Route path={ROUTES.requestBlood} element={<RequestBlood />} />
+      <Route path={ROUTES.about} element={<About />} />
+      <Route path={ROUTES.contact} element={<Contact />} />
       
       {/* Auth Routes */}
-      <Route path="/donor/register" element={<DonorRegister />} />
-      <Route path="/donor/login" element={<DonorLogin />} />
-      <Route path="/hospital/register" element={<HospitalRegister />} />
-      <Route path="/hospital/login" element={<HospitalLogin />} />
-      <Route path="/bloodbank/register" element={<BloodBankRegister />} />
-      <Route path="/bloodbank/login" element={<BloodBankLogin />} />
-      <Route path="/ngo/register" element={<NgoRegister />} />
-      <Route path="/ngo/login" element={<NgoLogin />} />
-      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path={ROUTES.portal.donor.register} element={<DonorRegister />} />
+      <Route path={ROUTES.portal.donor.login} element={<DonorLogin />} />
+      <Route path={ROUTES.portal.hospital.register} element={<HospitalRegister />} />
+      <Route path={ROUTES.portal.hospital.login} element={<HospitalLogin />} />
+      <Route path={ROUTES.portal.bloodbank.register} element={<BloodBankRegister />} />
+      <Route path={ROUTES.portal.bloodbank.login} element={<BloodBankLogin />} />
+      <Route path={ROUTES.portal.ngo.register} element={<NgoRegister />} />
+      <Route path={ROUTES.portal.ngo.login} element={<NgoLogin />} />
+      <Route path={ROUTES.portal.admin.login} element={<AdminLogin />} />
 
       {/* Protected Routes */}
       <Route element={<ProtectedRoute />}>
-        <Route path="/donor/onboarding" element={<DonorOnboarding />} />
-        <Route path="/donor/dashboard" element={<DonorDashboard />}>
+        <Route path={ROUTES.portal.donor.onboarding} element={<DonorOnboarding />} />
+        <Route path={ROUTES.portal.donor.dashboard.root} element={<DonorDashboard />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<DonorOverview />} />
           <Route path="readiness" element={<DonorReadiness />} />
@@ -156,10 +157,10 @@ const AppRoutes = () => {
           <Route path="referrals" element={<DonorReferrals />} />
           <Route path="account" element={<DonorAccount />} />
         </Route>
-        <Route path="/hospital/onboarding" element={<HospitalOnboarding />} />
-        <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
-        <Route path="/bloodbank/onboarding" element={<BloodBankOnboarding />} />
-        <Route path="/bloodbank/dashboard" element={<BloodBankDashboard />}>
+        <Route path={ROUTES.portal.hospital.onboarding} element={<HospitalOnboarding />} />
+        <Route path={ROUTES.portal.hospital.dashboard} element={<HospitalDashboard />} />
+        <Route path={ROUTES.portal.bloodbank.onboarding} element={<BloodBankOnboarding />} />
+        <Route path={ROUTES.portal.bloodbank.dashboard.root} element={<BloodBankDashboard />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<BloodBankOverview />} />
           <Route path="requests" element={<BloodBankRequests />} />
@@ -170,8 +171,8 @@ const AppRoutes = () => {
           <Route path="referrals" element={<BloodBankReferrals />} />
           <Route path="account" element={<BloodBankAccount />} />
         </Route>
-        <Route path="/ngo/onboarding" element={<NgoOnboarding />} />
-        <Route path="/ngo/dashboard" element={<NgoDashboard />}>
+        <Route path={ROUTES.portal.ngo.onboarding} element={<NgoOnboarding />} />
+        <Route path={ROUTES.portal.ngo.dashboard.root} element={<NgoDashboard />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<NgoOverview />} />
           <Route path="campaigns" element={<NgoCampaigns />} />
@@ -185,8 +186,8 @@ const AppRoutes = () => {
           <Route path="referrals" element={<NgoReferrals />} />
           <Route path="account" element={<NgoAccount />} />
         </Route>
-        <Route path="/admin/onboarding" element={<AdminOnboarding />} />
-        <Route path="/admin/dashboard" element={<AdminPortal />}>
+        <Route path={ROUTES.portal.admin.onboarding} element={<AdminOnboarding />} />
+        <Route path={ROUTES.portal.admin.dashboard.root} element={<AdminPortal />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<AdminOverview />} />
           <Route path="users" element={<AdminUsers />} />
@@ -204,14 +205,14 @@ const AppRoutes = () => {
           <Route path="volunteers-partnerships" element={<AdminVolunteersPartnerships />} />
           <Route path="appointments-donations" element={<AdminAppointmentsDonations />} />
           <Route path="analytics-reports" element={<AdminAnalyticsReports />} />
-          <Route path="reports" element={<Navigate to="/admin/dashboard/analytics-reports" replace />} />
+          <Route path="reports" element={<Navigate to={ROUTES.portal.admin.dashboard.analyticsReports} replace />} />
           <Route path="audit-security" element={<AdminAuditSecurity />} />
           <Route path="error-logs" element={<AdminErrorLogs />} />
           <Route path="impersonation-audit" element={<ImpersonationAudit />} />
           <Route path="notifications" element={<AdminNotifications />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
-        <Route path="/admin/impersonation-audit" element={<ImpersonationAudit />} />
+        <Route path={ROUTES.portal.admin.dashboard.impersonationAudit} element={<ImpersonationAudit />} />
       </Route>
 
       {/* 404 Route */}

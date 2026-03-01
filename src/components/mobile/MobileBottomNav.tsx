@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import { Activity, BarChart3, Calendar, Heart, Home, Settings, Shield, Users } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { DASHBOARD_PREFIX, ROUTES } from '../../constants/routes';
 
 type MobileNavItem = {
   to: string;
@@ -9,38 +10,38 @@ type MobileNavItem = {
 };
 
 const donorNav: MobileNavItem[] = [
-  { to: '/donor/dashboard/overview', label: 'Home', icon: Home },
-  { to: '/donor/dashboard/requests', label: 'Requests', icon: Heart },
-  { to: '/donor/dashboard/journey', label: 'Journey', icon: Activity },
-  { to: '/donor/dashboard/account', label: 'Account', icon: Settings },
+  { to: ROUTES.portal.donor.dashboard.overview, label: 'Home', icon: Home },
+  { to: ROUTES.portal.donor.dashboard.requests, label: 'Requests', icon: Heart },
+  { to: ROUTES.portal.donor.dashboard.journey, label: 'Journey', icon: Activity },
+  { to: ROUTES.portal.donor.dashboard.account, label: 'Account', icon: Settings },
 ];
 
 const ngoNav: MobileNavItem[] = [
-  { to: '/ngo/dashboard/overview', label: 'Home', icon: Home },
-  { to: '/ngo/dashboard/campaigns', label: 'Campaigns', icon: Heart },
-  { to: '/ngo/dashboard/donors', label: 'Donors', icon: Users },
-  { to: '/ngo/dashboard/account', label: 'Account', icon: Settings },
+  { to: ROUTES.portal.ngo.dashboard.overview, label: 'Home', icon: Home },
+  { to: ROUTES.portal.ngo.dashboard.campaigns, label: 'Campaigns', icon: Heart },
+  { to: ROUTES.portal.ngo.dashboard.donors, label: 'Donors', icon: Users },
+  { to: ROUTES.portal.ngo.dashboard.account, label: 'Account', icon: Settings },
 ];
 
 const bloodbankNav: MobileNavItem[] = [
-  { to: '/bloodbank/dashboard/overview', label: 'Home', icon: Home },
-  { to: '/bloodbank/dashboard/requests', label: 'Requests', icon: Heart },
-  { to: '/bloodbank/dashboard/appointments', label: 'Appts', icon: Calendar },
-  { to: '/bloodbank/dashboard/account', label: 'Account', icon: Settings },
+  { to: ROUTES.portal.bloodbank.dashboard.overview, label: 'Home', icon: Home },
+  { to: ROUTES.portal.bloodbank.dashboard.requests, label: 'Requests', icon: Heart },
+  { to: ROUTES.portal.bloodbank.dashboard.appointments, label: 'Appts', icon: Calendar },
+  { to: ROUTES.portal.bloodbank.dashboard.account, label: 'Account', icon: Settings },
 ];
 
 const adminNav: MobileNavItem[] = [
-  { to: '/admin/dashboard/overview', label: 'Home', icon: Home },
-  { to: '/admin/dashboard/users', label: 'Users', icon: Users },
-  { to: '/admin/dashboard/analytics-reports', label: 'Reports', icon: BarChart3 },
-  { to: '/admin/dashboard/settings', label: 'Settings', icon: Shield },
+  { to: ROUTES.portal.admin.dashboard.overview, label: 'Home', icon: Home },
+  { to: ROUTES.portal.admin.dashboard.users, label: 'Users', icon: Users },
+  { to: ROUTES.portal.admin.dashboard.analyticsReports, label: 'Reports', icon: BarChart3 },
+  { to: ROUTES.portal.admin.dashboard.settings, label: 'Settings', icon: Shield },
 ];
 
 const resolveItems = (pathname: string): MobileNavItem[] | null => {
-  if (pathname.startsWith('/donor/dashboard')) return donorNav;
-  if (pathname.startsWith('/ngo/dashboard')) return ngoNav;
-  if (pathname.startsWith('/bloodbank/dashboard')) return bloodbankNav;
-  if (pathname.startsWith('/admin/dashboard')) return adminNav;
+  if (pathname.startsWith(DASHBOARD_PREFIX.donor)) return donorNav;
+  if (pathname.startsWith(DASHBOARD_PREFIX.ngo)) return ngoNav;
+  if (pathname.startsWith(DASHBOARD_PREFIX.bloodbank)) return bloodbankNav;
+  if (pathname.startsWith(DASHBOARD_PREFIX.admin)) return adminNav;
   return null;
 };
 

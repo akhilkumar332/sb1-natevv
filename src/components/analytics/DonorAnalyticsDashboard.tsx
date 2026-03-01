@@ -22,6 +22,7 @@ import {
   type BloodTypeDistribution,
 } from '../../services/analytics.service';
 import { captureHandledError } from '../../services/errorLog.service';
+import { CHART_PALETTE } from '../../constants/theme';
 
 interface DonorAnalyticsDashboardProps {
   donorId: string;
@@ -194,7 +195,7 @@ export const DonorAnalyticsDashboard: React.FC<DonorAnalyticsDashboardProps> = (
         <LineChart
           data={trendData}
           title="Donation Trend"
-          color="#DC2626"
+          color={CHART_PALETTE.primary}
         />
 
         {/* Blood Type Distribution */}
@@ -216,7 +217,7 @@ export const DonorAnalyticsDashboard: React.FC<DonorAnalyticsDashboardProps> = (
             value: d.value,
           }))}
           title="Monthly Donation Breakdown"
-          color="#DC2626"
+          color={CHART_PALETTE.primary}
           height={250}
         />
       )}

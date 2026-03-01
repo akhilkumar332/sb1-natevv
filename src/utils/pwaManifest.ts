@@ -1,3 +1,6 @@
+import { APP_ROUTE_PREFIXES_WITH_LEGACY, LEGACY_ROUTE_PREFIXES, PORTAL_PATH_PREFIXES } from '../constants/routes';
+import { PWA_THEME_COLORS } from '../constants/theme';
+
 type PwaBrand = {
   manifest: string;
   themeColor: string;
@@ -8,34 +11,36 @@ type PwaBrand = {
 const PWA_BRANDS: Record<string, PwaBrand> = {
   donor: {
     manifest: '/manifest-donor.json',
-    themeColor: '#dc2626',
+    themeColor: PWA_THEME_COLORS.donor,
     title: 'BloodHub Donor',
     icon: '/icons/apple-touch-icon.png',
   },
   ngo: {
     manifest: '/manifest-ngo.json',
-    themeColor: '#2563eb',
+    themeColor: PWA_THEME_COLORS.ngo,
     title: 'BloodHub NGO',
     icon: '/icons/apple-touch-icon.png',
   },
   bloodbank: {
     manifest: '/manifest-bloodbank.json',
-    themeColor: '#16a34a',
+    themeColor: PWA_THEME_COLORS.bloodbank,
     title: 'BloodHub Bloodbank',
     icon: '/icons/apple-touch-icon.png',
   },
   default: {
     manifest: '/manifest-donor.json',
-    themeColor: '#dc2626',
+    themeColor: PWA_THEME_COLORS.default,
     title: 'BloodHub',
     icon: '/icons/apple-touch-icon.png',
   },
 };
 
 const resolveBrandKey = (pathname: string) => {
-  if (pathname.startsWith('/ngo')) return 'ngo';
-  if (pathname.startsWith('/bloodbank')) return 'bloodbank';
-  if (pathname.startsWith('/donor')) return 'donor';
+  if (pathname.startsWith(PORTAL_PATH_PREFIXES.ngo)) return 'ngo';
+  if (pathname.startsWith(PORTAL_PATH_PREFIXES.bloodbank)) return 'bloodbank';
+  if (pathname.startsWith(LEGACY_ROUTE_PREFIXES.hospital)) return 'bloodbank';
+  if (pathname.startsWith(PORTAL_PATH_PREFIXES.donor)) return 'donor';
+  if (!APP_ROUTE_PREFIXES_WITH_LEGACY.some((prefix) => pathname.startsWith(prefix))) return 'default';
   return 'default';
 };
 

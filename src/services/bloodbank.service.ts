@@ -1,3 +1,4 @@
+import { COLLECTIONS } from '../constants/firestore';
 /**
  * BloodBank Service
  *
@@ -58,7 +59,7 @@ const reportBloodBankServiceError = (error: unknown, kind: string, metadata?: Re
 export const getBloodBankInventory = async (hospitalId: string): Promise<BloodInventory[]> => {
   try {
     const q = query(
-      collection(db, 'bloodInventory'),
+      collection(db, COLLECTIONS.BLOOD_INVENTORY),
       where('hospitalId', '==', hospitalId)
     );
 
@@ -81,7 +82,7 @@ export const getBloodBankInventoryByType = async (
 ): Promise<BloodInventory | null> => {
   try {
     const q = query(
-      collection(db, 'bloodInventory'),
+      collection(db, COLLECTIONS.BLOOD_INVENTORY),
       where('hospitalId', '==', hospitalId),
       where('bloodType', '==', bloodType),
       limit(1)
@@ -110,7 +111,7 @@ export const updateBloodBankInventory = async (
       throw new ValidationError('Units cannot be negative');
     }
 
-    const inventoryDoc = await getDoc(doc(db, 'bloodInventory', inventoryId));
+    const inventoryDoc = await getDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, inventoryId));
     if (!inventoryDoc.exists()) {
       throw new NotFoundError('Inventory item not found');
     }
@@ -129,7 +130,7 @@ export const updateBloodBankInventory = async (
       status = 'surplus';
     }
 
-    await updateDoc(doc(db, 'bloodInventory', inventoryId), {
+    await updateDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, inventoryId), {
       units,
       status,
       updatedAt: getServerTimestamp(),
@@ -157,7 +158,7 @@ export const addBloodBankBatch = async (
   }
 ): Promise<void> => {
   try {
-    const inventoryDoc = await getDoc(doc(db, 'bloodInventory', inventoryId));
+    const inventoryDoc = await getDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, inventoryId));
     if (!inventoryDoc.exists()) {
       throw new NotFoundError('Inventory item not found');
     }
@@ -182,7 +183,7 @@ export const addBloodBankBatch = async (
       status = 'surplus';
     }
 
-    await updateDoc(doc(db, 'bloodInventory', inventoryId), {
+    await updateDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, inventoryId), {
       batches,
       units: newUnits,
       status,
@@ -203,7 +204,7 @@ export const addBloodBankBatch = async (
  */
 export const removeBloodBankExpiredBatches = async (inventoryId: string): Promise<void> => {
   try {
-    const inventoryDoc = await getDoc(doc(db, 'bloodInventory', inventoryId));
+    const inventoryDoc = await getDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, inventoryId));
     if (!inventoryDoc.exists()) {
       throw new NotFoundError('Inventory item not found');
     }
@@ -242,7 +243,7 @@ export const removeBloodBankExpiredBatches = async (inventoryId: string): Promis
       status = 'surplus';
     }
 
-    await updateDoc(doc(db, 'bloodInventory', inventoryId), {
+    await updateDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, inventoryId), {
       batches: activeBatches,
       units: Math.max(0, newUnits),
       status,
@@ -264,7 +265,7 @@ export const removeBloodBankExpiredBatches = async (inventoryId: string): Promis
 export const getBloodBankLowStockInventory = async (hospitalId: string): Promise<BloodInventory[]> => {
   try {
     const q = query(
-      collection(db, 'bloodInventory'),
+      collection(db, COLLECTIONS.BLOOD_INVENTORY),
       where('hospitalId', '==', hospitalId),
       where('status', 'in', ['low', 'critical'])
     );
@@ -303,7 +304,7 @@ export const createBloodBankRequest = async (
       throw new ValidationError('Needed by date must be in the future');
     }
 
-    const docRef = await addDoc(collection(db, 'bloodRequests'), {
+    const docRef = await addDoc(collection(db, COLLECTIONS.BLOOD_REQUESTS), {
       ...request,
       status: 'active',
       unitsReceived: 0,
@@ -338,7 +339,7 @@ const notifyMatchingDonors = async (
   try {
     // Find matching donors
     const q = query(
-      collection(db, 'users'),
+      collection(db, COLLECTIONS.USERS),
       where('role', '==', 'donor'),
       where('bloodType', '==', bloodType),
       where('city', '==', city),
@@ -351,7 +352,7 @@ const notifyMatchingDonors = async (
 
     // Create notifications for each donor
     const notificationPromises = donors.map(donor =>
-      addDoc(collection(db, 'notifications'), {
+      addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
         userId: donor.uid,
         userRole: 'donor',
         type: 'emergency_request',
@@ -380,7 +381,7 @@ const notifyMatchingDonors = async (
 export const getBloodBankRequests = async (hospitalId: string): Promise<BloodRequest[]> => {
   try {
     const q = query(
-      collection(db, 'bloodRequests'),
+      collection(db, COLLECTIONS.BLOOD_REQUESTS),
       where('requesterId', '==', hospitalId),
       orderBy('requestedAt', 'desc'),
       limit(50)
@@ -425,7 +426,7 @@ export const updateBloodBankRequestStatus = async (
       updateData.fulfilledAt = getServerTimestamp();
     }
 
-    await updateDoc(doc(db, 'bloodRequests', requestId), updateData);
+    await updateDoc(doc(db, COLLECTIONS.BLOOD_REQUESTS, requestId), updateData);
   } catch (error) {
     throw new DatabaseError('Failed to update blood request status');
   }
@@ -441,7 +442,7 @@ export const confirmDonorForBloodBankRequest = async (
   donorId: string
 ): Promise<void> => {
   try {
-    const requestDoc = await getDoc(doc(db, 'bloodRequests', requestId));
+    const requestDoc = await getDoc(doc(db, COLLECTIONS.BLOOD_REQUESTS, requestId));
     if (!requestDoc.exists()) {
       throw new NotFoundError('Blood request not found');
     }
@@ -451,13 +452,13 @@ export const confirmDonorForBloodBankRequest = async (
     // Add donor to confirmed list if not already there
     if (!request.confirmedDonors?.includes(donorId)) {
       const confirmedDonors = [...(request.confirmedDonors || []), donorId];
-      await updateDoc(doc(db, 'bloodRequests', requestId), {
+      await updateDoc(doc(db, COLLECTIONS.BLOOD_REQUESTS, requestId), {
         confirmedDonors,
         updatedAt: getServerTimestamp(),
       });
 
       // Create notification for donor
-      await addDoc(collection(db, 'notifications'), {
+      await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
         userId: donorId,
         userRole: 'donor',
         type: 'donation_confirmation',
@@ -496,7 +497,7 @@ export const getBloodBankAppointments = async (
     let q;
     if (status) {
       q = query(
-        collection(db, 'appointments'),
+        collection(db, COLLECTIONS.APPOINTMENTS),
         where('hospitalId', '==', hospitalId),
         where('status', '==', status),
         orderBy('scheduledDate', 'desc'),
@@ -504,7 +505,7 @@ export const getBloodBankAppointments = async (
       );
     } else {
       q = query(
-        collection(db, 'appointments'),
+        collection(db, COLLECTIONS.APPOINTMENTS),
         where('hospitalId', '==', hospitalId),
         orderBy('scheduledDate', 'desc'),
         limit(50)
@@ -537,7 +538,7 @@ export const getBloodBankTodayAppointments = async (hospitalId: string): Promise
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const q = query(
-      collection(db, 'appointments'),
+      collection(db, COLLECTIONS.APPOINTMENTS),
       where('hospitalId', '==', hospitalId),
       where('scheduledDate', '>=', Timestamp.fromDate(today)),
       where('scheduledDate', '<', Timestamp.fromDate(tomorrow)),
@@ -577,7 +578,7 @@ export const updateBloodBankAppointmentStatus = async (
       updateData.completedAt = getServerTimestamp();
     }
 
-    await updateDoc(doc(db, 'appointments', appointmentId), updateData);
+    await updateDoc(doc(db, COLLECTIONS.APPOINTMENTS, appointmentId), updateData);
   } catch (error) {
     throw new DatabaseError('Failed to update appointment status');
   }
@@ -606,14 +607,14 @@ export const recordBloodBankDonation = async (
     }
 
     // Create donation record
-    const docRef = await addDoc(collection(db, 'donations'), {
+    const docRef = await addDoc(collection(db, COLLECTIONS.DONATIONS), {
       ...donation,
       createdAt: getServerTimestamp(),
       updatedAt: getServerTimestamp(),
     });
 
     // Update donor's last donation and total donations
-    const donorRef = doc(db, 'users', donation.donorId);
+    const donorRef = doc(db, COLLECTIONS.USERS, donation.donorId);
     const donorDoc = await getDoc(donorRef);
 
     if (donorDoc.exists()) {
@@ -625,7 +626,7 @@ export const recordBloodBankDonation = async (
       });
     }
 
-    const historyRef = doc(db, 'DonationHistory', donation.donorId);
+    const historyRef = doc(db, COLLECTIONS.DONATION_HISTORY, donation.donorId);
     const historySnapshot = await getDoc(historyRef);
     const existingHistory = historySnapshot.exists() && Array.isArray(historySnapshot.data().donations)
       ? historySnapshot.data().donations
@@ -683,7 +684,7 @@ export const recordBloodBankDonation = async (
     // If linked to an appointment, update it
     if (donation.requestId) {
       const appointmentQuery = query(
-        collection(db, 'appointments'),
+        collection(db, COLLECTIONS.APPOINTMENTS),
         where('relatedId', '==', donation.requestId),
         where('donorId', '==', donation.donorId),
         limit(1)
@@ -702,7 +703,7 @@ export const recordBloodBankDonation = async (
     }
 
     // Create notification for donor
-    await addDoc(collection(db, 'notifications'), {
+    await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
       userId: donation.donorId,
       userRole: 'donor',
       type: 'donation_confirmation',
@@ -736,7 +737,7 @@ export const getBloodBankDonations = async (
 ): Promise<Donation[]> => {
   try {
     const q = query(
-      collection(db, 'donations'),
+      collection(db, COLLECTIONS.DONATIONS),
       where('hospitalId', '==', hospitalId),
       orderBy('donationDate', 'desc'),
       limit(limitCount)

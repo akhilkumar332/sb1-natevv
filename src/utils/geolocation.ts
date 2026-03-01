@@ -5,6 +5,7 @@
  */
 
 import { Coordinates } from '../types/database.types';
+import { TEN_SECONDS_MS, THIRTY_SECONDS_MS, ZERO_MS } from '../constants/time';
 
 // ============================================================================
 // CONSTANTS
@@ -167,8 +168,8 @@ export const getCurrentLocation = (): Promise<Coordinates> => {
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+        timeout: TEN_SECONDS_MS,
+        maximumAge: ZERO_MS,
       }
     );
   });
@@ -204,8 +205,8 @@ export const watchLocation = (
     },
     {
       enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 30000,
+      timeout: TEN_SECONDS_MS,
+      maximumAge: THIRTY_SECONDS_MS,
     }
   );
 

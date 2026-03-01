@@ -26,6 +26,8 @@ import {
 import { countries, getStatesByCountry, getCitiesByState } from '../../data/locations';
 import { db } from '../../firebase';
 import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../../services/referral.service';
+import { COLLECTIONS } from '../../constants/firestore';
+import { ROUTES } from '../../constants/routes';
 import { validateOnboardingStep, type OnboardingValidationRule } from '../../utils/onboardingValidation';
 import { LeafletClickMarker, LeafletMapUpdater } from '../../components/shared/leaflet/LocationMapPrimitives';
 import { useAddressAutocomplete } from '../../hooks/useAddressAutocomplete';
@@ -349,7 +351,7 @@ export function DonorOnboarding() {
         if (formData.lastDonation && user?.uid) {
           const parsedDate = new Date(formData.lastDonation);
           if (!Number.isNaN(parsedDate.getTime())) {
-            const historyRef = doc(db, 'DonationHistory', user.uid);
+            const historyRef = doc(db, COLLECTIONS.DONATION_HISTORY, user.uid);
             const historySnapshot = await getDoc(historyRef);
             const existingDonations = historySnapshot.exists() && Array.isArray(historySnapshot.data().donations)
               ? historySnapshot.data().donations
@@ -414,7 +416,7 @@ export function DonorOnboarding() {
           const returnTo = rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//') ? rawReturnTo : '';
           params.delete('returnTo');
           const nextSearch = params.toString();
-          const destination = returnTo || '/donor/dashboard';
+          const destination = returnTo || ROUTES.portal.donor.dashboard.root;
           const target = nextSearch
             ? `${destination}${destination.includes('?') ? '&' : '?'}${nextSearch}`
             : destination;

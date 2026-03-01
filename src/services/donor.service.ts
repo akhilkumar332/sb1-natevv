@@ -1,3 +1,4 @@
+import { COLLECTIONS } from '../constants/firestore';
 /**
  * Donor Service
  *
@@ -49,7 +50,7 @@ export const getDonationHistory = async (
 ): Promise<Donation[]> => {
   try {
     const q = query(
-      collection(db, 'donations'),
+      collection(db, COLLECTIONS.DONATIONS),
       where('donorId', '==', donorId),
       orderBy('donationDate', 'desc'),
       limit(limitCount)
@@ -71,7 +72,7 @@ export const getUpcomingDonations = async (donorId: string): Promise<Donation[]>
   try {
     const now = Timestamp.now();
     const q = query(
-      collection(db, 'donations'),
+      collection(db, COLLECTIONS.DONATIONS),
       where('donorId', '==', donorId),
       where('status', '==', 'scheduled'),
       where('donationDate', '>=', now),
@@ -147,7 +148,7 @@ export const getNearbyBloodRequests = async (
 ): Promise<BloodRequest[]> => {
   try {
     // Get donor details
-    const donorDoc = await getDoc(doc(db, 'users', donorId));
+    const donorDoc = await getDoc(doc(db, COLLECTIONS.USERS, donorId));
     if (!donorDoc.exists()) {
       throw new NotFoundError('Donor not found');
     }
@@ -160,7 +161,7 @@ export const getNearbyBloodRequests = async (
 
     // Get active requests matching donor's blood type
     const q = query(
-      collection(db, 'bloodRequests'),
+      collection(db, COLLECTIONS.BLOOD_REQUESTS),
       where('status', '==', 'active'),
       where('bloodType', '==', donor.bloodType),
       orderBy('requestedAt', 'desc'),
@@ -192,7 +193,7 @@ export const getNearbyBloodRequests = async (
  */
 export const getEmergencyBloodRequests = async (donorId: string): Promise<BloodRequest[]> => {
   try {
-    const donorDoc = await getDoc(doc(db, 'users', donorId));
+    const donorDoc = await getDoc(doc(db, COLLECTIONS.USERS, donorId));
     if (!donorDoc.exists()) {
       throw new NotFoundError('Donor not found');
     }
@@ -204,7 +205,7 @@ export const getEmergencyBloodRequests = async (donorId: string): Promise<BloodR
     }
 
     const q = query(
-      collection(db, 'bloodRequests'),
+      collection(db, COLLECTIONS.BLOOD_REQUESTS),
       where('status', '==', 'active'),
       where('bloodType', '==', donor.bloodType),
       where('isEmergency', '==', true),
@@ -238,7 +239,7 @@ export const respondToBloodRequest = async (
 ): Promise<void> => {
   try {
     // Check if donor is eligible
-    const donorDoc = await getDoc(doc(db, 'users', donorId));
+    const donorDoc = await getDoc(doc(db, COLLECTIONS.USERS, donorId));
     if (!donorDoc.exists()) {
       throw new NotFoundError('Donor not found');
     }
@@ -250,7 +251,7 @@ export const respondToBloodRequest = async (
     }
 
     // Get the blood request
-    const requestDoc = await getDoc(doc(db, 'bloodRequests', requestId));
+    const requestDoc = await getDoc(doc(db, COLLECTIONS.BLOOD_REQUESTS, requestId));
     if (!requestDoc.exists()) {
       throw new NotFoundError('Blood request not found');
     }
@@ -264,13 +265,13 @@ export const respondToBloodRequest = async (
 
     // Update blood request
     const respondedDonors = [...(request.respondedDonors || []), donorId];
-    await updateDoc(doc(db, 'bloodRequests', requestId), {
+    await updateDoc(doc(db, COLLECTIONS.BLOOD_REQUESTS, requestId), {
       respondedDonors,
       updatedAt: getServerTimestamp(),
     });
 
     // Create notification for requester
-    await addDoc(collection(db, 'notifications'), {
+    await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
       userId: request.requesterId,
       userRole: request.requesterType === 'bloodbank' || request.requesterType === 'hospital' ? 'bloodbank' : 'donor',
       type: 'donation_confirmation',
@@ -303,7 +304,7 @@ export const getUpcomingAppointments = async (donorId: string): Promise<Appointm
   try {
     const now = Timestamp.now();
     const q = query(
-      collection(db, 'appointments'),
+      collection(db, COLLECTIONS.APPOINTMENTS),
       where('donorId', '==', donorId),
       where('scheduledDate', '>=', now),
       where('status', 'in', ['scheduled', 'confirmed']),
@@ -336,7 +337,7 @@ export const getAppointmentHistory = async (
 ): Promise<Appointment[]> => {
   try {
     const q = query(
-      collection(db, 'appointments'),
+      collection(db, COLLECTIONS.APPOINTMENTS),
       where('donorId', '==', donorId),
       orderBy('scheduledDate', 'desc'),
       limit(limitCount)
@@ -365,7 +366,7 @@ export const scheduleAppointment = async (
 ): Promise<string> => {
   try {
     // Validate donor eligibility
-    const donorDoc = await getDoc(doc(db, 'users', appointment.donorId));
+    const donorDoc = await getDoc(doc(db, COLLECTIONS.USERS, appointment.donorId));
     if (!donorDoc.exists()) {
       throw new NotFoundError('Donor not found');
     }
@@ -386,7 +387,7 @@ export const scheduleAppointment = async (
     }
 
     // Create appointment
-    const docRef = await addDoc(collection(db, 'appointments'), {
+    const docRef = await addDoc(collection(db, COLLECTIONS.APPOINTMENTS), {
       ...appointment,
       status: 'scheduled',
       reminderSent: false,
@@ -395,7 +396,7 @@ export const scheduleAppointment = async (
     });
 
     // Create notification for donor
-    await addDoc(collection(db, 'notifications'), {
+    await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
       userId: appointment.donorId,
       userRole: 'donor',
       type: 'appointment_reminder',
@@ -430,7 +431,7 @@ export const cancelAppointment = async (
 ): Promise<void> => {
   try {
     // Get appointment
-    const appointmentDoc = await getDoc(doc(db, 'appointments', appointmentId));
+    const appointmentDoc = await getDoc(doc(db, COLLECTIONS.APPOINTMENTS, appointmentId));
     if (!appointmentDoc.exists()) {
       throw new NotFoundError('Appointment not found');
     }
@@ -452,14 +453,14 @@ export const cancelAppointment = async (
     }
 
     // Update appointment
-    await updateDoc(doc(db, 'appointments', appointmentId), {
+    await updateDoc(doc(db, COLLECTIONS.APPOINTMENTS, appointmentId), {
       status: 'cancelled',
       cancellationReason: reason,
       updatedAt: getServerTimestamp(),
     });
 
     // Create notification for hospital
-    await addDoc(collection(db, 'notifications'), {
+    await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
       userId: appointment.hospitalId,
       userRole: 'bloodbank',
       type: 'general',
@@ -494,7 +495,7 @@ export const rescheduleAppointment = async (
 ): Promise<void> => {
   try {
     // Get appointment
-    const appointmentDoc = await getDoc(doc(db, 'appointments', appointmentId));
+    const appointmentDoc = await getDoc(doc(db, COLLECTIONS.APPOINTMENTS, appointmentId));
     if (!appointmentDoc.exists()) {
       throw new NotFoundError('Appointment not found');
     }
@@ -522,7 +523,7 @@ export const rescheduleAppointment = async (
     }
 
     // Update appointment
-    await updateDoc(doc(db, 'appointments', appointmentId), {
+    await updateDoc(doc(db, COLLECTIONS.APPOINTMENTS, appointmentId), {
       scheduledDate: newDate,
       scheduledTime: newTime,
       reminderSent: false,
@@ -530,7 +531,7 @@ export const rescheduleAppointment = async (
     });
 
     // Create notification for hospital
-    await addDoc(collection(db, 'notifications'), {
+    await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
       userId: appointment.hospitalId,
       userRole: 'bloodbank',
       type: 'general',
@@ -566,7 +567,7 @@ export const getDonorNotifications = async (
 ): Promise<Notification[]> => {
   try {
     const q = query(
-      collection(db, 'notifications'),
+      collection(db, COLLECTIONS.NOTIFICATIONS),
       where('userId', '==', donorId),
       orderBy('createdAt', 'desc'),
       limit(limitCount)
@@ -585,7 +586,7 @@ export const getDonorNotifications = async (
  */
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
   try {
-    await updateDoc(doc(db, 'notifications', notificationId), {
+    await updateDoc(doc(db, COLLECTIONS.NOTIFICATIONS, notificationId), {
       read: true,
       readAt: getServerTimestamp(),
     });
@@ -601,7 +602,7 @@ export const markNotificationAsRead = async (notificationId: string): Promise<vo
 export const markAllNotificationsAsRead = async (donorId: string): Promise<void> => {
   try {
     const q = query(
-      collection(db, 'notifications'),
+      collection(db, COLLECTIONS.NOTIFICATIONS),
       where('userId', '==', donorId),
       where('read', '==', false)
     );

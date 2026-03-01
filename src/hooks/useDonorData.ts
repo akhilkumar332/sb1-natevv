@@ -1,3 +1,4 @@
+import { FIVE_MINUTES_MS, ZERO_MS } from '../constants/time';
 /**
  * Custom hook for Donor Dashboard data
  * Fetches all donor-related data from Firestore
@@ -18,6 +19,7 @@ import {
   Timestamp
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { COLLECTIONS } from '../constants/firestore';
 import { gamificationService } from '../services/gamification.service';
 import { useScopedErrorReporter } from './useScopedErrorReporter';
 import { readDashboardCache, writeDashboardCache } from '../utils/dashboardCache';
@@ -127,7 +129,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     return !auth.currentUser || auth.currentUser.uid !== userId;
   };
   const cacheKey = useMemo(() => (userId ? `donor_dashboard_cache_${userId}` : ''), [userId]);
-  const cacheTTL = 5 * 60 * 1000;
+  const cacheTTL = FIVE_MINUTES_MS;
   const reportDonorDataError = useScopedErrorReporter({
     scope: 'donor',
     metadata: { hook: 'useDonorData' },
@@ -254,11 +256,11 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
   const syncDonationHistoryFromLegacy = async () => {
     if (!userId) return;
     try {
-      const historyRef = doc(db, 'DonationHistory', userId);
+      const historyRef = doc(db, COLLECTIONS.DONATION_HISTORY, userId);
       const [historySnapshot, legacySnapshot] = await Promise.all([
         getDoc(historyRef),
         getDocs(query(
-          collection(db, 'donations'),
+          collection(db, COLLECTIONS.DONATIONS),
           where('donorId', '==', userId),
           limit(50)
         ))
@@ -336,7 +338,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
   // Real-time stats listener
   useEffect(() => {
     if (!userId) return;
-    const userStatsRef = doc(db, 'userStats', userId);
+    const userStatsRef = doc(db, COLLECTIONS.USER_STATS, userId);
     const unsubscribe = onSnapshot(
       userStatsRef,
       (snapshot) => {
@@ -375,7 +377,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
         void syncDonationHistoryFromLegacy();
       }
 
-      const historyRef = doc(db, 'DonationHistory', userId);
+      const historyRef = doc(db, COLLECTIONS.DONATION_HISTORY, userId);
       const unsubscribe = onSnapshot(
         historyRef,
         (snapshot) => {
@@ -425,7 +427,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
   const fetchDonationHistoryOnce = async () => {
     if (!userId) return;
     try {
-      const historyRef = doc(db, 'DonationHistory', userId);
+      const historyRef = doc(db, COLLECTIONS.DONATION_HISTORY, userId);
       const snapshot = await getDoc(historyRef);
       if (!snapshot.exists()) {
         setDonationHistory([]);
@@ -460,7 +462,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     if (!bloodType) return () => {};
 
     try {
-      const requestsRef = collection(db, 'bloodRequests');
+      const requestsRef = collection(db, COLLECTIONS.BLOOD_REQUESTS);
       // Simplified query - fetch by blood type only, then filter and sort in memory
       const q = query(
         requestsRef,
@@ -521,7 +523,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
   const fetchEmergencyRequestsOnce = async () => {
     if (!bloodType) return;
     try {
-      const requestsRef = collection(db, 'bloodRequests');
+      const requestsRef = collection(db, COLLECTIONS.BLOOD_REQUESTS);
       const q = query(
         requestsRef,
         where('bloodType', '==', bloodType),
@@ -564,7 +566,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     if (!city) return;
 
     try {
-      const campsRef = collection(db, 'campaigns');
+      const campsRef = collection(db, COLLECTIONS.CAMPAIGNS);
       // Simplified query - fetch by type only, then filter and sort in memory
       const q = query(
         campsRef,
@@ -744,7 +746,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
           if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
             idleTaskId = (window as any).requestIdleCallback(task);
           } else {
-            timeoutTaskId = setTimeout(task, 0);
+            timeoutTaskId = setTimeout(task, ZERO_MS);
           }
         };
 

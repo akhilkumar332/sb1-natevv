@@ -1,3 +1,4 @@
+import { ONE_DAY_MS, TEN_MINUTES_MS, THIRTY_MINUTES_MS, TWELVE_HOURS_MS, ZERO_MS } from '../constants/time';
 // src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { NavigateFunction } from 'react-router-dom';
@@ -36,6 +37,7 @@ import {
   enableNetwork
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
+import { COLLECTIONS } from '../constants/firestore';
 import { getMessaging } from 'firebase/messaging';
 import { initializeFCM, saveFCMDeviceToken, saveFCMToken } from '../services/notification.service';
 import { requestImpersonation, requestImpersonationResume } from '../services/impersonation.service';
@@ -52,6 +54,7 @@ import { PhoneAuthError } from '../errors/PhoneAuthError';
 import { authStorage } from '../utils/authStorage';
 import { readFcmTokenMeta, readStoredFcmToken, writeFcmTokenMeta, writeStoredFcmToken } from '../utils/fcmStorage';
 import { authMessages } from '../constants/messages';
+import { ROUTES } from '../constants/routes';
 
 const trackImpersonationEvent = (eventName: string, params?: Record<string, any>) => {
   void import('../services/monitoring.service')
@@ -263,8 +266,8 @@ const portalRoleStorageKey = 'bh_superadmin_portal_role';
 const impersonationStorageKey = 'bh_superadmin_impersonation';
 const userCacheKey = 'bh_user_cache';
 const userCacheAtKey = 'bh_user_cache_at';
-const userCacheTtlMs = 24 * 60 * 60 * 1000;
-const IMPERSONATION_TTL_MS = 30 * 60 * 1000;
+const userCacheTtlMs = ONE_DAY_MS;
+const IMPERSONATION_TTL_MS = THIRTY_MINUTES_MS;
 
 const reportAuthContextError = (
   error: unknown,
@@ -458,7 +461,7 @@ const readPendingPhoneLink = () => {
       targetUid: string;
       createdAt: number;
     };
-    if (parsed.createdAt && Date.now() - parsed.createdAt > 10 * 60 * 1000) {
+    if (parsed.createdAt && Date.now() - parsed.createdAt > TEN_MINUTES_MS) {
       clearPendingPhoneLink();
       return null;
     }
@@ -511,7 +514,7 @@ const updateUserInFirestore = async (
   additionalData?: Partial<User>
 ): Promise<UserFetchResult> => {
   try {
-    const userRef: DocumentReference = doc(db, 'users', firebaseUser.uid);
+    const userRef: DocumentReference = doc(db, COLLECTIONS.USERS, firebaseUser.uid);
     const userDoc: DocumentSnapshot = await getUserDocSnapshot(userRef);
 
     // If user document doesn't exist, return null
@@ -581,7 +584,7 @@ const updateUserInFirestore = async (
     if (canPublishPublicDonor) {
       try {
         await setDoc(
-          doc(db, 'publicDonors', firebaseUser.uid),
+          doc(db, COLLECTIONS.PUBLIC_DONORS, firebaseUser.uid),
           {
             ...buildPublicDonorPayload(resolvedUser),
             updatedAt: serverTimestamp(),
@@ -602,7 +605,7 @@ const updateUserInFirestore = async (
 
 const updateSessionMetadata = async (firebaseUser: FirebaseUser, knownUser?: User) => {
   try {
-    const userRef = doc(db, 'users', firebaseUser.uid);
+    const userRef = doc(db, COLLECTIONS.USERS, firebaseUser.uid);
     const updatePayload: Record<string, any> = { lastLoginAt: serverTimestamp() };
     const rawPhone = knownUser?.phoneNumber
       || (knownUser as any)?.phone
@@ -1158,7 +1161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           storedToken
           && meta?.token === storedToken
           && meta?.deviceId === deviceId
-          && Date.now() - meta.savedAt < 12 * 60 * 60 * 1000
+          && Date.now() - meta.savedAt < TWELVE_HOURS_MS
         );
 
         if (storedToken) {
@@ -1222,7 +1225,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (publicDonorSyncRef.current === payloadKey) return;
     publicDonorSyncRef.current = payloadKey;
     setDoc(
-      doc(db, 'publicDonors', user.uid),
+      doc(db, COLLECTIONS.PUBLIC_DONORS, user.uid),
       {
         ...payload,
         updatedAt: serverTimestamp(),
@@ -1588,7 +1591,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       cleanupRecaptcha();
 
       const normalizedPhone = normalizePhoneNumber(userCredential.user.phoneNumber || '');
-      const userRef = doc(db, 'users', userCredential.user.uid);
+      const userRef = doc(db, COLLECTIONS.USERS, userCredential.user.uid);
 
       // Fetch user data first
       const userDoc = await getDoc(userRef);
@@ -1799,7 +1802,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (Object.keys(updatePayload).length > 0) {
-        await updateDoc(doc(db, 'users', auth.currentUser.uid), updatePayload);
+        await updateDoc(doc(db, COLLECTIONS.USERS, auth.currentUser.uid), updatePayload);
         setUser(prev => prev ? {
           ...prev,
           phoneNumber: updatePayload.phoneNumber || prev.phoneNumber,
@@ -1878,7 +1881,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (Object.keys(updatePayload).length > 0) {
-        await updateDoc(doc(db, 'users', auth.currentUser.uid), updatePayload);
+        await updateDoc(doc(db, COLLECTIONS.USERS, auth.currentUser.uid), updatePayload);
         setUser(prev => prev ? {
           ...prev,
           phoneNumber: updatePayload.phoneNumber || prev.phoneNumber,
@@ -1901,7 +1904,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     await updateEmail(auth.currentUser, normalizedEmail);
     await sendEmailVerification(auth.currentUser);
-    await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+    await updateDoc(doc(db, COLLECTIONS.USERS, auth.currentUser.uid), {
       email: normalizedEmail,
       updatedAt: serverTimestamp(),
     });
@@ -1943,7 +1946,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Check if user exists in Firestore
-      const userRef = doc(db, 'users', result.user.uid);
+      const userRef = doc(db, COLLECTIONS.USERS, result.user.uid);
       const userDoc = await getUserDocSnapshot(userRef);
 
       if (!userDoc.exists()) {
@@ -2146,7 +2149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Check if user exists before proceeding
-      const userRef = doc(db, 'users', result.user.uid);
+      const userRef = doc(db, COLLECTIONS.USERS, result.user.uid);
       const userDoc = await getUserDocSnapshot(userRef);
 
       if (!userDoc.exists()) {
@@ -2221,7 +2224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Clear user state early so dashboards unmount listeners before sign-out.
       setUser(null);
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise(resolve => setTimeout(resolve, ZERO_MS));
     } catch {
       // ignore
     }
@@ -2271,14 +2274,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const resolvedRole = user?.role === 'superadmin' ? portalRoleState : user?.role;
     const resolvedRedirect = options.redirectTo ?? (
       resolvedRole === 'ngo'
-        ? '/ngo/login'
+        ? ROUTES.portal.ngo.login
         : resolvedRole === 'bloodbank'
-          ? '/bloodbank/login'
+          ? ROUTES.portal.bloodbank.login
           : resolvedRole === 'admin'
-            ? '/admin/login'
+            ? ROUTES.portal.admin.login
             : resolvedRole === 'donor'
-              ? '/donor/login'
-              : '/admin/login'
+              ? ROUTES.portal.donor.login
+              : ROUTES.portal.admin.login
     );
     const { showToast = true } = options;
     let hadError = false;
@@ -2352,7 +2355,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       await setDoc(
-        doc(db, 'users', user.uid),
+        doc(db, COLLECTIONS.USERS, user.uid),
         {
           ...sanitizedData,
           ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
@@ -2392,7 +2395,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (canPublishPublicDonor) {
         try {
           await setDoc(
-            doc(db, 'publicDonors', user.uid),
+            doc(db, COLLECTIONS.PUBLIC_DONORS, user.uid),
             {
               ...buildPublicDonorPayload(nextUser),
               updatedAt: serverTimestamp(),

@@ -5,6 +5,7 @@ import type { NgoDashboardContext } from '../NgoDashboard';
 import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import { updateUserNotificationPreferences } from '../../../services/offlineMutationOutbox.service';
 import { captureHandledError } from '../../../services/errorLog.service';
+import { ROUTES } from '../../../constants/routes';
 
 function NgoAccount() {
   const { user } = useOutletContext<NgoDashboardContext>();
@@ -135,7 +136,7 @@ function NgoAccount() {
 
             <div className="mt-4">
               <Link
-                to="/ngo/onboarding"
+                to={ROUTES.portal.ngo.onboarding}
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 px-4 py-2 text-xs font-semibold text-white shadow-lg hover:from-red-700 hover:to-amber-700"
               >
                 Update organization profile

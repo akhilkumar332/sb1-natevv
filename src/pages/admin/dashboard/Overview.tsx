@@ -3,6 +3,7 @@ import { Activity, AlertTriangle, Bell, Droplet, Shield, Users } from 'lucide-re
 import { useAdminOverviewData } from '../../../hooks/admin/useAdminQueries';
 import { AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import OfflineSyncHealthCard from '../../../components/admin/OfflineSyncHealthCard';
+import { ROUTES } from '../../../constants/routes';
 
 function AdminOverviewPage() {
   const {
@@ -62,7 +63,7 @@ function AdminOverviewPage() {
         <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-bold text-gray-900">Recent Platform Activity</h2>
-            <Link to="/admin/dashboard/analytics-reports" className="text-sm font-semibold text-red-700 hover:text-red-800">
+            <Link to={ROUTES.portal.admin.dashboard.analyticsReports} className="text-sm font-semibold text-red-700 hover:text-red-800">
               View analytics
             </Link>
           </div>
@@ -138,9 +139,9 @@ function AdminOverviewPage() {
           <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
             <h3 className="text-lg font-bold text-gray-900">Quick Actions</h3>
             <div className="mt-3 grid gap-2">
-              <Link to="/admin/dashboard/verification" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100">Review Verification Queue</Link>
-              <Link to="/admin/dashboard/emergency-requests" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100">Review Emergency Requests</Link>
-              <Link to="/admin/dashboard/users" className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100">Manage Users</Link>
+              <Link to={ROUTES.portal.admin.dashboard.verification} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100">Review Verification Queue</Link>
+              <Link to={ROUTES.portal.admin.dashboard.emergencyRequests} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100">Review Emergency Requests</Link>
+              <Link to={ROUTES.portal.admin.dashboard.users} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100">Manage Users</Link>
             </div>
           </div>
 

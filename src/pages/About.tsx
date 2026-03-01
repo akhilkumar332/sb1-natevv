@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Heart, Droplet, Users, Award, Target, Shield, Zap, Globe, ArrowRight, Activity, TrendingUp, Star, Gift, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { ROUTES } from '../constants/routes';
 
 function About() {
   const values = [
@@ -689,7 +690,7 @@ function About() {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
               <Link
-                to="/donor/register"
+                to={ROUTES.portal.donor.register}
                 className="group/btn relative px-10 py-5 bg-white text-red-600 rounded-full text-xl font-bold hover:shadow-2xl transform hover:scale-105 hover:-translate-y-1 transition-all duration-500 inline-flex items-center justify-center overflow-hidden"
                 style={{ boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}
               >
@@ -699,7 +700,7 @@ function About() {
                 <ArrowRight className="ml-2 relative z-10 group-hover/btn:translate-x-1 transition-transform duration-300" />
               </Link>
               <Link
-                to="/request-blood"
+                to={ROUTES.requestBlood}
                 className="group/btn px-10 py-5 bg-white/10 backdrop-blur-xl text-white border-2 border-white rounded-full text-xl font-bold hover:bg-white hover:text-red-600 hover:shadow-2xl transform hover:scale-105 hover:-translate-y-1 transition-all duration-500 inline-flex items-center justify-center"
               >
                 <Heart className="w-6 h-6 mr-2" />

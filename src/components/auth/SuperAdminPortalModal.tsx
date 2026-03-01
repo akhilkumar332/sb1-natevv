@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Search, Shield } from 'lucide-react';
 import { searchUsersForImpersonation, searchUsersForImpersonationFast } from '../../services/admin.service';
 import type { ImpersonationUser } from '../../services/admin.service';
+import { ONE_MINUTE_MS, THREE_FIFTY_MS } from '../../constants/time';
 
 type PortalRole = 'donor' | 'ngo' | 'bloodbank' | 'admin';
 
@@ -136,12 +137,12 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
     const now = Date.now();
     const cache = cacheRef.current;
     const cached = cache.get(normalized);
-    if (cached && now - cached.at < 60_000) {
+    if (cached && now - cached.at < ONE_MINUTE_MS) {
       setSearchResults(cached.results);
     } else {
       let bestPrefix: { key: string; entry: { results: ImpersonationUser[]; at: number } } | null = null;
       for (const [key, entry] of cache.entries()) {
-        if (normalized.startsWith(key) && now - entry.at < 60_000) {
+        if (normalized.startsWith(key) && now - entry.at < ONE_MINUTE_MS) {
           if (!bestPrefix || key.length > bestPrefix.key.length) {
             bestPrefix = { key, entry };
           }
@@ -158,7 +159,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
       try {
         if (!isExact) {
           const fastCache = fastCacheRef.current.get(normalized);
-          if (fastCache && now - fastCache.at < 60_000) {
+          if (fastCache && now - fastCache.at < ONE_MINUTE_MS) {
             if (isActive) {
               setSearchResults(fastCache.results);
             }
@@ -207,7 +208,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
           setSearchLoading(false);
         }
       }
-    }, 350);
+    }, THREE_FIFTY_MS);
 
     return () => {
       isActive = false;

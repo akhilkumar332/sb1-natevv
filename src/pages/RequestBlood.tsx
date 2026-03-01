@@ -3,6 +3,7 @@ import { Droplet, AlertCircle, User, Calendar, Phone, Mail, Hospital, FileText, 
 import { notify } from 'services/notify.service';
 import { Link } from 'react-router-dom';
 import { captureHandledError } from '../services/errorLog.service';
+import { ROUTES } from '../constants/routes';
 
 // Define the interface for blood request form data
 interface BloodRequestFormData {
@@ -540,7 +541,7 @@ function RequestBlood() {
               Browse our verified donor database to find compatible donors in your area
             </p>
             <Link
-              to="/donors"
+              to={ROUTES.donors}
               className="inline-flex items-center px-10 py-5 bg-white text-red-600 rounded-full text-xl font-bold hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
             >
               <Droplet className="w-6 h-6 mr-2" />

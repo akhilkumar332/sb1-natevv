@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AdminPortal from '../AdminPortal';
+import { ROUTES } from '../../../constants/routes';
 
 const useAuthMock = vi.fn();
 
@@ -26,9 +27,9 @@ describe('AdminPortal', () => {
 
     render(
       <QueryClientProvider client={createClient()}>
-        <MemoryRouter initialEntries={['/admin/dashboard/overview']}>
+        <MemoryRouter initialEntries={[ROUTES.portal.admin.dashboard.overview]}>
           <Routes>
-            <Route path="/admin/dashboard" element={<AdminPortal />}>
+            <Route path={ROUTES.portal.admin.dashboard.root} element={<AdminPortal />}>
               <Route path="overview" element={<div>Overview</div>} />
             </Route>
           </Routes>
@@ -48,9 +49,9 @@ describe('AdminPortal', () => {
 
     render(
       <QueryClientProvider client={createClient()}>
-        <MemoryRouter initialEntries={['/admin/dashboard/overview']}>
+        <MemoryRouter initialEntries={[ROUTES.portal.admin.dashboard.overview]}>
           <Routes>
-            <Route path="/admin/dashboard" element={<AdminPortal />}>
+            <Route path={ROUTES.portal.admin.dashboard.root} element={<AdminPortal />}>
               <Route path="overview" element={<div>Overview</div>} />
             </Route>
           </Routes>

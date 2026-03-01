@@ -15,6 +15,7 @@ import {
   DocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { COLLECTIONS } from '../constants/firestore';
 import {
   User,
   BloodRequest,
@@ -125,7 +126,7 @@ export const searchDonors = async (
       constraints.push(startAfter(lastDoc));
     }
 
-    const q = query(collection(db, 'users'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.USERS), ...constraints);
     const snapshot = await getDocs(q);
 
     const allResults = extractQueryData<User>(snapshot, [
@@ -249,7 +250,7 @@ export const searchHospitals = async (
       constraints.push(startAfter(lastDoc));
     }
 
-    const q = query(collection(db, 'users'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.USERS), ...constraints);
     const snapshot = await getDocs(q);
 
     let allResults = extractQueryData<User>(snapshot, [
@@ -359,7 +360,7 @@ export const searchCampaigns = async (
       constraints.push(startAfter(lastDoc));
     }
 
-    const q = query(collection(db, 'campaigns'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.CAMPAIGNS), ...constraints);
     const snapshot = await getDocs(q);
 
     let allResults = extractQueryData<Campaign>(snapshot, [
@@ -483,7 +484,7 @@ export const searchBloodRequests = async (
       constraints.push(startAfter(lastDoc));
     }
 
-    const q = query(collection(db, 'bloodRequests'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.BLOOD_REQUESTS), ...constraints);
     const snapshot = await getDocs(q);
 
     const allResults = extractQueryData<BloodRequest>(snapshot, [
@@ -566,7 +567,7 @@ export const searchUsersByText = async (
     constraints.push(orderBy('displayName'));
     constraints.push(limit(100));
 
-    const q = query(collection(db, 'users'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.USERS), ...constraints);
     const snapshot = await getDocs(q);
 
     const allUsers = extractQueryData<User>(snapshot, [
@@ -600,7 +601,7 @@ export const searchUsersByText = async (
 export const searchCampaignsByText = async (searchText: string): Promise<Campaign[]> => {
   try {
     const q = query(
-      collection(db, 'campaigns'),
+      collection(db, COLLECTIONS.CAMPAIGNS),
       orderBy('title'),
       limit(100)
     );

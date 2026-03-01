@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AdminPortal from '../pages/admin/AdminPortal';
 import ImpersonationAudit from '../pages/admin/ImpersonationAudit';
 import ErrorLogsPage from '../pages/admin/dashboard/ErrorLogs';
+import { ROUTES } from '../constants/routes';
 
 const useAuthMock = vi.fn();
 
@@ -45,9 +46,9 @@ describe('admin route access', () => {
 
     render(
       <QueryClientProvider client={createClient()}>
-        <MemoryRouter initialEntries={['/admin/dashboard/impersonation-audit']}>
+        <MemoryRouter initialEntries={[ROUTES.portal.admin.dashboard.impersonationAudit]}>
           <Routes>
-            <Route path="/admin/dashboard" element={<AdminPortal />}>
+            <Route path={ROUTES.portal.admin.dashboard.root} element={<AdminPortal />}>
               <Route path="impersonation-audit" element={<ImpersonationAudit />} />
             </Route>
           </Routes>
@@ -66,9 +67,9 @@ describe('admin route access', () => {
 
     render(
       <QueryClientProvider client={createClient()}>
-        <MemoryRouter initialEntries={['/admin/dashboard/impersonation-audit']}>
+        <MemoryRouter initialEntries={[ROUTES.portal.admin.dashboard.impersonationAudit]}>
           <Routes>
-            <Route path="/admin/dashboard" element={<AdminPortal />}>
+            <Route path={ROUTES.portal.admin.dashboard.root} element={<AdminPortal />}>
               <Route path="impersonation-audit" element={<ImpersonationAudit />} />
             </Route>
           </Routes>
@@ -87,9 +88,9 @@ describe('admin route access', () => {
 
     render(
       <QueryClientProvider client={createClient()}>
-        <MemoryRouter initialEntries={['/admin/dashboard/error-logs']}>
+        <MemoryRouter initialEntries={[ROUTES.portal.admin.dashboard.errorLogs]}>
           <Routes>
-            <Route path="/admin/dashboard" element={<AdminPortal />}>
+            <Route path={ROUTES.portal.admin.dashboard.root} element={<AdminPortal />}>
               <Route path="error-logs" element={<ErrorLogsPage />} />
             </Route>
           </Routes>

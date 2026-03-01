@@ -18,6 +18,8 @@ import { DatabaseError, NotFoundError } from '../utils/errorHandler';
 import { runDedupedRequest } from '../utils/requestDedupe';
 import { logAuditEvent } from './audit.service';
 import { toDateValue } from '../utils/dateValue';
+import { COLLECTIONS } from '../constants/firestore';
+import { FIFTEEN_SECONDS_MS } from '../constants/time';
 
 type JsonRecord = Record<string, any>;
 
@@ -192,7 +194,7 @@ const rankUserCandidate = (data: JsonRecord) => {
 
 const resolveUserDoc = async (uidOrDocId: string) => {
   return runDedupedRequest(`adminUserDetail:resolve:${uidOrDocId}`, async () => {
-    const directRef = doc(db, 'users', uidOrDocId);
+    const directRef = doc(db, COLLECTIONS.USERS, uidOrDocId);
     let directSnap;
     try {
       directSnap = await getDoc(directRef);
@@ -205,7 +207,7 @@ const resolveUserDoc = async (uidOrDocId: string) => {
       const embeddedUid = typeof directData.uid === 'string' ? directData.uid.trim() : '';
       if (embeddedUid && embeddedUid !== directSnap.id) {
         try {
-          const candidate = await getDoc(doc(db, 'users', embeddedUid));
+          const candidate = await getDoc(doc(db, COLLECTIONS.USERS, embeddedUid));
           if (candidate.exists()) {
             uidDocSnap = candidate;
           }
@@ -216,7 +218,7 @@ const resolveUserDoc = async (uidOrDocId: string) => {
     }
     let byUidDocs: Array<{ id: string; data: () => JsonRecord }> = [];
     try {
-      const byUidSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', uidOrDocId), limit(10)));
+      const byUidSnap = await getDocs(query(collection(db, COLLECTIONS.USERS), where('uid', '==', uidOrDocId), limit(10)));
       byUidDocs = byUidSnap.docs;
     } catch (_error) {
       byUidDocs = [];
@@ -261,12 +263,12 @@ const resolveUserDoc = async (uidOrDocId: string) => {
       ? selected.data.uid.trim()
       : selected.id;
     return {
-      ref: doc(db, 'users', selected.id),
+      ref: doc(db, COLLECTIONS.USERS, selected.id),
       snap: selected.snap,
       data: selected.data,
       resolvedUid,
     };
-  }, 15 * 1000);
+  }, FIFTEEN_SECONDS_MS);
 };
 
 export const getAdminUserDetail = async (uid: string): Promise<User> => {
@@ -351,13 +353,13 @@ export const getAdminUserSecurity = async (uid: string): Promise<AdminUserSecuri
     }> = [];
     try {
       const impersonationQ = query(
-        collection(db, 'impersonationEvents'),
+        collection(db, COLLECTIONS.IMPERSONATION_EVENTS),
         where('targetUid', '==', resolvedUid),
         orderBy('createdAt', 'desc'),
         limit(50),
       );
       const impersonationFallbackQ = query(
-        collection(db, 'impersonationEvents'),
+        collection(db, COLLECTIONS.IMPERSONATION_EVENTS),
         where('targetUid', '==', resolvedUid),
         limit(100),
       );
@@ -383,13 +385,13 @@ export const getAdminUserSecurity = async (uid: string): Promise<AdminUserSecuri
     }> = [];
     try {
       const auditQ = query(
-        collection(db, 'auditLogs'),
+        collection(db, COLLECTIONS.AUDIT_LOGS),
         where('targetUid', '==', resolvedUid),
         orderBy('createdAt', 'desc'),
         limit(50),
       );
       const auditFallbackQ = query(
-        collection(db, 'auditLogs'),
+        collection(db, COLLECTIONS.AUDIT_LOGS),
         where('targetUid', '==', resolvedUid),
         limit(100),
       );
@@ -471,9 +473,9 @@ export const getAdminUserKpis = async (
     const role = roleHint || user.role || 'donor';
 
     if (role === 'donor') {
-      const donationsSnap = await getDocs(query(collection(db, 'donations'), where('donorId', '==', uid), limit(1000)));
-      const requestsSentSnap = await getDocs(query(collection(db, 'donorRequests'), where('requesterUid', '==', uid), limit(1000)));
-      const requestsReceivedSnap = await getDocs(query(collection(db, 'donorRequests'), where('targetDonorUid', '==', uid), limit(1000)));
+      const donationsSnap = await getDocs(query(collection(db, COLLECTIONS.DONATIONS), where('donorId', '==', uid), limit(1000)));
+      const requestsSentSnap = await getDocs(query(collection(db, COLLECTIONS.DONOR_REQUESTS), where('requesterUid', '==', uid), limit(1000)));
+      const requestsReceivedSnap = await getDocs(query(collection(db, COLLECTIONS.DONOR_REQUESTS), where('targetDonorUid', '==', uid), limit(1000)));
       const donations = donationsSnap.docs.map((d) => d.data() as JsonRecord);
       const completed = donations.filter((d) => d.status === 'completed');
       const completedInRange = filterByRange(completed, (d) => toDateValue(d.donationDate || d.createdAt), range);
@@ -494,9 +496,9 @@ export const getAdminUserKpis = async (
     }
 
     if (role === 'ngo') {
-      const campaignsSnap = await getDocs(query(collection(db, 'campaigns'), where('ngoId', '==', uid), limit(1000)));
-      const volunteersSnap = await getDocs(query(collection(db, 'volunteers'), where('ngoId', '==', uid), limit(1000)));
-      const partnershipsSnap = await getDocs(query(collection(db, 'partnerships'), where('ngoId', '==', uid), limit(1000)));
+      const campaignsSnap = await getDocs(query(collection(db, COLLECTIONS.CAMPAIGNS), where('ngoId', '==', uid), limit(1000)));
+      const volunteersSnap = await getDocs(query(collection(db, COLLECTIONS.VOLUNTEERS), where('ngoId', '==', uid), limit(1000)));
+      const partnershipsSnap = await getDocs(query(collection(db, COLLECTIONS.PARTNERSHIPS), where('ngoId', '==', uid), limit(1000)));
       const campaigns = campaignsSnap.docs.map((d) => d.data() as JsonRecord);
       const campaignsInRange = filterByRange(campaigns, (c) => toDateValue(c.createdAt || c.startDate), range);
       const trend = placeInMonthBuckets(campaignsInRange.map((c) => toDateValue(c.createdAt || c.startDate)));
@@ -515,9 +517,9 @@ export const getAdminUserKpis = async (
     }
 
     if (role === 'bloodbank' || role === 'hospital') {
-      const requestsSnap = await getDocs(query(collection(db, 'bloodRequests'), where('requesterId', '==', uid), limit(1000)));
-      const inventorySnap = await getDocs(query(collection(db, 'bloodInventory'), where('hospitalId', '==', uid), limit(1000)));
-      const appointmentsSnap = await getDocs(query(collection(db, 'appointments'), where('hospitalId', '==', uid), limit(1000)));
+      const requestsSnap = await getDocs(query(collection(db, COLLECTIONS.BLOOD_REQUESTS), where('requesterId', '==', uid), limit(1000)));
+      const inventorySnap = await getDocs(query(collection(db, COLLECTIONS.BLOOD_INVENTORY), where('hospitalId', '==', uid), limit(1000)));
+      const appointmentsSnap = await getDocs(query(collection(db, COLLECTIONS.APPOINTMENTS), where('hospitalId', '==', uid), limit(1000)));
       const requests = requestsSnap.docs.map((d) => d.data() as JsonRecord);
       const requestsInRange = filterByRange(requests, (r) => toDateValue(r.requestedAt || r.createdAt), range);
       const trend = placeInMonthBuckets(requestsInRange.map((r) => toDateValue(r.requestedAt || r.createdAt)));
@@ -535,7 +537,7 @@ export const getAdminUserKpis = async (
       };
     }
 
-    const auditSnap = await getDocs(query(collection(db, 'auditLogs'), where('actorUid', '==', uid), limit(1000)));
+    const auditSnap = await getDocs(query(collection(db, COLLECTIONS.AUDIT_LOGS), where('actorUid', '==', uid), limit(1000)));
     const audits = auditSnap.docs.map((d) => d.data() as JsonRecord);
     return {
       role,
@@ -556,7 +558,7 @@ export const getAdminUserReferrals = async (
 ): Promise<AdminUserReferral[]> => {
   try {
     const referralSnap = await getDocs(
-      query(collection(db, 'ReferralTracking'), where('referrerUid', '==', uid), limit(500)),
+      query(collection(db, COLLECTIONS.REFERRAL_TRACKING), where('referrerUid', '==', uid), limit(500)),
     );
     const referrals: ReferralTrackingEntry[] = referralSnap.docs.map((docSnap) => ({
       id: docSnap.id,
@@ -568,7 +570,7 @@ export const getAdminUserReferrals = async (
     const chunkSize = 10;
     for (let i = 0; i < referredUids.length; i += chunkSize) {
       const chunk = referredUids.slice(i, i + chunkSize);
-      const userSnap = await getDocs(query(collection(db, 'users'), where(documentId(), 'in', chunk)));
+      const userSnap = await getDocs(query(collection(db, COLLECTIONS.USERS), where(documentId(), 'in', chunk)));
       userSnap.docs.forEach((d) => usersById.set(d.id, d.data() as JsonRecord));
     }
 
@@ -620,9 +622,9 @@ export const getAdminUserTimeline = async (
 ): Promise<AdminUserTimelineItem[]> => {
   try {
     const [auditSnap, notificationSnap, impersonationSnap] = await Promise.all([
-      getDocs(query(collection(db, 'auditLogs'), where('targetUid', '==', uid), limit(100))),
-      getDocs(query(collection(db, 'notifications'), where('userId', '==', uid), limit(100))),
-      getDocs(query(collection(db, 'impersonationEvents'), where('targetUid', '==', uid), limit(100))),
+      getDocs(query(collection(db, COLLECTIONS.AUDIT_LOGS), where('targetUid', '==', uid), limit(100))),
+      getDocs(query(collection(db, COLLECTIONS.NOTIFICATIONS), where('userId', '==', uid), limit(100))),
+      getDocs(query(collection(db, COLLECTIONS.IMPERSONATION_EVENTS), where('targetUid', '==', uid), limit(100))),
     ]);
 
     const audits = auditSnap.docs.map((d) => {

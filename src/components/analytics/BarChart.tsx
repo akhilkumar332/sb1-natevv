@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { CHART_PALETTE } from '../../constants/theme';
 
 interface BarChartProps {
   data: Array<{ label: string; value: number }>;
@@ -20,7 +21,7 @@ interface BarChartProps {
 export const BarChart: React.FC<BarChartProps> = ({
   data,
   title,
-  color = '#DC2626',
+  color = CHART_PALETTE.primary,
   height = 300,
   horizontal = false,
 }) => {
@@ -91,10 +92,10 @@ export const BarChart: React.FC<BarChartProps> = ({
                 y1={y}
                 x2={width - padding}
                 y2={y}
-                stroke="#E5E7EB"
+                stroke={CHART_PALETTE.grid}
                 strokeWidth="1"
               />
-              <text x={padding - 10} y={y + 4} textAnchor="end" fontSize="12" fill="#6B7280">
+              <text x={padding - 10} y={y + 4} textAnchor="end" fontSize="12" fill={CHART_PALETTE.axis}>
                 {Math.round(maxValue * ratio)}
               </text>
             </g>
@@ -138,7 +139,7 @@ export const BarChart: React.FC<BarChartProps> = ({
                 y={padding + chartHeight + 20}
                 textAnchor="middle"
                 fontSize="12"
-                fill="#6B7280"
+                fill={CHART_PALETTE.axis}
               >
                 {d.label.length > 10 ? d.label.substring(0, 10) + '...' : d.label}
               </text>
@@ -152,7 +153,7 @@ export const BarChart: React.FC<BarChartProps> = ({
           y1={padding + chartHeight}
           x2={width - padding}
           y2={padding + chartHeight}
-          stroke="#6B7280"
+          stroke={CHART_PALETTE.axis}
           strokeWidth="2"
         />
       </svg>

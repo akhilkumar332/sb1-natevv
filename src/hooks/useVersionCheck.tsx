@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { notify } from 'services/notify.service';
 import { captureHandledError } from '../services/errorLog.service';
+import { ONE_MINUTE_MS } from '../constants/time';
 
 const VERSION_URL = '/version.json';
-const POLL_INTERVAL_MS = 60_000;
+const POLL_INTERVAL_MS = ONE_MINUTE_MS;
 const VERSION_STORAGE_KEY = 'bh_app_version';
 
 type VersionPayload = {

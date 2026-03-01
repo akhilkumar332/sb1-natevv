@@ -28,11 +28,13 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '../../../firebase';
+import { COLLECTIONS } from '../../../constants/firestore';
 import type { BloodBankDashboardContext } from '../BloodBankDashboard';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { captureHandledError } from '../../../services/errorLog.service';
 import { usePageVisibility } from '../../../hooks/usePageVisibility';
 
+import { FORTY_TWO_DAYS_MS, ONE_DAY_MS, SEVEN_DAYS_MS, THIRTY_DAYS_MS } from '../../../constants/time';
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 const calculateStatus = (units: number, lowLevel: number, criticalLevel: number) => {
@@ -45,7 +47,7 @@ const calculateStatus = (units: number, lowLevel: number, criticalLevel: number)
 
 const toDateInput = (value?: Date) => (value ? value.toISOString().slice(0, 10) : '');
 
-const defaultExpiryDate = () => new Date(Date.now() + 42 * 24 * 60 * 60 * 1000);
+const defaultExpiryDate = () => new Date(Date.now() + FORTY_TWO_DAYS_MS);
 
 type InventoryTransaction = {
   id: string;
@@ -267,8 +269,8 @@ function BloodBankInventory() {
 
   const summary = useMemo(() => {
     const now = new Date();
-    const in7 = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const in30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const in7 = new Date(now.getTime() + SEVEN_DAYS_MS);
+    const in30 = new Date(now.getTime() + THIRTY_DAYS_MS);
 
     const summarySource = branchScopedInventory;
     const totalUnits = summarySource.reduce((sum, item) => sum + (item.units || 0), 0);
@@ -383,7 +385,7 @@ function BloodBankInventory() {
   useEffect(() => {
     if (!baseHospitalId || !isPageVisible) return;
     const q = query(
-      collection(db, 'inventoryTransactions'),
+      collection(db, COLLECTIONS.INVENTORY_TRANSACTIONS),
       where('hospitalId', '==', baseHospitalId),
       orderBy('createdAt', 'desc'),
       limit(15)
@@ -417,13 +419,13 @@ function BloodBankInventory() {
     if (!baseHospitalId || !isPageVisible) return;
 
     const outgoingQuery = query(
-      collection(db, 'inventoryTransfers'),
+      collection(db, COLLECTIONS.INVENTORY_TRANSFERS),
       where('fromHospitalId', '==', baseHospitalId),
       orderBy('createdAt', 'desc'),
       limit(10)
     );
     const incomingQuery = query(
-      collection(db, 'inventoryTransfers'),
+      collection(db, COLLECTIONS.INVENTORY_TRANSFERS),
       where('toHospitalId', '==', baseHospitalId),
       orderBy('createdAt', 'desc'),
       limit(10)
@@ -500,7 +502,7 @@ function BloodBankInventory() {
     const loadBloodbanks = async () => {
       try {
         const q = query(
-          collection(db, 'users'),
+          collection(db, COLLECTIONS.USERS),
           where('role', 'in', ['bloodbank', 'hospital'])
         );
         const snapshot = await getDocs(q);
@@ -530,7 +532,7 @@ function BloodBankInventory() {
   useEffect(() => {
     if (!baseHospitalId || !isPageVisible) return;
     const q = query(
-      collection(db, 'bloodbankBranches'),
+      collection(db, COLLECTIONS.BLOODBANK_BRANCHES),
       where('parentHospitalId', '==', baseHospitalId),
       orderBy('createdAt', 'asc')
     );
@@ -570,7 +572,7 @@ function BloodBankInventory() {
   useEffect(() => {
     if (!baseHospitalId || !isPageVisible) return;
     const q = query(
-      collection(db, 'inventoryAlerts'),
+      collection(db, COLLECTIONS.INVENTORY_ALERTS),
       where('hospitalId', '==', baseHospitalId),
       orderBy('createdAt', 'desc'),
       limit(10)
@@ -601,7 +603,7 @@ function BloodBankInventory() {
   useEffect(() => {
     if (!baseHospitalId || !isPageVisible) return;
     const q = query(
-      collection(db, 'inventoryReservations'),
+      collection(db, COLLECTIONS.INVENTORY_RESERVATIONS),
       where('hospitalId', '==', baseHospitalId),
       orderBy('createdAt', 'desc'),
       limit(12)
@@ -702,7 +704,7 @@ function BloodBankInventory() {
 
   const logTransaction = async (payload: Omit<InventoryTransaction, 'id' | 'createdAt'> & { inventoryId: string }) => {
     if (!user?.uid || !baseHospitalId) return;
-    await addDoc(collection(db, 'inventoryTransactions'), {
+    await addDoc(collection(db, COLLECTIONS.INVENTORY_TRANSACTIONS), {
       hospitalId: baseHospitalId,
       inventoryId: payload.inventoryId,
       bloodType: payload.bloodType,
@@ -731,7 +733,7 @@ function BloodBankInventory() {
     if (existing?.id) {
       return existing.id;
     }
-    const ref = doc(collection(db, 'bloodInventory'));
+    const ref = doc(collection(db, COLLECTIONS.BLOOD_INVENTORY));
     await setDoc(ref, {
       hospitalId: baseHospitalId,
       branchId: resolvedBranchId,
@@ -778,7 +780,7 @@ function BloodBankInventory() {
       ? [...(target?.batches || []), attachBatch]
       : undefined;
 
-    await updateDoc(doc(db, 'bloodInventory', inventoryId), {
+    await updateDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, inventoryId), {
       units: nextUnits,
       status,
       ...(nextBatches ? { batches: nextBatches } : {}),
@@ -830,7 +832,7 @@ function BloodBankInventory() {
 
       const nextBatches = [...(target?.batches || []), newBatch];
 
-      await updateDoc(doc(db, 'bloodInventory', inventoryId), {
+      await updateDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, inventoryId), {
         batches: nextBatches,
         units: nextUnits,
         status,
@@ -883,7 +885,7 @@ function BloodBankInventory() {
 
     setBusyAction(true);
     try {
-      await updateDoc(doc(db, 'bloodInventory', target.id), {
+      await updateDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, target.id), {
         units: nextUnits,
         status,
         updatedAt: serverTimestamp(),
@@ -928,7 +930,7 @@ function BloodBankInventory() {
 
     setBusyAction(true);
     try {
-      await updateDoc(doc(db, 'bloodInventory', target.id), {
+      await updateDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, target.id), {
         batches: nextBatches,
         units: nextUnits,
         status,
@@ -963,7 +965,7 @@ function BloodBankInventory() {
 
     setBusyAction(true);
     try {
-      await updateDoc(doc(db, 'bloodInventory', target.id), {
+      await updateDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, target.id), {
         batches: nextBatches,
         units: nextUnits,
         status,
@@ -1013,7 +1015,7 @@ function BloodBankInventory() {
 
     setBusyAction(true);
     try {
-      await updateDoc(doc(db, 'bloodInventory', selectedInventory.id), {
+      await updateDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, selectedInventory.id), {
         batches: nextBatches,
         units: nextUnits,
         status,
@@ -1056,7 +1058,7 @@ function BloodBankInventory() {
         );
         const nextUnits = Math.max(0, item.units - removedUnits);
         const status = calculateStatus(nextUnits, item.lowLevel, item.criticalLevel);
-        await updateDoc(doc(db, 'bloodInventory', item.id), {
+        await updateDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, item.id), {
           batches: nextBatches,
           units: nextUnits,
           status,
@@ -1093,7 +1095,7 @@ function BloodBankInventory() {
 
     setBusyAction(true);
     try {
-      await addDoc(collection(db, 'inventoryTransfers'), {
+      await addDoc(collection(db, COLLECTIONS.INVENTORY_TRANSFERS), {
         fromHospitalId: baseHospitalId,
         toHospitalId,
         fromHospitalName: user.bloodBankName || user.hospitalName || user.displayName || 'BloodBank',
@@ -1183,7 +1185,7 @@ function BloodBankInventory() {
       const nextUnits = Math.max(0, target.units - consumedUnits);
       const status = calculateStatus(nextUnits, target.lowLevel, target.criticalLevel);
 
-      await updateDoc(doc(db, 'bloodInventory', target.id), {
+      await updateDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, target.id), {
         batches: nextBatches,
         units: nextUnits,
         status,
@@ -1200,7 +1202,7 @@ function BloodBankInventory() {
         reason,
       });
 
-      await updateDoc(doc(db, 'inventoryTransfers', transfer.id), {
+      await updateDoc(doc(db, COLLECTIONS.INVENTORY_TRANSFERS, transfer.id), {
         status: 'sent',
         updatedAt: serverTimestamp(),
       });
@@ -1238,7 +1240,7 @@ function BloodBankInventory() {
         attachBatch,
         branchId: transfer.toBranchId || activeBranchId,
       });
-      await updateDoc(doc(db, 'inventoryTransfers', transfer.id), {
+      await updateDoc(doc(db, COLLECTIONS.INVENTORY_TRANSFERS, transfer.id), {
         status: 'received',
         updatedAt: serverTimestamp(),
       });
@@ -1249,7 +1251,7 @@ function BloodBankInventory() {
 
   const cancelTransfer = async (transfer: InventoryTransfer) => {
     if (transfer.status !== 'pending') return;
-    await updateDoc(doc(db, 'inventoryTransfers', transfer.id), {
+    await updateDoc(doc(db, COLLECTIONS.INVENTORY_TRANSFERS, transfer.id), {
       status: 'cancelled',
       updatedAt: serverTimestamp(),
     });
@@ -1257,7 +1259,7 @@ function BloodBankInventory() {
 
   const rejectTransfer = async (transfer: InventoryTransfer) => {
     if (transfer.status !== 'pending' && transfer.status !== 'sent') return;
-    await updateDoc(doc(db, 'inventoryTransfers', transfer.id), {
+    await updateDoc(doc(db, COLLECTIONS.INVENTORY_TRANSFERS, transfer.id), {
       status: 'rejected',
       updatedAt: serverTimestamp(),
     });
@@ -1275,7 +1277,7 @@ function BloodBankInventory() {
   };
 
   const expiringCountFor = (item: typeof inventory[number], days: number) => {
-    const threshold = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    const threshold = new Date(Date.now() + days * ONE_DAY_MS);
     return item.batches.filter((batch) =>
       (batch.status === 'available' || batch.status === 'reserved') && batch.expiryDate <= threshold
     ).length;
@@ -1336,7 +1338,7 @@ function BloodBankInventory() {
 
   const dismissAlert = async (alertId: string) => {
     if (!alertId) return;
-    await updateDoc(doc(db, 'inventoryAlerts', alertId), {
+    await updateDoc(doc(db, COLLECTIONS.INVENTORY_ALERTS, alertId), {
       status: 'dismissed',
       updatedAt: serverTimestamp(),
     });
@@ -1347,7 +1349,7 @@ function BloodBankInventory() {
     if (!baseHospitalId || !branchForm.name.trim()) return;
     setBusyAction(true);
     try {
-      await addDoc(collection(db, 'bloodbankBranches'), {
+      await addDoc(collection(db, COLLECTIONS.BLOODBANK_BRANCHES), {
         parentHospitalId: baseHospitalId,
         name: branchForm.name.trim(),
         address: branchForm.address.trim(),
@@ -1384,7 +1386,7 @@ function BloodBankInventory() {
     const availableUnits = availableUnitsFor(reserveForm.bloodType, branchId);
     if (availableUnits < units) return;
 
-    const reservationRef = doc(collection(db, 'inventoryReservations'));
+    const reservationRef = doc(collection(db, COLLECTIONS.INVENTORY_RESERVATIONS));
     const reservationId = reservationRef.id;
 
     const sortedBatches = [...target.batches]
@@ -1435,7 +1437,7 @@ function BloodBankInventory() {
 
     setBusyAction(true);
     try {
-      await updateDoc(doc(db, 'bloodInventory', target.id), {
+      await updateDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, target.id), {
         batches: nextBatches,
         updatedAt: serverTimestamp(),
       });
@@ -1495,11 +1497,11 @@ function BloodBankInventory() {
 
     setBusyAction(true);
     try {
-      await updateDoc(doc(db, 'bloodInventory', target.id), {
+      await updateDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, target.id), {
         batches: nextBatches,
         updatedAt: serverTimestamp(),
       });
-      await updateDoc(doc(db, 'inventoryReservations', reservation.id), {
+      await updateDoc(doc(db, COLLECTIONS.INVENTORY_RESERVATIONS, reservation.id), {
         status: 'released',
         releasedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -1544,13 +1546,13 @@ function BloodBankInventory() {
 
     setBusyAction(true);
     try {
-      await updateDoc(doc(db, 'bloodInventory', target.id), {
+      await updateDoc(doc(db, COLLECTIONS.BLOOD_INVENTORY, target.id), {
         batches: nextBatches,
         units: nextUnits,
         status,
         updatedAt: serverTimestamp(),
       });
-      await updateDoc(doc(db, 'inventoryReservations', reservation.id), {
+      await updateDoc(doc(db, COLLECTIONS.INVENTORY_RESERVATIONS, reservation.id), {
         status: 'fulfilled',
         fulfilledAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

@@ -1,3 +1,4 @@
+import { COLLECTIONS } from '../constants/firestore';
 /**
  * useRealtimeBloodRequests Hook
  *
@@ -79,7 +80,7 @@ export const useRealtimeBloodRequests = ({
     constraints.push(orderBy('requestedAt', 'desc'));
     constraints.push(limit(limitCount));
 
-    const q = query(collection(db, 'bloodRequests'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.BLOOD_REQUESTS), ...constraints);
 
     // Set up real-time listener
     const unsubscribe = onSnapshot(
@@ -177,7 +178,7 @@ export const useBloodBankBloodRequests = (
     setError(null);
 
     const q = query(
-      collection(db, 'bloodRequests'),
+      collection(db, COLLECTIONS.BLOOD_REQUESTS),
       where('requesterId', '==', hospitalId),
       orderBy('requestedAt', 'desc'),
       limit(50)
@@ -246,7 +247,7 @@ export const useActiveBloodRequestCount = (): number => {
 
   useEffect(() => {
     const q = query(
-      collection(db, 'bloodRequests'),
+      collection(db, COLLECTIONS.BLOOD_REQUESTS),
       where('status', '==', 'active')
     );
 

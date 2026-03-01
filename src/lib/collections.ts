@@ -28,26 +28,7 @@ import {
   Analytics,
 } from '../types/database.types';
 import { createConverter } from '../utils/firestore.utils';
-
-// ============================================================================
-// COLLECTION NAMES
-// ============================================================================
-
-export const COLLECTIONS = {
-  USERS: 'users',
-  DONATIONS: 'donations',
-  BLOOD_REQUESTS: 'bloodRequests',
-  BLOOD_INVENTORY: 'bloodInventory',
-  CAMPAIGNS: 'campaigns',
-  APPOINTMENTS: 'appointments',
-  VOLUNTEERS: 'volunteers',
-  PARTNERSHIPS: 'partnerships',
-  NOTIFICATIONS: 'notifications',
-  BADGES: 'badges',
-  USER_BADGES: 'userBadges',
-  VERIFICATION_REQUESTS: 'verificationRequests',
-  ANALYTICS: 'analytics',
-} as const;
+import { COLLECTIONS } from '../constants/firestore';
 
 // ============================================================================
 // CONVERTERS

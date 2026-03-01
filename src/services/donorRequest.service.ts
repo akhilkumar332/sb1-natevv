@@ -17,9 +17,11 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { captureHandledError } from './errorLog.service';
+import { COLLECTIONS } from '../constants/firestore';
 
 export type DonationComponent = 'whole' | 'plasma' | 'platelets';
 
+import { ONE_DAY_MS, THREE_MINUTES_MS } from '../constants/time';
 export type PendingDonorRequest = {
   targetDonorId: string;
   targetDonorBhId?: string;
@@ -49,14 +51,14 @@ export type PendingDonorRequestBatch = {
 
 export type PendingDonorRequestPayload = PendingDonorRequest | PendingDonorRequestBatch;
 
-const MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const DUPLICATE_WINDOW_MS = 24 * 60 * 60 * 1000;
-const CONNECTION_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_AGE_MS = ONE_DAY_MS;
+const DUPLICATE_WINDOW_MS = ONE_DAY_MS;
+const CONNECTION_WINDOW_MS = ONE_DAY_MS;
 const SESSION_KEY_PREFIX = 'pendingDonorRequest:';
 export const MAX_DONOR_REQUEST_BATCH_TARGETS = 200;
 export const MAX_DONOR_REQUEST_MESSAGE_LENGTH = 280;
 const RECENT_CACHE_PREFIX = 'recentDonorRequests:';
-const RECENT_CACHE_TTL_MS = 3 * 60 * 1000;
+const RECENT_CACHE_TTL_MS = THREE_MINUTES_MS;
 
 const reportDonorRequestServiceError = (error: unknown, kind: string, metadata?: Record<string, unknown>) => {
   void captureHandledError(error, {
@@ -120,7 +122,7 @@ const fetchActiveConnections = async (requesterUid: string, targetIds: string[])
 
   await Promise.all(chunks.map(async (chunk) => {
     const connectionsQuery = query(
-      collection(db, 'donorRequests'),
+      collection(db, COLLECTIONS.DONOR_REQUESTS),
       where('connectionKey', 'in', chunk)
     );
     const snapshot = await getDocs(connectionsQuery);
@@ -237,7 +239,7 @@ export const savePendingDonorRequestDoc = async (uid: string, payload: PendingDo
   const expiresAt = Timestamp.fromDate(new Date(Date.now() + MAX_AGE_MS));
   const isBatch = Array.isArray((payload as PendingDonorRequestBatch).targets);
   await setDoc(
-    doc(db, 'pendingDonorRequests', uid),
+    doc(db, COLLECTIONS.PENDING_DONOR_REQUESTS, uid),
     {
       ...payload,
       mode: isBatch ? 'batch' : 'single',
@@ -250,19 +252,19 @@ export const savePendingDonorRequestDoc = async (uid: string, payload: PendingDo
 };
 
 export const loadPendingDonorRequestDoc = async (uid: string): Promise<PendingDonorRequestPayload | null> => {
-  const snapshot = await getDoc(doc(db, 'pendingDonorRequests', uid));
+  const snapshot = await getDoc(doc(db, COLLECTIONS.PENDING_DONOR_REQUESTS, uid));
   if (!snapshot.exists()) return null;
   const data = snapshot.data() as any;
   const createdAt = data?.createdAt?.toDate ? data.createdAt.toDate() : null;
   const expiresAt = data?.expiresAt?.toDate ? data.expiresAt.toDate() : null;
   if (expiresAt && expiresAt.getTime() <= Date.now()) {
-    await deleteDoc(doc(db, 'pendingDonorRequests', uid));
+    await deleteDoc(doc(db, COLLECTIONS.PENDING_DONOR_REQUESTS, uid));
     return null;
   }
   if (Array.isArray(data.targets)) {
     const cleanTargets = data.targets.filter((target: any) => target && typeof target.id === 'string' && target.id.length > 0);
     if (cleanTargets.length === 0) {
-      await deleteDoc(doc(db, 'pendingDonorRequests', uid));
+      await deleteDoc(doc(db, COLLECTIONS.PENDING_DONOR_REQUESTS, uid));
       return null;
     }
     return {
@@ -274,7 +276,7 @@ export const loadPendingDonorRequestDoc = async (uid: string): Promise<PendingDo
     } as PendingDonorRequestBatch;
   }
   if (!data?.targetDonorId) {
-    await deleteDoc(doc(db, 'pendingDonorRequests', uid));
+    await deleteDoc(doc(db, COLLECTIONS.PENDING_DONOR_REQUESTS, uid));
     return null;
   }
   return {
@@ -290,7 +292,7 @@ export const loadPendingDonorRequestDoc = async (uid: string): Promise<PendingDo
 };
 
 export const clearPendingDonorRequestDoc = async (uid: string) => {
-  await deleteDoc(doc(db, 'pendingDonorRequests', uid));
+  await deleteDoc(doc(db, COLLECTIONS.PENDING_DONOR_REQUESTS, uid));
 };
 
 const loadRecentRequestCache = (uid: string) => {
@@ -320,7 +322,7 @@ export const primeRecentDonorRequestCache = async (uid: string) => {
   if (cached) return;
   try {
     const recentQuery = query(
-      collection(db, 'donorRequests'),
+      collection(db, COLLECTIONS.DONOR_REQUESTS),
       where('requesterUid', '==', uid),
       orderBy('requestedAt', 'desc'),
       limit(60)
@@ -352,7 +354,7 @@ export const submitDonorRequest = async (requester: RequesterProfile, payload: P
   try {
     const connectionKey = buildConnectionKey(requester.uid, payload.targetDonorId);
     const existingQuery = query(
-      collection(db, 'donorRequests'),
+      collection(db, COLLECTIONS.DONOR_REQUESTS),
       where('connectionKey', '==', connectionKey)
     );
     const existingSnapshot = await getDocs(existingQuery);
@@ -391,7 +393,7 @@ export const submitDonorRequest = async (requester: RequesterProfile, payload: P
     }
     reportDonorRequestServiceError(error, 'donor_request.verify_existing');
   }
-  return await addDoc(collection(db, 'donorRequests'), {
+  return await addDoc(collection(db, COLLECTIONS.DONOR_REQUESTS), {
     requesterUid: requester.uid,
     requesterBhId: requester.bhId || '',
     requesterName: requester.displayName || 'Anonymous',
@@ -428,7 +430,7 @@ export const submitDonorRequestBatch = async (
     throw new Error('too_many_targets');
   }
 
-  const batchRef = doc(collection(db, 'donorRequestBatches'));
+  const batchRef = doc(collection(db, COLLECTIONS.DONOR_REQUEST_BATCHES));
   const batchId = batchRef.id;
 
   const recentMap = new Map<string, { requestedAt?: Date; status?: string }>();
@@ -445,7 +447,7 @@ export const submitDonorRequestBatch = async (
   } else {
     try {
       const recentQuery = query(
-        collection(db, 'donorRequests'),
+        collection(db, COLLECTIONS.DONOR_REQUESTS),
         where('requesterUid', '==', requester.uid),
         orderBy('requestedAt', 'desc'),
         limit(60)
@@ -489,7 +491,7 @@ export const submitDonorRequestBatch = async (
     const chunks = chunkArray(connectionKeys, 10);
     for (const chunk of chunks) {
       const existingQuery = query(
-        collection(db, 'donorRequests'),
+        collection(db, COLLECTIONS.DONOR_REQUESTS),
         where('connectionKey', 'in', chunk)
       );
       const snapshot = await getDocs(existingQuery);
@@ -577,7 +579,7 @@ export const submitDonorRequestBatch = async (
   if (sendTargets.length > 0) {
     const batch = writeBatch(db);
     sendTargets.forEach((target) => {
-      const requestRef = doc(collection(db, 'donorRequests'));
+      const requestRef = doc(collection(db, COLLECTIONS.DONOR_REQUESTS));
       batch.set(requestRef, {
         requesterUid: requester.uid,
         requesterBhId: requester.bhId || '',

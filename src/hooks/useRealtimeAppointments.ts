@@ -1,3 +1,4 @@
+import { COLLECTIONS } from '../constants/firestore';
 /**
  * useRealtimeAppointments Hook
  *
@@ -80,7 +81,7 @@ export const useRealtimeAppointments = ({
     constraints.push(orderBy('scheduledDate', upcomingOnly ? 'asc' : 'desc'));
     constraints.push(limit(limitCount));
 
-    const q = query(collection(db, 'appointments'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.APPOINTMENTS), ...constraints);
 
     // Set up real-time listener
     const unsubscribe = onSnapshot(
@@ -178,7 +179,7 @@ export const useTodayAppointments = (hospitalId: string): UseRealtimeAppointment
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const q = query(
-      collection(db, 'appointments'),
+      collection(db, COLLECTIONS.APPOINTMENTS),
       where('hospitalId', '==', hospitalId),
       where('scheduledDate', '>=', Timestamp.fromDate(today)),
       where('scheduledDate', '<', Timestamp.fromDate(tomorrow)),
@@ -260,7 +261,7 @@ export const useUpcomingAppointmentCount = (
       constraints.push(where('hospitalId', '==', hospitalId));
     }
 
-    const q = query(collection(db, 'appointments'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.APPOINTMENTS), ...constraints);
 
     const unsubscribe = onSnapshot(
       q,

@@ -1,6 +1,8 @@
 import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { captureHandledError } from './errorLog.service';
+import { COLLECTIONS } from '../constants/firestore';
+import { FIFTEEN_SECONDS_MS, FIVE_MINUTES_MS, TWELVE_HUNDRED_MS } from '../constants/time';
 
 type MutationType = 'user.notificationPreferences';
 
@@ -80,9 +82,9 @@ export type OfflineMutationTelemetry = {
 const DB_NAME = 'bloodhub_offline_mutations';
 const STORE_NAME = 'mutations';
 const DB_VERSION = 1;
-const FLUSH_INTERVAL_MS = 15_000;
-const MAX_BACKOFF_MS = 5 * 60_000;
-const MIN_FLUSH_TRIGGER_GAP_MS = 1_200;
+const FLUSH_INTERVAL_MS = FIFTEEN_SECONDS_MS;
+const MAX_BACKOFF_MS = FIVE_MINUTES_MS;
+const MIN_FLUSH_TRIGGER_GAP_MS = TWELVE_HUNDRED_MS;
 const TELEMETRY_STORAGE_KEY = 'bh_offline_mutation_telemetry_v1';
 
 let workerStarted = false;
@@ -418,7 +420,7 @@ const applyMutation = async (mutation: MutationRecord): Promise<void> => {
   switch (mutation.type) {
     case 'user.notificationPreferences': {
       const payload = mutation.payload as UserNotificationPreferencesMutation;
-      await updateDoc(doc(db, 'users', payload.userId), {
+      await updateDoc(doc(db, COLLECTIONS.USERS, payload.userId), {
         notificationPreferences: payload.notificationPreferences,
         updatedAt: serverTimestamp(),
       });
@@ -737,7 +739,7 @@ export const updateUserNotificationPreferences = async (options: {
       return false;
     }
     try {
-      await updateDoc(doc(db, 'users', options.userId), {
+      await updateDoc(doc(db, COLLECTIONS.USERS, options.userId), {
         notificationPreferences: options.notificationPreferences,
         updatedAt: serverTimestamp(),
       });

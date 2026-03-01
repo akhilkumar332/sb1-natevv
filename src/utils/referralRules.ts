@@ -1,3 +1,4 @@
+import { ONE_DAY_MS } from '../constants/time';
 export type ReferralRules = {
   eligibleAfterDays: number;
   excludeDeleted: boolean;
@@ -34,7 +35,7 @@ export const computeReferralStatus = ({
   const createdAt = normalizeReferralDate(referredUser?.createdAt);
   const baseDate = referredAt || createdAt;
   const ageDays = baseDate
-    ? Math.floor((Date.now() - baseDate.getTime()) / (24 * 60 * 60 * 1000))
+    ? Math.floor((Date.now() - baseDate.getTime()) / (ONE_DAY_MS))
     : null;
   const isDeleted = referredUser?.status === 'deleted';
   const hasOnboarded = Boolean(referredUser?.onboardingCompleted);

@@ -13,6 +13,7 @@ import {
 import type { NgoDashboardContext } from '../NgoDashboard';
 import { getCampaignTargetLabel, getCampaignTypeLabel } from '../../../utils/campaignLabels';
 
+import { ROUTES } from '../../../constants/routes';
 const formatDateRange = (start: Date, end: Date) => {
   const startText = start.toLocaleDateString();
   const endText = end.toLocaleDateString();
@@ -93,7 +94,7 @@ function NgoOverview() {
               <h2 className="text-2xl font-bold text-gray-900">Active campaigns</h2>
             </div>
             <Link
-              to="/ngo/dashboard/campaigns"
+              to={ROUTES.portal.ngo.dashboard.campaigns}
               className="text-sm font-semibold text-red-600 hover:text-red-700 flex items-center gap-2"
             >
               View all
@@ -220,7 +221,7 @@ function NgoOverview() {
               </div>
             </div>
             <Link
-              to="/ngo/dashboard/donors"
+              to={ROUTES.portal.ngo.dashboard.donors}
               className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-white/90"
             >
               View donor details
@@ -248,7 +249,7 @@ function NgoOverview() {
             </div>
             <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
               <span>{referralCount} total referrals</span>
-              <Link to="/ngo/dashboard/referrals" className="inline-flex items-center gap-1 font-semibold text-amber-600 hover:text-amber-700">
+              <Link to={ROUTES.portal.ngo.dashboard.referrals} className="inline-flex items-center gap-1 font-semibold text-amber-600 hover:text-amber-700">
                 View details
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
@@ -287,28 +288,28 @@ function NgoOverview() {
           </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
             <Link
-              to="/ngo/dashboard/campaigns"
+              to={ROUTES.portal.ngo.dashboard.campaigns}
               className="flex items-center justify-between rounded-xl border border-red-100 px-4 py-3 text-sm font-semibold text-gray-800 hover:bg-red-50"
             >
               Create campaign
               <ChevronRight className="w-4 h-4 text-red-500" />
             </Link>
             <Link
-              to="/ngo/dashboard/volunteers"
+              to={ROUTES.portal.ngo.dashboard.volunteers}
               className="flex items-center justify-between rounded-xl border border-amber-100 px-4 py-3 text-sm font-semibold text-gray-800 hover:bg-amber-50"
             >
               Add volunteers
               <ChevronRight className="w-4 h-4 text-amber-500" />
             </Link>
             <Link
-              to="/ngo/dashboard/partnerships"
+              to={ROUTES.portal.ngo.dashboard.partnerships}
               className="flex items-center justify-between rounded-xl border border-red-100 px-4 py-3 text-sm font-semibold text-gray-800 hover:bg-red-50"
             >
               Manage partners
               <ChevronRight className="w-4 h-4 text-red-500" />
             </Link>
             <Link
-              to="/ngo/dashboard/analytics"
+              to={ROUTES.portal.ngo.dashboard.analytics}
               className="flex items-center justify-between rounded-xl border border-amber-100 px-4 py-3 text-sm font-semibold text-gray-800 hover:bg-amber-50"
             >
               Review analytics

@@ -5,6 +5,7 @@ import { BarChart } from '../../../components/analytics/BarChart';
 import { LineChart } from '../../../components/analytics/LineChart';
 import { PieChart } from '../../../components/analytics/PieChart';
 import type { NgoDashboardContext } from '../NgoDashboard';
+import { CHART_PALETTE } from '../../../constants/theme';
 
 function NgoAnalytics() {
   const { campaigns, volunteers, stats, donorCommunity } = useOutletContext<NgoDashboardContext>();
@@ -107,7 +108,7 @@ function NgoAnalytics() {
         <LineChart
           title="Impact trend (units collected)"
           data={impactTrendData}
-          color="#DC2626"
+          color={CHART_PALETTE.primary}
           height={240}
         />
         <PieChart
@@ -121,13 +122,13 @@ function NgoAnalytics() {
         <BarChart
           title="Campaign status"
           data={campaignStatusData}
-          color="#F59E0B"
+          color={CHART_PALETTE.warning}
           height={260}
         />
         <BarChart
           title="Top volunteer hours"
           data={volunteerHoursData}
-          color="#DC2626"
+          color={CHART_PALETTE.primary}
           horizontal
           height={220}
         />

@@ -7,6 +7,8 @@ import { useState, useEffect } from 'react';
 import { collection, query, where, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { captureHandledError } from '../services/errorLog.service';
+import { COLLECTIONS } from '../constants/firestore';
+import { SEVEN_DAYS_MS, THIRTY_DAYS_MS } from '../constants/time';
 
 export interface BloodInventoryItem {
   id: string;
@@ -149,7 +151,7 @@ export const useBloodBankLegacyData = (hospitalId: string): UseBloodBankLegacyDa
   // Fetch blood inventory
   const fetchInventory = async () => {
     try {
-      const inventoryRef = collection(db, 'bloodInventory');
+      const inventoryRef = collection(db, COLLECTIONS.BLOOD_INVENTORY);
       const q = query(
         inventoryRef,
         where('hospitalId', '==', hospitalId)
@@ -197,7 +199,7 @@ export const useBloodBankLegacyData = (hospitalId: string): UseBloodBankLegacyDa
   // Fetch blood requests
   const fetchBloodRequests = async () => {
     try {
-      const requestsRef = collection(db, 'bloodRequests');
+      const requestsRef = collection(db, COLLECTIONS.BLOOD_REQUESTS);
       const q = query(
         requestsRef,
         where('requesterId', '==', hospitalId),
@@ -256,7 +258,7 @@ export const useBloodBankLegacyData = (hospitalId: string): UseBloodBankLegacyDa
   // Fetch appointments
   const fetchAppointments = async () => {
     try {
-      const appointmentsRef = collection(db, 'appointments');
+      const appointmentsRef = collection(db, COLLECTIONS.APPOINTMENTS);
       const q = query(
         appointmentsRef,
         where('hospitalId', '==', hospitalId),
@@ -292,7 +294,7 @@ export const useBloodBankLegacyData = (hospitalId: string): UseBloodBankLegacyDa
   // Fetch donations
   const fetchDonations = async () => {
     try {
-      const donationsRef = collection(db, 'donations');
+      const donationsRef = collection(db, COLLECTIONS.DONATIONS);
       const q = query(
         donationsRef,
         where('hospitalId', '==', hospitalId),
@@ -335,8 +337,8 @@ export const useBloodBankLegacyData = (hospitalId: string): UseBloodBankLegacyDa
 
     // Expiring batches
     const now = new Date();
-    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const sevenDaysFromNow = new Date(now.getTime() + SEVEN_DAYS_MS);
+    const thirtyDaysFromNow = new Date(now.getTime() + THIRTY_DAYS_MS);
 
     let expiringIn7Days = 0;
     let expiringIn30Days = 0;

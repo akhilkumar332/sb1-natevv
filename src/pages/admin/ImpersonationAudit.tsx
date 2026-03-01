@@ -24,6 +24,7 @@ import { timestampToDate } from '../../utils/firestore.utils';
 import { useAuth } from '../../contexts/AuthContext';
 import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
 import { useScopedErrorReporter } from '../../hooks/useScopedErrorReporter';
+import { COLLECTIONS } from '../../constants/firestore';
 
 export type ImpersonationEvent = {
   id: string;
@@ -118,13 +119,13 @@ const ImpersonationAudit = () => {
     try {
       const baseQuery = cursor
         ? query(
-            collection(db, 'impersonationEvents'),
+            collection(db, COLLECTIONS.IMPERSONATION_EVENTS),
             orderBy('createdAt', 'desc'),
             startAfter(cursor),
             limit(pageSize + 1)
           )
         : query(
-            collection(db, 'impersonationEvents'),
+            collection(db, COLLECTIONS.IMPERSONATION_EVENTS),
             orderBy('createdAt', 'desc'),
             limit(pageSize + 1)
           );

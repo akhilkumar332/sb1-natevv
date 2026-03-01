@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { notify } from 'services/notify.service';
 import { User, Calendar, MapPin, Droplet, Briefcase, Globe, Heart } from 'lucide-react';
+import { ROUTES } from '../../constants/routes';
 import { validateOnboardingStep, type OnboardingValidationRule } from '../../utils/onboardingValidation';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -136,7 +137,7 @@ export function AdminOnboarding() {
           onboardingCompleted: true
         });
         notify.success('Onboarding completed successfully!');
-        navigate('/admin/dashboard');
+        navigate(ROUTES.portal.admin.dashboard.root);
       } catch (error) {
         notify.error('Failed to complete onboarding');
       } finally {

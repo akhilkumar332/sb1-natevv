@@ -2,6 +2,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { AuditLog } from '../types/database.types';
 import { captureHandledError } from './errorLog.service';
+import { COLLECTIONS } from '../constants/firestore';
 
 export type AuditAction =
   | 'role_change'
@@ -34,7 +35,7 @@ export const logAuditEvent = async (event: AuditEventInput): Promise<void> => {
       ...(event.metadata ? { metadata: event.metadata } : {}),
       createdAt: serverTimestamp() as unknown as AuditLog['createdAt'],
     };
-    await addDoc(collection(db, 'auditLogs'), payload);
+    await addDoc(collection(db, COLLECTIONS.AUDIT_LOGS), payload);
   } catch (error) {
     void captureHandledError(error, {
       source: 'frontend',

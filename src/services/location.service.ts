@@ -1,3 +1,4 @@
+import { COLLECTIONS } from '../constants/firestore';
 /**
  * Location-Based Search Service
  *
@@ -61,7 +62,7 @@ export const findDonorsNearby = async (
       constraints.push(where('verified', '==', options.verified));
     }
 
-    const q = query(collection(db, 'users'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.USERS), ...constraints);
     const snapshot = await getDocs(q);
 
     const donors = extractQueryData<User>(snapshot, [
@@ -138,7 +139,7 @@ export const findHospitalsNearby = async (
       constraints.push(where('verified', '==', options.verified));
     }
 
-    const q = query(collection(db, 'users'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.USERS), ...constraints);
     const snapshot = await getDocs(q);
 
     let hospitals = extractQueryData<User>(snapshot, [
@@ -227,7 +228,7 @@ export const findBloodRequestsNearby = async (
       constraints.push(where('isEmergency', '==', options.isEmergency));
     }
 
-    const q = query(collection(db, 'bloodRequests'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.BLOOD_REQUESTS), ...constraints);
     const snapshot = await getDocs(q);
 
     const requests = extractQueryData<BloodRequest>(snapshot, [
@@ -304,7 +305,7 @@ export const findCampaignsNearby = async (
       constraints.push(where('type', '==', options.type));
     }
 
-    const q = query(collection(db, 'campaigns'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.CAMPAIGNS), ...constraints);
     const snapshot = await getDocs(q);
 
     const campaigns = extractQueryData<Campaign>(snapshot, [
@@ -406,7 +407,7 @@ export const getPopularLocations = async (): Promise<
 > => {
   try {
     // Get all donors to find popular locations
-    const donorsQuery = query(collection(db, 'users'), where('role', '==', 'donor'));
+    const donorsQuery = query(collection(db, COLLECTIONS.USERS), where('role', '==', 'donor'));
     const donorsSnapshot = await getDocs(donorsQuery);
     const donors = extractQueryData<User>(donorsSnapshot, [
       'createdAt',

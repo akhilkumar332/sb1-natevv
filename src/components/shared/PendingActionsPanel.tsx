@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, CloudOff, RefreshCw } from 'lucide-react';
 import { usePendingOfflineMutations } from '../../hooks/usePendingOfflineMutations';
 import { useNetworkStatus } from '../../contexts/NetworkStatusContext';
+import { HOUR_MS, MINUTE_MS, ONE_DAY_MS } from '../../constants/time';
 
 const mutationLabelMap: Record<string, string> = {
   'user.notificationPreferences': 'Notification preferences update',
@@ -9,18 +10,18 @@ const mutationLabelMap: Record<string, string> = {
 
 const formatRelativeTime = (ts: number) => {
   const diff = Date.now() - ts;
-  if (diff < 60_000) return 'just now';
-  if (diff < 3_600_000) return `${Math.max(1, Math.floor(diff / 60_000))}m ago`;
-  if (diff < 86_400_000) return `${Math.max(1, Math.floor(diff / 3_600_000))}h ago`;
-  return `${Math.max(1, Math.floor(diff / 86_400_000))}d ago`;
+  if (diff < MINUTE_MS) return 'just now';
+  if (diff < HOUR_MS) return `${Math.max(1, Math.floor(diff / MINUTE_MS))}m ago`;
+  if (diff < ONE_DAY_MS) return `${Math.max(1, Math.floor(diff / HOUR_MS))}h ago`;
+  return `${Math.max(1, Math.floor(diff / ONE_DAY_MS))}d ago`;
 };
 
 const formatCountdown = (targetTs: number) => {
   const diff = Math.max(0, targetTs - Date.now());
-  if (diff < 60_000) return '<1m';
-  if (diff < 3_600_000) return `${Math.max(1, Math.floor(diff / 60_000))}m`;
-  if (diff < 86_400_000) return `${Math.max(1, Math.floor(diff / 3_600_000))}h`;
-  return `${Math.max(1, Math.floor(diff / 86_400_000))}d`;
+  if (diff < MINUTE_MS) return '<1m';
+  if (diff < HOUR_MS) return `${Math.max(1, Math.floor(diff / MINUTE_MS))}m`;
+  if (diff < ONE_DAY_MS) return `${Math.max(1, Math.floor(diff / HOUR_MS))}h`;
+  return `${Math.max(1, Math.floor(diff / ONE_DAY_MS))}d`;
 };
 
 export const PendingActionsPanel = () => {

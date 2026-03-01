@@ -19,6 +19,7 @@ import {
   usePlatformStats,
   useUserGrowthTrend,
 } from '../../hooks/useAnalyticsQuery';
+import { CHART_PALETTE } from '../../constants/theme';
 
 /**
  * AdminAnalyticsDashboard Component
@@ -190,7 +191,7 @@ export const AdminAnalyticsDashboard: React.FC = () => {
         <LineChart
           data={growthData}
           title="User Growth Trend"
-          color="#2563EB"
+          color={CHART_PALETTE.secondary}
         />
 
         {/* Blood Type Distribution */}
@@ -212,7 +213,7 @@ export const AdminAnalyticsDashboard: React.FC = () => {
             value: d.totalUsers,
           }))}
           title="Top 10 Locations by Users"
-          color="#16A34A"
+          color={CHART_PALETTE.success}
           height={300}
           horizontal={true}
         />

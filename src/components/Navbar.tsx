@@ -9,8 +9,22 @@ import { gamificationService } from '../services/gamification.service';
 import ThemeToggle from './ThemeToggle';
 import { captureHandledError } from '../services/errorLog.service';
 import { useScopedErrorReporter } from '../hooks/useScopedErrorReporter';
+import {
+  DASHBOARD_LINKS,
+  DASHBOARD_PREFIX,
+  PORTAL_LABELS,
+  PORTAL_OPTIONS,
+  ROUTES,
+  SIGNIN_OPTIONS,
+  getAdminDashboardLinks,
+  getPortalDashboardPath,
+  getPortalLoginPath,
+  toPortalRole,
+  type PortalRole,
+} from '../constants/routes';
 
-const TOP_BADGE_TTL_MS = 10 * 60 * 1000;
+import { TEN_MINUTES_MS } from '../constants/time';
+const TOP_BADGE_TTL_MS = TEN_MINUTES_MS;
 
 const getTopBadge = (badges: Array<{ name: string; earned: boolean; requirement?: number; icon?: string }> = []) => {
   const earned = badges.filter((badge) => badge.earned);
@@ -101,74 +115,6 @@ interface NavLinkProps {
   children: React.ReactNode;
 }
 
-type PortalRole = 'donor' | 'ngo' | 'bloodbank' | 'admin';
-
-const portalLabels: Record<PortalRole, string> = {
-  donor: 'Donor',
-  ngo: 'NGO',
-  bloodbank: 'Blood Bank',
-  admin: 'Admin',
-};
-
-const portalOptions: Array<{ role: PortalRole; label: string }> = [
-  { role: 'donor', label: 'Donor' },
-  { role: 'ngo', label: 'NGO' },
-  { role: 'bloodbank', label: 'Blood Bank' },
-  { role: 'admin', label: 'Admin' },
-];
-
-const donorDashboardLinks = [
-  { label: 'Overview', path: '/donor/dashboard/overview' },
-  { label: 'Readiness', path: '/donor/dashboard/readiness' },
-  { label: 'Requests', path: '/donor/dashboard/requests' },
-  { label: 'Blood Drives', path: '/donor/dashboard/blood-drives' },
-  { label: 'Journey', path: '/donor/dashboard/journey' },
-  { label: 'Referrals', path: '/donor/dashboard/referrals' },
-  { label: 'Account', path: '/donor/dashboard/account' },
-];
-
-const ngoDashboardLinks = [
-  { label: 'Overview', path: '/ngo/dashboard/overview' },
-  { label: 'Campaigns', path: '/ngo/dashboard/campaigns' },
-  { label: 'Volunteers', path: '/ngo/dashboard/volunteers' },
-  { label: 'Partnerships', path: '/ngo/dashboard/partnerships' },
-  { label: 'Donors', path: '/ngo/dashboard/donors' },
-  { label: 'Analytics', path: '/ngo/dashboard/analytics' },
-  { label: 'Referrals', path: '/ngo/dashboard/referrals' },
-  { label: 'Account', path: '/ngo/dashboard/account' },
-];
-
-const bloodbankDashboardLinks = [
-  { label: 'Overview', path: '/bloodbank/dashboard/overview' },
-  { label: 'Requests', path: '/bloodbank/dashboard/requests' },
-  { label: 'Donors', path: '/bloodbank/dashboard/donors' },
-  { label: 'Appointments', path: '/bloodbank/dashboard/appointments' },
-  { label: 'Inventory', path: '/bloodbank/dashboard/inventory' },
-  { label: 'Analytics', path: '/bloodbank/dashboard/analytics' },
-  { label: 'Referrals', path: '/bloodbank/dashboard/referrals' },
-  { label: 'Account', path: '/bloodbank/dashboard/account' },
-];
-
-const adminDashboardLinks = (isSuperAdmin: boolean) => [
-  { label: 'Overview', path: '/admin/dashboard/overview' },
-  { label: 'Users', path: '/admin/dashboard/users' },
-  { label: 'Donors', path: '/admin/dashboard/donors' },
-  { label: 'NGOs', path: '/admin/dashboard/ngos' },
-  { label: 'BloodBanks', path: '/admin/dashboard/bloodbanks' },
-  { label: 'Verification', path: '/admin/dashboard/verification' },
-  { label: 'Emergency', path: '/admin/dashboard/emergency-requests' },
-  { label: 'Inventory Alerts', path: '/admin/dashboard/inventory-alerts' },
-  { label: 'Campaigns', path: '/admin/dashboard/campaigns' },
-  { label: 'Volunteers & Partners', path: '/admin/dashboard/volunteers-partnerships' },
-  { label: 'Appointments', path: '/admin/dashboard/appointments-donations' },
-  { label: 'Analytics', path: '/admin/dashboard/analytics-reports' },
-  { label: 'Audit & Security', path: '/admin/dashboard/audit-security' },
-  { label: 'Error Logs', path: '/admin/dashboard/error-logs' },
-  ...(isSuperAdmin ? [{ label: 'Impersonation Audit', path: '/admin/dashboard/impersonation-audit' }] : []),
-  { label: 'Notifications', path: '/admin/dashboard/notifications' },
-  { label: 'Settings', path: '/admin/dashboard/settings' },
-];
-
 function DesktopNavLink({ to, children }: NavLinkProps) {
   const location = useLocation();
   const isActive = location.pathname === to;
@@ -212,12 +158,6 @@ function MobileNavLink({ to, children, onClick }: NavLinkProps & { onClick?: () 
 function SigninDropdown() {
   const [isOpen, setIsOpen] = useState(false);
 
-  const signinOptions = [
-    { label: 'Donor', path: '/donor/login' },
-    { label: 'NGO', path: '/ngo/login' },
-    { label: 'BloodBank', path: '/bloodbank/login' },
-  ];
-
   return (
     <div
       className="relative"
@@ -232,7 +172,7 @@ function SigninDropdown() {
       {isOpen && (
         <div className="absolute right-0 top-full pt-1 z-50">
           <div className="w-48 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl py-2 border border-gray-100 animate-fadeIn">
-            {signinOptions.map((option) => (
+            {SIGNIN_OPTIONS.map((option) => (
               <Link
                 key={option.path}
                 to={option.path}
@@ -262,7 +202,7 @@ function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: 
   };
 
   const currentPortal = portalRole
-    ?? (portalOptions.some(option => option.role === user?.role)
+    ?? (PORTAL_OPTIONS.some(option => option.role === user?.role)
       ? (user?.role as PortalRole)
       : null);
 
@@ -273,26 +213,11 @@ function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: 
     }
     setPortalRole(null);
     setIsOpen(false);
-    navigate(targetPortal === 'admin' ? '/admin/login' : `/${targetPortal}/login`);
+    navigate(getPortalLoginPath(targetPortal));
   };
 
   // Get dashboard path based on user role
-  const getDashboardPath = () => {
-    switch (user?.role) {
-      case 'donor':
-        return '/donor/dashboard';
-      case 'bloodbank':
-        return '/bloodbank/dashboard';
-      case 'ngo':
-        return '/ngo/dashboard';
-      case 'admin':
-        return '/admin/dashboard';
-      case 'superadmin':
-        return '/admin/dashboard';
-      default:
-        return '/donor/dashboard';
-    }
-  };
+  const getDashboardPath = () => getPortalDashboardPath(toPortalRole(user?.role) ?? 'donor');
 
 
   return (
@@ -382,12 +307,6 @@ function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: 
 function MobileAuthMenu({ onClose }: { onClose?: () => void }) {
   const [signinExpanded, setSigninExpanded] = useState(false);
 
-  const signinOptions = [
-    { label: 'Donor', path: '/donor/login' },
-    { label: 'NGO', path: '/ngo/login' },
-    { label: 'BloodBank', path: '/bloodbank/login' },
-  ];
-
   return (
     <div className="flex flex-col space-y-2 mt-6 pt-6 border-t border-gray-200 animate-slideInRight" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
       {/* Signin Dropdown */}
@@ -401,7 +320,7 @@ function MobileAuthMenu({ onClose }: { onClose?: () => void }) {
         </button>
         {signinExpanded && (
           <div className="mt-2 ml-4 space-y-1">
-            {signinOptions.map((option) => (
+            {SIGNIN_OPTIONS.map((option) => (
               <Link
                 key={option.path}
                 to={option.path}
@@ -445,7 +364,7 @@ function MobileUserMenu({
 
   const resolvedPortal = currentPortal
     ?? portalRole
-    ?? (portalOptions.some(option => option.role === user?.role)
+    ?? (PORTAL_OPTIONS.some(option => option.role === user?.role)
       ? (user?.role as PortalRole)
       : null);
 
@@ -464,7 +383,7 @@ function MobileUserMenu({
     }
     setPortalRole(role);
     if (onClose) onClose();
-    navigate(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`);
+    navigate(getPortalDashboardPath(role));
   };
 
   const handleReturnToPicker = () => {
@@ -474,26 +393,11 @@ function MobileUserMenu({
     }
     setPortalRole(null);
     if (onClose) onClose();
-    navigate(targetPortal === 'admin' ? '/admin/login' : `/${targetPortal}/login`);
+    navigate(getPortalLoginPath(targetPortal));
   };
 
   // Get dashboard path based on user role
-  const getDashboardPath = () => {
-    switch (user?.role) {
-      case 'donor':
-        return '/donor/dashboard';
-      case 'bloodbank':
-        return '/bloodbank/dashboard';
-      case 'ngo':
-        return '/ngo/dashboard';
-      case 'admin':
-        return '/admin/dashboard';
-      case 'superadmin':
-        return '/admin/dashboard';
-      default:
-        return '/donor/dashboard';
-    }
-  };
+  const getDashboardPath = () => getPortalDashboardPath(toPortalRole(user?.role) ?? 'donor');
 
 
   return (
@@ -538,7 +442,7 @@ function MobileUserMenu({
             <p className="text-[10px] font-semibold uppercase tracking-widest text-red-600">SuperAdmin Mode</p>
             <p className="text-xs text-gray-500">Quick portal switch</p>
             <div className="mt-3 grid gap-2">
-              {portalOptions.map((option) => {
+              {PORTAL_OPTIONS.map((option) => {
                 const isActive = resolvedPortal === option.role;
                 const isDisabled = isImpersonating;
                 return (
@@ -595,10 +499,10 @@ const Navbar: React.FC = () => {
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const isDonorDashboard = user?.role === 'donor' && location.pathname.startsWith('/donor/dashboard');
-  const isNgoDashboard = user?.role === 'ngo' && location.pathname.startsWith('/ngo/dashboard');
-  const isBloodbankDashboard = user?.role === 'bloodbank' && location.pathname.startsWith('/bloodbank/dashboard');
-  const isAdminDashboard = location.pathname.startsWith('/admin/dashboard');
+  const isDonorDashboard = user?.role === 'donor' && location.pathname.startsWith(DASHBOARD_PREFIX.donor);
+  const isNgoDashboard = user?.role === 'ngo' && location.pathname.startsWith(DASHBOARD_PREFIX.ngo);
+  const isBloodbankDashboard = user?.role === 'bloodbank' && location.pathname.startsWith(DASHBOARD_PREFIX.bloodbank);
+  const isAdminDashboard = location.pathname.startsWith(DASHBOARD_PREFIX.admin);
   const hidePublicNav = isDonorDashboard || isNgoDashboard || isBloodbankDashboard || isAdminDashboard;
   const hideDashboardLink = isDonorDashboard || isNgoDashboard || isBloodbankDashboard || isAdminDashboard;
   const showNotificationBadge = isDonorDashboard || isNgoDashboard || isBloodbankDashboard;
@@ -618,7 +522,7 @@ const Navbar: React.FC = () => {
     ? `${topBadge.icon ? `${topBadge.icon} ` : ''}${topBadge.name}`
     : (user?.role === 'donor' ? 'New Donor' : '');
   const currentPortal = portalRole
-    ?? (portalOptions.some(option => option.role === user?.role)
+    ?? (PORTAL_OPTIONS.some(option => option.role === user?.role)
       ? (user?.role as PortalRole)
       : null);
 
@@ -635,7 +539,7 @@ const Navbar: React.FC = () => {
     const nextPortal = pendingPortal;
     setPendingPortal(null);
     setPortalRole(nextPortal);
-    navigate(nextPortal === 'admin' ? '/admin/dashboard' : `/${nextPortal}/dashboard`);
+    navigate(getPortalDashboardPath(nextPortal));
   };
 
   const cancelPortalSwitch = () => {
@@ -660,7 +564,7 @@ const Navbar: React.FC = () => {
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <div className="flex items-center">
-              <Link to="/" className="flex items-center space-x-2 group">
+              <Link to={ROUTES.home} className="flex items-center space-x-2 group">
                 <LogoMark className="w-9 h-9 group-hover:scale-110 transition-transform duration-300" />
                 <div>
                   <span className="font-extrabold text-2xl bg-gradient-to-r from-red-600 via-red-700 to-red-800 bg-clip-text text-transparent">
@@ -675,10 +579,10 @@ const Navbar: React.FC = () => {
             <div className="hidden md:flex items-center space-x-1">
               {!hidePublicNav && (
                 <>
-                  <DesktopNavLink to="/donors">Find Donors</DesktopNavLink>
-                  <DesktopNavLink to="/request-blood">Request Blood</DesktopNavLink>
-                  <DesktopNavLink to="/about">About</DesktopNavLink>
-                  <DesktopNavLink to="/contact">Contact</DesktopNavLink>
+                  <DesktopNavLink to={ROUTES.donors}>Find Donors</DesktopNavLink>
+                  <DesktopNavLink to={ROUTES.requestBlood}>Request Blood</DesktopNavLink>
+                  <DesktopNavLink to={ROUTES.about}>About</DesktopNavLink>
+                  <DesktopNavLink to={ROUTES.contact}>Contact</DesktopNavLink>
                 </>
               )}
 
@@ -715,7 +619,7 @@ const Navbar: React.FC = () => {
                             SuperAdmin Mode
                           </span>
                           <div className="flex items-center gap-1 rounded-full border border-red-100 bg-white/80 p-1 shadow-sm">
-                            {portalOptions.map((option) => {
+                            {PORTAL_OPTIONS.map((option) => {
                               const isActive = currentPortal === option.role;
                               const isDisabled = isImpersonating;
                               return (
@@ -797,7 +701,7 @@ const Navbar: React.FC = () => {
       {isSuperAdmin && !isImpersonating && currentPortal && currentPortal !== 'admin' && (
         <div className="border-b border-amber-200 bg-amber-50">
           <div className="container mx-auto px-4 py-2 text-xs font-medium text-amber-900 sm:text-sm">
-            You are acting as <span className="font-semibold">{portalLabels[currentPortal]}</span> portal.
+            You are acting as <span className="font-semibold">{PORTAL_LABELS[currentPortal]}</span> portal.
           </div>
         </div>
       )}
@@ -863,16 +767,16 @@ const Navbar: React.FC = () => {
                 {!hidePublicNav && (
                   <>
                     <div className="animate-slideInRight" style={{ animationDelay: '0.1s', animationFillMode: 'both' }}>
-                      <MobileNavLink to="/donors" onClick={() => setIsOpen(false)}>Find Donors</MobileNavLink>
+                      <MobileNavLink to={ROUTES.donors} onClick={() => setIsOpen(false)}>Find Donors</MobileNavLink>
                     </div>
                     <div className="animate-slideInRight" style={{ animationDelay: '0.15s', animationFillMode: 'both' }}>
-                      <MobileNavLink to="/request-blood" onClick={() => setIsOpen(false)}>Request Blood</MobileNavLink>
+                      <MobileNavLink to={ROUTES.requestBlood} onClick={() => setIsOpen(false)}>Request Blood</MobileNavLink>
                     </div>
                     <div className="animate-slideInRight" style={{ animationDelay: '0.2s', animationFillMode: 'both' }}>
-                      <MobileNavLink to="/about" onClick={() => setIsOpen(false)}>About</MobileNavLink>
+                      <MobileNavLink to={ROUTES.about} onClick={() => setIsOpen(false)}>About</MobileNavLink>
                     </div>
                     <div className="animate-slideInRight" style={{ animationDelay: '0.25s', animationFillMode: 'both' }}>
-                      <MobileNavLink to="/contact" onClick={() => setIsOpen(false)}>Contact</MobileNavLink>
+                      <MobileNavLink to={ROUTES.contact} onClick={() => setIsOpen(false)}>Contact</MobileNavLink>
                     </div>
                   </>
                 )}
@@ -880,7 +784,7 @@ const Navbar: React.FC = () => {
                 {isDonorDashboard && (
                   <div className="space-y-2 border-b border-gray-200 pb-4 mb-4 dark:border-gray-700">
                     <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">Donor Menu</p>
-                    {donorDashboardLinks.map((item) => (
+                    {DASHBOARD_LINKS.donor.map((item) => (
                       <MobileNavLink key={item.path} to={item.path} onClick={() => setIsOpen(false)}>
                         {item.label}
                       </MobileNavLink>
@@ -890,7 +794,7 @@ const Navbar: React.FC = () => {
                 {isNgoDashboard && (
                   <div className="space-y-2 border-b border-gray-200 pb-4 mb-4 dark:border-gray-700">
                     <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">NGO Menu</p>
-                    {ngoDashboardLinks.map((item) => (
+                    {DASHBOARD_LINKS.ngo.map((item) => (
                       <MobileNavLink key={item.path} to={item.path} onClick={() => setIsOpen(false)}>
                         {item.label}
                       </MobileNavLink>
@@ -900,7 +804,7 @@ const Navbar: React.FC = () => {
                 {isBloodbankDashboard && (
                   <div className="space-y-2 border-b border-gray-200 pb-4 mb-4 dark:border-gray-700">
                     <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">BloodBank Menu</p>
-                    {bloodbankDashboardLinks.map((item) => (
+                    {DASHBOARD_LINKS.bloodbank.map((item) => (
                       <MobileNavLink key={item.path} to={item.path} onClick={() => setIsOpen(false)}>
                         {item.label}
                       </MobileNavLink>
@@ -910,7 +814,7 @@ const Navbar: React.FC = () => {
                 {isAdminDashboard && (
                   <div className="space-y-2 border-b border-gray-200 pb-4 mb-4 dark:border-gray-700">
                     <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">Admin Menu</p>
-                    {adminDashboardLinks(isSuperAdmin).map((item) => (
+                    {getAdminDashboardLinks(isSuperAdmin).map((item) => (
                       <MobileNavLink key={item.path} to={item.path} onClick={() => setIsOpen(false)}>
                         {item.label}
                       </MobileNavLink>
@@ -958,7 +862,7 @@ const Navbar: React.FC = () => {
             </div>
             <div className="px-6 py-5 space-y-4">
               <p className="text-sm text-gray-600">
-                You are about to switch to the <span className="font-semibold">{portalLabels[pendingPortal]}</span> portal.
+                You are about to switch to the <span className="font-semibold">{PORTAL_LABELS[pendingPortal]}</span> portal.
               </p>
               <div className="flex items-center justify-end gap-3">
                 <button

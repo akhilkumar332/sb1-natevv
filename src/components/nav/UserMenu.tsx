@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { User as UserIcon, LogOut, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { getDashboardRouteByUserRole } from '../../constants/routes';
 
 export function UserMenu() {
   const { user, authLoading, logout } = useAuth();
@@ -15,20 +16,7 @@ export function UserMenu() {
   };
 
   // Get dashboard path based on user role
-  const getDashboardPath = () => {
-    switch (user?.role) {
-      case 'donor':
-        return '/donor/dashboard';
-      case 'bloodbank':
-        return '/bloodbank/dashboard';
-      case 'ngo':
-        return '/ngo/dashboard';
-      case 'admin':
-        return '/admin/dashboard';
-      default:
-        return '/donor/dashboard';
-    }
-  };
+  const getDashboardPath = () => getDashboardRouteByUserRole(user?.role || 'donor');
 
   if(authLoading) {
     return (
@@ -86,20 +74,7 @@ export function MobileUserMenu() {
   };
 
   // Get dashboard path based on user role
-  const getDashboardPath = () => {
-    switch (user?.role) {
-      case 'donor':
-        return '/donor/dashboard';
-      case 'bloodbank':
-        return '/bloodbank/dashboard';
-      case 'ngo':
-        return '/ngo/dashboard';
-      case 'admin':
-        return '/admin/dashboard';
-      default:
-        return '/donor/dashboard';
-    }
-  };
+  const getDashboardPath = () => getDashboardRouteByUserRole(user?.role || 'donor');
 
   return (
     <div className="space-y-2 border-t border-gray-200 pt-4">

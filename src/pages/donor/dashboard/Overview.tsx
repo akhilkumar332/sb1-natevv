@@ -12,6 +12,8 @@ import {
   Users,
   Zap,
 } from 'lucide-react';
+import { ROUTES } from '../../../constants/routes';
+import { ONE_DAY_MS } from '../../../constants/time';
 
 const DonorOverview = () => {
   const [historyFilter, setHistoryFilter] = useState<'month' | 'year'>('month');
@@ -63,7 +65,7 @@ const DonorOverview = () => {
     ? (nextEligibleDate ? `Eligible since ${nextEligibleLabel}` : 'Eligible anytime')
     : `Next eligible on ${nextEligibleLabel}`;
 
-  const contactWindowMs = 24 * 60 * 60 * 1000;
+  const contactWindowMs = ONE_DAY_MS;
   const isContactActive = (respondedAt?: any) => {
     if (!respondedAt) return false;
     const respondedDate = respondedAt instanceof Date ? respondedAt : new Date(respondedAt);
@@ -250,7 +252,7 @@ const DonorOverview = () => {
             </div>
             <button
               type="button"
-              onClick={() => navigate('/donor/dashboard/requests')}
+              onClick={() => navigate(ROUTES.portal.donor.dashboard.requests)}
               className="mt-2 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
             >
               View connections →
@@ -428,7 +430,7 @@ const DonorOverview = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => navigate('/donor/dashboard/journey')}
+                  onClick={() => navigate(ROUTES.portal.donor.dashboard.journey)}
                   className="shrink-0 text-[11px] font-semibold text-red-600 hover:text-red-700 transition"
                 >
                   View all history

@@ -14,6 +14,7 @@ import { useAdminEmergencyRequests } from '../../../hooks/admin/useAdminQueries'
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { refetchQuery } from '../../../utils/queryRefetch';
 import { runWithFeedback } from '../../../utils/runWithFeedback';
+import { COLLECTIONS } from '../../../constants/firestore';
 
 type UrgencyFilter = 'all' | 'critical' | 'high' | 'medium' | 'low';
 type StatusFilter = 'all' | 'active' | 'partially_fulfilled' | 'fulfilled' | 'expired' | 'cancelled';
@@ -96,7 +97,7 @@ function EmergencyRequestsPage() {
   const handleStatusUpdate = async (id: string, nextStatus: 'fulfilled' | 'cancelled') => {
     setProcessingId(id);
     await runWithFeedback({
-      action: () => updateDoc(doc(db, 'bloodRequests', id), {
+      action: () => updateDoc(doc(db, COLLECTIONS.BLOOD_REQUESTS, id), {
         status: nextStatus,
         updatedAt: getServerTimestamp(),
         ...(nextStatus === 'fulfilled' ? { fulfilledAt: getServerTimestamp() } : {}),

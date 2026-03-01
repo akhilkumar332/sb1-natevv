@@ -1,0 +1,33 @@
+export const SECOND_MS = 1000;
+export const MINUTE_MS = 60 * SECOND_MS;
+export const HOUR_MS = 60 * MINUTE_MS;
+export const DAY_MS = 24 * HOUR_MS;
+export const WEEK_MS = 7 * DAY_MS;
+
+export const FIVE_SECONDS_MS = 5 * SECOND_MS;
+export const EIGHT_SECONDS_MS = 8 * SECOND_MS;
+export const TEN_SECONDS_MS = 10 * SECOND_MS;
+export const FIFTEEN_SECONDS_MS = 15 * SECOND_MS;
+export const THIRTY_SECONDS_MS = 30 * SECOND_MS;
+export const THREE_SECONDS_MS = 3 * SECOND_MS;
+export const FORTY_FIVE_SECONDS_MS = 45 * SECOND_MS;
+export const TWELVE_HUNDRED_MS = 1200;
+export const EIGHT_HUNDRED_MS = 800;
+export const THREE_FIFTY_MS = 350;
+export const THREE_HUNDRED_MS = 300;
+export const TWO_POINT_FIVE_SECONDS_MS = 2500;
+export const ZERO_MS = 0;
+
+export const ONE_MINUTE_MS = MINUTE_MS;
+export const TWO_MINUTES_MS = 2 * MINUTE_MS;
+export const THREE_MINUTES_MS = 3 * MINUTE_MS;
+export const FOUR_MINUTES_MS = 4 * MINUTE_MS;
+export const FIVE_MINUTES_MS = 5 * MINUTE_MS;
+export const TEN_MINUTES_MS = 10 * MINUTE_MS;
+export const FIFTEEN_MINUTES_MS = 15 * MINUTE_MS;
+export const THIRTY_MINUTES_MS = 30 * MINUTE_MS;
+export const TWELVE_HOURS_MS = 12 * HOUR_MS;
+export const ONE_DAY_MS = DAY_MS;
+export const SEVEN_DAYS_MS = 7 * DAY_MS;
+export const THIRTY_DAYS_MS = 30 * DAY_MS;
+export const FORTY_TWO_DAYS_MS = 42 * DAY_MS;

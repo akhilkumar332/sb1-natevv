@@ -1,4 +1,5 @@
 import { captureHandledError } from '../services/errorLog.service';
+import { ONE_DAY_MS } from '../constants/time';
 
 const referralCookieName = 'bh_referrer';
 const referralStorageKey = 'bh_referrer_meta';
@@ -86,7 +87,7 @@ export const setReferralReferrerUid = (referrerUid: string) => {
 
 export const getReferralTracking = () => {
   const now = Date.now();
-  const maxAgeMs = referralMaxAgeDays * 24 * 60 * 60 * 1000;
+  const maxAgeMs = referralMaxAgeDays * ONE_DAY_MS;
   if (typeof window !== 'undefined') {
     const raw =
       safeGet(localStorage, referralStorageKey)

@@ -31,6 +31,7 @@ import {
   notifyLocationDetected,
   notifyMapAddressUpdated,
 } from '../../utils/locationFeedback';
+import { ROUTES } from '../../constants/routes';
 import { isValidCoordinatePair } from '../../utils/locationSelection';
 import { buildGeocodeLocationPatch, buildSuggestionLocationUpdate } from '../../utils/locationController';
 import { resolveOnboardingSubmitErrorMessage } from '../../utils/onboardingFeedback';
@@ -305,7 +306,7 @@ export function NgoOnboarding() {
         });
       }
       notify.success('NGO profile completed successfully!');
-      navigate('/ngo/dashboard');
+      navigate(ROUTES.portal.ngo.dashboard.root);
     } catch (error) {
       reportOnboardingError(error, 'ngo.onboarding.submit');
       notify.error(resolveOnboardingSubmitErrorMessage(error, 'ngo'));

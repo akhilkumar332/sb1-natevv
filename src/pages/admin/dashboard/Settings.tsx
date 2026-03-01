@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { notify } from 'services/notify.service';
 import { Save } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { ROUTES } from '../../../constants/routes';
 
 function SettingsPage() {
   const { isSuperAdmin } = useAuth();
@@ -82,14 +83,14 @@ function SettingsPage() {
       <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
         <h3 className="text-lg font-bold text-gray-900">Admin Navigation</h3>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Link to="/admin/dashboard/audit-security" className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
+          <Link to={ROUTES.portal.admin.dashboard.auditSecurity} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
             Open Audit & Security
           </Link>
-          <Link to="/admin/dashboard/error-logs" className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
+          <Link to={ROUTES.portal.admin.dashboard.errorLogs} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
             Open Error Logs
           </Link>
           {isSuperAdmin && (
-            <Link to="/admin/dashboard/impersonation-audit" className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
+            <Link to={ROUTES.portal.admin.dashboard.impersonationAudit} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
               Open Impersonation Audit
             </Link>
           )}

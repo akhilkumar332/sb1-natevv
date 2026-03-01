@@ -13,6 +13,7 @@ import { useAdminCampaigns } from '../../../hooks/admin/useAdminQueries';
 import { refetchQuery } from '../../../utils/queryRefetch';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { runWithFeedback } from '../../../utils/runWithFeedback';
+import { COLLECTIONS } from '../../../constants/firestore';
 
 type CampaignRow = {
   id: string;
@@ -93,7 +94,7 @@ function CampaignsPage() {
   const handleStatusUpdate = async (campaignId: string, nextStatus: 'active' | 'completed' | 'cancelled') => {
     setProcessingId(campaignId);
     await runWithFeedback({
-      action: () => updateDoc(doc(db, 'campaigns', campaignId), {
+      action: () => updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId), {
         status: nextStatus,
         updatedAt: getServerTimestamp(),
       }),

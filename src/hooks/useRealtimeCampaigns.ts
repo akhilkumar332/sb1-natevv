@@ -1,3 +1,5 @@
+import { COLLECTIONS } from '../constants/firestore';
+import { FIVE_MINUTES_MS } from '../constants/time';
 /**
  * useRealtimeCampaigns Hook
  *
@@ -55,7 +57,7 @@ export const useRealtimeCampaigns = ({
     const key = [ngoId || 'all', status || 'all', city || 'all', limitCount].join('|');
     return `campaigns_cache_${encodeURIComponent(key)}`;
   }, [ngoId, status, city, limitCount]);
-  const cacheTTL = 5 * 60 * 1000;
+  const cacheTTL = FIVE_MINUTES_MS;
 
   const serializeCampaigns = (items: Campaign[]) =>
     items.map((item) => ({
@@ -113,7 +115,7 @@ export const useRealtimeCampaigns = ({
     constraints.push(orderBy('startDate', 'desc'));
     constraints.push(limit(limitCount));
 
-    const q = query(collection(db, 'campaigns'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.CAMPAIGNS), ...constraints);
 
     // Set up real-time listener
     const unsubscribe = onSnapshot(
@@ -229,7 +231,7 @@ export const useRealtimeCampaign = (campaignId: string): {
     setError(null);
 
     const q = query(
-      collection(db, 'campaigns'),
+      collection(db, COLLECTIONS.CAMPAIGNS),
       where('__name__', '==', campaignId)
     );
 
@@ -335,7 +337,7 @@ export const useActiveCampaignCount = (ngoId?: string): number => {
       constraints.push(where('ngoId', '==', ngoId));
     }
 
-    const q = query(collection(db, 'campaigns'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.CAMPAIGNS), ...constraints);
 
     const unsubscribe = onSnapshot(
       q,

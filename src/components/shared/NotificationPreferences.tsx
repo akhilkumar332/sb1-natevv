@@ -11,6 +11,8 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { captureHandledError } from '../../services/errorLog.service';
+import { COLLECTIONS } from '../../constants/firestore';
+import { THREE_SECONDS_MS } from '../../constants/time';
 
 interface NotificationPreferencesProps {
   onSave?: () => void;
@@ -95,7 +97,7 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
     setSaved(false);
 
     try {
-      const userRef = doc(db, 'users', user.uid);
+      const userRef = doc(db, COLLECTIONS.USERS, user.uid);
 
       await updateDoc(userRef, {
         notificationPreferences: preferences,
@@ -105,7 +107,7 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
       onSave?.();
 
       // Reset saved state after 3 seconds
-      setTimeout(() => setSaved(false), 3000);
+      setTimeout(() => setSaved(false), THREE_SECONDS_MS);
     } catch (error) {
       void captureHandledError(error, {
         source: 'frontend',

@@ -6,6 +6,7 @@ import { applyReferralTrackingForUser, resolveReferralContext } from '../service
 import { captureHandledError } from '../services/errorLog.service';
 import { authStorage } from './authStorage';
 import { authFlowMessages } from './authInputValidation';
+import { COLLECTIONS } from '../constants/firestore';
 
 type GoogleRegisterRole = 'donor' | 'ngo' | 'bloodbank';
 
@@ -44,7 +45,7 @@ export const registerWithGoogleRole = async ({
       return;
     }
 
-    const userRef = doc(db, 'users', result.user.uid);
+    const userRef = doc(db, COLLECTIONS.USERS, result.user.uid);
     const userDoc = await getDoc(userRef);
     if (userDoc.exists()) {
       await signOut(auth);

@@ -1,3 +1,4 @@
+import { COLLECTIONS } from '../constants/firestore';
 /**
  * useRealtimeDonations Hook
  *
@@ -75,7 +76,7 @@ export const useRealtimeDonations = ({
     constraints.push(orderBy('donationDate', 'desc'));
     constraints.push(limit(limitCount));
 
-    const q = query(collection(db, 'donations'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.DONATIONS), ...constraints);
 
     // Set up real-time listener
     const unsubscribe = onSnapshot(

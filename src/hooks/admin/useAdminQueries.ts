@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { adminQueryKeys, type AdminKpiRange, type AdminUserRoleFilter } from '../../constants/adminQueryKeys';
+import { COLLECTIONS } from '../../constants/firestore';
+import { ADMIN_QUERY_TIMINGS } from '../../constants/query';
 import { getAdminCacheKey, readAdminCache, writeAdminCache } from '../../utils/adminCache';
 import {
   getAllUsers,
@@ -114,7 +116,7 @@ const fetchAdminUsers = async (role: AdminUserRoleFilter = 'all', limitCount: nu
 };
 
 const fetchCampaigns = async (limitCount: number): Promise<AdminEntity[]> => {
-  const snapshot = await getDocs(query(collection(db, 'campaigns'), orderBy('createdAt', 'desc'), limit(limitCount)));
+  const snapshot = await getDocs(query(collection(db, COLLECTIONS.CAMPAIGNS), orderBy('createdAt', 'desc'), limit(limitCount)));
   return snapshot.docs.map((docSnap) => {
     const data = docSnap.data() as Record<string, any>;
     return {
@@ -129,7 +131,7 @@ const fetchCampaigns = async (limitCount: number): Promise<AdminEntity[]> => {
 };
 
 const fetchVolunteers = async (limitCount: number): Promise<AdminEntity[]> => {
-  const snapshot = await getDocs(query(collection(db, 'volunteers'), orderBy('createdAt', 'desc'), limit(limitCount)));
+  const snapshot = await getDocs(query(collection(db, COLLECTIONS.VOLUNTEERS), orderBy('createdAt', 'desc'), limit(limitCount)));
   return snapshot.docs.map((docSnap) => {
     const data = docSnap.data() as Record<string, any>;
     return {
@@ -143,7 +145,7 @@ const fetchVolunteers = async (limitCount: number): Promise<AdminEntity[]> => {
 };
 
 const fetchPartnerships = async (limitCount: number): Promise<AdminEntity[]> => {
-  const snapshot = await getDocs(query(collection(db, 'partnerships'), orderBy('createdAt', 'desc'), limit(limitCount)));
+  const snapshot = await getDocs(query(collection(db, COLLECTIONS.PARTNERSHIPS), orderBy('createdAt', 'desc'), limit(limitCount)));
   return snapshot.docs.map((docSnap) => {
     const data = docSnap.data() as Record<string, any>;
     return {
@@ -157,7 +159,7 @@ const fetchPartnerships = async (limitCount: number): Promise<AdminEntity[]> => 
 };
 
 const fetchAppointments = async (limitCount: number): Promise<AdminEntity[]> => {
-  const snapshot = await getDocs(query(collection(db, 'appointments'), orderBy('scheduledDate', 'desc'), limit(limitCount)));
+  const snapshot = await getDocs(query(collection(db, COLLECTIONS.APPOINTMENTS), orderBy('scheduledDate', 'desc'), limit(limitCount)));
   return snapshot.docs.map((docSnap) => {
     const data = docSnap.data() as Record<string, any>;
     return {
@@ -172,7 +174,7 @@ const fetchAppointments = async (limitCount: number): Promise<AdminEntity[]> => 
 };
 
 const fetchDonations = async (limitCount: number): Promise<AdminEntity[]> => {
-  const snapshot = await getDocs(query(collection(db, 'donations'), orderBy('donationDate', 'desc'), limit(limitCount)));
+  const snapshot = await getDocs(query(collection(db, COLLECTIONS.DONATIONS), orderBy('donationDate', 'desc'), limit(limitCount)));
   return snapshot.docs.map((docSnap) => {
     const data = docSnap.data() as Record<string, any>;
     return {
@@ -186,7 +188,7 @@ const fetchDonations = async (limitCount: number): Promise<AdminEntity[]> => {
 };
 
 const fetchNotifications = async (limitCount: number): Promise<AdminEntity[]> => {
-  const snapshot = await getDocs(query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(limitCount)));
+  const snapshot = await getDocs(query(collection(db, COLLECTIONS.NOTIFICATIONS), orderBy('createdAt', 'desc'), limit(limitCount)));
   return snapshot.docs.map((docSnap) => {
     const data = docSnap.data() as Record<string, any>;
     return {
@@ -199,7 +201,7 @@ const fetchNotifications = async (limitCount: number): Promise<AdminEntity[]> =>
 };
 
 const fetchAuditLogs = async (limitCount: number): Promise<AdminEntity[]> => {
-  const snapshot = await getDocs(query(collection(db, 'auditLogs'), orderBy('createdAt', 'desc'), limit(limitCount)));
+  const snapshot = await getDocs(query(collection(db, COLLECTIONS.AUDIT_LOGS), orderBy('createdAt', 'desc'), limit(limitCount)));
   return snapshot.docs.map((docSnap) => {
     const data = docSnap.data() as Record<string, any>;
     return {
@@ -212,7 +214,7 @@ const fetchAuditLogs = async (limitCount: number): Promise<AdminEntity[]> => {
 };
 
 const fetchErrorLogs = async (limitCount: number): Promise<AdminEntity[]> => {
-  const snapshot = await getDocs(query(collection(db, 'errorLogs'), orderBy('createdAt', 'desc'), limit(limitCount)));
+  const snapshot = await getDocs(query(collection(db, COLLECTIONS.ERROR_LOGS), orderBy('createdAt', 'desc'), limit(limitCount)));
   return snapshot.docs.map((docSnap) => {
     const data = docSnap.data() as Record<string, any>;
     return {
@@ -227,31 +229,39 @@ const fetchErrorLogs = async (limitCount: number): Promise<AdminEntity[]> => {
 export const useAdminUsers = (role: AdminUserRoleFilter = 'all', limitCount: number = 800) =>
   useCachedAdminQuery<User[]>(
     adminQueryKeys.users(role, limitCount),
-    2 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.users.ttl,
     ['createdAt', 'updatedAt', 'lastLoginAt', 'lastDonation', 'dateOfBirth'],
     () => fetchAdminUsers(role, limitCount),
-    { staleTime: 3 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 5 * 60 * 1000 },
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.users.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.users.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.users.refetchInterval,
+    },
   );
 
 export const useAdminOverviewUsers = (limitCount: number = 100) =>
   useCachedAdminQuery<User[]>(
     adminQueryKeys.overviewUsers(limitCount),
-    2 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.users.ttl,
     ['createdAt', 'updatedAt', 'lastLoginAt', 'lastDonation', 'dateOfBirth'],
     () => fetchAdminUsers('all', limitCount),
-    { staleTime: 3 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 5 * 60 * 1000 },
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.users.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.users.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.users.refetchInterval,
+    },
   );
 
 export const useAdminVerificationRequests = (limitCount: number = 500) =>
   useCachedAdminQuery<VerificationRequest[]>(
     adminQueryKeys.verificationRequests(limitCount),
-    60 * 1000,
+    ADMIN_QUERY_TIMINGS.verification.ttl,
     ['submittedAt', 'updatedAt', 'reviewedAt', 'createdAt'],
     () => getVerificationRequests(undefined, limitCount),
     {
-      staleTime: 60 * 1000,
-      gcTime: 5 * 60 * 1000,
-      refetchInterval: 45 * 1000,
+      staleTime: ADMIN_QUERY_TIMINGS.verification.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.verification.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.verification.refetchInterval,
       refetchIntervalInBackground: false,
     },
   );
@@ -259,13 +269,13 @@ export const useAdminVerificationRequests = (limitCount: number = 500) =>
 export const useAdminEmergencyRequests = () =>
   useCachedAdminQuery<BloodRequest[]>(
     adminQueryKeys.emergencyRequests(),
-    60 * 1000,
+    ADMIN_QUERY_TIMINGS.emergency.ttl,
     ['requestedAt', 'neededBy', 'expiresAt', 'fulfilledAt', 'createdAt', 'updatedAt'],
     () => getEmergencyRequests(),
     {
-      staleTime: 60 * 1000,
-      gcTime: 5 * 60 * 1000,
-      refetchInterval: 45 * 1000,
+      staleTime: ADMIN_QUERY_TIMINGS.emergency.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.emergency.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.emergency.refetchInterval,
       refetchIntervalInBackground: false,
     },
   );
@@ -273,13 +283,13 @@ export const useAdminEmergencyRequests = () =>
 export const useAdminInventoryAlerts = () =>
   useCachedAdminQuery<BloodInventory[]>(
     adminQueryKeys.inventoryAlerts(),
-    2 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.inventory.ttl,
     ['lastRestocked', 'updatedAt', 'createdAt'],
     () => getInventoryAlerts(),
     {
-      staleTime: 2 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
-      refetchInterval: 2 * 60 * 1000,
+      staleTime: ADMIN_QUERY_TIMINGS.inventory.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.inventory.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.inventory.refetchInterval,
       refetchIntervalInBackground: false,
     },
   );
@@ -287,7 +297,7 @@ export const useAdminInventoryAlerts = () =>
 export const useAdminRecentActivity = (limitCount: number = 5) =>
   useCachedAdminQuery<AdminRecentActivity>(
     adminQueryKeys.recentActivity(limitCount),
-    2 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.recentActivity.ttl,
     ['donationDate', 'requestedAt', 'startDate', 'createdAt', 'updatedAt'],
     async () => {
       const raw = await getRecentActivity(limitCount);
@@ -308,73 +318,101 @@ export const useAdminRecentActivity = (limitCount: number = 5) =>
         })),
       };
     },
-    { staleTime: 3 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 3 * 60 * 1000 },
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.recentActivity.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.recentActivity.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.recentActivity.refetchInterval,
+    },
   );
 
 export const useAdminPlatformStats = () =>
   useCachedAdminQuery<PlatformStatsResponse>(
     adminQueryKeys.platformStats(),
-    10 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.platform.ttl,
     [],
     () => getPlatformStats(),
-    { staleTime: 10 * 60 * 1000, gcTime: 20 * 60 * 1000, refetchInterval: 10 * 60 * 1000 },
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.platform.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.platform.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.platform.refetchInterval,
+    },
   );
 
 export const useAdminCampaigns = (limitCount: number = 1000) =>
   useCachedAdminQuery<AdminEntity[]>(
     adminQueryKeys.campaigns(limitCount),
-    10 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.entitiesLarge.ttl,
     ['startDate', 'endDate', 'createdAt', 'updatedAt'],
     () => fetchCampaigns(limitCount),
-    { staleTime: 10 * 60 * 1000, gcTime: 20 * 60 * 1000, refetchInterval: 10 * 60 * 1000 },
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.entitiesLarge.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.entitiesLarge.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.entitiesLarge.refetchInterval,
+    },
   );
 
 export const useAdminVolunteers = (limitCount: number = 1000) =>
   useCachedAdminQuery<AdminEntity[]>(
     adminQueryKeys.volunteers(limitCount),
-    10 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.entitiesLarge.ttl,
     ['joinDate', 'createdAt', 'updatedAt'],
     () => fetchVolunteers(limitCount),
-    { staleTime: 10 * 60 * 1000, gcTime: 20 * 60 * 1000, refetchInterval: 10 * 60 * 1000 },
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.entitiesLarge.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.entitiesLarge.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.entitiesLarge.refetchInterval,
+    },
   );
 
 export const useAdminPartnerships = (limitCount: number = 1000) =>
   useCachedAdminQuery<AdminEntity[]>(
     adminQueryKeys.partnerships(limitCount),
-    10 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.entitiesLarge.ttl,
     ['since', 'createdAt', 'updatedAt'],
     () => fetchPartnerships(limitCount),
-    { staleTime: 10 * 60 * 1000, gcTime: 20 * 60 * 1000, refetchInterval: 10 * 60 * 1000 },
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.entitiesLarge.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.entitiesLarge.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.entitiesLarge.refetchInterval,
+    },
   );
 
 export const useAdminAppointments = (limitCount: number = 1000) =>
   useCachedAdminQuery<AdminEntity[]>(
     adminQueryKeys.appointments(limitCount),
-    5 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.entitiesMedium.ttl,
     ['scheduledDate', 'completedAt', 'createdAt', 'updatedAt'],
     () => fetchAppointments(limitCount),
-    { staleTime: 3 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 3 * 60 * 1000 },
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.entitiesMedium.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.entitiesMedium.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.entitiesMedium.refetchInterval,
+    },
   );
 
 export const useAdminDonations = (limitCount: number = 1000) =>
   useCachedAdminQuery<AdminEntity[]>(
     adminQueryKeys.donations(limitCount),
-    5 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.entitiesMedium.ttl,
     ['donationDate', 'createdAt', 'updatedAt'],
     () => fetchDonations(limitCount),
-    { staleTime: 3 * 60 * 1000, gcTime: 10 * 60 * 1000, refetchInterval: 3 * 60 * 1000 },
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.entitiesMedium.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.entitiesMedium.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.entitiesMedium.refetchInterval,
+    },
   );
 
 export const useAdminNotifications = (limitCount: number = 1000) =>
   useCachedAdminQuery<AdminEntity[]>(
     adminQueryKeys.notifications(limitCount),
-    2 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.notifications.ttl,
     ['createdAt', 'updatedAt'],
     () => fetchNotifications(limitCount),
     {
-      staleTime: 2 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
-      refetchInterval: 2 * 60 * 1000,
+      staleTime: ADMIN_QUERY_TIMINGS.notifications.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.notifications.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.notifications.refetchInterval,
       refetchIntervalInBackground: false,
     },
   );
@@ -382,13 +420,13 @@ export const useAdminNotifications = (limitCount: number = 1000) =>
 export const useAdminAuditLogs = (limitCount: number = 1000) =>
   useCachedAdminQuery<AdminEntity[]>(
     adminQueryKeys.auditLogs(limitCount),
-    2 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.notifications.ttl,
     ['createdAt', 'updatedAt'],
     () => fetchAuditLogs(limitCount),
     {
-      staleTime: 2 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
-      refetchInterval: 2 * 60 * 1000,
+      staleTime: ADMIN_QUERY_TIMINGS.notifications.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.notifications.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.notifications.refetchInterval,
       refetchIntervalInBackground: false,
     },
   );
@@ -396,13 +434,13 @@ export const useAdminAuditLogs = (limitCount: number = 1000) =>
 export const useAdminErrorLogs = (limitCount: number = 1000) =>
   useCachedAdminQuery<AdminEntity[]>(
     adminQueryKeys.errorLogs(limitCount),
-    2 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.notifications.ttl,
     ['createdAt', 'updatedAt'],
     () => fetchErrorLogs(limitCount),
     {
-      staleTime: 2 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
-      refetchInterval: 2 * 60 * 1000,
+      staleTime: ADMIN_QUERY_TIMINGS.notifications.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.notifications.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.notifications.refetchInterval,
       refetchIntervalInBackground: false,
     },
   );
@@ -414,8 +452,8 @@ export const useAdminUserDetail = (uid: string, options?: { enabled?: boolean })
     ['createdAt', 'updatedAt', 'lastLoginAt', 'lastDonation', 'dateOfBirth'],
     () => getAdminUserDetail(uid),
     {
-      staleTime: 0,
-      gcTime: 15 * 60 * 1000,
+      staleTime: ADMIN_QUERY_TIMINGS.userDetail.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.userDetail.gcTime,
       refetchInterval: false,
       refetchIntervalInBackground: false,
       refetchOnMount: 'always',
@@ -431,8 +469,8 @@ export const useAdminUserSecurity = (uid: string, options?: { enabled?: boolean 
     ['updatedAt', 'createdAt'],
     () => getAdminUserSecurity(uid),
     {
-      staleTime: 0,
-      gcTime: 10 * 60 * 1000,
+      staleTime: ADMIN_QUERY_TIMINGS.userSecurity.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.userSecurity.gcTime,
       refetchInterval: false,
       refetchIntervalInBackground: false,
       refetchOnMount: 'always',
@@ -449,13 +487,13 @@ export const useAdminUserKpis = (
 ) =>
   useCachedAdminQuery<AdminUserKpis>(
     adminQueryKeys.userKpis(uid, range),
-    5 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.userKpis.staleTime,
     [],
     () => getAdminUserKpis(uid, roleHint, range),
     {
-      staleTime: 5 * 60 * 1000,
-      gcTime: 15 * 60 * 1000,
-      refetchInterval: 5 * 60 * 1000,
+      staleTime: ADMIN_QUERY_TIMINGS.userKpis.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.userKpis.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.userKpis.refetchInterval,
       refetchIntervalInBackground: false,
       enabled: options?.enabled ?? Boolean(uid),
     },
@@ -468,13 +506,13 @@ export const useAdminUserReferrals = (
 ) =>
   useCachedAdminQuery<AdminUserReferral[]>(
     adminQueryKeys.userReferrals(uid, filters),
-    5 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.userKpis.staleTime,
     ['referredAt', 'createdAt'],
     () => getAdminUserReferrals(uid, filters),
     {
-      staleTime: 5 * 60 * 1000,
-      gcTime: 15 * 60 * 1000,
-      refetchInterval: 5 * 60 * 1000,
+      staleTime: ADMIN_QUERY_TIMINGS.userKpis.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.userKpis.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.userKpis.refetchInterval,
       refetchIntervalInBackground: false,
       enabled: options?.enabled ?? Boolean(uid),
     },
@@ -487,13 +525,13 @@ export const useAdminUserTimeline = (
 ) =>
   useCachedAdminQuery<AdminUserTimelineItem[]>(
     adminQueryKeys.userTimeline(uid, filters),
-    2 * 60 * 1000,
+    ADMIN_QUERY_TIMINGS.userRefsTimeline.staleTime,
     ['createdAt'],
     () => getAdminUserTimeline(uid, filters),
     {
-      staleTime: 2 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
-      refetchInterval: 2 * 60 * 1000,
+      staleTime: ADMIN_QUERY_TIMINGS.userRefsTimeline.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.userRefsTimeline.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.userRefsTimeline.refetchInterval,
       refetchIntervalInBackground: false,
       enabled: options?.enabled ?? Boolean(uid),
     },

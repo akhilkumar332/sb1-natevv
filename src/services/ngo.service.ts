@@ -1,3 +1,4 @@
+import { COLLECTIONS } from '../constants/firestore';
 /**
  * NGO Service
  *
@@ -83,7 +84,7 @@ export const createCampaign = async (
       throw new ValidationError('End date must be after start date');
     }
 
-    const docRef = await addDoc(collection(db, 'campaigns'), {
+    const docRef = await addDoc(collection(db, COLLECTIONS.CAMPAIGNS), {
       ...campaign,
       achieved: 0,
       registeredDonors: [],
@@ -118,7 +119,7 @@ export const getNgoCampaigns = async (
     let q;
     if (status) {
       q = query(
-        collection(db, 'campaigns'),
+        collection(db, COLLECTIONS.CAMPAIGNS),
         where('ngoId', '==', ngoId),
         where('status', '==', status),
         orderBy('startDate', 'desc'),
@@ -126,7 +127,7 @@ export const getNgoCampaigns = async (
       );
     } else {
       q = query(
-        collection(db, 'campaigns'),
+        collection(db, COLLECTIONS.CAMPAIGNS),
         where('ngoId', '==', ngoId),
         orderBy('startDate', 'desc'),
         limit(50)
@@ -150,7 +151,7 @@ export const getActiveCampaigns = async (city?: string): Promise<Campaign[]> => 
     let q;
     if (city) {
       q = query(
-        collection(db, 'campaigns'),
+        collection(db, COLLECTIONS.CAMPAIGNS),
         where('status', '==', 'active'),
         where('location.city', '==', city),
         orderBy('startDate', 'desc'),
@@ -158,7 +159,7 @@ export const getActiveCampaigns = async (city?: string): Promise<Campaign[]> => 
       );
     } else {
       q = query(
-        collection(db, 'campaigns'),
+        collection(db, COLLECTIONS.CAMPAIGNS),
         where('status', '==', 'active'),
         orderBy('startDate', 'desc'),
         limit(20)
@@ -187,7 +188,7 @@ export const updateCampaign = async (
     const hasStart = allowedUpdates.startDate !== undefined;
     const hasEnd = allowedUpdates.endDate !== undefined;
     if (hasStart || hasEnd) {
-      const campaignDoc = await getDoc(doc(db, 'campaigns', campaignId));
+      const campaignDoc = await getDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId));
       if (!campaignDoc.exists()) {
         throw new NotFoundError('Campaign not found');
       }
@@ -215,7 +216,7 @@ export const updateCampaign = async (
       }
     }
 
-    await updateDoc(doc(db, 'campaigns', campaignId), {
+    await updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId), {
       ...allowedUpdates,
       updatedAt: getServerTimestamp(),
     });
@@ -233,7 +234,7 @@ export const updateCampaign = async (
  */
 export const archiveCampaign = async (campaignId: string): Promise<void> => {
   try {
-    await updateDoc(doc(db, 'campaigns', campaignId), {
+    await updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId), {
       status: 'cancelled',
       updatedAt: getServerTimestamp(),
     });
@@ -248,7 +249,7 @@ export const archiveCampaign = async (campaignId: string): Promise<void> => {
  */
 export const deleteCampaign = async (campaignId: string): Promise<void> => {
   try {
-    await deleteDoc(doc(db, 'campaigns', campaignId));
+    await deleteDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId));
   } catch (error) {
     throw new DatabaseError('Failed to delete campaign');
   }
@@ -264,7 +265,7 @@ export const registerDonorForCampaign = async (
   donorId: string
 ): Promise<void> => {
   try {
-    const campaignDoc = await getDoc(doc(db, 'campaigns', campaignId));
+    const campaignDoc = await getDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId));
     if (!campaignDoc.exists()) {
       throw new NotFoundError('Campaign not found');
     }
@@ -276,14 +277,14 @@ export const registerDonorForCampaign = async (
       throw new ValidationError('Donor already registered for this campaign');
     }
 
-    await updateDoc(doc(db, 'campaigns', campaignId), {
+    await updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId), {
       registeredDonors: arrayUnion(donorId),
       updatedAt: getServerTimestamp(),
     });
 
     // Create notification for donor (best-effort)
     try {
-      await addDoc(collection(db, 'notifications'), {
+      await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
         userId: donorId,
         userRole: 'donor',
         type: 'campaign_invite',
@@ -316,7 +317,7 @@ export const confirmDonorAttendance = async (
   donorId: string
 ): Promise<void> => {
   try {
-    const campaignDoc = await getDoc(doc(db, 'campaigns', campaignId));
+    const campaignDoc = await getDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId));
     if (!campaignDoc.exists()) {
       throw new NotFoundError('Campaign not found');
     }
@@ -337,7 +338,7 @@ export const confirmDonorAttendance = async (
         ? confirmedDonors.length
         : campaign.achieved;
 
-      await updateDoc(doc(db, 'campaigns', campaignId), {
+      await updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId), {
         confirmedDonors,
         achieved: newAchieved,
         updatedAt: getServerTimestamp(),
@@ -365,7 +366,7 @@ export const updateCampaignProgress = async (
       throw new ValidationError('Achieved value cannot be negative');
     }
 
-    await updateDoc(doc(db, 'campaigns', campaignId), {
+    await updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId), {
       achieved,
       updatedAt: getServerTimestamp(),
     });
@@ -384,7 +385,7 @@ export const updateCampaignProgress = async (
  */
 export const getCampaignStats = async (campaignId: string) => {
   try {
-    const campaignDoc = await getDoc(doc(db, 'campaigns', campaignId));
+    const campaignDoc = await getDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId));
     if (!campaignDoc.exists()) {
       throw new NotFoundError('Campaign not found');
     }
@@ -439,7 +440,7 @@ export const addVolunteer = async (
       throw new ValidationError('Invalid volunteer data');
     }
 
-    const docRef = await addDoc(collection(db, 'volunteers'), {
+    const docRef = await addDoc(collection(db, COLLECTIONS.VOLUNTEERS), {
       ...volunteer,
       hoursContributed: 0,
       campaignsParticipated: 0,
@@ -472,7 +473,7 @@ export const getNgoVolunteers = async (
     let q;
     if (status) {
       q = query(
-        collection(db, 'volunteers'),
+        collection(db, COLLECTIONS.VOLUNTEERS),
         where('ngoId', '==', ngoId),
         where('status', '==', status),
         orderBy('joinedAt', 'desc'),
@@ -480,7 +481,7 @@ export const getNgoVolunteers = async (
       );
     } else {
       q = query(
-        collection(db, 'volunteers'),
+        collection(db, COLLECTIONS.VOLUNTEERS),
         where('ngoId', '==', ngoId),
         orderBy('joinedAt', 'desc'),
         limit(100)
@@ -506,7 +507,7 @@ export const updateVolunteer = async (
   try {
     const { id, createdAt, ...allowedUpdates } = updates;
 
-    await updateDoc(doc(db, 'volunteers', volunteerId), {
+    await updateDoc(doc(db, COLLECTIONS.VOLUNTEERS, volunteerId), {
       ...allowedUpdates,
       updatedAt: getServerTimestamp(),
     });
@@ -521,7 +522,7 @@ export const updateVolunteer = async (
  */
 export const archiveVolunteer = async (volunteerId: string): Promise<void> => {
   try {
-    await updateDoc(doc(db, 'volunteers', volunteerId), {
+    await updateDoc(doc(db, COLLECTIONS.VOLUNTEERS, volunteerId), {
       status: 'inactive',
       updatedAt: getServerTimestamp(),
     });
@@ -536,7 +537,7 @@ export const archiveVolunteer = async (volunteerId: string): Promise<void> => {
  */
 export const deleteVolunteer = async (volunteerId: string): Promise<void> => {
   try {
-    await deleteDoc(doc(db, 'volunteers', volunteerId));
+    await deleteDoc(doc(db, COLLECTIONS.VOLUNTEERS, volunteerId));
   } catch (error) {
     throw new DatabaseError('Failed to delete volunteer');
   }
@@ -552,7 +553,7 @@ export const assignVolunteerToCampaign = async (
   volunteerId: string
 ): Promise<void> => {
   try {
-    const campaignDoc = await getDoc(doc(db, 'campaigns', campaignId));
+    const campaignDoc = await getDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId));
     if (!campaignDoc.exists()) {
       throw new NotFoundError('Campaign not found');
     }
@@ -565,14 +566,14 @@ export const assignVolunteerToCampaign = async (
 
     const volunteers = [...(campaign.volunteers || []), volunteerId];
 
-    await updateDoc(doc(db, 'campaigns', campaignId), {
+    await updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId), {
       volunteers,
       updatedAt: getServerTimestamp(),
     });
 
     // Update volunteer's campaign participation count
     const volunteerQuery = query(
-      collection(db, 'volunteers'),
+      collection(db, COLLECTIONS.VOLUNTEERS),
       where('userId', '==', volunteerId),
       limit(1)
     );
@@ -610,14 +611,14 @@ export const logVolunteerHours = async (
       throw new ValidationError('Hours must be greater than 0');
     }
 
-    const volunteerDoc = await getDoc(doc(db, 'volunteers', volunteerId));
+    const volunteerDoc = await getDoc(doc(db, COLLECTIONS.VOLUNTEERS, volunteerId));
     if (!volunteerDoc.exists()) {
       throw new NotFoundError('Volunteer not found');
     }
 
     const volunteer = { ...volunteerDoc.data(), id: volunteerDoc.id } as Volunteer;
 
-    await updateDoc(doc(db, 'volunteers', volunteerId), {
+    await updateDoc(doc(db, COLLECTIONS.VOLUNTEERS, volunteerId), {
       hoursContributed: (volunteer.hoursContributed || 0) + hours,
       lastActiveAt: getServerTimestamp(),
       updatedAt: getServerTimestamp(),
@@ -648,7 +649,7 @@ export const createPartnership = async (
       throw new ValidationError('Invalid partnership data');
     }
 
-    const docRef = await addDoc(collection(db, 'partnerships'), {
+    const docRef = await addDoc(collection(db, COLLECTIONS.PARTNERSHIPS), {
       ...partnership,
       totalDonations: 0,
       totalCampaigns: 0,
@@ -680,7 +681,7 @@ export const getNgoPartnerships = async (
     let q;
     if (status) {
       q = query(
-        collection(db, 'partnerships'),
+        collection(db, COLLECTIONS.PARTNERSHIPS),
         where('ngoId', '==', ngoId),
         where('status', '==', status),
         orderBy('startDate', 'desc'),
@@ -688,7 +689,7 @@ export const getNgoPartnerships = async (
       );
     } else {
       q = query(
-        collection(db, 'partnerships'),
+        collection(db, COLLECTIONS.PARTNERSHIPS),
         where('ngoId', '==', ngoId),
         orderBy('startDate', 'desc'),
         limit(50)
@@ -714,7 +715,7 @@ export const updatePartnership = async (
   try {
     const { id, createdAt, ...allowedUpdates } = updates;
 
-    await updateDoc(doc(db, 'partnerships', partnershipId), {
+    await updateDoc(doc(db, COLLECTIONS.PARTNERSHIPS, partnershipId), {
       ...allowedUpdates,
       updatedAt: getServerTimestamp(),
     });
@@ -729,7 +730,7 @@ export const updatePartnership = async (
  */
 export const archivePartnership = async (partnershipId: string): Promise<void> => {
   try {
-    await updateDoc(doc(db, 'partnerships', partnershipId), {
+    await updateDoc(doc(db, COLLECTIONS.PARTNERSHIPS, partnershipId), {
       status: 'inactive',
       updatedAt: getServerTimestamp(),
     });
@@ -744,7 +745,7 @@ export const archivePartnership = async (partnershipId: string): Promise<void> =
  */
 export const deletePartnership = async (partnershipId: string): Promise<void> => {
   try {
-    await deleteDoc(doc(db, 'partnerships', partnershipId));
+    await deleteDoc(doc(db, COLLECTIONS.PARTNERSHIPS, partnershipId));
   } catch (error) {
     throw new DatabaseError('Failed to delete partnership');
   }
@@ -762,7 +763,7 @@ export const addPartnerToCampaign = async (
   partnerType: 'bloodbank' | 'hospital' | 'organization'
 ): Promise<void> => {
   try {
-    const campaignDoc = await getDoc(doc(db, 'campaigns', campaignId));
+    const campaignDoc = await getDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId));
     if (!campaignDoc.exists()) {
       throw new NotFoundError('Campaign not found');
     }
@@ -785,7 +786,7 @@ export const addPartnerToCampaign = async (
 
     updateData.updatedAt = getServerTimestamp();
 
-    await updateDoc(doc(db, 'campaigns', campaignId), updateData);
+    await updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId), updateData);
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) {
       throw error;
@@ -876,7 +877,7 @@ export const getCampaignPerformanceReport = async (campaignId: string) => {
   try {
     const stats = await getCampaignStats(campaignId);
 
-    const campaignDoc = await getDoc(doc(db, 'campaigns', campaignId));
+    const campaignDoc = await getDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId));
     if (!campaignDoc.exists()) {
       throw new NotFoundError('Campaign not found');
     }

@@ -1,3 +1,4 @@
+import { FIVE_MINUTES_MS, TEN_MINUTES_MS } from '../constants/time';
 /**
  * Analytics Service
  *
@@ -15,11 +16,13 @@ import {
   documentId,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { COLLECTIONS } from '../constants/firestore';
 import { User, Donation, BloodRequest, Campaign } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
 import { countCollection } from '../utils/firestoreCount';
 import { runDedupedRequest } from '../utils/requestDedupe';
 import { DatabaseError } from '../utils/errorHandler';
+import { BLOOD_TYPE_CHART_COLORS, CHART_PALETTE } from '../constants/theme';
 
 // ============================================================================
 // ANALYTICS TYPES
@@ -110,7 +113,7 @@ export const getDonorStats = async (donorId: string): Promise<DonorStats> => {
   try {
     // Get all donations for donor
     const donationsQuery = query(
-      collection(db, 'donations'),
+      collection(db, COLLECTIONS.DONATIONS),
       where('donorId', '==', donorId),
       where('status', '==', 'completed'),
       orderBy('donationDate', 'desc')
@@ -157,7 +160,7 @@ export const getDonationTrend = async (
 ): Promise<TrendData[]> => {
   try {
     const donationsQuery = query(
-      collection(db, 'donations'),
+      collection(db, COLLECTIONS.DONATIONS),
       where('donorId', '==', donorId),
       where('donationDate', '>=', Timestamp.fromDate(dateRange.startDate)),
       where('donationDate', '<=', Timestamp.fromDate(dateRange.endDate)),
@@ -185,7 +188,7 @@ export const getBloodBankStats = async (hospitalId: string): Promise<BloodBankSt
   try {
     // Get blood requests
     const requestsQuery = query(
-      collection(db, 'bloodRequests'),
+      collection(db, COLLECTIONS.BLOOD_REQUESTS),
       where('requesterId', '==', hospitalId)
     );
 
@@ -198,7 +201,7 @@ export const getBloodBankStats = async (hospitalId: string): Promise<BloodBankSt
 
     // Get donations received
     const donationsQuery = query(
-      collection(db, 'donations'),
+      collection(db, COLLECTIONS.DONATIONS),
       where('hospitalId', '==', hospitalId),
       where('status', '==', 'completed')
     );
@@ -237,7 +240,7 @@ export const getBloodRequestTrend = async (
 ): Promise<TrendData[]> => {
   try {
     const requestsQuery = query(
-      collection(db, 'bloodRequests'),
+      collection(db, COLLECTIONS.BLOOD_REQUESTS),
       where('requesterId', '==', hospitalId),
       where('requestedAt', '>=', Timestamp.fromDate(dateRange.startDate)),
       where('requestedAt', '<=', Timestamp.fromDate(dateRange.endDate)),
@@ -254,7 +257,7 @@ export const getBloodRequestTrend = async (
     if (code === 'failed-precondition' || code === 'permission-denied' || code === 'unauthenticated') {
       try {
         const fallbackQuery = query(
-          collection(db, 'bloodRequests'),
+          collection(db, COLLECTIONS.BLOOD_REQUESTS),
           where('requesterId', '==', hospitalId)
         );
         const fallbackSnap = await getDocs(fallbackQuery);
@@ -280,7 +283,7 @@ export const getInventoryDistribution = async (
 ): Promise<BloodTypeDistribution[]> => {
   try {
     const inventoryQuery = query(
-      collection(db, 'bloodInventory'),
+      collection(db, COLLECTIONS.BLOOD_INVENTORY),
       where('hospitalId', '==', hospitalId)
     );
 
@@ -310,7 +313,7 @@ export const getCampaignStats = async (campaignId: string): Promise<CampaignStat
   try {
     // Get campaign details
     const campaignQuery = query(
-      collection(db, 'campaigns'),
+      collection(db, COLLECTIONS.CAMPAIGNS),
       where('__name__', '==', campaignId)
     );
 
@@ -350,7 +353,7 @@ export const getNGOCampaignPerformance = async (
 ): Promise<TrendData[]> => {
   try {
     const campaignsQuery = query(
-      collection(db, 'campaigns'),
+      collection(db, COLLECTIONS.CAMPAIGNS),
       where('ngoId', '==', ngoId),
       where('startDate', '>=', Timestamp.fromDate(dateRange.startDate)),
       where('startDate', '<=', Timestamp.fromDate(dateRange.endDate)),
@@ -433,7 +436,7 @@ export const getUserGrowthTrend = async (
       constraints.push(where('role', '==', role));
     }
 
-    const usersQuery = query(collection(db, 'users'), ...constraints);
+    const usersQuery = query(collection(db, COLLECTIONS.USERS), ...constraints);
     const snapshot = await getDocs(usersQuery);
     const users = extractQueryData<User>(snapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']);
 
@@ -449,17 +452,7 @@ export const getUserGrowthTrend = async (
 export const getBloodTypeDistribution = async (): Promise<BloodTypeDistribution[]> => {
   try {
     return runDedupedRequest('analytics:bloodTypeDistribution', async () => {
-      const BLOOD_TYPE_COLORS: Record<string, string> = {
-        'A+': '#DC2626',
-        'A-': '#EA580C',
-        'B+': '#D97706',
-        'B-': '#16A34A',
-        'O+': '#0891B2',
-        'O-': '#2563EB',
-        'AB+': '#7C3AED',
-        'AB-': '#DB2777',
-      };
-      const bloodTypes = Object.keys(BLOOD_TYPE_COLORS);
+      const bloodTypes = Object.keys(BLOOD_TYPE_CHART_COLORS);
       const counts = await Promise.all(
         bloodTypes.map((bloodType) => (
           countCollection('users', where('role', '==', 'donor'), where('bloodType', '==', bloodType))
@@ -473,10 +466,10 @@ export const getBloodTypeDistribution = async (): Promise<BloodTypeDistribution[
           bloodType,
           count,
           percentage: total > 0 ? (count / total) * 100 : 0,
-          color: BLOOD_TYPE_COLORS[bloodType] || '#6B7280',
+          color: BLOOD_TYPE_CHART_COLORS[bloodType] || CHART_PALETTE.neutral,
         });
       }).filter((entry) => entry.count > 0);
-    }, 10 * 60 * 1000);
+    }, TEN_MINUTES_MS);
   } catch (error) {
     throw new DatabaseError('Failed to get blood type distribution');
   }
@@ -488,7 +481,7 @@ export const getBloodTypeDistribution = async (): Promise<BloodTypeDistribution[
 export const getGeographicDistribution = async (): Promise<GeographicDistribution[]> => {
   try {
     return runDedupedRequest('analytics:geoDistribution', async () => {
-      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const usersSnapshot = await getDocs(collection(db, COLLECTIONS.USERS));
       const users = extractQueryData<User>(usersSnapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']);
 
       const distribution: Record<string, GeographicDistribution> = {};
@@ -525,7 +518,7 @@ export const getGeographicDistribution = async (): Promise<GeographicDistributio
       });
 
       return Object.values(distribution).sort((a, b) => b.count - a.count);
-    }, 10 * 60 * 1000);
+    }, TEN_MINUTES_MS);
   } catch (error) {
     throw new DatabaseError('Failed to get geographic distribution');
   }
@@ -537,7 +530,7 @@ export const getGeographicDistribution = async (): Promise<GeographicDistributio
 export const getTopDonors = async (limitCount: number = 10): Promise<Array<User & { donationCount: number }>> => {
   try {
     return runDedupedRequest(`analytics:topDonors:${limitCount}`, async () => {
-      const donationsSnapshot = await getDocs(query(collection(db, 'donations'), where('status', '==', 'completed')));
+      const donationsSnapshot = await getDocs(query(collection(db, COLLECTIONS.DONATIONS), where('status', '==', 'completed')));
       const donations = extractQueryData<Donation>(donationsSnapshot, ['donationDate']);
 
       const donorCounts: Record<string, number> = {};
@@ -557,7 +550,7 @@ export const getTopDonors = async (limitCount: number = 10): Promise<Array<User 
       }
       const userSnapshots = await Promise.all(
         donorChunks.map((chunk) => getDocs(query(
-          collection(db, 'users'),
+          collection(db, COLLECTIONS.USERS),
           where(documentId(), 'in', chunk),
           limit(chunk.length)
         )))
@@ -572,7 +565,7 @@ export const getTopDonors = async (limitCount: number = 10): Promise<Array<User 
           return user ? { ...user, donationCount: donorCounts[id] } : null;
         })
         .filter(Boolean) as Array<User & { donationCount: number }>;
-    }, 5 * 60 * 1000);
+    }, FIVE_MINUTES_MS);
   } catch (error) {
     throw new DatabaseError('Failed to get top donors');
   }

@@ -1,8 +1,7 @@
 import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useNetworkStatus } from '../../contexts/NetworkStatusContext';
-
-const APP_PREFIXES = ['/donor', '/ngo', '/bloodbank', '/admin'];
+import { APP_ROUTE_PREFIXES_WITH_LEGACY } from '../../constants/routes';
 
 export const NetworkStatusBadge = () => {
   const location = useLocation();
@@ -14,7 +13,7 @@ export const NetworkStatusBadge = () => {
     setDataSaverMode,
   } = useNetworkStatus();
 
-  const isAppRoute = APP_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
+  const isAppRoute = APP_ROUTE_PREFIXES_WITH_LEGACY.some((prefix) => location.pathname.startsWith(prefix));
   if (!isAppRoute) return null;
 
   if (syncStatus === 'synced' && persistenceStatus === 'enabled' && !isLowBandwidth) return null;

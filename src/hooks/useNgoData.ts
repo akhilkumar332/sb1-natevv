@@ -6,9 +6,11 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { collection, query, where, limit, onSnapshot, getDocs, documentId, writeBatch, doc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { COLLECTIONS } from '../constants/firestore';
 import { getServerTimestamp } from '../utils/firestore.utils';
 import { captureHandledError } from '../services/errorLog.service';
 import { readDashboardCache, writeDashboardCache } from '../utils/dashboardCache';
+import { FIVE_MINUTES_MS, ZERO_MS } from '../constants/time';
 
 export interface Campaign {
   id: string;
@@ -133,8 +135,8 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
   const autoCompleteRef = useRef<{ lastRun: number; inFlight: boolean }>({ lastRun: 0, inFlight: false });
 
   const cacheKey = useMemo(() => (ngoId ? `ngo_dashboard_cache_${ngoId}` : ''), [ngoId]);
-  const cacheTTL = 5 * 60 * 1000;
-  const participantsCacheTTL = 5 * 60 * 1000;
+  const cacheTTL = FIVE_MINUTES_MS;
+  const participantsCacheTTL = FIVE_MINUTES_MS;
   const reportNgoDataError = (err: unknown, kind: string) => {
     void captureHandledError(err, {
       source: 'frontend',
@@ -197,7 +199,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
   // Fetch campaigns
   const fetchCampaigns = async () => {
     try {
-      const campaignsRef = collection(db, 'campaigns');
+      const campaignsRef = collection(db, COLLECTIONS.CAMPAIGNS);
       const q = query(
         campaignsRef,
         where('ngoId', '==', ngoId),
@@ -265,7 +267,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
 
   const fetchCampaignsOnce = async () => {
     try {
-      const campaignsRef = collection(db, 'campaigns');
+      const campaignsRef = collection(db, COLLECTIONS.CAMPAIGNS);
       const q = query(
         campaignsRef,
         where('ngoId', '==', ngoId),
@@ -322,7 +324,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
   // Fetch volunteers
   const fetchVolunteers = async () => {
     try {
-      const volunteersRef = collection(db, 'volunteers');
+      const volunteersRef = collection(db, COLLECTIONS.VOLUNTEERS);
       const q = query(
         volunteersRef,
         where('ngoId', '==', ngoId),
@@ -355,7 +357,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
   // Fetch partnerships
   const fetchPartnerships = async () => {
     try {
-      const partnershipsRef = collection(db, 'partnerships');
+      const partnershipsRef = collection(db, COLLECTIONS.PARTNERSHIPS);
       const q = query(
         partnershipsRef,
         where('ngoId', '==', ngoId),
@@ -387,7 +389,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
 
   const fetchDonorCommunity = async () => {
     try {
-      const publicSnap = await getDocs(collection(db, 'publicDonors'));
+      const publicSnap = await getDocs(collection(db, COLLECTIONS.PUBLIC_DONORS));
       const eligibleDonors = publicSnap.docs
         .map((doc) => doc.data())
         .filter((data: any) => data && data.status !== 'deleted' && data.onboardingCompleted !== false)
@@ -554,7 +556,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
       } else {
         timeoutFetchId = setTimeout(() => {
           void runFetch();
-        }, 0);
+        }, ZERO_MS);
       }
     };
 
@@ -578,7 +580,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
     if (!ngoId || campaigns.length === 0) return;
     if (autoCompleteRef.current.inFlight) return;
     const now = Date.now();
-    if (now - autoCompleteRef.current.lastRun < 5 * 60 * 1000) {
+    if (now - autoCompleteRef.current.lastRun < FIVE_MINUTES_MS) {
       return;
     }
     const today = new Date();
@@ -598,7 +600,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
     autoCompleteRef.current.inFlight = true;
     const batch = writeBatch(db);
     toComplete.forEach((campaign) => {
-      batch.update(doc(db, 'campaigns', campaign.id), {
+      batch.update(doc(db, COLLECTIONS.CAMPAIGNS, campaign.id), {
         status: 'completed',
         completedAt: getServerTimestamp(),
         updatedAt: getServerTimestamp(),
@@ -710,7 +712,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
     try {
       // Primary source for participant directory rows.
       const publicQueries = chunks.map((chunk) =>
-        getDocs(query(collection(db, 'publicDonors'), where(documentId(), 'in', chunk)))
+        getDocs(query(collection(db, COLLECTIONS.PUBLIC_DONORS), where(documentId(), 'in', chunk)))
       );
       const publicSnapshots = await Promise.all(publicQueries);
       publicSnapshots.forEach((snapshot) => {
@@ -728,7 +730,7 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
         }
         try {
           const userQueries = missingChunks.map((chunk) =>
-            getDocs(query(collection(db, 'users'), where(documentId(), 'in', chunk)))
+            getDocs(query(collection(db, COLLECTIONS.USERS), where(documentId(), 'in', chunk)))
           );
           const userSnapshots = await Promise.all(userQueries);
           userSnapshots.forEach((snapshot) => {

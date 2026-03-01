@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ROUTES } from '../../constants/routes';
 
 const { addDocMock, collectionMock, serverTimestampMock, authState } = vi.hoisted(() => ({
   addDocMock: vi.fn(async (..._args: unknown[]) => ({ id: 'log-1' })),
@@ -89,7 +90,7 @@ describe('errorLog.service', () => {
     authState.currentUser = { uid: 'user-5' };
 
     await captureError(new Error('route redaction check'), {
-      route: '/donor/login?pendingRequest=abc123&token=xyz987&page=1',
+      route: `${ROUTES.portal.donor.login}?pendingRequest=abc123&token=xyz987&page=1`,
     });
 
     expect(addDocMock).toHaveBeenCalledTimes(1);

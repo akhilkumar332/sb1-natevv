@@ -1,3 +1,4 @@
+import { COLLECTIONS } from '../constants/firestore';
 /**
  * useRealtimeInventory Hook
  *
@@ -63,7 +64,7 @@ export const useRealtimeInventory = ({
     setError(null);
 
     const q = query(
-      collection(db, 'bloodInventory'),
+      collection(db, COLLECTIONS.BLOOD_INVENTORY),
       where('hospitalId', '==', hospitalId)
     );
 
@@ -162,7 +163,7 @@ export const useRealtimeBloodTypeInventory = (
     if (!hospitalId || !bloodType) return;
 
     const q = query(
-      collection(db, 'bloodInventory'),
+      collection(db, COLLECTIONS.BLOOD_INVENTORY),
       where('hospitalId', '==', hospitalId),
       where('bloodType', '==', bloodType)
     );
@@ -207,7 +208,7 @@ export const useRealtimeLowInventoryAlerts = (): {
 
   useEffect(() => {
     const q = query(
-      collection(db, 'bloodInventory'),
+      collection(db, COLLECTIONS.BLOOD_INVENTORY),
       where('status', 'in', ['low', 'critical'])
     );
 
@@ -261,7 +262,7 @@ export const useRealtimeInventoryStats = (
     if (!hospitalId) return;
 
     const q = query(
-      collection(db, 'bloodInventory'),
+      collection(db, COLLECTIONS.BLOOD_INVENTORY),
       where('hospitalId', '==', hospitalId)
     );
 

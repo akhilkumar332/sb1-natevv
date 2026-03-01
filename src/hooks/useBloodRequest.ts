@@ -7,6 +7,7 @@ import { doc, updateDoc, arrayUnion, getDoc, serverTimestamp, collection, setDoc
 import { db } from '../firebase';
 import { notify } from 'services/notify.service';
 import { captureHandledError } from '../services/errorLog.service';
+import { COLLECTIONS } from '../constants/firestore';
 
 interface RespondToRequestParams {
   requestId: string;
@@ -35,7 +36,7 @@ export const useBloodRequest = () => {
       const { requestId, donorId, donorName, donorPhone, donorEmail } = params;
 
       // Get the blood request
-      const requestRef = doc(db, 'bloodRequests', requestId);
+      const requestRef = doc(db, COLLECTIONS.BLOOD_REQUESTS, requestId);
       const requestSnap = await getDoc(requestRef);
 
       if (!requestSnap.exists()) {
@@ -68,7 +69,7 @@ export const useBloodRequest = () => {
       // Send notification to hospital
       if (requestData.hospitalId) {
         try {
-          const notificationRef = doc(collection(db, 'notifications'));
+          const notificationRef = doc(collection(db, COLLECTIONS.NOTIFICATIONS));
           await setDoc(notificationRef, {
             userId: requestData.hospitalId,
             title: 'Donor Response',

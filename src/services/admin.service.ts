@@ -1,3 +1,4 @@
+import { COLLECTIONS } from '../constants/firestore';
 /**
  * Admin Service
  *
@@ -133,7 +134,7 @@ export const searchUsersForImpersonationFast = async (rawQuery: string): Promise
   const queryText = rawQuery.trim();
   if (!queryText || queryText.length < 2) return [];
 
-  const usersRef = collection(db, 'users');
+  const usersRef = collection(db, COLLECTIONS.USERS);
   const results = new Map<string, ImpersonationUser>();
   const maxResults = 6;
 
@@ -205,14 +206,14 @@ const buildUsersQuery = (
   if (status) constraints.push(where('status', '==', status));
   if (includeOrderBy) constraints.push(orderBy('createdAt', 'desc'));
   constraints.push(limit(limitCount));
-  return query(collection(db, 'users'), ...constraints);
+  return query(collection(db, COLLECTIONS.USERS), ...constraints);
 };
 
 export const searchUsersForImpersonation = async (rawQuery: string): Promise<ImpersonationUser[]> => {
   const queryText = rawQuery.trim();
   if (!queryText || queryText.length < 2) return [];
 
-  const usersRef = collection(db, 'users');
+  const usersRef = collection(db, COLLECTIONS.USERS);
   const results = new Map<string, ImpersonationUser>();
   const maxResults = 10;
 
@@ -298,7 +299,7 @@ export const getAllUsers = async (
     const broadLimit = Math.max(limitCount * 4, 1000);
     const broadSnapshot = await getDocs(
       query(
-        collection(db, 'users'),
+        collection(db, COLLECTIONS.USERS),
         orderBy('createdAt', 'desc'),
         limit(broadLimit)
       )
@@ -320,7 +321,7 @@ export const getAllUsers = async (
  */
 export const getUserById = async (userId: string): Promise<User> => {
   try {
-    const userDoc = await getDoc(doc(db, 'users', userId));
+    const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, userId));
     if (!userDoc.exists()) {
       throw new NotFoundError('User not found');
     }
@@ -356,19 +357,19 @@ export const updateUserStatus = async (
 ): Promise<void> => {
   try {
     // Verify admin permissions
-    const adminDoc = await getDoc(doc(db, 'users', adminId));
+    const adminDoc = await getDoc(doc(db, COLLECTIONS.USERS, adminId));
     if (!adminDoc.exists() || !['admin', 'superadmin'].includes(adminDoc.data().role)) {
       throw new PermissionError('Only admins can update user status');
     }
     const adminRole = adminDoc.data().role || 'admin';
 
-    await updateDoc(doc(db, 'users', userId), {
+    await updateDoc(doc(db, COLLECTIONS.USERS, userId), {
       status,
       updatedAt: getServerTimestamp(),
     });
 
     // Create notification for user
-    await addDoc(collection(db, 'notifications'), {
+    await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
       userId,
       userRole: 'donor', // Will be updated based on actual user role
       type: 'verification_status',
@@ -406,20 +407,20 @@ export const verifyUserAccount = async (
 ): Promise<void> => {
   try {
     // Verify admin permissions
-    const adminDoc = await getDoc(doc(db, 'users', adminId));
+    const adminDoc = await getDoc(doc(db, COLLECTIONS.USERS, adminId));
     if (!adminDoc.exists() || !['admin', 'superadmin'].includes(adminDoc.data().role)) {
       throw new PermissionError('Only admins can verify user accounts');
     }
     const adminRole = adminDoc.data().role || 'admin';
 
-    await updateDoc(doc(db, 'users', userId), {
+    await updateDoc(doc(db, COLLECTIONS.USERS, userId), {
       verified: true,
       status: 'active',
       updatedAt: getServerTimestamp(),
     });
 
     // Create notification for user
-    await addDoc(collection(db, 'notifications'), {
+    await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
       userId,
       userRole: 'donor', // Will be updated based on actual user role
       type: 'verification_status',
@@ -457,20 +458,20 @@ export const deleteUserAccount = async (
 ): Promise<void> => {
   try {
     // Verify admin permissions
-    const adminDoc = await getDoc(doc(db, 'users', adminId));
+    const adminDoc = await getDoc(doc(db, COLLECTIONS.USERS, adminId));
     if (!adminDoc.exists() || !['admin', 'superadmin'].includes(adminDoc.data().role)) {
       throw new PermissionError('Only admins can delete user accounts');
     }
     const adminRole = adminDoc.data().role || 'admin';
 
     // Prevent deleting admin accounts
-    const userDoc = await getDoc(doc(db, 'users', userId));
+    const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, userId));
     if (userDoc.exists() && ['admin', 'superadmin'].includes(userDoc.data().role)) {
       throw new ValidationError('Cannot delete admin accounts');
     }
 
     // Instead of deleting, mark as inactive
-    await updateDoc(doc(db, 'users', userId), {
+    await updateDoc(doc(db, COLLECTIONS.USERS, userId), {
       status: 'inactive',
       updatedAt: getServerTimestamp(),
     });
@@ -503,7 +504,7 @@ export const searchUsers = async (
   try {
     // Note: This is a simple implementation. For production, use Algolia or similar
     const q = query(
-      collection(db, 'users'),
+      collection(db, COLLECTIONS.USERS),
       orderBy('displayName'),
       limit(limitCount)
     );
@@ -542,14 +543,14 @@ export const getVerificationRequests = async (
 
     if (status) {
       q = query(
-        collection(db, 'verificationRequests'),
+        collection(db, COLLECTIONS.VERIFICATION_REQUESTS),
         where('status', '==', status),
         orderBy('submittedAt', 'desc'),
         limit(limitCount)
       );
     } else {
       q = query(
-        collection(db, 'verificationRequests'),
+        collection(db, COLLECTIONS.VERIFICATION_REQUESTS),
         orderBy('submittedAt', 'desc'),
         limit(limitCount)
       );
@@ -579,13 +580,13 @@ export const approveVerificationRequest = async (
 ): Promise<void> => {
   try {
     // Verify admin permissions
-    const adminDoc = await getDoc(doc(db, 'users', adminId));
+    const adminDoc = await getDoc(doc(db, COLLECTIONS.USERS, adminId));
     if (!adminDoc.exists() || !['admin', 'superadmin'].includes(adminDoc.data().role)) {
       throw new PermissionError('Only admins can approve verification requests');
     }
     const adminRole = adminDoc.data().role || 'admin';
 
-    const requestDoc = await getDoc(doc(db, 'verificationRequests', requestId));
+    const requestDoc = await getDoc(doc(db, COLLECTIONS.VERIFICATION_REQUESTS, requestId));
     if (!requestDoc.exists()) {
       throw new NotFoundError('Verification request not found');
     }
@@ -593,7 +594,7 @@ export const approveVerificationRequest = async (
     const request = { ...requestDoc.data(), id: requestDoc.id } as VerificationRequest;
 
     // Update verification request
-    await updateDoc(doc(db, 'verificationRequests', requestId), {
+    await updateDoc(doc(db, COLLECTIONS.VERIFICATION_REQUESTS, requestId), {
       status: 'approved',
       reviewedBy: adminId,
       reviewedAt: getServerTimestamp(),
@@ -602,14 +603,14 @@ export const approveVerificationRequest = async (
     });
 
     // Update user account
-    await updateDoc(doc(db, 'users', request.userId), {
+    await updateDoc(doc(db, COLLECTIONS.USERS, request.userId), {
       verified: true,
       status: 'active',
       updatedAt: getServerTimestamp(),
     });
 
     // Create notification for user
-    await addDoc(collection(db, 'notifications'), {
+    await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
       userId: request.userId,
       userRole: request.organizationType === 'bloodbank' || request.organizationType === 'hospital' ? 'bloodbank' : 'ngo',
       type: 'verification_status',
@@ -651,7 +652,7 @@ export const rejectVerificationRequest = async (
 ): Promise<void> => {
   try {
     // Verify admin permissions
-    const adminDoc = await getDoc(doc(db, 'users', adminId));
+    const adminDoc = await getDoc(doc(db, COLLECTIONS.USERS, adminId));
     if (!adminDoc.exists() || !['admin', 'superadmin'].includes(adminDoc.data().role)) {
       throw new PermissionError('Only admins can reject verification requests');
     }
@@ -661,7 +662,7 @@ export const rejectVerificationRequest = async (
       throw new ValidationError('Rejection reason is required');
     }
 
-    const requestDoc = await getDoc(doc(db, 'verificationRequests', requestId));
+    const requestDoc = await getDoc(doc(db, COLLECTIONS.VERIFICATION_REQUESTS, requestId));
     if (!requestDoc.exists()) {
       throw new NotFoundError('Verification request not found');
     }
@@ -669,7 +670,7 @@ export const rejectVerificationRequest = async (
     const request = { ...requestDoc.data(), id: requestDoc.id } as VerificationRequest;
 
     // Update verification request
-    await updateDoc(doc(db, 'verificationRequests', requestId), {
+    await updateDoc(doc(db, COLLECTIONS.VERIFICATION_REQUESTS, requestId), {
       status: 'rejected',
       reviewedBy: adminId,
       reviewedAt: getServerTimestamp(),
@@ -678,7 +679,7 @@ export const rejectVerificationRequest = async (
     });
 
     // Create notification for user
-    await addDoc(collection(db, 'notifications'), {
+    await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
       userId: request.userId,
       userRole: request.organizationType === 'bloodbank' || request.organizationType === 'hospital' ? 'bloodbank' : 'ngo',
       type: 'verification_status',
@@ -719,13 +720,13 @@ export const markVerificationUnderReview = async (
 ): Promise<void> => {
   try {
     // Verify admin permissions
-    const adminDoc = await getDoc(doc(db, 'users', adminId));
+    const adminDoc = await getDoc(doc(db, COLLECTIONS.USERS, adminId));
     if (!adminDoc.exists() || !['admin', 'superadmin'].includes(adminDoc.data().role)) {
       throw new PermissionError('Only admins can update verification requests');
     }
     const adminRole = adminDoc.data().role || 'admin';
 
-    await updateDoc(doc(db, 'verificationRequests', requestId), {
+    await updateDoc(doc(db, COLLECTIONS.VERIFICATION_REQUESTS, requestId), {
       status: 'under_review',
       reviewedBy: adminId,
       updatedAt: getServerTimestamp(),
@@ -819,7 +820,7 @@ export const getPlatformStats = async () => {
 
     // Keep exact total units behavior by summing completed donations.
     const completedDonationsSnapshot = await getDocs(
-      query(collection(db, 'donations'), where('status', '==', 'completed'))
+      query(collection(db, COLLECTIONS.DONATIONS), where('status', '==', 'completed'))
     );
     const completedDonationRows = extractQueryData<Donation>(completedDonationsSnapshot, [
       'donationDate',
@@ -902,7 +903,7 @@ export const getRecentActivity = async (limitCount: number = 20) => {
   try {
     // Get recent donations
     const donationsQuery = query(
-      collection(db, 'donations'),
+      collection(db, COLLECTIONS.DONATIONS),
       orderBy('createdAt', 'desc'),
       limit(limitCount)
     );
@@ -911,7 +912,7 @@ export const getRecentActivity = async (limitCount: number = 20) => {
 
     // Get recent blood requests
     const requestsQuery = query(
-      collection(db, 'bloodRequests'),
+      collection(db, COLLECTIONS.BLOOD_REQUESTS),
       orderBy('createdAt', 'desc'),
       limit(limitCount)
     );
@@ -927,7 +928,7 @@ export const getRecentActivity = async (limitCount: number = 20) => {
 
     // Get recent campaigns
     const campaignsQuery = query(
-      collection(db, 'campaigns'),
+      collection(db, COLLECTIONS.CAMPAIGNS),
       orderBy('createdAt', 'desc'),
       limit(limitCount)
     );
@@ -951,7 +952,7 @@ export const getRecentActivity = async (limitCount: number = 20) => {
 export const getInventoryAlerts = async (): Promise<BloodInventory[]> => {
   try {
     const q = query(
-      collection(db, 'bloodInventory'),
+      collection(db, COLLECTIONS.BLOOD_INVENTORY),
       where('status', 'in', ['low', 'critical']),
       orderBy('units', 'asc'),
       limit(50)
@@ -963,8 +964,8 @@ export const getInventoryAlerts = async (): Promise<BloodInventory[]> => {
     if (isRecoverableQueryError(error)) {
       try {
         const [criticalSnapshot, lowSnapshot] = await Promise.all([
-          getDocs(query(collection(db, 'bloodInventory'), where('status', '==', 'critical'), limit(50))),
-          getDocs(query(collection(db, 'bloodInventory'), where('status', '==', 'low'), limit(50))),
+          getDocs(query(collection(db, COLLECTIONS.BLOOD_INVENTORY), where('status', '==', 'critical'), limit(50))),
+          getDocs(query(collection(db, COLLECTIONS.BLOOD_INVENTORY), where('status', '==', 'low'), limit(50))),
         ]);
 
         const merged = [
@@ -990,7 +991,7 @@ export const getInventoryAlerts = async (): Promise<BloodInventory[]> => {
 export const getEmergencyRequests = async (): Promise<BloodRequest[]> => {
   try {
     const q = query(
-      collection(db, 'bloodRequests'),
+      collection(db, COLLECTIONS.BLOOD_REQUESTS),
       where('isEmergency', '==', true),
       where('status', '==', 'active'),
       orderBy('requestedAt', 'desc'),
@@ -1011,7 +1012,7 @@ export const getEmergencyRequests = async (): Promise<BloodRequest[]> => {
       try {
         const fallbackSnapshot = await getDocs(
           query(
-            collection(db, 'bloodRequests'),
+            collection(db, COLLECTIONS.BLOOD_REQUESTS),
             where('isEmergency', '==', true),
             where('status', '==', 'active'),
             limit(100)
@@ -1063,7 +1064,7 @@ export const generateDailyAnalytics = async (): Promise<string> => {
     today.setHours(0, 0, 0, 0);
 
     // Get inventory stats
-    const inventorySnapshot = await getDocs(collection(db, 'bloodInventory'));
+    const inventorySnapshot = await getDocs(collection(db, COLLECTIONS.BLOOD_INVENTORY));
     const inventory = extractQueryData<BloodInventory>(inventorySnapshot, ['lastRestocked', 'updatedAt']);
 
     const totalBloodUnits = inventory.reduce((sum, inv) => sum + (inv.units || 0), 0);
@@ -1094,7 +1095,7 @@ export const generateDailyAnalytics = async (): Promise<string> => {
       generatedAt: getServerTimestamp() as Timestamp,
     };
 
-    const docRef = await addDoc(collection(db, 'analytics'), analyticsData);
+    const docRef = await addDoc(collection(db, COLLECTIONS.ANALYTICS), analyticsData);
     return docRef.id;
   } catch (error) {
     throw new DatabaseError('Failed to generate daily analytics');
@@ -1113,7 +1114,7 @@ export const getAnalyticsByDateRange = async (
 ): Promise<Analytics[]> => {
   try {
     const q = query(
-      collection(db, 'analytics'),
+      collection(db, COLLECTIONS.ANALYTICS),
       where('date', '>=', Timestamp.fromDate(startDate)),
       where('date', '<=', Timestamp.fromDate(endDate)),
       orderBy('date', 'desc')

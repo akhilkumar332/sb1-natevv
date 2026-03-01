@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Phone, Mail, MapPin, Facebook, Twitter, Instagram, Linkedin, AlertCircle, ChevronDown } from 'lucide-react';
 import LogoMark from './LogoMark';
+import { ROUTES } from '../constants/routes';
 
 function Footer() {
   const [openSections, setOpenSections] = useState({
@@ -102,7 +103,7 @@ function Footer() {
               <ul className="space-y-3">
                 <li>
                   <Link
-                    to="/donor/register"
+                    to={ROUTES.portal.donor.register}
                     className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                   >
                     <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
@@ -111,7 +112,7 @@ function Footer() {
                 </li>
                 <li>
                   <Link
-                    to="/request-blood"
+                    to={ROUTES.requestBlood}
                     className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                   >
                     <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
@@ -120,7 +121,7 @@ function Footer() {
                 </li>
                 <li>
                   <Link
-                    to="/donors"
+                    to={ROUTES.donors}
                     className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                   >
                     <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
@@ -129,7 +130,7 @@ function Footer() {
                 </li>
                 <li>
                   <Link
-                    to="/about"
+                    to={ROUTES.about}
                     className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                   >
                     <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
@@ -138,7 +139,7 @@ function Footer() {
                 </li>
                 <li>
                   <Link
-                    to="/contact"
+                    to={ROUTES.contact}
                     className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                   >
                     <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
@@ -166,7 +167,7 @@ function Footer() {
               <ul className="space-y-3">
                 <li>
                   <Link
-                    to="/donor/login"
+                    to={ROUTES.portal.donor.login}
                     className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                   >
                     <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
@@ -175,7 +176,7 @@ function Footer() {
                 </li>
                 <li>
                   <Link
-                    to="/bloodbank/login"
+                    to={ROUTES.portal.bloodbank.login}
                     className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                   >
                     <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
@@ -184,7 +185,7 @@ function Footer() {
                 </li>
                 <li>
                   <Link
-                    to="/ngo/login"
+                    to={ROUTES.portal.ngo.login}
                     className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                   >
                     <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>

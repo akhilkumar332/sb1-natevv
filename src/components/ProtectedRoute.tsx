@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Loading from './Loading';
 import { notify } from 'services/notify.service';
 import { authMessages } from '../constants/messages';
+import { LEGACY_ROUTE_PREFIXES, PORTAL_PATH_PREFIXES, ROUTES } from '../constants/routes';
 
 const ProtectedRoute = () => {
   const { user, authLoading, loading, portalRole, effectiveRole, isSuperAdmin, isImpersonating } = useAuth();
@@ -23,12 +24,7 @@ const ProtectedRoute = () => {
   }
 
   // Define role-based paths
-  const rolePaths = {
-    donor: '/donor',
-    admin: '/admin',
-    ngo: '/ngo',
-    bloodbank: '/bloodbank',
-  } as const;
+  const rolePaths = PORTAL_PATH_PREFIXES;
 
   const resolvedImpersonatedRole = effectiveRole === 'hospital' ? 'bloodbank' : effectiveRole;
   const activeRole = isImpersonating
@@ -38,16 +34,24 @@ const ProtectedRoute = () => {
       : (effectiveRole ?? user?.role);
 
   if (!user) {
+    if (location.pathname.startsWith(LEGACY_ROUTE_PREFIXES.hospital)) {
+      return <Navigate to={ROUTES.portal.hospital.login} replace />;
+    }
     for (const role in rolePaths) {
       if (location.pathname.startsWith(rolePaths[role as keyof typeof rolePaths])) {
-        return <Navigate to={`${rolePaths[role as keyof typeof rolePaths]}/login`} replace />;
+        const key = role as keyof typeof rolePaths;
+        return <Navigate to={ROUTES.portal[key].login} replace />;
       }
     }
   } else {
     if (isSuperAdmin && !portalRole && !isImpersonating) {
+      if (location.pathname.startsWith(LEGACY_ROUTE_PREFIXES.hospital)) {
+        return <Navigate to={ROUTES.portal.hospital.login} replace />;
+      }
       for (const role in rolePaths) {
         if (location.pathname.startsWith(rolePaths[role as keyof typeof rolePaths])) {
-          return <Navigate to={`${rolePaths[role as keyof typeof rolePaths]}/login`} replace />;
+          const key = role as keyof typeof rolePaths;
+          return <Navigate to={ROUTES.portal[key].login} replace />;
         }
       }
     }
@@ -56,7 +60,10 @@ const ProtectedRoute = () => {
 
     // Check for onboarding completion (only redirect if explicitly false/undefined and not already on onboarding page)
     if (!isSuperAdmin && !isImpersonating && userRole && user.onboardingCompleted !== true && !location.pathname.includes('/onboarding')) {
-      return <Navigate to={`/${userRole}/onboarding`} replace />;
+      const onboardingRole = userRole === 'hospital' ? 'bloodbank' : userRole;
+      if (onboardingRole === 'donor' || onboardingRole === 'ngo' || onboardingRole === 'bloodbank' || onboardingRole === 'admin') {
+        return <Navigate to={ROUTES.portal[onboardingRole].onboarding} replace />;
+      }
     }
 
     // Role-based access
@@ -70,8 +77,12 @@ const ProtectedRoute = () => {
             lastDeniedRef.current = deniedKey;
           }
         }
-        return <Navigate to={`${rolePaths[role as keyof typeof rolePaths]}/login`} replace />;
+        const key = role as keyof typeof rolePaths;
+        return <Navigate to={ROUTES.portal[key].login} replace />;
       }
+    }
+    if (location.pathname.startsWith(LEGACY_ROUTE_PREFIXES.hospital) && userRole !== 'bloodbank' && userRole !== 'hospital') {
+      return <Navigate to={ROUTES.portal.hospital.login} replace />;
     }
   }
 

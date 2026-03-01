@@ -9,6 +9,7 @@ import PwaInstallCta from '../../components/PwaInstallCta';
 import SuperAdminPortalModal from '../../components/auth/SuperAdminPortalModal';
 import AuthStatusScreen from '../../components/auth/AuthStatusScreen';
 import { authMessages } from '../../constants/messages';
+import { ROUTES } from '../../constants/routes';
 import { handleRoleGoogleLogin } from '../../utils/roleGoogleLogin';
 import { navigateToPortalDashboard, resolveImpersonationRole, resolvePortalRole } from '../../utils/portalNavigation';
 import { notifyRoleMismatch } from '../../utils/authNotifications';
@@ -59,7 +60,9 @@ export function BloodBankLogin() {
       return;
     }
 
-    const targetPath = user.onboardingCompleted ? '/bloodbank/dashboard' : '/bloodbank/onboarding';
+    const targetPath = user.onboardingCompleted
+      ? ROUTES.portal.bloodbank.dashboard.root
+      : ROUTES.portal.bloodbank.onboarding;
     hasRedirected.current = true;
     navigate(targetPath);
   }, [
@@ -84,10 +87,10 @@ export function BloodBankLogin() {
         expectedRoles: ['bloodbank', 'hospital'],
         roleMismatchMessage: authMessages.roleMismatch.bloodbank,
         roleMismatchId: 'role-mismatch-bloodbank',
-        mismatchRedirectTo: '/bloodbank/login',
+        mismatchRedirectTo: ROUTES.portal.bloodbank.login,
         successMessage: 'Successfully logged in as BloodBank!',
-        dashboardPath: '/bloodbank/dashboard',
-        onboardingPath: '/bloodbank/onboarding',
+        dashboardPath: ROUTES.portal.bloodbank.dashboard.root,
+        onboardingPath: ROUTES.portal.bloodbank.onboarding,
         scope: 'bloodbank',
         page: 'BloodBankLogin',
       });
@@ -263,7 +266,7 @@ export function BloodBankLogin() {
                 <p className="text-center text-sm text-gray-600">
                   Don't have an account?{' '}
                   <Link
-                    to="/bloodbank/register"
+                    to={ROUTES.portal.bloodbank.register}
                     className="font-semibold text-red-600 hover:text-red-700 transition-colors"
                   >
                     Register now

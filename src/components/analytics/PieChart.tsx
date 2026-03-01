@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { CHART_PALETTE } from '../../constants/theme';
 
 interface PieChartProps {
   data: Array<{ label: string; value: number; color?: string }>;
@@ -12,16 +13,7 @@ interface PieChartProps {
   size?: number;
 }
 
-const COLORS = [
-  '#DC2626', // red-600
-  '#EA580C', // orange-600
-  '#D97706', // amber-600
-  '#16A34A', // green-600
-  '#0891B2', // cyan-600
-  '#2563EB', // blue-600
-  '#7C3AED', // violet-600
-  '#DB2777', // pink-600
-];
+const COLORS = CHART_PALETTE.sequence;
 
 /**
  * PieChart Component

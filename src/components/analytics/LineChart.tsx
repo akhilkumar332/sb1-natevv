@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { CHART_PALETTE } from '../../constants/theme';
 
 interface LineChartProps {
   data: Array<{ date?: string; label?: string; value: number }>;
@@ -20,7 +21,7 @@ interface LineChartProps {
 export const LineChart: React.FC<LineChartProps> = ({
   data,
   title,
-  color = '#DC2626',
+  color = CHART_PALETTE.primary,
   height = 200,
 }) => {
   if (data.length === 0) {
@@ -71,10 +72,10 @@ export const LineChart: React.FC<LineChartProps> = ({
                 y1={y}
                 x2={width - padding}
                 y2={y}
-                stroke="#E5E7EB"
+                stroke={CHART_PALETTE.grid}
                 strokeWidth="1"
               />
-              <text x={padding - 10} y={y + 4} textAnchor="end" fontSize="12" fill="#6B7280">
+              <text x={padding - 10} y={y + 4} textAnchor="end" fontSize="12" fill={CHART_PALETTE.axis}>
                 {Math.round(maxValue * ratio)}
               </text>
             </g>
@@ -105,7 +106,7 @@ export const LineChart: React.FC<LineChartProps> = ({
                 y={height - 10}
                 textAnchor="middle"
                 fontSize="12"
-                fill="#6B7280"
+                fill={CHART_PALETTE.axis}
               >
                 {p.date.substring(5)}
               </text>

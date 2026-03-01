@@ -19,6 +19,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { COLLECTIONS } from '../constants/firestore';
 import type { Notification as NotificationData, Coordinates, NotificationType, NotificationPriority } from '../types/database.types';
 import { FCM_CONFIG } from '../config/fcm.config';
 import { calculateDistance } from '../utils/geolocation';
@@ -26,6 +27,7 @@ import { DatabaseError } from '../utils/errorHandler';
 import type { DeviceInfo } from '../utils/device';
 import { captureHandledError } from './errorLog.service';
 import { runOnlineTransaction } from '../utils/onlineOnlyTransaction';
+import { ROUTES } from '../constants/routes';
 
 // ============================================================================
 // FCM TOKEN MANAGEMENT
@@ -152,7 +154,7 @@ export const requestNotificationPermission = async (
  */
 export const saveFCMToken = async (userId: string, token: string): Promise<void> => {
   try {
-    const userRef = doc(db, 'users', userId);
+    const userRef = doc(db, COLLECTIONS.USERS, userId);
     await runOnlineTransaction(async (tx) => {
       const snapshot = await tx.get(userRef);
       const snapshotData = snapshot.exists() ? (snapshot.data() as any) : {};
@@ -192,7 +194,7 @@ export const saveFCMDeviceToken = async (
   deviceInfo?: DeviceInfo | null
 ): Promise<void> => {
   try {
-    const userRef = doc(db, 'users', userId);
+    const userRef = doc(db, COLLECTIONS.USERS, userId);
     const detailsPayload = {
       token,
       info: deviceInfo || {},
@@ -221,7 +223,7 @@ export const removeFCMToken = async (
   token: string
 ): Promise<void> => {
   try {
-    const userRef = doc(db, 'users', userId);
+    const userRef = doc(db, COLLECTIONS.USERS, userId);
     const snapshot = await getDoc(userRef);
     const data = snapshot.exists() ? (snapshot.data() as any) : {};
     const currentDeviceDetails = { ...(data.fcmDeviceDetails || {}) };
@@ -249,7 +251,7 @@ export const removeFCMDeviceToken = async (
   token: string
 ): Promise<void> => {
   try {
-    const userRef = doc(db, 'users', userId);
+    const userRef = doc(db, COLLECTIONS.USERS, userId);
     void token;
     await updateDoc(userRef, {
       [`fcmDeviceDetails.${deviceId}`]: deleteField(),
@@ -310,7 +312,7 @@ export const createNotification = async (
   notification: Omit<NotificationData, 'id' | 'createdAt' | 'read'>
 ): Promise<string> => {
   try {
-    const notificationRef = doc(collection(db, 'notifications'));
+    const notificationRef = doc(collection(db, COLLECTIONS.NOTIFICATIONS));
 
     const notificationData: NotificationData = {
       ...notification,
@@ -383,7 +385,7 @@ export const sendEmergencyRequestNotification = async (
   try {
     // Find nearby donors with matching blood type
     const donorsQuery = query(
-      collection(db, 'users'),
+      collection(db, COLLECTIONS.USERS),
       where('role', '==', 'donor'),
       where('bloodType', '==', bloodType),
       where('isAvailable', '==', true),
@@ -549,7 +551,7 @@ export const sendDonationReminderNotification = async (
     {
       daysSinceLastDonation,
       priority: 'medium',
-      actionUrl: '/donor/dashboard',
+      actionUrl: ROUTES.portal.donor.dashboard.root,
     }
   );
 };
@@ -619,7 +621,7 @@ export const sendNearbyCampaignNotification = async (
   try {
     // Find nearby donors
     const donorsQuery = query(
-      collection(db, 'users'),
+      collection(db, COLLECTIONS.USERS),
       where('role', '==', 'donor'),
       where('verified', '==', true)
     );
@@ -714,7 +716,7 @@ export const sendLowInventoryAlert = async (
       units,
       criticalLevel,
       priority: 'high',
-      actionUrl: '/bloodbank/dashboard/inventory',
+      actionUrl: ROUTES.portal.bloodbank.dashboard.inventory,
     }
   );
 };
@@ -739,7 +741,7 @@ export const sendCriticalInventoryAlert = async (
       bloodType,
       units,
       priority: 'high',
-      actionUrl: '/bloodbank/dashboard/inventory',
+      actionUrl: ROUTES.portal.bloodbank.dashboard.inventory,
     }
   );
 };
@@ -867,7 +869,7 @@ export const sendSystemAnnouncement = async (
       constraints.push(where('role', '==', targetRole));
     }
 
-    const q = query(collection(db, 'users'), ...constraints);
+    const q = query(collection(db, COLLECTIONS.USERS), ...constraints);
     const snapshot = await getDocs(q);
 
     const userIds = snapshot.docs.map((doc) => doc.id);

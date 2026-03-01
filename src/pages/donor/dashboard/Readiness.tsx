@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { BookOpen, CheckCircle, Clock } from 'lucide-react';
+import { ROUTES } from '../../../constants/routes';
 
 const DonorReadiness = () => {
   const dashboard = useOutletContext<any>();
@@ -181,7 +182,7 @@ const DonorReadiness = () => {
                   {!lastDonationDate && (
                     <button
                       type="button"
-                      onClick={() => navigate('/donor/dashboard/journey')}
+                      onClick={() => navigate(ROUTES.portal.donor.dashboard.journey)}
                       className="text-[11px] font-semibold text-red-600 hover:text-red-700"
                     >
                       Log a donation in Journey

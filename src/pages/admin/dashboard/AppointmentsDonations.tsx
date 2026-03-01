@@ -12,6 +12,7 @@ import { useAdminAppointments, useAdminDonations } from '../../../hooks/admin/us
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { refetchQueries } from '../../../utils/queryRefetch';
 import { runWithFeedback } from '../../../utils/runWithFeedback';
+import { COLLECTIONS } from '../../../constants/firestore';
 
 type AppointmentRow = {
   id: string;
@@ -114,7 +115,7 @@ function AppointmentsDonationsPage() {
   const updateAppointmentStatus = async (id: string, status: 'confirmed' | 'completed' | 'cancelled') => {
     setProcessingId(id);
     await runWithFeedback({
-      action: () => updateDoc(doc(db, 'appointments', id), { status, updatedAt: getServerTimestamp() }),
+      action: () => updateDoc(doc(db, COLLECTIONS.APPOINTMENTS, id), { status, updatedAt: getServerTimestamp() }),
       successMessage: `Appointment marked ${status}`,
       errorMessage: 'Failed to update appointment status.',
       capture: { scope: 'admin', metadata: { kind: 'admin.appointment.status.update', status } },
@@ -126,7 +127,7 @@ function AppointmentsDonationsPage() {
   const updateDonationStatus = async (id: string, status: 'completed' | 'rejected' | 'pending') => {
     setProcessingId(id);
     await runWithFeedback({
-      action: () => updateDoc(doc(db, 'donations', id), { status, updatedAt: getServerTimestamp() }),
+      action: () => updateDoc(doc(db, COLLECTIONS.DONATIONS, id), { status, updatedAt: getServerTimestamp() }),
       successMessage: `Donation marked ${status}`,
       errorMessage: 'Failed to update donation status.',
       capture: { scope: 'admin', metadata: { kind: 'admin.donation.status.update', status } },

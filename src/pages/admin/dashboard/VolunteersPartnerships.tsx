@@ -12,6 +12,7 @@ import { useAdminPartnerships, useAdminVolunteers } from '../../../hooks/admin/u
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { refetchQueries } from '../../../utils/queryRefetch';
 import { runWithFeedback } from '../../../utils/runWithFeedback';
+import { COLLECTIONS } from '../../../constants/firestore';
 
 type VolunteerRow = {
   id: string;
@@ -115,7 +116,7 @@ function VolunteersPartnershipsPage() {
   const updateVolunteerStatus = async (id: string, status: 'active' | 'inactive') => {
     setProcessingId(id);
     await runWithFeedback({
-      action: () => updateDoc(doc(db, 'volunteers', id), { status, updatedAt: getServerTimestamp() }),
+      action: () => updateDoc(doc(db, COLLECTIONS.VOLUNTEERS, id), { status, updatedAt: getServerTimestamp() }),
       successMessage: `Volunteer marked ${status}`,
       errorMessage: 'Failed to update volunteer status.',
       capture: { scope: 'admin', metadata: { kind: 'admin.volunteer.status.update', status } },
@@ -127,7 +128,7 @@ function VolunteersPartnershipsPage() {
   const updatePartnershipStatus = async (id: string, status: 'active' | 'pending' | 'inactive') => {
     setProcessingId(id);
     await runWithFeedback({
-      action: () => updateDoc(doc(db, 'partnerships', id), { status, updatedAt: getServerTimestamp() }),
+      action: () => updateDoc(doc(db, COLLECTIONS.PARTNERSHIPS, id), { status, updatedAt: getServerTimestamp() }),
       successMessage: `Partnership marked ${status}`,
       errorMessage: 'Failed to update partnership status.',
       capture: { scope: 'admin', metadata: { kind: 'admin.partnership.status.update', status } },

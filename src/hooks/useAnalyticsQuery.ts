@@ -1,3 +1,4 @@
+import { FIFTEEN_MINUTES_MS, TEN_MINUTES_MS } from '../constants/time';
 /**
  * React Query Hooks for Analytics
  *
@@ -165,7 +166,7 @@ export const usePlatformStats = (
     queryKey: ['platformStats'],
     queryFn: () => getPlatformStats(),
     // Cache platform stats for 10 minutes (less frequently changing)
-    staleTime: 10 * 60 * 1000,
+    staleTime: TEN_MINUTES_MS,
     ...options,
   });
 };
@@ -195,7 +196,7 @@ export const useBloodTypeDistribution = (
     queryKey: ['bloodTypeDistribution'],
     queryFn: () => getBloodTypeDistribution(),
     // Cache blood type distribution for 15 minutes (rarely changes)
-    staleTime: 15 * 60 * 1000,
+    staleTime: FIFTEEN_MINUTES_MS,
     ...options,
   });
 };
@@ -210,7 +211,7 @@ export const useGeographicDistribution = (
     queryKey: ['geographicDistribution'],
     queryFn: () => getGeographicDistribution(),
     // Cache geographic distribution for 15 minutes (rarely changes)
-    staleTime: 15 * 60 * 1000,
+    staleTime: FIFTEEN_MINUTES_MS,
     ...options,
   });
 };
@@ -226,7 +227,7 @@ export const useTopDonors = (
     queryKey: ['topDonors', limit],
     queryFn: () => getTopDonors(limit),
     // Cache top donors for 10 minutes
-    staleTime: 10 * 60 * 1000,
+    staleTime: TEN_MINUTES_MS,
     ...options,
   });
 };
