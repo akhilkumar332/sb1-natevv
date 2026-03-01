@@ -17,7 +17,7 @@ import {
   serverTimestamp,
   Timestamp
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { auth, db } from '../firebase';
 import { gamificationService } from '../services/gamification.service';
 import { useScopedErrorReporter } from './useScopedErrorReporter';
 import { readDashboardCache, writeDashboardCache } from '../utils/dashboardCache';
@@ -120,6 +120,11 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
     const code = error?.code || '';
     const message = String(error?.message || '').toLowerCase();
     return code === 'unavailable' || message.includes('client is offline');
+  };
+  const isExpectedAuthTeardownError = (error: any) => {
+    const code = String(error?.code || '').toLowerCase();
+    if (code !== 'permission-denied') return false;
+    return !auth.currentUser || auth.currentUser.uid !== userId;
   };
   const cacheKey = useMemo(() => (userId ? `donor_dashboard_cache_${userId}` : ''), [userId]);
   const cacheTTL = 5 * 60 * 1000;
@@ -355,6 +360,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
         });
       },
       (err) => {
+        if (isExpectedAuthTeardownError(err)) return;
         reportDonorDataError(err, 'user_stats.listen');
       }
     );
@@ -403,6 +409,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
           setFirstDonationDate(oldestDonation);
         },
         (err) => {
+          if (isExpectedAuthTeardownError(err)) return;
           reportDonorDataError(err, 'donation_history.listen');
         }
       );
@@ -498,6 +505,7 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
           setEmergencyRequests(activeRequests);
         },
         (err) => {
+          if (isExpectedAuthTeardownError(err)) return;
           reportDonorDataError(err, 'emergency_requests.listen');
         }
       );
