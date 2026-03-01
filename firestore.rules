@@ -125,6 +125,28 @@ service cloud.firestore {
     }
 
     /**
+     * Restrict non-owner user-profile reads to active, non-break-glass accounts.
+     */
+    function isReadableDirectoryProfile() {
+      return resource.data.status == 'active'
+        && !(resource.data.breakGlass == true)
+        && resource.data.role in ['donor', 'ngo', 'bloodbank', 'hospital']
+        && (resource.data.role != 'donor' || resource.data.onboardingCompleted != false);
+    }
+
+    /**
+     * Allow a caller to append only themselves to a list field.
+     */
+    function isSelfAppendOnly(listField) {
+      return request.resource.data[listField] is list
+        && resource.data[listField] is list
+        && request.resource.data[listField].hasAll(resource.data[listField])
+        && request.resource.data[listField].size() == resource.data[listField].size() + 1
+        && request.auth.uid in request.resource.data[listField]
+        && !(request.auth.uid in resource.data[listField]);
+    }
+
+    /**
      * Validate referral status updates from referred users
      */
     function isValidReferralStatusUpdate() {
@@ -286,8 +308,12 @@ service cloud.firestore {
     // ========================================================================
 
     match /users/{userId} {
-      // Anyone authenticated can read user data
-      allow read: if isAuthenticated();
+      // Owner/admin can read all; other authenticated users can read only active directory-safe profiles.
+      allow read: if isAuthenticated() && (
+        isOwner(userId) ||
+        isAdmin() ||
+        isReadableDirectoryProfile()
+      );
 
       // Users can create their own document during registration
       allow create: if isAuthenticated() && isOwner(userId) && !(request.resource.data.breakGlass == true);
@@ -467,12 +493,15 @@ service cloud.firestore {
         isAdmin()
       );
 
-      // Only the requester or admin can update
-      // Any authenticated user can update respondedDonors and confirmedDonors arrays
+      // Requester/admin can update all fields.
+      // Donors can only self-append to respondedDonors.
       allow update: if isAuthenticated() && (
         resource.data.requesterId == request.auth.uid ||
         isAdmin() ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['respondedDonors', 'confirmedDonors', 'updatedAt'])
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['respondedDonors', 'updatedAt'])
+          && isSelfAppendOnly('respondedDonors')
+        )
       );
 
       // Only the requester or admin can delete
@@ -614,12 +643,16 @@ service cloud.firestore {
         isAdmin()
       );
 
-      // Only the creating NGO or admin can update
-      // Any authenticated user can update registeredDonors and confirmedDonors arrays
+      // Owner/admin can update all fields.
+      // Donors can only self-register (append own uid to registeredDonors).
       allow update: if isAuthenticated() && (
         resource.data.ngoId == request.auth.uid ||
         isAdmin() ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registeredDonors', 'confirmedDonors', 'updatedAt'])
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registeredDonors', 'updatedAt'])
+          && isDonor()
+          && isSelfAppendOnly('registeredDonors')
+        )
       );
 
       // Only the creating NGO or admin can delete
@@ -641,8 +674,12 @@ service cloud.firestore {
         isAdmin()
       );
 
-      // Any authenticated user can create appointments
-      allow create: if isAuthenticated();
+      // Donor or hospital side must be the authenticated principal (or admin).
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        request.resource.data.donorId == request.auth.uid ||
+        hasHospitalEditAccess(request.resource.data.hospitalId)
+      );
 
       // Involved parties or admin can update
       allow update: if isAuthenticated() && (

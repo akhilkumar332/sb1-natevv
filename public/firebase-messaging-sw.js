@@ -84,31 +84,6 @@ async function enqueueBackgroundMessage(payload) {
   }
 }
 
-async function postToBridge(payload) {
-  if (!payload) return;
-  const userId = payload?.data?.userId;
-  if (!userId) return;
-  const body = {
-    payload,
-    userId,
-    userRole: payload?.data?.userRole || payload?.data?.role,
-    messageId: payload.messageId || (payload.data && payload.data.messageId),
-    receivedAt: Date.now(),
-    source: 'background',
-    from: payload.from,
-  };
-  try {
-    await fetch('/.netlify/functions/fcm-bridge', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      keepalive: true,
-    });
-  } catch (error) {
-    console.warn('[firebase-messaging-sw.js] Failed to forward to bridge', error);
-  }
-}
-
 // Handle background messages
 if (messaging) {
   messaging.onBackgroundMessage((payload) => {
@@ -140,10 +115,6 @@ if (messaging) {
 
   enqueueBackgroundMessage(payload).catch((error) => {
     console.warn('[firebase-messaging-sw.js] Failed to enqueue background message', error);
-  });
-
-  postToBridge(payload).catch((error) => {
-    console.warn('[firebase-messaging-sw.js] Failed to post to bridge', error);
   });
 
   return self.registration.showNotification(notificationTitle, notificationOptions);

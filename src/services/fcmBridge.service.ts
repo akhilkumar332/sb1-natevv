@@ -1,3 +1,5 @@
+import { auth } from '../firebase';
+
 type FcmBridgePayload = {
   messageId?: string;
   from?: string;
@@ -16,6 +18,7 @@ export const sendFcmToBridge = async (payload: FcmBridgePayload): Promise<boolea
 
   const userId = payload.data?.userId;
   if (!userId) return false;
+  if (!auth.currentUser || auth.currentUser.uid !== userId) return false;
 
   const body = {
     payload,
@@ -27,9 +30,14 @@ export const sendFcmToBridge = async (payload: FcmBridgePayload): Promise<boolea
   };
 
   try {
+    const idToken = await auth.currentUser.getIdToken();
+    if (!idToken) return false;
     const response = await fetch(BRIDGE_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      },
       body: JSON.stringify(body),
       keepalive: true,
     });

@@ -187,12 +187,12 @@ const loadServiceAccount = () => {
 // Initialize Firebase Admin
 if (!admin.apps.length) {
   const serviceAccount = loadServiceAccount();
-  const rawPrivateKey = process.env.VITE_FIREBASE_PRIVATE_KEY;
+  const rawPrivateKey = process.env.FIREBASE_PRIVATE_KEY || process.env.VITE_FIREBASE_PRIVATE_KEY;
   const privateKey = rawPrivateKey
     ? rawPrivateKey.replace(/^"|"$/g, '').replace(/\\n/g, '\n')
     : undefined;
-  const projectId = process.env.VITE_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.VITE_FIREBASE_CLIENT_EMAIL;
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || process.env.VITE_FIREBASE_CLIENT_EMAIL;
 
   const envServiceAccount = projectId && privateKey && clientEmail
     ? { projectId, privateKey, clientEmail }
@@ -360,30 +360,20 @@ app.get('/api/v1/health', (req, res) => {
  *         description: Invalid credentials
  */
 app.post('/api/v1/auth/login', async (req, res) => {
-  const { email, password } = req.body;
-
-  try {
-    const userCredential = await admin.auth().getUserByEmail(email);
-    // Here you would typically validate the password with a custom auth method.
-    // For simplicity, we are assuming the user exists and the password is correct.
-    
-    // Generate custom token (or handle your login logic)
-    const idToken = await admin.auth().createCustomToken(userCredential.uid);
-    
-    res.status(200).json({ idToken });
-  } catch (error) {
-    logEvent({
-      level: 'error',
-      event: 'auth.login.failed',
-      error,
-      meta: {
-        path: req.path,
-        method: req.method,
-        email: typeof email === 'string' ? email : null,
-      },
-    });
-    res.status(400).json({ message: 'Invalid credentials' });
-  }
+  logEvent({
+    level: 'warn',
+    event: 'auth.login.disabled',
+    dedupe: false,
+    meta: {
+      path: req.path,
+      method: req.method,
+      ip: req.ip,
+    },
+  });
+  res.status(410).json({
+    error: 'Disabled',
+    message: 'This endpoint has been disabled for security hardening.',
+  });
 });
 
 /**
