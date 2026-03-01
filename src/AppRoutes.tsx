@@ -114,6 +114,7 @@ const AdminAppointmentsDonations = lazy(() => lazyLoad(import('./pages/admin/das
 const AdminAnalyticsReports = lazy(() => lazyLoad(import('./pages/admin/dashboard/AnalyticsReports')));
 const AdminAuditSecurity = lazy(() => lazyLoad(import('./pages/admin/dashboard/AuditSecurity')));
 const AdminErrorLogs = lazy(() => lazyLoad(import('./pages/admin/dashboard/ErrorLogs')));
+const AdminContactSubmissions = lazy(() => lazyLoad(import('./pages/admin/dashboard/ContactSubmissions')));
 const AdminNotifications = lazy(() => lazyLoad(import('./pages/admin/dashboard/Notifications')));
 const AdminSettings = lazy(() => lazyLoad(import('./pages/admin/dashboard/Settings')));
 const FindDonors = lazy(() => lazyLoad(import('./pages/FindDonors')));
@@ -208,6 +209,7 @@ const AppRoutes = () => {
           <Route path="reports" element={<Navigate to={ROUTES.portal.admin.dashboard.analyticsReports} replace />} />
           <Route path="audit-security" element={<AdminAuditSecurity />} />
           <Route path="error-logs" element={<AdminErrorLogs />} />
+          <Route path="contact-submissions" element={<AdminContactSubmissions />} />
           <Route path="impersonation-audit" element={<ImpersonationAudit />} />
           <Route path="notifications" element={<AdminNotifications />} />
           <Route path="settings" element={<AdminSettings />} />

@@ -808,6 +808,27 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // COLLECTION: contactSubmissions
+    // ========================================================================
+
+    match /contactSubmissions/{submissionId} {
+      allow read: if isAdmin();
+      allow create: if false;
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'readAt', 'readBy', 'updatedAt']) &&
+        request.resource.data.status in ['read', 'unread'];
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    // COLLECTION: contactRateLimits
+    // ========================================================================
+
+    match /contactRateLimits/{rateLimitId} {
+      allow read, write: if false;
+    }
+
+    // ========================================================================
     // COLLECTION: publicDonors (sanitized public donor profiles)
     // ========================================================================
 

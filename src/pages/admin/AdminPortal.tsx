@@ -13,6 +13,7 @@ import {
   Droplets,
   Heart,
   LayoutDashboard,
+  Mail,
   Settings,
   Shield,
   Users,
@@ -92,6 +93,7 @@ function AdminPortal() {
         label: 'System',
         icon: Settings,
         items: [
+          { id: 'contact-submissions', label: 'Contact Submissions', to: 'contact-submissions', icon: Mail },
           { id: 'notifications', label: 'Notifications', to: 'notifications', icon: Bell },
           { id: 'settings', label: 'Settings', to: 'settings', icon: Settings },
         ],

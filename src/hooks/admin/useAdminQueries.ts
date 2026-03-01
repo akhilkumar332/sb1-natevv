@@ -25,7 +25,7 @@ import {
   type AdminUserSecurity,
   type AdminUserTimelineItem,
 } from '../../services/adminUserDetail.service';
-import type { BloodInventory, BloodRequest, User, VerificationRequest } from '../../types/database.types';
+import type { BloodInventory, BloodRequest, ContactSubmission, User, VerificationRequest } from '../../types/database.types';
 import { toDateValue } from '../../utils/dateValue';
 
 type PlatformStatsResponse = Awaited<ReturnType<typeof getPlatformStats>>;
@@ -197,6 +197,34 @@ const fetchNotifications = async (limitCount: number): Promise<AdminEntity[]> =>
       createdAt: toDateValue(data.createdAt),
       updatedAt: toDateValue(data.updatedAt),
     };
+  });
+};
+
+const fetchContactSubmissions = async (limitCount: number): Promise<ContactSubmission[]> => {
+  const snapshot = await getDocs(query(
+    collection(db, COLLECTIONS.CONTACT_SUBMISSIONS),
+    orderBy('createdAt', 'desc'),
+    limit(limitCount)
+  ));
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data() as Record<string, any>;
+    return {
+      id: docSnap.id,
+      name: typeof data.name === 'string' ? data.name : '',
+      email: typeof data.email === 'string' ? data.email : '',
+      phone: typeof data.phone === 'string' ? data.phone : undefined,
+      subject: typeof data.subject === 'string' ? data.subject : 'general',
+      message: typeof data.message === 'string' ? data.message : '',
+      status: data.status === 'read' ? 'read' : 'unread',
+      recaptchaScore: typeof data.recaptchaScore === 'number' ? data.recaptchaScore : null,
+      recaptchaAction: typeof data.recaptchaAction === 'string' ? data.recaptchaAction : null,
+      sourceIpHash: typeof data.sourceIpHash === 'string' ? data.sourceIpHash : null,
+      userAgentHash: typeof data.userAgentHash === 'string' ? data.userAgentHash : null,
+      readAt: (toDateValue(data.readAt) as any) || null,
+      readBy: typeof data.readBy === 'string' ? data.readBy : null,
+      createdAt: toDateValue(data.createdAt) as any,
+      updatedAt: toDateValue(data.updatedAt) as any,
+    } as ContactSubmission;
   });
 };
 
@@ -413,6 +441,20 @@ export const useAdminNotifications = (limitCount: number = 1000) =>
       staleTime: ADMIN_QUERY_TIMINGS.notifications.staleTime,
       gcTime: ADMIN_QUERY_TIMINGS.notifications.gcTime,
       refetchInterval: ADMIN_QUERY_TIMINGS.notifications.refetchInterval,
+      refetchIntervalInBackground: false,
+    },
+  );
+
+export const useAdminContactSubmissions = (limitCount: number = 1000) =>
+  useCachedAdminQuery<ContactSubmission[]>(
+    adminQueryKeys.contactSubmissions(limitCount),
+    ADMIN_QUERY_TIMINGS.contactSubmissions.ttl,
+    ['createdAt', 'updatedAt', 'readAt'],
+    () => fetchContactSubmissions(limitCount),
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.contactSubmissions.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.contactSubmissions.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.contactSubmissions.refetchInterval,
       refetchIntervalInBackground: false,
     },
   );

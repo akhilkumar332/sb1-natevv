@@ -38,6 +38,8 @@ export const adminQueryKeys = {
   donations: (limit: number = 1000) => ['admin', 'donations', { limit }] as const,
   notificationsRoot: ['admin', 'notifications'] as const,
   notifications: (limit: number = 1000) => ['admin', 'notifications', { limit }] as const,
+  contactSubmissionsRoot: ['admin', 'contactSubmissions'] as const,
+  contactSubmissions: (limit: number = 1000) => ['admin', 'contactSubmissions', { limit }] as const,
   auditRoot: ['admin', 'auditLogs'] as const,
   auditLogs: (limit: number = 1000) => ['admin', 'auditLogs', { limit }] as const,
   errorRoot: ['admin', 'errorLogs'] as const,

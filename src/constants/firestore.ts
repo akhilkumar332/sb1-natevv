@@ -23,6 +23,8 @@ export const COLLECTIONS = {
   REFERRAL_TRACKING: 'ReferralTracking',
   IMPERSONATION_EVENTS: 'impersonationEvents',
   INVENTORY_ALERTS: 'inventoryAlerts',
+  CONTACT_SUBMISSIONS: 'contactSubmissions',
+  CONTACT_RATE_LIMITS: 'contactRateLimits',
   INVENTORY_TRANSFERS: 'inventoryTransfers',
   INVENTORY_RESERVATIONS: 'inventoryReservations',
   INVENTORY_TRANSACTIONS: 'inventoryTransactions',

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Mail, Phone, MapPin, Send, MessageCircle, Clock, Headphones } from 'lucide-react';
 import { notify } from 'services/notify.service';
+import { CONTACT_SUBJECT_OPTIONS } from '../constants/contact';
+import { submitContactForm } from '../services/contact.service';
+import { captureHandledError } from '../services/errorLog.service';
 
 function Contact() {
   const [formData, setFormData] = useState({
@@ -10,11 +13,27 @@ function Contact() {
     subject: '',
     message: ''
   });
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    notify.success('Message sent successfully! We\'ll get back to you soon.');
-    setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+    if (submitting) return;
+
+    setSubmitting(true);
+    try {
+      await submitContactForm(formData);
+      notify.success('Message sent successfully! We\'ll get back to you soon.');
+      setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+    } catch (error) {
+      void captureHandledError(error, {
+        source: 'frontend',
+        scope: 'unknown',
+        metadata: { kind: 'contact.form.submit' },
+      });
+      notify.error(error instanceof Error ? error.message : 'Failed to submit contact form.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -199,11 +218,9 @@ function Contact() {
                         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors"
                       >
                         <option value="">Select a subject</option>
-                        <option value="general">General Inquiry</option>
-                        <option value="donor">Donor Support</option>
-                        <option value="bloodbank">BloodBank Partnership</option>
-                        <option value="emergency">Emergency Request</option>
-                        <option value="technical">Technical Support</option>
+                        {CONTACT_SUBJECT_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
                       </select>
                     </div>
 
@@ -222,10 +239,11 @@ function Contact() {
 
                     <button
                       type="submit"
+                      disabled={submitting}
                       className="w-full py-4 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center"
                     >
                       <Send className="w-5 h-5 mr-2" />
-                      Send Message
+                      {submitting ? 'Sending...' : 'Send Message'}
                     </button>
                   </form>
                 </div>

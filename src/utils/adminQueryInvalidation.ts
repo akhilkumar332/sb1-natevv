@@ -46,6 +46,9 @@ const recipes = {
   notificationUpdated: [
     adminQueryKeys.notificationsRoot,
   ],
+  contactSubmissionUpdated: [
+    adminQueryKeys.contactSubmissionsRoot,
+  ],
   volunteerUpdated: [
     adminQueryKeys.volunteersRoot,
   ],
@@ -65,4 +68,3 @@ export const invalidateAdminRecipe = async (
     queryKeys.map((queryKey) => queryClient.invalidateQueries({ queryKey }))
   );
 };
-

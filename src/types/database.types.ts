@@ -776,6 +776,30 @@ export interface Notification {
 }
 
 // ============================================================================
+// COLLECTION: contactSubmissions
+// ============================================================================
+
+export type ContactSubmissionStatus = 'unread' | 'read';
+
+export interface ContactSubmission {
+  id?: string;
+  name: string;
+  email: string;
+  phone?: string;
+  subject: string;
+  message: string;
+  status: ContactSubmissionStatus;
+  recaptchaScore?: number | null;
+  recaptchaAction?: string | null;
+  sourceIpHash?: string | null;
+  userAgentHash?: string | null;
+  readAt?: Timestamp | null;
+  readBy?: string | null;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+// ============================================================================
 // COLLECTION: badges
 // ============================================================================
 
