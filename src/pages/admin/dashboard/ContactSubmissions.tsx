@@ -360,7 +360,6 @@ function ContactSubmissionsPage() {
                     </th>
                     <th className="px-4 py-3">Sender</th>
                     <th className="px-4 py-3">Subject</th>
-                    <th className="px-4 py-3">Message</th>
                     <th className="px-4 py-3">Received</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3 text-right">Actions</th>
@@ -387,9 +386,6 @@ function ContactSubmissionsPage() {
                             <p className="text-xs text-gray-500">{entry.phone || '-'}</p>
                           </td>
                           <td className="px-4 py-3 text-gray-700">{entry.subject}</td>
-                          <td className="px-4 py-3 text-gray-600 max-w-[380px]">
-                            <p className="line-clamp-2">{entry.message}</p>
-                          </td>
                           <td className="px-4 py-3 text-gray-600">{entry.createdAt ? entry.createdAt.toLocaleString() : 'N/A'}</td>
                           <td className="px-4 py-3">
                             <span className={`rounded-full px-2 py-1 text-xs font-semibold ${entry.status === CONTACT_SUBMISSION_STATUS.read ? 'bg-gray-100 text-gray-700' : 'bg-red-100 text-red-700'}`}>
@@ -437,7 +433,7 @@ function ContactSubmissionsPage() {
                         </tr>
                         {isExpanded && (
                           <tr className="bg-gray-50/70">
-                            <td colSpan={7} className="px-4 py-4">
+                            <td colSpan={6} className="px-4 py-4">
                               <p className="text-xs font-semibold text-gray-800">Message</p>
                               <pre className="mt-1 max-h-56 overflow-auto rounded-lg border border-gray-200 bg-white p-3 text-[11px] text-gray-700 whitespace-pre-wrap">
                                 {entry.message}
