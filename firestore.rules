@@ -130,8 +130,13 @@ service cloud.firestore {
     function isReadableDirectoryProfile() {
       return resource.data.status == 'active'
         && !(resource.data.breakGlass == true)
-        && resource.data.role in ['donor', 'ngo', 'bloodbank', 'hospital']
-        && (resource.data.role != 'donor' || resource.data.onboardingCompleted != false);
+        && (
+          (resource.data.role == 'donor' && resource.data.onboardingCompleted != false) ||
+          (
+            resource.data.role in ['ngo', 'bloodbank', 'hospital']
+            && resource.data.verified == true
+          )
+        );
     }
 
     /**
