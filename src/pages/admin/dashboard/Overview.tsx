@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Activity, AlertTriangle, Bell, Droplet, Shield, Users } from 'lucide-react';
 import { useAdminOverviewData } from '../../../hooks/admin/useAdminQueries';
 import { AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
+import OfflineSyncHealthCard from '../../../components/admin/OfflineSyncHealthCard';
 
 function AdminOverviewPage() {
   const {
@@ -142,6 +143,8 @@ function AdminOverviewPage() {
               <Link to="/admin/dashboard/users" className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100">Manage Users</Link>
             </div>
           </div>
+
+          <OfflineSyncHealthCard />
         </div>
       </div>
     </div>

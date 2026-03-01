@@ -13,6 +13,7 @@ import { EmptyStateCard } from '../../../components/shared/EmptyStateCard';
 import { DonorPaginationFooter } from '../../../components/shared/DonorPaginationFooter';
 import { useScopedErrorReporter } from '../../../hooks/useScopedErrorReporter';
 import { useDonorDirectory } from '../../../hooks/useDonorDirectory';
+import { useNetworkStatus } from '../../../contexts/NetworkStatusContext';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -28,6 +29,7 @@ function NgoDonors() {
     scope: 'ngo',
     metadata: { page: 'NgoDonors' },
   });
+  const { isLowBandwidth } = useNetworkStatus();
 
   const {
     bloodTypes,
@@ -57,6 +59,7 @@ function NgoDonors() {
       ttlMs: 5 * 60 * 1000,
       enablePrefetch: true,
     },
+    lowBandwidthMode: isLowBandwidth,
     onError: reportNgoDonorsError,
     onPageLoadError: (error) => {
       notify.fromError(error, 'Unable to load donors right now.', { id: 'ngo-donors-page-load-error' });

@@ -3,8 +3,8 @@ import { Link, useOutletContext } from 'react-router-dom';
 import { CheckCircle, MapPin, User, Building2, FileText } from 'lucide-react';
 import type { NgoDashboardContext } from '../NgoDashboard';
 import { usePushNotifications } from '../../../hooks/usePushNotifications';
-import { db } from '../../../firebase';
-import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { updateUserNotificationPreferences } from '../../../services/offlineMutationOutbox.service';
+import { captureHandledError } from '../../../services/errorLog.service';
 
 function NgoAccount() {
   const { user } = useOutletContext<NgoDashboardContext>();
@@ -24,45 +24,65 @@ function NgoAccount() {
 
   const handlePushToggle = async () => {
     if (!user?.uid) return;
-    const wantsEnable = !pushEnabled;
-    setPushMessage(null);
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      setPushMessage('Push notifications are not supported in this browser.');
-      return;
-    }
+    const previousPushEnabled = pushEnabled;
+    try {
+      const wantsEnable = !pushEnabled;
+      setPushMessage(null);
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        setPushMessage('Push notifications are not supported in this browser.');
+        return;
+      }
 
-    if (wantsEnable) {
-      await requestPermission();
-      if (Notification.permission === 'granted') {
-        setPushEnabled(true);
-        await updateDoc(doc(db, 'users', user.uid), {
-          notificationPreferences: {
-            ...(user.notificationPreferences || {}),
-            push: true,
-          },
-          updatedAt: serverTimestamp(),
-        });
+      if (wantsEnable) {
+        await requestPermission();
+        if (Notification.permission === 'granted') {
+          setPushEnabled(true);
+          const result = await updateUserNotificationPreferences({
+            userId: user.uid,
+            notificationPreferences: {
+              ...(user.notificationPreferences || {}),
+              push: true,
+            },
+          });
+          if (result.queued) {
+            setPushMessage('You are offline. This change will sync automatically.');
+          }
+        } else {
+          setPushEnabled(false);
+          const result = await updateUserNotificationPreferences({
+            userId: user.uid,
+            notificationPreferences: {
+              ...(user.notificationPreferences || {}),
+              push: false,
+            },
+          });
+          if (result.queued) {
+            setPushMessage('You are offline. This change will sync automatically.');
+          }
+          setPushMessage('Notifications are blocked. Enable them in your browser settings.');
+        }
       } else {
+        await unsubscribe();
         setPushEnabled(false);
-        await updateDoc(doc(db, 'users', user.uid), {
+        const result = await updateUserNotificationPreferences({
+          userId: user.uid,
           notificationPreferences: {
             ...(user.notificationPreferences || {}),
             push: false,
           },
-          updatedAt: serverTimestamp(),
         });
-        setPushMessage('Notifications are blocked. Enable them in your browser settings.');
+        if (result.queued) {
+          setPushMessage('You are offline. This change will sync automatically.');
+        }
       }
-    } else {
-      await unsubscribe();
-      setPushEnabled(false);
-      await updateDoc(doc(db, 'users', user.uid), {
-        notificationPreferences: {
-          ...(user.notificationPreferences || {}),
-          push: false,
-        },
-        updatedAt: serverTimestamp(),
+    } catch (error) {
+      setPushEnabled(previousPushEnabled);
+      void captureHandledError(error, {
+        source: 'frontend',
+        scope: 'ngo',
+        metadata: { kind: 'ngo.account.push.toggle' },
       });
+      setPushMessage('Failed to update notification preference. Please try again.');
     }
   };
 

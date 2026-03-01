@@ -19,6 +19,7 @@ import { useViewport } from './hooks/useViewport';
 import AppLaunchSplash from './components/mobile/AppLaunchSplash';
 import MobileRouteTransition from './components/mobile/MobileRouteTransition';
 import MobileBottomNav from './components/mobile/MobileBottomNav';
+import NetworkStatusBadge from './components/shared/NetworkStatusBadge';
 
 function App() {
   useAuthSync();
@@ -108,6 +109,7 @@ function App() {
       <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
         <AppLaunchSplash enabled={useMobileAppExperience} />
         <Navbar />
+        <NetworkStatusBadge />
         <Suspense fallback={<Loading />}>
           <main className={mainClassName}>
             <div className={appContentFrameClass}>

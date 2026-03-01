@@ -23,6 +23,8 @@ type UseDonorDirectoryOptions = {
   scope: DonorDirectoryScope;
   page: string;
   pageSize?: number;
+  mapFetchLimit?: number;
+  lowBandwidthMode?: boolean;
   cache?: DonorDirectoryCacheOptions;
   onError: (error: unknown, kind: string, metadata?: Record<string, unknown>) => void;
   onPageLoadError?: (error: unknown) => void;
@@ -61,7 +63,10 @@ const sanitizeDonor = (donor: DonorSummary): SerializedDonor => ({
 });
 
 export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
-  const pageSize = options.pageSize ?? 10;
+  const lowBandwidthMode = Boolean(options.lowBandwidthMode);
+  const pageSize = options.pageSize ?? (lowBandwidthMode ? 6 : 10);
+  const mapFetchLimit = options.mapFetchLimit ?? (lowBandwidthMode ? 80 : 200);
+  const enablePrefetch = Boolean(options.cache?.enablePrefetch) && !lowBandwidthMode;
   const cacheTtlMs = options.cache?.ttlMs ?? 5 * 60 * 1000;
   const [searchTerm, setSearchTerm] = useState('');
   const [bloodTypeFilter, setBloodTypeFilter] = useState('all');
@@ -83,10 +88,12 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
 
   const pageCacheKey = useMemo(() => {
     if (!options.cache?.pageCacheKeyPrefix) return null;
-    return `${options.cache.pageCacheKeyPrefix}_${bloodTypeFilter}_${availabilityFilter}_${cityFilter}`;
-  }, [options.cache?.pageCacheKeyPrefix, bloodTypeFilter, availabilityFilter, cityFilter]);
+    return `${options.cache.pageCacheKeyPrefix}_${bloodTypeFilter}_${availabilityFilter}_${cityFilter}_lb${lowBandwidthMode ? 1 : 0}`;
+  }, [options.cache?.pageCacheKeyPrefix, bloodTypeFilter, availabilityFilter, cityFilter, lowBandwidthMode]);
 
-  const mapCacheKey = options.cache?.mapCacheKey || null;
+  const mapCacheKey = options.cache?.mapCacheKey
+    ? `${options.cache.mapCacheKey}_lb${lowBandwidthMode ? 1 : 0}`
+    : null;
 
   const reportError = useCallback(
     (error: unknown, kind: string, metadata?: Record<string, unknown>) => {
@@ -266,7 +273,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
 
       try {
         const publicSnap = await getDocs(
-          query(collection(db, 'publicDonors'), orderBy(documentId()), limit(200))
+          query(collection(db, 'publicDonors'), orderBy(documentId()), limit(mapFetchLimit))
         );
         const publicRows = publicSnap.docs
           .map(mapDocToDonorSummary)
@@ -291,7 +298,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
         }
       }
     },
-    [cacheTtlMs, mapCacheKey, options.scope, reportError]
+    [cacheTtlMs, mapCacheKey, mapFetchLimit, options.scope, reportError]
   );
 
   useEffect(() => {
@@ -299,7 +306,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
   }, [fetchDonorPage, pageCacheKey]);
 
   useEffect(() => {
-    if (!pageCacheKey || !options.cache?.enablePrefetch) return;
+    if (!pageCacheKey || !enablePrefetch) return;
     if (typeof window === 'undefined' || !window.sessionStorage) return;
     const prefetchKey = `${options.scope}_donors_prefetch_${pageCacheKey}`;
     const lastPrefetch = window.sessionStorage.getItem(prefetchKey);
@@ -326,7 +333,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
     }
     const timer = setTimeout(task, 1200);
     return () => clearTimeout(timer);
-  }, [cacheTtlMs, fetchDonorPage, options.cache?.enablePrefetch, options.scope, pageCacheKey, reportError]);
+  }, [cacheTtlMs, enablePrefetch, fetchDonorPage, options.scope, pageCacheKey, reportError]);
 
   useEffect(() => {
     let isActive = true;
@@ -338,7 +345,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
     };
     void run();
 
-    if (mapCacheKey && options.cache?.enablePrefetch && typeof window !== 'undefined' && window.sessionStorage) {
+    if (mapCacheKey && enablePrefetch && typeof window !== 'undefined' && window.sessionStorage) {
       const prefetchKey = `${options.scope}_donors_map_prefetch`;
       const lastPrefetch = window.sessionStorage.getItem(prefetchKey);
       if (!lastPrefetch || Date.now() - Number(lastPrefetch) >= cacheTtlMs) {
@@ -373,7 +380,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
         }
       }
     };
-  }, [cacheTtlMs, fetchMapDonors, mapCacheKey, options.cache?.enablePrefetch, options.scope, reportError]);
+  }, [cacheTtlMs, enablePrefetch, fetchMapDonors, mapCacheKey, options.scope, reportError]);
 
   const onPrevPage = useCallback(async () => {
     if (currentPage === 1 || loadingDonors) return;

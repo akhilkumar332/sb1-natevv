@@ -16,6 +16,7 @@ import { DonorPaginationFooter } from '../../../components/shared/DonorPaginatio
 import { useScopedErrorReporter } from '../../../hooks/useScopedErrorReporter';
 import { useDonorDirectory } from '../../../hooks/useDonorDirectory';
 import { runDedupedRequest } from '../../../utils/requestDedupe';
+import { useNetworkStatus } from '../../../contexts/NetworkStatusContext';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -30,6 +31,7 @@ function BloodBankDonors() {
     scope: 'bloodbank',
     metadata: { page: 'BloodBankDonors' },
   });
+  const { isLowBandwidth } = useNetworkStatus();
 
   const [donorCommunity, setDonorCommunity] = useState({
     totalDonors: 0,
@@ -64,6 +66,7 @@ function BloodBankDonors() {
       ttlMs: 5 * 60 * 1000,
       enablePrefetch: false,
     },
+    lowBandwidthMode: isLowBandwidth,
     onError: reportBloodBankDonorsError,
     onPageLoadError: (error) => {
       notify.fromError(error, 'Unable to load donors right now.', { id: 'bloodbank-donors-page-load-error' });

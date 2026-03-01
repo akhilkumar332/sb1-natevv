@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, MapPin, Filter, AlertCircle, CheckCircle, Clock, Heart, X, Users, ChevronRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, startAfter, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, startAfter, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { calculateDistance } from '../utils/geolocation';
 import type { Coordinates } from '../types/database.types';
 import { db } from '../firebase';
@@ -29,6 +29,8 @@ import { useScopedErrorReporter } from '../hooks/useScopedErrorReporter';
 import { filterSelfTargets, getPendingCooldownHours } from '../services/donorRequestGuard.service';
 import { notifySelfRequestBlocked } from '../utils/validationFeedback';
 import { useLocationResolver } from '../hooks/useLocationResolver';
+import { useNetworkStatus } from '../contexts/NetworkStatusContext';
+import { isOnlineRequiredError, runOnlineTransaction } from '../utils/onlineOnlyTransaction';
 
 interface Donor {
   id: string;
@@ -49,6 +51,7 @@ function FindDonors() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, updateUserProfile } = useAuth();
+  const { isLowBandwidth } = useNetworkStatus();
 
   const urlParams = new URLSearchParams(location.search);
 
@@ -89,7 +92,7 @@ function FindDonors() {
   const [undoingBatchId, setUndoingBatchId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 12;
-  const cacheTTL = 120000;
+  const cacheTTL = isLowBandwidth ? 5 * 60 * 1000 : 120000;
   const [rawDonorsVersion, setRawDonorsVersion] = useState(0);
   const rawDonorsRef = useRef<any[] | null>(null);
   const rawDonorSourceRef = useRef<'publicDonors' | 'users' | null>(null);
@@ -482,7 +485,7 @@ function FindDonors() {
     roleFilter: boolean,
     lastDoc: any | null
   ) => {
-    const batchSize = 200;
+    const batchSize = isLowBandwidth ? 80 : 200;
     const constraints: any[] = [orderBy('__name__'), limit(batchSize)];
     if (roleFilter) {
       constraints.unshift(where('role', '==', 'donor'));
@@ -541,7 +544,7 @@ function FindDonors() {
       setRawDonors(result.rows, source, result.lastDoc, result.hasMore);
       writeCachedDonors(source, result.rows);
 
-      if (result.hasMore) {
+      if (result.hasMore && !isLowBandwidth) {
         const fetchMore = async () => {
           while (rawDonorHasMoreRef.current) {
             const next = await fetchCollectionBatch(source, roleFilter, rawDonorLastDocRef.current);
@@ -570,7 +573,7 @@ function FindDonors() {
 
   useEffect(() => {
     void prefetchDonors();
-  }, [user?.uid]);
+  }, [isLowBandwidth, user?.uid]);
 
   useEffect(() => {
     if (!rawDonorsRef.current) return;
@@ -1000,7 +1003,7 @@ function FindDonors() {
 
       const deletedCount = snapshot.size;
       const batchRef = doc(db, 'donorRequestBatches', batchId);
-      await runTransaction(db, async (transaction) => {
+      await runOnlineTransaction(async (transaction) => {
         const batchSnap = await transaction.get(batchRef);
         if (!batchSnap.exists()) return;
         const batchData = batchSnap.data() as any;
@@ -1012,11 +1015,15 @@ function FindDonors() {
           status: 'cancelled',
           updatedAt: serverTimestamp(),
         });
-      });
+      }, 'You are offline. Reconnect to undo this batch.');
       notify.success('Request batch undone.');
     } catch (error) {
       reportFindDonorsError(error, 'undo_donor_request_batch');
-      notify.error('Unable to undo requests. Please try again.');
+      if (isOnlineRequiredError(error)) {
+        notify.error(error.message || 'You are offline. Please reconnect and try again.');
+      } else {
+        notify.error('Unable to undo requests. Please try again.');
+      }
     } finally {
       setUndoingBatchId(null);
     }

@@ -19,7 +19,7 @@ import { useDonorData } from '../../hooks/useDonorData';
 import { useBloodRequest } from '../../hooks/useBloodRequest';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { notify } from 'services/notify.service';
-import { addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, runTransaction, serverTimestamp, Timestamp, query, where, onSnapshot } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { useReferrals } from '../../hooks/useReferrals';
 import PortalNotificationBridge from '../../components/shared/PortalNotificationBridge';
@@ -41,9 +41,11 @@ import { filterSelfTargets } from '../../services/donorRequestGuard.service';
 import type { ConfirmationResult } from 'firebase/auth';
 import { authInputMessages, getOtpValidationError, sanitizeOtp, validateGeneralPhoneInput } from '../../utils/authInputValidation';
 import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
+import PendingActionsPanel from '../../components/shared/PendingActionsPanel';
 import { notifyKeepOneLoginMethod, notifySelfRequestBlocked } from '../../utils/validationFeedback';
 import { useScopedErrorReporter } from '../../hooks/useScopedErrorReporter';
 import { usePageVisibility } from '../../hooks/usePageVisibility';
+import { isOnlineRequiredError, runOnlineTransaction } from '../../utils/onlineOnlyTransaction';
 
 type ShareOptions = {
   showPhone: boolean;
@@ -1448,7 +1450,7 @@ function DonorDashboard() {
       const batchId = requestData.requestBatchId as string | undefined;
       if (batchId) {
         const batchRef = doc(db, 'donorRequestBatches', batchId);
-        await runTransaction(db, async (transaction) => {
+        await runOnlineTransaction(async (transaction) => {
           const batchSnap = await transaction.get(batchRef);
           if (!batchSnap.exists()) return;
           const batchData = batchSnap.data() as any;
@@ -1462,13 +1464,17 @@ function DonorDashboard() {
             status: nextStatus,
             updatedAt: serverTimestamp(),
           });
-        });
+        }, 'You are offline. Reconnect to update request batch status.');
       }
       await deleteDoc(requestRef);
       notify.success('Request deleted.');
     } catch (error) {
       reportDonorDashboardError(error, 'delete_donor_request');
-      notify.fromError(error, 'Unable to delete request. Please try again.', { id: 'donor-request-delete-error' });
+      if (isOnlineRequiredError(error)) {
+        notify.error(error.message || 'You are offline. Please reconnect and try again.');
+      } else {
+        notify.fromError(error, 'Unable to delete request. Please try again.', { id: 'donor-request-delete-error' });
+      }
     } finally {
       setDonorRequestDeleteId(null);
     }
@@ -2542,6 +2548,7 @@ function DonorDashboard() {
           </aside>
           <main className="min-w-0 flex-1">
             <PortalNotificationBridge disabled={user?.notificationPreferences?.push === false} />
+            <PendingActionsPanel />
             <Outlet context={dashboardContext} />
           </main>
         </div>

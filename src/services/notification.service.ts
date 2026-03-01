@@ -16,7 +16,6 @@ import {
   getDocs,
   Timestamp,
   deleteField,
-  runTransaction,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -26,6 +25,7 @@ import { calculateDistance } from '../utils/geolocation';
 import { DatabaseError } from '../utils/errorHandler';
 import type { DeviceInfo } from '../utils/device';
 import { captureHandledError } from './errorLog.service';
+import { runOnlineTransaction } from '../utils/onlineOnlyTransaction';
 
 // ============================================================================
 // FCM TOKEN MANAGEMENT
@@ -153,7 +153,7 @@ export const requestNotificationPermission = async (
 export const saveFCMToken = async (userId: string, token: string): Promise<void> => {
   try {
     const userRef = doc(db, 'users', userId);
-    await runTransaction(db, async (tx) => {
+    await runOnlineTransaction(async (tx) => {
       const snapshot = await tx.get(userRef);
       const snapshotData = snapshot.exists() ? (snapshot.data() as any) : {};
       const currentDetails = (snapshotData?.fcmDeviceDetails || {}) as Record<string, any>;
@@ -176,7 +176,7 @@ export const saveFCMToken = async (userId: string, token: string): Promise<void>
           updatedAt: serverTimestamp(),
         },
       }, { merge: true });
-    });
+    }, 'You are offline. Reconnect to save notification token.');
   } catch (error) {
     throw new DatabaseError('Failed to save FCM token');
   }
@@ -198,7 +198,7 @@ export const saveFCMDeviceToken = async (
       info: deviceInfo || {},
       updatedAt: serverTimestamp(),
     };
-    await runTransaction(db, async (tx) => {
+    await runOnlineTransaction(async (tx) => {
       tx.set(
         userRef,
         {
@@ -207,7 +207,7 @@ export const saveFCMDeviceToken = async (
       },
         { merge: true }
       );
-    });
+    }, 'You are offline. Reconnect to save notification token.');
   } catch (error) {
     throw new DatabaseError('Failed to save FCM token');
   }

@@ -17,11 +17,11 @@ import {
   collection,
   doc,
   writeBatch,
-  runTransaction,
   serverTimestamp,
   FieldValue,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { runOnlineTransaction } from './onlineOnlyTransaction';
 
 // ============================================================================
 // TIMESTAMP CONVERSION UTILITIES
@@ -279,7 +279,7 @@ export const createBatch = (): WriteBatch => {
 export const runTransactionHelper = async <T>(
   updateFunction: (transaction: Transaction) => Promise<T>
 ): Promise<T> => {
-  return runTransaction(db, updateFunction);
+  return runOnlineTransaction(updateFunction);
 };
 
 // ============================================================================

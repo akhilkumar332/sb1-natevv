@@ -1,7 +1,11 @@
 // src/firebase.ts
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { initializeFirestore } from 'firebase/firestore';
+import {
+  enableIndexedDbPersistence,
+  enableMultiTabIndexedDbPersistence,
+  initializeFirestore,
+} from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -26,5 +30,73 @@ export const db = initializeFirestore(app, {
     ? { experimentalForceLongPolling: true, useFetchStreams: false }
     : { experimentalAutoDetectLongPolling: true }),
 });
+
+type FirestorePersistenceStatus = 'idle' | 'enabling' | 'enabled' | 'disabled' | 'failed';
+
+const isPersistenceFeatureEnabled = import.meta.env.VITE_FIRESTORE_OFFLINE_PERSISTENCE !== 'false';
+let persistenceStatus: FirestorePersistenceStatus = isPersistenceFeatureEnabled ? 'idle' : 'disabled';
+let persistenceInitPromise: Promise<void> | null = null;
+const persistenceListeners = new Set<(status: FirestorePersistenceStatus) => void>();
+
+const publishPersistenceStatus = (next: FirestorePersistenceStatus) => {
+  persistenceStatus = next;
+  persistenceListeners.forEach((listener) => {
+    listener(next);
+  });
+};
+
+const isPersistenceUnsupported = (error: unknown) => {
+  const code = String((error as any)?.code || '');
+  const message = String((error as any)?.message || '').toLowerCase();
+  return (
+    code === 'failed-precondition'
+    || code === 'unimplemented'
+    || message.includes('indexeddb')
+    || message.includes('persistence')
+  );
+};
+
+export const initializeFirestoreOfflinePersistence = async (): Promise<void> => {
+  if (!isPersistenceFeatureEnabled) {
+    publishPersistenceStatus('disabled');
+    return;
+  }
+  if (persistenceStatus === 'enabled') return;
+  if (persistenceInitPromise) return persistenceInitPromise;
+
+  publishPersistenceStatus('enabling');
+  persistenceInitPromise = enableMultiTabIndexedDbPersistence(db)
+    .catch(async (error) => {
+      if (!isPersistenceUnsupported(error)) throw error;
+      return enableIndexedDbPersistence(db);
+    })
+    .then(() => {
+      publishPersistenceStatus('enabled');
+    })
+    .catch((error) => {
+      if (isPersistenceUnsupported(error)) {
+        publishPersistenceStatus('disabled');
+        return;
+      }
+      publishPersistenceStatus('failed');
+    })
+    .finally(() => {
+      persistenceInitPromise = null;
+    });
+
+  return persistenceInitPromise;
+};
+
+export const getFirestorePersistenceStatus = () => persistenceStatus;
+
+export const subscribeFirestorePersistenceStatus = (
+  listener: (status: FirestorePersistenceStatus) => void,
+): (() => void) => {
+  persistenceListeners.add(listener);
+  listener(persistenceStatus);
+  return () => {
+    persistenceListeners.delete(listener);
+  };
+};
 
 export default app;

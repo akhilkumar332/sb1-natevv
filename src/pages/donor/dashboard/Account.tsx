@@ -28,6 +28,7 @@ import {
   notifyLocationDetected,
 } from '../../../utils/locationFeedback';
 import { buildGeocodeLocationPatch, buildSuggestionLocationUpdate } from '../../../utils/locationController';
+import { updateUserNotificationPreferences } from '../../../services/offlineMutationOutbox.service';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -162,44 +163,60 @@ const DonorAccount = () => {
 
   const handlePushToggle = async () => {
     if (!user?.uid) return;
-    const wantsEnable = !pushEnabled;
-    setPushMessage(null);
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      setPushMessage('Push notifications are not supported in this browser.');
-      return;
-    }
-    if (wantsEnable) {
-      await requestPermission();
-      if (Notification.permission === 'granted') {
-        setPushEnabled(true);
-        await updateDoc(doc(db, 'users', user.uid), {
-          notificationPreferences: {
-            ...(user.notificationPreferences || {}),
-            push: true,
-          },
-          updatedAt: serverTimestamp(),
-        });
+    const previousPushEnabled = pushEnabled;
+    try {
+      const wantsEnable = !pushEnabled;
+      setPushMessage(null);
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        setPushMessage('Push notifications are not supported in this browser.');
+        return;
+      }
+      if (wantsEnable) {
+        await requestPermission();
+        if (Notification.permission === 'granted') {
+          setPushEnabled(true);
+          const result = await updateUserNotificationPreferences({
+            userId: user.uid,
+            notificationPreferences: {
+              ...(user.notificationPreferences || {}),
+              push: true,
+            },
+          });
+          if (result.queued) {
+            setPushMessage('You are offline. This change will sync automatically.');
+          }
+        } else {
+          setPushEnabled(false);
+          const result = await updateUserNotificationPreferences({
+            userId: user.uid,
+            notificationPreferences: {
+              ...(user.notificationPreferences || {}),
+              push: false,
+            },
+          });
+          if (result.queued) {
+            setPushMessage('You are offline. This change will sync automatically.');
+          }
+          setPushMessage('Notifications are blocked. Enable them in your browser settings.');
+        }
       } else {
+        await unsubscribe();
         setPushEnabled(false);
-        await updateDoc(doc(db, 'users', user.uid), {
+        const result = await updateUserNotificationPreferences({
+          userId: user.uid,
           notificationPreferences: {
             ...(user.notificationPreferences || {}),
             push: false,
           },
-          updatedAt: serverTimestamp(),
         });
-        setPushMessage('Notifications are blocked. Enable them in your browser settings.');
+        if (result.queued) {
+          setPushMessage('You are offline. This change will sync automatically.');
+        }
       }
-    } else {
-      await unsubscribe();
-      setPushEnabled(false);
-      await updateDoc(doc(db, 'users', user.uid), {
-        notificationPreferences: {
-          ...(user.notificationPreferences || {}),
-          push: false,
-        },
-        updatedAt: serverTimestamp(),
-      });
+    } catch (error) {
+      setPushEnabled(previousPushEnabled);
+      reportDonorAccountError(error, 'donor.account.push.toggle');
+      setPushMessage('Failed to update notification preference. Please try again.');
     }
   };
 

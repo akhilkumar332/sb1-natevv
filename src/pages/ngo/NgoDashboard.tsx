@@ -11,6 +11,7 @@ import {
 } from '../../hooks/useNgoData';
 import { useReferrals } from '../../hooks/useReferrals';
 import PortalNotificationBridge from '../../components/shared/PortalNotificationBridge';
+import PendingActionsPanel from '../../components/shared/PendingActionsPanel';
 import {
   Activity,
   AlertCircle,
@@ -270,6 +271,7 @@ function NgoDashboard() {
 
           <main className="min-w-0 flex-1">
             <PortalNotificationBridge disabled={user?.notificationPreferences?.push === false} />
+            <PendingActionsPanel />
             <Outlet context={dashboardContext} />
           </main>
         </div>
