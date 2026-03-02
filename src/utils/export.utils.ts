@@ -5,6 +5,76 @@
  */
 import { captureHandledError } from '../services/errorLog.service';
 
+const removeUnsafeNodes = (root: ParentNode) => {
+  root.querySelectorAll('script, iframe, object, embed').forEach((node) => node.remove());
+  root.querySelectorAll<HTMLElement>('*').forEach((node) => {
+    Array.from(node.attributes).forEach((attr) => {
+      const key = attr.name.toLowerCase();
+      if (key.startsWith('on')) node.removeAttribute(attr.name);
+    });
+  });
+};
+
+const renderPrintableDocument = (
+  printWindow: Window,
+  title: string,
+  sourceElement: HTMLElement,
+  extraHeadLinks: string[] = [],
+) => {
+  const doc = printWindow.document;
+  doc.open();
+  doc.write('<!doctype html><html><head></head><body></body></html>');
+  doc.close();
+
+  if (!doc.head || !doc.body) return;
+
+  const titleEl = doc.createElement('title');
+  titleEl.textContent = title;
+  doc.head.appendChild(titleEl);
+
+  extraHeadLinks.forEach((href) => {
+    const link = doc.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    doc.head.appendChild(link);
+  });
+
+  const style = doc.createElement('style');
+  style.textContent = `
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f3f4f6;
+    }
+    @media print {
+      button {
+        display: none;
+      }
+    }
+  `;
+  doc.head.appendChild(style);
+
+  const safeClone = sourceElement.cloneNode(true) as HTMLElement;
+  removeUnsafeNodes(safeClone);
+  doc.body.appendChild(doc.importNode(safeClone, true));
+
+  printWindow.addEventListener('load', () => {
+    printWindow.print();
+    printWindow.close();
+  }, { once: true });
+};
+
 // ============================================================================
 // CSV EXPORT
 // ============================================================================
@@ -122,47 +192,7 @@ export const exportToPDF = (elementId: string, filename: string): void => {
     return;
   }
 
-  printWindow.document.write(`
-    <html>
-      <head>
-        <title>${filename}</title>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-          }
-          th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-          }
-          th {
-            background-color: #f3f4f6;
-          }
-          @media print {
-            button {
-              display: none;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        ${element.innerHTML}
-        <script>
-          window.onload = function() {
-            window.print();
-            window.close();
-          }
-        </script>
-      </body>
-    </html>
-  `);
-
-  printWindow.document.close();
+  renderPrintableDocument(printWindow, filename, element);
 };
 
 // ============================================================================
@@ -218,36 +248,7 @@ export const printElement = (elementId: string): void => {
     return;
   }
 
-  printWindow.document.write(`
-    <html>
-      <head>
-        <title>Print</title>
-        <link rel="stylesheet" href="${window.location.origin}/styles.css">
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-          }
-          @media print {
-            button {
-              display: none;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        ${element.innerHTML}
-        <script>
-          window.onload = function() {
-            window.print();
-            window.close();
-          }
-        </script>
-      </body>
-    </html>
-  `);
-
-  printWindow.document.close();
+  renderPrintableDocument(printWindow, 'Print', element, [`${window.location.origin}/styles.css`]);
 };
 
 // ============================================================================
