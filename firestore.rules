@@ -862,6 +862,7 @@ service cloud.firestore {
       // Immutable user responses in v1; admins can update follow-up workflow only.
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'tags',
           'followUpStatus',
           'followedUpBy',
           'followUpNotes',
@@ -869,11 +870,77 @@ service cloud.firestore {
           'updatedAt'
         ])
         && (
+          !request.resource.data.keys().hasAny(['tags'])
+          || request.resource.data.tags is list
+        )
+        && (
           !request.resource.data.keys().hasAny(['followUpStatus'])
           || request.resource.data.followUpStatus in ['open', 'in_progress', 'closed']
         );
 
       allow delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: npsPromptOverrides
+    // ========================================================================
+
+    match /npsPromptOverrides/{overrideId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly([
+          'userId',
+          'cycleKey',
+          'enabled',
+          'triggeredBy',
+          'createdAt',
+          'lastTriggeredAt',
+          'updatedAt'
+        ])
+        && request.resource.data.userId is string
+        && request.resource.data.cycleKey is string
+        && request.resource.data.enabled is bool
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.lastTriggeredAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && overrideId == request.resource.data.userId + '_' + request.resource.data.cycleKey;
+
+      allow update: if (
+        (
+          isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'enabled',
+            'triggeredBy',
+            'lastTriggeredAt',
+            'updatedAt'
+          ])
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.enabled is bool
+          && (
+            !request.resource.data.keys().hasAny(['triggeredBy'])
+            || request.resource.data.triggeredBy is string
+            || request.resource.data.triggeredBy == null
+          )
+          && (
+            !request.resource.data.keys().hasAny(['lastTriggeredAt'])
+            || request.resource.data.lastTriggeredAt is timestamp
+          )
+          && request.resource.data.updatedAt is timestamp
+        )
+        || (
+          isAuthenticated()
+          && resource.data.userId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['enabled', 'updatedAt'])
+          && request.resource.data.enabled == false
+          && request.resource.data.updatedAt is timestamp
+        )
+      );
+
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
 
     // ========================================================================

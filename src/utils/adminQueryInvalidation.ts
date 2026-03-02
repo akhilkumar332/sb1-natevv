@@ -51,6 +51,10 @@ const recipes = {
   ],
   npsUpdated: [
     adminQueryKeys.npsRoot,
+    adminQueryKeys.npsResponsesRoot,
+    adminQueryKeys.npsActiveUsersRoot,
+    adminQueryKeys.npsActiveUserProfilesRoot,
+    adminQueryKeys.npsPromptOverridesRoot,
   ],
   volunteerUpdated: [
     adminQueryKeys.volunteersRoot,

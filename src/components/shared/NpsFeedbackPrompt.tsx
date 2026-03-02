@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { MessageSquareHeart, X } from 'lucide-react';
 import { db } from '../../firebase';
 import { COLLECTIONS } from '../../constants/firestore';
 import {
   NPS_ALLOWED_ROLES,
   NPS_DISMISS_SNOOZE_MS,
+  NPS_PROMPT_SOURCE,
   NPS_QUESTION_VERSION,
   NPS_SCORE,
   NPS_SEGMENT,
@@ -24,6 +25,7 @@ type NpsFeedbackPromptProps = {
   userId?: string | null;
   userRole?: UserRoleLike;
   className?: string;
+  promptLabel?: string;
 };
 
 const normalizeRole = (role?: UserRoleLike): NpsRole | null => {
@@ -33,7 +35,12 @@ const normalizeRole = (role?: UserRoleLike): NpsRole | null => {
   return null;
 };
 
-function NpsFeedbackPrompt({ userId, userRole, className = '' }: NpsFeedbackPromptProps) {
+function NpsFeedbackPrompt({
+  userId,
+  userRole,
+  className = '',
+  promptLabel = 'Quarterly NPS',
+}: NpsFeedbackPromptProps) {
   const role = normalizeRole(userRole);
   const cycleKey = useMemo(() => getNpsCycleKey(), []);
   const [visible, setVisible] = useState(false);
@@ -57,22 +64,41 @@ function NpsFeedbackPrompt({ userId, userRole, className = '' }: NpsFeedbackProm
       }
 
       try {
+        const responseId = toNpsDocId(userId, cycleKey);
+        const responseRef = doc(db, COLLECTIONS.NPS_RESPONSES, responseId);
+        const overrideRef = doc(db, COLLECTIONS.NPS_PROMPT_OVERRIDES, responseId);
+        const [snapshot, overrideSnapshot] = await Promise.all([getDoc(responseRef), getDoc(overrideRef)]);
+        if (!active) return;
+        if (snapshot.exists()) {
+          if (overrideSnapshot.exists() && overrideSnapshot.data()?.enabled === true) {
+            void setDoc(overrideRef, {
+              enabled: false,
+              updatedAt: serverTimestamp(),
+            }, { merge: true }).catch(() => {});
+          }
+          setVisible(false);
+          return;
+        }
+
+        const overrideEnabled = overrideSnapshot.exists() && overrideSnapshot.data()?.enabled === true;
+        if (overrideEnabled) {
+          setVisible(true);
+          void setDoc(overrideRef, {
+            enabled: false,
+            updatedAt: serverTimestamp(),
+          }, { merge: true }).catch(() => {});
+          return;
+        }
+
         const dismissedAt = typeof window !== 'undefined'
           ? Number(window.localStorage.getItem(dismissKey) || 0)
           : 0;
         if (dismissedAt && Date.now() - dismissedAt < NPS_DISMISS_SNOOZE_MS) {
-          if (active) {
-            setVisible(false);
-            setChecking(false);
-          }
+          setVisible(false);
           return;
         }
 
-        const responseId = toNpsDocId(userId, cycleKey);
-        const responseRef = doc(db, COLLECTIONS.NPS_RESPONSES, responseId);
-        const snapshot = await getDoc(responseRef);
-        if (!active) return;
-        setVisible(!snapshot.exists());
+        setVisible(true);
       } catch {
         if (!active) return;
         // Fail-open: if read fails, keep UI non-blocking and hidden.
@@ -128,10 +154,18 @@ function NpsFeedbackPrompt({ userId, userRole, className = '' }: NpsFeedbackProm
         ...(normalizedComment ? { comment: normalizedComment } : {}),
         cycleKey,
         questionVersion: NPS_QUESTION_VERSION,
-        source: 'dashboard_prompt',
+        source: NPS_PROMPT_SOURCE,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      const overrideRef = doc(db, COLLECTIONS.NPS_PROMPT_OVERRIDES, responseId);
+      const overrideSnapshot = await getDoc(overrideRef);
+      if (overrideSnapshot.exists()) {
+        void updateDoc(overrideRef, {
+          enabled: false,
+          updatedAt: serverTimestamp(),
+        }).catch(() => {});
+      }
 
       notify.success('Thank you for your feedback.');
       setVisible(false);
@@ -146,7 +180,7 @@ function NpsFeedbackPrompt({ userId, userRole, className = '' }: NpsFeedbackProm
     <section className={`rounded-2xl border border-red-200 bg-white p-4 shadow-sm sm:p-5 ${className}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-600">Quarterly NPS</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-600">{promptLabel}</p>
           <h3 className="mt-1 text-base font-bold text-gray-900 sm:text-lg">How likely are you to recommend BloodHub?</h3>
           <p className="mt-1 text-xs text-gray-500">0 = Not likely, 10 = Extremely likely</p>
         </div>
@@ -154,7 +188,7 @@ function NpsFeedbackPrompt({ userId, userRole, className = '' }: NpsFeedbackProm
           type="button"
           onClick={handleDismiss}
           className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50"
-          aria-label="Dismiss NPS prompt"
+          aria-label={`Dismiss ${promptLabel} prompt`}
         >
           <X className="h-4 w-4" />
         </button>

@@ -36,6 +36,22 @@ export const NPS_FETCH_LIMIT = 3000;
 export const NPS_DISMISS_SNOOZE_MS = 14 * ONE_DAY_MS;
 export const NPS_RESPONSE_WINDOW_MS = 90 * ONE_DAY_MS;
 export const NPS_DETRACTOR_SLA_MS = SEVEN_DAYS_MS;
+export const NPS_DETRACTOR_ESCALATION_SLA_MS = 14 * ONE_DAY_MS;
+export const NPS_MIN_SAMPLE_SIZE = 30;
+export const NPS_MEDIUM_CONFIDENCE_SAMPLE_SIZE = 100;
+
+export const NPS_DRIVER_TAGS = {
+  support: 'support',
+  availability: 'availability',
+  appUx: 'app_ux',
+  turnaround: 'turnaround',
+  trust: 'trust',
+  communication: 'communication',
+  operations: 'operations',
+} as const;
+
+export type NpsDriverTag = (typeof NPS_DRIVER_TAGS)[keyof typeof NPS_DRIVER_TAGS];
+export type NpsSampleConfidence = 'low' | 'medium' | 'high';
 
 export const getNpsSegmentFromScore = (score: number): NpsSegment => {
   if (score >= NPS_SCORE.promoterMin) return NPS_SEGMENT.promoter;
@@ -62,4 +78,12 @@ export const computeNpsScore = (promoters: number, detractors: number, total: nu
   const promoterPct = (promoters / total) * 100;
   const detractorPct = (detractors / total) * 100;
   return Math.round((promoterPct - detractorPct) * 10) / 10;
+};
+
+export const isNpsSampleReliable = (sampleSize: number): boolean => sampleSize >= NPS_MIN_SAMPLE_SIZE;
+
+export const getNpsSampleConfidence = (sampleSize: number): NpsSampleConfidence => {
+  if (sampleSize < NPS_MIN_SAMPLE_SIZE) return 'low';
+  if (sampleSize < NPS_MEDIUM_CONFIDENCE_SAMPLE_SIZE) return 'medium';
+  return 'high';
 };

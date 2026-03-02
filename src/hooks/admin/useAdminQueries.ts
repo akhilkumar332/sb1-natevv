@@ -7,7 +7,9 @@ import { COLLECTIONS } from '../../constants/firestore';
 import { ADMIN_QUERY_TIMINGS } from '../../constants/query';
 import {
   NPS_FETCH_LIMIT,
+  NPS_DRIVER_TAGS,
   NPS_FOLLOW_UP_STATUS,
+  type NpsDriverTag,
   type NpsFollowUpStatus,
   type NpsRole,
 } from '../../constants/nps';
@@ -35,6 +37,7 @@ import type {
   BloodInventory,
   BloodRequest,
   ContactSubmission,
+  NpsPromptOverride,
   NpsResponse,
   User,
   VerificationRequest
@@ -82,6 +85,11 @@ export type AdminSystemAlert = {
 };
 
 export type AdminNpsActiveUsers = Record<NpsRole, number> & { all: number };
+export type AdminNpsActiveUserProfile = {
+  uid: string;
+  role: NpsRole;
+  lastLoginAt: Date | null;
+};
 
 const useCachedAdminQuery = <T,>(
   queryKey: readonly unknown[],
@@ -270,6 +278,11 @@ const fetchNpsResponses = async (limitCount: number): Promise<NpsResponse[]> => 
       : data.followUpStatus === NPS_FOLLOW_UP_STATUS.closed
         ? NPS_FOLLOW_UP_STATUS.closed
         : NPS_FOLLOW_UP_STATUS.open;
+    const tags = Array.isArray(data.tags)
+      ? data.tags.filter((item: unknown): item is NpsDriverTag => (
+        typeof item === 'string' && Object.values(NPS_DRIVER_TAGS).includes(item as NpsDriverTag)
+      ))
+      : [];
     return {
       id: docSnap.id,
       userId: typeof data.userId === 'string' ? data.userId : '',
@@ -277,7 +290,7 @@ const fetchNpsResponses = async (limitCount: number): Promise<NpsResponse[]> => 
       score: Number.isFinite(data.score) ? Number(data.score) : 0,
       segment: data.segment === 'promoter' || data.segment === 'passive' ? data.segment : 'detractor',
       comment: typeof data.comment === 'string' ? data.comment : null,
-      tags: Array.isArray(data.tags) ? data.tags.filter((item: unknown) => typeof item === 'string') : [],
+      tags,
       cycleKey: typeof data.cycleKey === 'string' ? data.cycleKey : '',
       questionVersion: typeof data.questionVersion === 'string' ? data.questionVersion : 'v1',
       source: data.source === 'settings_feedback' ? 'settings_feedback' : 'dashboard_prompt',
@@ -307,6 +320,50 @@ const fetchNpsActiveUsers = async (): Promise<AdminNpsActiveUsers> => {
     bloodbank: bloodbankCount,
     all,
   };
+};
+
+const fetchNpsPromptOverrides = async (limitCount: number): Promise<NpsPromptOverride[]> => {
+  const snapshot = await getDocs(query(
+    collection(db, COLLECTIONS.NPS_PROMPT_OVERRIDES),
+    orderBy('updatedAt', 'desc'),
+    limit(limitCount)
+  ));
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data() as Record<string, any>;
+    return {
+      id: docSnap.id,
+      userId: typeof data.userId === 'string' ? data.userId : '',
+      cycleKey: typeof data.cycleKey === 'string' ? data.cycleKey : '',
+      enabled: data.enabled === true,
+      triggeredBy: typeof data.triggeredBy === 'string' ? data.triggeredBy : null,
+      createdAt: (toDateValue(data.createdAt) as any) || null,
+      lastTriggeredAt: (toDateValue(data.lastTriggeredAt) as any) || null,
+      updatedAt: (toDateValue(data.updatedAt) as any) || null,
+    } as NpsPromptOverride;
+  });
+};
+
+const fetchNpsActiveUserProfiles = async (): Promise<AdminNpsActiveUserProfile[]> => {
+  const limitCount = 6000;
+  const [donors, ngos, bloodbanks, hospitals] = await Promise.all([
+    getAllUsers('donor', 'active', limitCount),
+    getAllUsers('ngo', 'active', limitCount),
+    getAllUsers('bloodbank', 'active', limitCount),
+    getAllUsers('hospital', 'active', limitCount),
+  ]);
+
+  const mapUser = (user: User, role: NpsRole): AdminNpsActiveUserProfile => ({
+    uid: user.uid || user.id || '',
+    role,
+    lastLoginAt: toDateValue(user.lastLoginAt) || null,
+  });
+
+  return [
+    ...donors.map((user) => mapUser(user, 'donor')),
+    ...ngos.map((user) => mapUser(user, 'ngo')),
+    ...bloodbanks.map((user) => mapUser(user, 'bloodbank')),
+    ...hospitals.map((user) => mapUser(user, 'bloodbank')),
+  ].filter((entry) => Boolean(entry.uid));
 };
 
 const fetchErrorLogs = async (limitCount: number): Promise<AdminEntity[]> => {
@@ -553,6 +610,35 @@ export const useAdminNpsActiveUsers = () =>
       refetchInterval: false,
       refetchIntervalInBackground: false,
       refetchOnWindowFocus: false,
+    },
+  );
+
+export const useAdminNpsActiveUserProfiles = () =>
+  useCachedAdminQuery<AdminNpsActiveUserProfile[]>(
+    adminQueryKeys.npsActiveUserProfiles(),
+    ADMIN_QUERY_TIMINGS.nps.ttl,
+    ['lastLoginAt'],
+    fetchNpsActiveUserProfiles,
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.nps.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.nps.gcTime,
+      refetchInterval: false,
+      refetchIntervalInBackground: false,
+      refetchOnWindowFocus: false,
+    },
+  );
+
+export const useAdminNpsPromptOverrides = (limitCount: number = 500) =>
+  useCachedAdminQuery<NpsPromptOverride[]>(
+    adminQueryKeys.npsPromptOverrides(limitCount),
+    ADMIN_QUERY_TIMINGS.nps.ttl,
+    ['createdAt', 'lastTriggeredAt', 'updatedAt'],
+    () => fetchNpsPromptOverrides(limitCount),
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.nps.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.nps.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.nps.refetchInterval,
+      refetchIntervalInBackground: false,
     },
   );
 

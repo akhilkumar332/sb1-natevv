@@ -806,6 +806,14 @@ export interface ContactSubmission {
 export type NpsUserRole = 'donor' | 'ngo' | 'bloodbank';
 export type NpsSegment = 'promoter' | 'passive' | 'detractor';
 export type NpsFollowUpStatus = 'open' | 'in_progress' | 'closed';
+export type NpsDriverTag =
+  | 'support'
+  | 'availability'
+  | 'app_ux'
+  | 'turnaround'
+  | 'trust'
+  | 'communication'
+  | 'operations';
 
 export interface NpsResponse {
   id?: string;
@@ -814,7 +822,7 @@ export interface NpsResponse {
   score: number;
   segment: NpsSegment;
   comment?: string | null;
-  tags?: string[];
+  tags?: NpsDriverTag[];
   cycleKey: string;
   questionVersion: string;
   source: 'dashboard_prompt' | 'settings_feedback';
@@ -823,6 +831,17 @@ export interface NpsResponse {
   followUpNotes?: string | null;
   followedUpAt?: Timestamp | null;
   createdAt: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface NpsPromptOverride {
+  id?: string;
+  userId: string;
+  cycleKey: string;
+  enabled: boolean;
+  triggeredBy?: string | null;
+  createdAt: Timestamp;
+  lastTriggeredAt?: Timestamp;
   updatedAt?: Timestamp;
 }
 

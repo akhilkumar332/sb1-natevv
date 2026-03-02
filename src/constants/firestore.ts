@@ -26,6 +26,7 @@ export const COLLECTIONS = {
   CONTACT_SUBMISSIONS: 'contactSubmissions',
   CONTACT_RATE_LIMITS: 'contactRateLimits',
   NPS_RESPONSES: 'npsResponses',
+  NPS_PROMPT_OVERRIDES: 'npsPromptOverrides',
   INVENTORY_TRANSFERS: 'inventoryTransfers',
   INVENTORY_RESERVATIONS: 'inventoryReservations',
   INVENTORY_TRANSACTIONS: 'inventoryTransactions',
