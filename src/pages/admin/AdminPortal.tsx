@@ -19,92 +19,64 @@ import {
   Users,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { ROUTES } from '../../constants/routes';
-
-type MenuItem = {
-  id: string;
-  label: string;
-  to: string;
-  icon: any;
-  superAdminOnly?: boolean;
-};
+import { ROUTES, getAdminDashboardMenuGroups, type AdminDashboardMenuGroup, type AdminDashboardMenuItem } from '../../constants/routes';
 
 type MenuGroup = {
   id: string;
   label: string;
   icon: any;
-  items: MenuItem[];
+  items: Array<AdminDashboardMenuItem & { to: string; icon: any }>;
 };
 
 function AdminPortal() {
   const { isSuperAdmin } = useAuth();
   const location = useLocation();
-  const overviewItem: MenuItem = {
+  const overviewItem = {
     id: 'overview',
     label: 'Overview',
     to: 'overview',
     icon: LayoutDashboard,
   };
 
+  const itemIconMap: Record<string, any> = {
+    users: Users,
+    donors: Heart,
+    ngos: Users,
+    bloodbanks: Building2,
+    verification: ClipboardCheck,
+    emergency: Activity,
+    inventory: Droplets,
+    campaigns: BarChart3,
+    ops: Users,
+    appointments: Calendar,
+    analytics: BarChart3,
+    audit: Shield,
+    errors: AlertTriangle,
+    impersonation: Shield,
+    'contact-submissions': Mail,
+    notifications: Bell,
+    settings: Settings,
+  };
+  const groupIconMap: Record<string, any> = {
+    users: Users,
+    operations: Activity,
+    insights: BarChart3,
+    security: Shield,
+    system: Settings,
+  };
+
   const menuGroups = useMemo<MenuGroup[]>(() => {
-    const groups: MenuGroup[] = [
-      {
-        id: 'users',
-        label: 'User Management',
-        icon: Users,
-        items: [
-          { id: 'users', label: 'Users', to: 'users', icon: Users },
-          { id: 'donors', label: 'Donors', to: 'donors', icon: Heart },
-          { id: 'ngos', label: 'NGOs', to: 'ngos', icon: Users },
-          { id: 'bloodbanks', label: 'Blood Banks', to: 'bloodbanks', icon: Building2 },
-          { id: 'verification', label: 'Verification', to: 'verification', icon: ClipboardCheck },
-        ],
-      },
-      {
-        id: 'operations',
-        label: 'Operations',
-        icon: Activity,
-        items: [
-          { id: 'emergency', label: 'Emergency Requests', to: 'emergency-requests', icon: Activity },
-          { id: 'inventory', label: 'Inventory Alerts', to: 'inventory-alerts', icon: Droplets },
-          { id: 'campaigns', label: 'Campaigns', to: 'campaigns', icon: BarChart3 },
-          { id: 'ops', label: 'Volunteers & Partners', to: 'volunteers-partnerships', icon: Users },
-          { id: 'appointments', label: 'Appointments & Donations', to: 'appointments-donations', icon: Calendar },
-        ],
-      },
-      {
-        id: 'insights',
-        label: 'Insights',
-        icon: BarChart3,
-        items: [{ id: 'analytics', label: 'Analytics', to: 'analytics-reports', icon: BarChart3 }],
-      },
-      {
-        id: 'security',
-        label: 'Security',
-        icon: Shield,
-        items: [
-          { id: 'audit', label: 'Audit & Security', to: 'audit-security', icon: Shield },
-          { id: 'errors', label: 'Error Logs', to: 'error-logs', icon: AlertTriangle },
-          { id: 'impersonation', label: 'Impersonation Audit', to: 'impersonation-audit', icon: Shield, superAdminOnly: true },
-        ],
-      },
-      {
-        id: 'system',
-        label: 'System',
-        icon: Settings,
-        items: [
-          { id: 'contact-submissions', label: 'Contact Submissions', to: 'contact-submissions', icon: Mail },
-          { id: 'notifications', label: 'Notifications', to: 'notifications', icon: Bell },
-          { id: 'settings', label: 'Settings', to: 'settings', icon: Settings },
-        ],
-      },
-    ];
-    return groups
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) => !item.superAdminOnly || isSuperAdmin),
-      }))
-      .filter((group) => group.items.length > 0);
+    const groups: AdminDashboardMenuGroup[] = getAdminDashboardMenuGroups(isSuperAdmin);
+    return groups.map((group) => ({
+      id: group.id,
+      label: group.label,
+      icon: groupIconMap[group.id] ?? Settings,
+      items: group.items.map((item) => ({
+        ...item,
+        to: item.path.replace(`${ROUTES.portal.admin.dashboard.root}/`, ''),
+        icon: itemIconMap[item.id] ?? Settings,
+      })),
+    }));
   }, [isSuperAdmin]);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const OverviewIcon = overviewItem.icon;

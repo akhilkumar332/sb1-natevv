@@ -167,36 +167,84 @@ export const DASHBOARD_LINKS = {
     { label: 'Referrals', path: ROUTES.portal.bloodbank.dashboard.referrals },
     { label: 'Account', path: ROUTES.portal.bloodbank.dashboard.account },
   ],
-  adminBase: [
-    { label: 'Overview', path: ROUTES.portal.admin.dashboard.overview },
-    { label: 'Users', path: ROUTES.portal.admin.dashboard.users },
-    { label: 'Donors', path: ROUTES.portal.admin.dashboard.donors },
-    { label: 'NGOs', path: ROUTES.portal.admin.dashboard.ngos },
-    { label: 'BloodBanks', path: ROUTES.portal.admin.dashboard.bloodbanks },
-    { label: 'Verification', path: ROUTES.portal.admin.dashboard.verification },
-    { label: 'Emergency', path: ROUTES.portal.admin.dashboard.emergencyRequests },
-    { label: 'Inventory Alerts', path: ROUTES.portal.admin.dashboard.inventoryAlerts },
-    { label: 'Campaigns', path: ROUTES.portal.admin.dashboard.campaigns },
-    { label: 'Volunteers & Partners', path: ROUTES.portal.admin.dashboard.volunteersPartnerships },
-    { label: 'Appointments', path: ROUTES.portal.admin.dashboard.appointmentsDonations },
-    { label: 'Analytics', path: ROUTES.portal.admin.dashboard.analyticsReports },
-    { label: 'Audit & Security', path: ROUTES.portal.admin.dashboard.auditSecurity },
-    { label: 'Error Logs', path: ROUTES.portal.admin.dashboard.errorLogs },
-    { label: 'Contact Submissions', path: ROUTES.portal.admin.dashboard.contactSubmissions },
-    { label: 'Notifications', path: ROUTES.portal.admin.dashboard.notifications },
-    { label: 'Settings', path: ROUTES.portal.admin.dashboard.settings },
-  ],
+  adminBase: [] as Array<{ label: string; path: string }>,
 } as const;
 
+export type AdminDashboardMenuItem = {
+  id: string;
+  label: string;
+  path: string;
+  superAdminOnly?: boolean;
+};
+
+export type AdminDashboardMenuGroup = {
+  id: string;
+  label: string;
+  items: AdminDashboardMenuItem[];
+};
+
+const ADMIN_DASHBOARD_MENU_GROUPS_BASE: AdminDashboardMenuGroup[] = [
+  {
+    id: 'users',
+    label: 'User Management',
+    items: [
+      { id: 'users', label: 'Users', path: ROUTES.portal.admin.dashboard.users },
+      { id: 'donors', label: 'Donors', path: ROUTES.portal.admin.dashboard.donors },
+      { id: 'ngos', label: 'NGOs', path: ROUTES.portal.admin.dashboard.ngos },
+      { id: 'bloodbanks', label: 'Blood Banks', path: ROUTES.portal.admin.dashboard.bloodbanks },
+      { id: 'verification', label: 'Verification', path: ROUTES.portal.admin.dashboard.verification },
+    ],
+  },
+  {
+    id: 'operations',
+    label: 'Operations',
+    items: [
+      { id: 'emergency', label: 'Emergency Requests', path: ROUTES.portal.admin.dashboard.emergencyRequests },
+      { id: 'inventory', label: 'Inventory Alerts', path: ROUTES.portal.admin.dashboard.inventoryAlerts },
+      { id: 'campaigns', label: 'Campaigns', path: ROUTES.portal.admin.dashboard.campaigns },
+      { id: 'ops', label: 'Volunteers & Partners', path: ROUTES.portal.admin.dashboard.volunteersPartnerships },
+      { id: 'appointments', label: 'Appointments & Donations', path: ROUTES.portal.admin.dashboard.appointmentsDonations },
+    ],
+  },
+  {
+    id: 'insights',
+    label: 'Insights',
+    items: [
+      { id: 'analytics', label: 'Analytics', path: ROUTES.portal.admin.dashboard.analyticsReports },
+    ],
+  },
+  {
+    id: 'security',
+    label: 'Security',
+    items: [
+      { id: 'audit', label: 'Audit & Security', path: ROUTES.portal.admin.dashboard.auditSecurity },
+      { id: 'errors', label: 'Error Logs', path: ROUTES.portal.admin.dashboard.errorLogs },
+      { id: 'impersonation', label: 'Impersonation Audit', path: ROUTES.portal.admin.dashboard.impersonationAudit, superAdminOnly: true },
+    ],
+  },
+  {
+    id: 'system',
+    label: 'System',
+    items: [
+      { id: 'contact-submissions', label: 'Contact Submissions', path: ROUTES.portal.admin.dashboard.contactSubmissions },
+      { id: 'notifications', label: 'Notifications', path: ROUTES.portal.admin.dashboard.notifications },
+      { id: 'settings', label: 'Settings', path: ROUTES.portal.admin.dashboard.settings },
+    ],
+  },
+];
+
+export const getAdminDashboardMenuGroups = (isSuperAdmin: boolean): AdminDashboardMenuGroup[] =>
+  ADMIN_DASHBOARD_MENU_GROUPS_BASE
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.superAdminOnly || isSuperAdmin),
+    }))
+    .filter((group) => group.items.length > 0);
+
 export const getAdminDashboardLinks = (isSuperAdmin: boolean) => {
-  const links = [...DASHBOARD_LINKS.adminBase] as Array<{ label: string; path: string }>;
-  if (isSuperAdmin) {
-    links.splice(14, 0, {
-      label: 'Impersonation Audit',
-      path: ROUTES.portal.admin.dashboard.impersonationAudit,
-    });
-  }
-  return links;
+  const grouped = getAdminDashboardMenuGroups(isSuperAdmin);
+  const flat = grouped.flatMap((group) => group.items.map((item) => ({ label: item.label, path: item.path })));
+  return [{ label: 'Overview', path: ROUTES.portal.admin.dashboard.overview }, ...flat];
 };
 
 const normalizePortalRole = (role?: string | null): PortalRole | null => {

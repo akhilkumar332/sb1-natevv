@@ -1,7 +1,7 @@
 // src/components/Navbar.tsx
 import React, { useEffect, useState, Suspense } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, LayoutDashboard, Heart, ChevronDown, Shield } from 'lucide-react';
+import { Menu, X, LogOut, LayoutDashboard, Heart, ChevronDown, ChevronRight, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import LogoMark from './LogoMark';
 import NotificationBadge from './shared/NotificationBadge';
@@ -16,7 +16,7 @@ import {
   PORTAL_OPTIONS,
   ROUTES,
   SIGNIN_OPTIONS,
-  getAdminDashboardLinks,
+  getAdminDashboardMenuGroups,
   getPortalDashboardPath,
   getPortalLoginPath,
   toPortalRole,
@@ -205,7 +205,6 @@ function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: 
     ?? (PORTAL_OPTIONS.some(option => option.role === user?.role)
       ? (user?.role as PortalRole)
       : null);
-
   const handleReturnToPicker = () => {
     const targetPortal = currentPortal && currentPortal !== 'admin' ? currentPortal : 'admin';
     if (isImpersonating) {
@@ -283,7 +282,7 @@ function UserMenu({ achievementLabel, hideDashboardLink }: { achievementLabel?: 
                   <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-r from-red-500 to-red-600 mr-3 shadow-md transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
                     <Shield className="w-4 h-4 text-white" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
                   </div>
-                  <span className="font-semibold">Return to portal picker</span>
+                  <span className="font-semibold">Superadmin Console</span>
                 </button>
                 <div className="h-px bg-gradient-to-r from-transparent via-red-200 to-transparent my-1"></div>
               </>
@@ -468,7 +467,7 @@ function MobileUserMenu({
             className="flex items-center w-full px-4 py-3 text-gray-700 hover:bg-red-50 rounded-xl transition-all group"
           >
             <Shield className="w-5 h-5 mr-3 text-red-600 group-hover:scale-110 transition-transform" />
-            <span className="font-medium">Return to portal picker</span>
+            <span className="font-medium">Superadmin Console</span>
           </button>
         </>
       )}
@@ -486,6 +485,7 @@ function MobileUserMenu({
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [pendingPortal, setPendingPortal] = useState<PortalRole | null>(null);
+  const [adminMobileExpandedGroups, setAdminMobileExpandedGroups] = useState<Record<string, boolean>>({});
   const {
     user,
     authLoading,
@@ -525,6 +525,21 @@ const Navbar: React.FC = () => {
     ?? (PORTAL_OPTIONS.some(option => option.role === user?.role)
       ? (user?.role as PortalRole)
       : null);
+  const adminMobileGroups = React.useMemo(() => getAdminDashboardMenuGroups(isSuperAdmin), [isSuperAdmin]);
+
+  useEffect(() => {
+    if (!isAdminDashboard) return;
+    setAdminMobileExpandedGroups((prev) => {
+      const next: Record<string, boolean> = {};
+      adminMobileGroups.forEach((group) => {
+        const hasActiveItem = group.items.some((item) =>
+          location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
+        );
+        next[group.id] = prev[group.id] ?? (hasActiveItem || group.id === 'security');
+      });
+      return next;
+    });
+  }, [adminMobileGroups, isAdminDashboard, location.pathname]);
 
   const handlePortalSelect = (role: PortalRole) => {
     if (!isSuperAdmin) return;
@@ -814,10 +829,34 @@ const Navbar: React.FC = () => {
                 {isAdminDashboard && (
                   <div className="space-y-2 border-b border-gray-200 pb-4 mb-4 dark:border-gray-700">
                     <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">Admin Menu</p>
-                    {getAdminDashboardLinks(isSuperAdmin).map((item) => (
-                      <MobileNavLink key={item.path} to={item.path} onClick={() => setIsOpen(false)}>
-                        {item.label}
-                      </MobileNavLink>
+                    <MobileNavLink to={ROUTES.portal.admin.dashboard.overview} onClick={() => setIsOpen(false)}>
+                      Overview
+                    </MobileNavLink>
+                    {adminMobileGroups.map((group) => (
+                      <div key={group.id} className="space-y-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setAdminMobileExpandedGroups((prev) => ({ ...prev, [group.id]: !(prev[group.id] ?? false) }))
+                          }
+                          className="flex w-full items-center justify-between rounded-lg px-1 py-1 text-left hover:bg-red-50/80"
+                          aria-expanded={adminMobileExpandedGroups[group.id] ?? false}
+                        >
+                          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                            {group.label}
+                          </span>
+                          {(adminMobileExpandedGroups[group.id] ?? false) ? (
+                            <ChevronDown className="h-3.5 w-3.5 text-red-500" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5 text-red-500" />
+                          )}
+                        </button>
+                        {(adminMobileExpandedGroups[group.id] ?? false) && group.items.map((item) => (
+                          <MobileNavLink key={item.path} to={item.path} onClick={() => setIsOpen(false)}>
+                            {item.label}
+                          </MobileNavLink>
+                        ))}
+                      </div>
                     ))}
                   </div>
                 )}

@@ -293,7 +293,6 @@ function ContactSubmissionsPage() {
                   </span>
                 </div>
                 <p className="mt-2 text-sm font-medium text-gray-800">Subject: {entry.subject}</p>
-                <p className="mt-1 text-sm text-gray-600 break-words line-clamp-3">{entry.message}</p>
                 <button
                   type="button"
                   onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
