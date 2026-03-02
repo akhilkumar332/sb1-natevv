@@ -76,6 +76,7 @@ export const ROUTES = {
         volunteersPartnerships: '/admin/dashboard/volunteers-partnerships',
         appointmentsDonations: '/admin/dashboard/appointments-donations',
         analyticsReports: '/admin/dashboard/analytics-reports',
+        nps: '/admin/dashboard/nps',
         auditSecurity: '/admin/dashboard/audit-security',
         errorLogs: '/admin/dashboard/error-logs',
         contactSubmissions: '/admin/dashboard/contact-submissions',
@@ -211,6 +212,7 @@ const ADMIN_DASHBOARD_MENU_GROUPS_BASE: AdminDashboardMenuGroup[] = [
     label: 'Insights',
     items: [
       { id: 'analytics', label: 'Analytics', path: ROUTES.portal.admin.dashboard.analyticsReports },
+      { id: 'nps', label: 'NPS Score', path: ROUTES.portal.admin.dashboard.nps },
     ],
   },
   {

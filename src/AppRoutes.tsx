@@ -112,6 +112,7 @@ const AdminCampaigns = lazy(() => lazyLoad(import('./pages/admin/dashboard/Campa
 const AdminVolunteersPartnerships = lazy(() => lazyLoad(import('./pages/admin/dashboard/VolunteersPartnerships')));
 const AdminAppointmentsDonations = lazy(() => lazyLoad(import('./pages/admin/dashboard/AppointmentsDonations')));
 const AdminAnalyticsReports = lazy(() => lazyLoad(import('./pages/admin/dashboard/AnalyticsReports')));
+const AdminNps = lazy(() => lazyLoad(import('./pages/admin/dashboard/Nps')));
 const AdminAuditSecurity = lazy(() => lazyLoad(import('./pages/admin/dashboard/AuditSecurity')));
 const AdminErrorLogs = lazy(() => lazyLoad(import('./pages/admin/dashboard/ErrorLogs')));
 const AdminContactSubmissions = lazy(() => lazyLoad(import('./pages/admin/dashboard/ContactSubmissions')));
@@ -206,6 +207,7 @@ const AppRoutes = () => {
           <Route path="volunteers-partnerships" element={<AdminVolunteersPartnerships />} />
           <Route path="appointments-donations" element={<AdminAppointmentsDonations />} />
           <Route path="analytics-reports" element={<AdminAnalyticsReports />} />
+          <Route path="nps" element={<AdminNps />} />
           <Route path="reports" element={<Navigate to={ROUTES.portal.admin.dashboard.analyticsReports} replace />} />
           <Route path="audit-security" element={<AdminAuditSecurity />} />
           <Route path="error-logs" element={<AdminErrorLogs />} />

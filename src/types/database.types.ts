@@ -800,6 +800,33 @@ export interface ContactSubmission {
 }
 
 // ============================================================================
+// COLLECTION: npsResponses
+// ============================================================================
+
+export type NpsUserRole = 'donor' | 'ngo' | 'bloodbank';
+export type NpsSegment = 'promoter' | 'passive' | 'detractor';
+export type NpsFollowUpStatus = 'open' | 'in_progress' | 'closed';
+
+export interface NpsResponse {
+  id?: string;
+  userId: string;
+  userRole: NpsUserRole;
+  score: number;
+  segment: NpsSegment;
+  comment?: string | null;
+  tags?: string[];
+  cycleKey: string;
+  questionVersion: string;
+  source: 'dashboard_prompt' | 'settings_feedback';
+  followUpStatus?: NpsFollowUpStatus;
+  followedUpBy?: string | null;
+  followUpNotes?: string | null;
+  followedUpAt?: Timestamp | null;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+// ============================================================================
 // COLLECTION: badges
 // ============================================================================
 

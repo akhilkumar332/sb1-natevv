@@ -1,5 +1,6 @@
 export type AdminUserRoleFilter = 'all' | 'donor' | 'ngo' | 'bloodbank';
 export type AdminKpiRange = '7d' | '30d' | '90d' | '12m';
+export type AdminNpsRange = '30d' | '90d' | '12m' | 'all';
 
 export const adminQueryKeys = {
   root: ['admin'] as const,
@@ -40,6 +41,9 @@ export const adminQueryKeys = {
   notifications: (limit: number = 1000) => ['admin', 'notifications', { limit }] as const,
   contactSubmissionsRoot: ['admin', 'contactSubmissions'] as const,
   contactSubmissions: (limit: number = 1000) => ['admin', 'contactSubmissions', { limit }] as const,
+  npsRoot: ['admin', 'nps'] as const,
+  npsResponses: (limit: number = 3000) => ['admin', 'npsResponses', { limit }] as const,
+  npsActiveUsers: () => ['admin', 'npsActiveUsers'] as const,
   auditRoot: ['admin', 'auditLogs'] as const,
   auditLogs: (limit: number = 1000) => ['admin', 'auditLogs', { limit }] as const,
   errorRoot: ['admin', 'errorLogs'] as const,

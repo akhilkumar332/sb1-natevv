@@ -49,6 +49,9 @@ const recipes = {
   contactSubmissionUpdated: [
     adminQueryKeys.contactSubmissionsRoot,
   ],
+  npsUpdated: [
+    adminQueryKeys.npsRoot,
+  ],
   volunteerUpdated: [
     adminQueryKeys.volunteersRoot,
   ],

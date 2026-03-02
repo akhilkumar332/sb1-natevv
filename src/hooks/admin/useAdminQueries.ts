@@ -5,6 +5,12 @@ import { db } from '../../firebase';
 import { adminQueryKeys, type AdminKpiRange, type AdminUserRoleFilter } from '../../constants/adminQueryKeys';
 import { COLLECTIONS } from '../../constants/firestore';
 import { ADMIN_QUERY_TIMINGS } from '../../constants/query';
+import {
+  NPS_FETCH_LIMIT,
+  NPS_FOLLOW_UP_STATUS,
+  type NpsFollowUpStatus,
+  type NpsRole,
+} from '../../constants/nps';
 import { getAdminCacheKey, readAdminCache, writeAdminCache } from '../../utils/adminCache';
 import {
   getAllUsers,
@@ -25,7 +31,14 @@ import {
   type AdminUserSecurity,
   type AdminUserTimelineItem,
 } from '../../services/adminUserDetail.service';
-import type { BloodInventory, BloodRequest, ContactSubmission, User, VerificationRequest } from '../../types/database.types';
+import type {
+  BloodInventory,
+  BloodRequest,
+  ContactSubmission,
+  NpsResponse,
+  User,
+  VerificationRequest
+} from '../../types/database.types';
 import { toDateValue } from '../../utils/dateValue';
 
 type PlatformStatsResponse = Awaited<ReturnType<typeof getPlatformStats>>;
@@ -67,6 +80,8 @@ export type AdminSystemAlert = {
   resolved: boolean;
   action?: string;
 };
+
+export type AdminNpsActiveUsers = Record<NpsRole, number> & { all: number };
 
 const useCachedAdminQuery = <T,>(
   queryKey: readonly unknown[],
@@ -239,6 +254,59 @@ const fetchAuditLogs = async (limitCount: number): Promise<AdminEntity[]> => {
       updatedAt: toDateValue(data.updatedAt),
     };
   });
+};
+
+const fetchNpsResponses = async (limitCount: number): Promise<NpsResponse[]> => {
+  const snapshot = await getDocs(query(
+    collection(db, COLLECTIONS.NPS_RESPONSES),
+    orderBy('createdAt', 'desc'),
+    limit(limitCount)
+  ));
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data() as Record<string, any>;
+    const role = data.userRole === 'ngo' || data.userRole === 'bloodbank' ? data.userRole : 'donor';
+    const followUpStatus: NpsFollowUpStatus = data.followUpStatus === NPS_FOLLOW_UP_STATUS.inProgress
+      ? NPS_FOLLOW_UP_STATUS.inProgress
+      : data.followUpStatus === NPS_FOLLOW_UP_STATUS.closed
+        ? NPS_FOLLOW_UP_STATUS.closed
+        : NPS_FOLLOW_UP_STATUS.open;
+    return {
+      id: docSnap.id,
+      userId: typeof data.userId === 'string' ? data.userId : '',
+      userRole: role,
+      score: Number.isFinite(data.score) ? Number(data.score) : 0,
+      segment: data.segment === 'promoter' || data.segment === 'passive' ? data.segment : 'detractor',
+      comment: typeof data.comment === 'string' ? data.comment : null,
+      tags: Array.isArray(data.tags) ? data.tags.filter((item: unknown) => typeof item === 'string') : [],
+      cycleKey: typeof data.cycleKey === 'string' ? data.cycleKey : '',
+      questionVersion: typeof data.questionVersion === 'string' ? data.questionVersion : 'v1',
+      source: data.source === 'settings_feedback' ? 'settings_feedback' : 'dashboard_prompt',
+      followUpStatus,
+      followedUpBy: typeof data.followedUpBy === 'string' ? data.followedUpBy : null,
+      followUpNotes: typeof data.followUpNotes === 'string' ? data.followUpNotes : null,
+      followedUpAt: (toDateValue(data.followedUpAt) as any) || null,
+      createdAt: toDateValue(data.createdAt) as any,
+      updatedAt: toDateValue(data.updatedAt) as any,
+    } as NpsResponse;
+  });
+};
+
+const fetchNpsActiveUsers = async (): Promise<AdminNpsActiveUsers> => {
+  const limitCount = 6000;
+  const [donors, ngos, bloodbanks, hospitals] = await Promise.all([
+    getAllUsers('donor', 'active', limitCount),
+    getAllUsers('ngo', 'active', limitCount),
+    getAllUsers('bloodbank', 'active', limitCount),
+    getAllUsers('hospital', 'active', limitCount),
+  ]);
+  const bloodbankCount = bloodbanks.length + hospitals.length;
+  const all = donors.length + ngos.length + bloodbankCount;
+  return {
+    donor: donors.length,
+    ngo: ngos.length,
+    bloodbank: bloodbankCount,
+    all,
+  };
 };
 
 const fetchErrorLogs = async (limitCount: number): Promise<AdminEntity[]> => {
@@ -456,6 +524,35 @@ export const useAdminContactSubmissions = (limitCount: number = 1000) =>
       gcTime: ADMIN_QUERY_TIMINGS.contactSubmissions.gcTime,
       refetchInterval: ADMIN_QUERY_TIMINGS.contactSubmissions.refetchInterval,
       refetchIntervalInBackground: false,
+    },
+  );
+
+export const useAdminNpsResponses = (limitCount: number = NPS_FETCH_LIMIT) =>
+  useCachedAdminQuery<NpsResponse[]>(
+    adminQueryKeys.npsResponses(limitCount),
+    ADMIN_QUERY_TIMINGS.nps.ttl,
+    ['createdAt', 'updatedAt', 'followedUpAt'],
+    () => fetchNpsResponses(limitCount),
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.nps.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.nps.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.nps.refetchInterval,
+      refetchIntervalInBackground: false,
+    },
+  );
+
+export const useAdminNpsActiveUsers = () =>
+  useCachedAdminQuery<AdminNpsActiveUsers>(
+    adminQueryKeys.npsActiveUsers(),
+    ADMIN_QUERY_TIMINGS.nps.ttl,
+    [],
+    fetchNpsActiveUsers,
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.nps.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.nps.gcTime,
+      refetchInterval: false,
+      refetchIntervalInBackground: false,
+      refetchOnWindowFocus: false,
     },
   );
 

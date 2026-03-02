@@ -7,6 +7,7 @@ import type { BloodBankDashboardContext } from '../BloodBankDashboard';
 import { captureHandledError } from '../../../services/errorLog.service';
 import { COLLECTIONS } from '../../../constants/firestore';
 import { ROUTES } from '../../../constants/routes';
+import NpsFeedbackPrompt from '../../../components/shared/NpsFeedbackPrompt';
 
 type BloodBankBranch = {
   id: string;
@@ -118,6 +119,7 @@ function BloodBankOverview() {
 
   return (
     <div className="space-y-6">
+      <NpsFeedbackPrompt userId={user?.uid} userRole={user?.role} />
       <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-red-100 dark:bg-slate-700 dark:border-red-200">
           <div className="flex items-center justify-between mb-3">

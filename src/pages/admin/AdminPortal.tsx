@@ -50,6 +50,7 @@ function AdminPortal() {
     ops: Users,
     appointments: Calendar,
     analytics: BarChart3,
+    nps: BarChart3,
     audit: Shield,
     errors: AlertTriangle,
     impersonation: Shield,

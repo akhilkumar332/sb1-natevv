@@ -808,6 +808,75 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // COLLECTION: npsResponses
+    // ========================================================================
+
+    match /npsResponses/{responseId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow create: if isAuthenticated()
+        && request.resource.data.keys().hasOnly([
+          'userId',
+          'userRole',
+          'score',
+          'segment',
+          'comment',
+          'tags',
+          'cycleKey',
+          'questionVersion',
+          'source',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.userRole in ['donor', 'ngo', 'bloodbank']
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0
+        && request.resource.data.score <= 10
+        && request.resource.data.segment in ['promoter', 'passive', 'detractor']
+        && (
+          (request.resource.data.score >= 9 && request.resource.data.segment == 'promoter')
+          || (request.resource.data.score >= 7 && request.resource.data.score <= 8
+            && request.resource.data.segment == 'passive')
+          || (request.resource.data.score <= 6 && request.resource.data.segment == 'detractor')
+        )
+        && (
+          !request.resource.data.keys().hasAny(['comment'])
+          || request.resource.data.comment is string
+          || request.resource.data.comment == null
+        )
+        && (
+          !request.resource.data.keys().hasAny(['tags'])
+          || request.resource.data.tags is list
+        )
+        && request.resource.data.cycleKey is string
+        && request.resource.data.questionVersion is string
+        && request.resource.data.source in ['dashboard_prompt', 'settings_feedback']
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && responseId == request.auth.uid + '_' + request.resource.data.cycleKey;
+
+      // Immutable user responses in v1; admins can update follow-up workflow only.
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'followUpStatus',
+          'followedUpBy',
+          'followUpNotes',
+          'followedUpAt',
+          'updatedAt'
+        ])
+        && (
+          !request.resource.data.keys().hasAny(['followUpStatus'])
+          || request.resource.data.followUpStatus in ['open', 'in_progress', 'closed']
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
     // COLLECTION: contactSubmissions
     // ========================================================================
 

@@ -67,6 +67,12 @@ export const ADMIN_QUERY_TIMINGS = {
     gcTime: TEN_MINUTES_MS,
     refetchInterval: TWO_MINUTES_MS,
   },
+  nps: {
+    ttl: FIVE_MINUTES_MS,
+    staleTime: THREE_MINUTES_MS,
+    gcTime: TEN_MINUTES_MS,
+    refetchInterval: THREE_MINUTES_MS,
+  },
   userDetail: {
     staleTime: 0,
     gcTime: 15 * ONE_MINUTE_MS,
