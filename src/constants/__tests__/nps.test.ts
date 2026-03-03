@@ -6,6 +6,7 @@ import {
   getNpsSampleConfidence,
   getNpsSegmentFromScore,
   isNpsSampleReliable,
+  normalizeNpsRole,
 } from '../nps';
 
 describe('nps constants helpers', () => {
@@ -31,5 +32,13 @@ describe('nps constants helpers', () => {
     expect(getNpsSampleConfidence(10)).toBe('low');
     expect(getNpsSampleConfidence(40)).toBe('medium');
     expect(getNpsSampleConfidence(150)).toBe('high');
+  });
+
+  it('normalizes nps role values', () => {
+    expect(normalizeNpsRole('donor')).toBe('donor');
+    expect(normalizeNpsRole('ngo')).toBe('ngo');
+    expect(normalizeNpsRole('bloodbank')).toBe('bloodbank');
+    expect(normalizeNpsRole('hospital')).toBe('bloodbank');
+    expect(normalizeNpsRole('admin')).toBeNull();
   });
 });

@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { ROUTES } from '../../../constants/routes';
 import { ONE_DAY_MS } from '../../../constants/time';
-import NpsFeedbackPrompt from '../../../components/shared/NpsFeedbackPrompt';
 
 const DonorOverview = () => {
   const [historyFilter, setHistoryFilter] = useState<'month' | 'year'>('month');
@@ -181,7 +180,6 @@ const DonorOverview = () => {
         <p className="text-xs uppercase tracking-[0.3em] text-red-600">Snapshot</p>
         <h2 className="text-xl font-bold text-gray-900 dark:text-gray-900">Your Snapshot</h2>
       </div>
-      <NpsFeedbackPrompt userId={user?.uid} userRole={user?.role} className="mb-6" promptLabel="Feedback" />
       <div className="mb-6">
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-5">
           <div className="bg-white rounded-xl border border-red-100 p-4 shadow-sm transition-all duration-300 hover:shadow-md dark:bg-slate-700 dark:border-red-200">

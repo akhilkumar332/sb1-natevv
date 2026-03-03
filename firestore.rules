@@ -813,6 +813,7 @@ service cloud.firestore {
 
     match /npsResponses/{responseId} {
       allow read: if isAuthenticated() && (
+        responseId.matches('^' + request.auth.uid + '_.*$') ||
         resource.data.userId == request.auth.uid ||
         isAdmin()
       );
@@ -887,6 +888,7 @@ service cloud.firestore {
 
     match /npsPromptOverrides/{overrideId} {
       allow read: if isAuthenticated() && (
+        overrideId.matches('^' + request.auth.uid + '_.*$') ||
         resource.data.userId == request.auth.uid ||
         isAdmin()
       );

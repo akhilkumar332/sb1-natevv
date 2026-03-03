@@ -53,6 +53,12 @@ export const NPS_DRIVER_TAGS = {
 export type NpsDriverTag = (typeof NPS_DRIVER_TAGS)[keyof typeof NPS_DRIVER_TAGS];
 export type NpsSampleConfidence = 'low' | 'medium' | 'high';
 
+export const normalizeNpsRole = (role: unknown): NpsRole | null => {
+  if (role === 'hospital') return 'bloodbank';
+  if (typeof role === 'string' && NPS_ALLOWED_ROLES.includes(role as NpsRole)) return role as NpsRole;
+  return null;
+};
+
 export const getNpsSegmentFromScore = (score: number): NpsSegment => {
   if (score >= NPS_SCORE.promoterMin) return NPS_SEGMENT.promoter;
   if (score >= NPS_SCORE.passiveMin) return NPS_SEGMENT.passive;
@@ -64,8 +70,8 @@ export const isValidNpsScore = (score: number): boolean => (
 );
 
 export const getNpsCycleKey = (date: Date = new Date()): string => {
-  const year = date.getFullYear();
-  const quarter = Math.floor(date.getMonth() / 3) + 1;
+  const year = date.getUTCFullYear();
+  const quarter = Math.floor(date.getUTCMonth() / 3) + 1;
   return `${year}-Q${quarter}`;
 };
 

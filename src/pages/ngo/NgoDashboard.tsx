@@ -12,6 +12,7 @@ import {
 import { useReferrals } from '../../hooks/useReferrals';
 import PortalNotificationBridge from '../../components/shared/PortalNotificationBridge';
 import PendingActionsPanel from '../../components/shared/PendingActionsPanel';
+import NpsFeedbackPrompt from '../../components/shared/NpsFeedbackPrompt';
 import {
   Activity,
   AlertCircle,
@@ -262,6 +263,7 @@ function NgoDashboard() {
           <main className="min-w-0 flex-1">
             <PortalNotificationBridge disabled={user?.notificationPreferences?.push === false} />
             <PendingActionsPanel />
+            <NpsFeedbackPrompt userId={user?.uid} userRole={user?.role} className="mb-4" promptLabel="Feedback" />
             <Outlet context={dashboardContext} />
           </main>
         </div>

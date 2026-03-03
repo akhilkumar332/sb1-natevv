@@ -9,6 +9,7 @@ import {
   NPS_FETCH_LIMIT,
   NPS_DRIVER_TAGS,
   NPS_FOLLOW_UP_STATUS,
+  normalizeNpsRole,
   type NpsDriverTag,
   type NpsFollowUpStatus,
   type NpsRole,
@@ -272,7 +273,7 @@ const fetchNpsResponses = async (limitCount: number): Promise<NpsResponse[]> => 
   ));
   return snapshot.docs.map((docSnap) => {
     const data = docSnap.data() as Record<string, any>;
-    const role = data.userRole === 'ngo' || data.userRole === 'bloodbank' ? data.userRole : 'donor';
+    const role = normalizeNpsRole(data.userRole) || 'donor';
     const followUpStatus: NpsFollowUpStatus = data.followUpStatus === NPS_FOLLOW_UP_STATUS.inProgress
       ? NPS_FOLLOW_UP_STATUS.inProgress
       : data.followUpStatus === NPS_FOLLOW_UP_STATUS.closed

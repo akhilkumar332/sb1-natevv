@@ -45,6 +45,7 @@ import type { ConfirmationResult } from 'firebase/auth';
 import { authInputMessages, getOtpValidationError, sanitizeOtp, validateGeneralPhoneInput } from '../../utils/authInputValidation';
 import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
 import PendingActionsPanel from '../../components/shared/PendingActionsPanel';
+import NpsFeedbackPrompt from '../../components/shared/NpsFeedbackPrompt';
 import { notifyKeepOneLoginMethod, notifySelfRequestBlocked } from '../../utils/validationFeedback';
 import { useScopedErrorReporter } from '../../hooks/useScopedErrorReporter';
 import { usePageVisibility } from '../../hooks/usePageVisibility';
@@ -2562,6 +2563,7 @@ function DonorDashboard() {
           <main className="min-w-0 flex-1">
             <PortalNotificationBridge disabled={user?.notificationPreferences?.push === false} />
             <PendingActionsPanel />
+            <NpsFeedbackPrompt userId={user?.uid} userRole={user?.role} className="mb-4" promptLabel="Feedback" />
             <Outlet context={dashboardContext} />
           </main>
         </div>

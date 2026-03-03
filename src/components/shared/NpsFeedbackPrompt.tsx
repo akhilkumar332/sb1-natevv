@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { MessageSquareHeart, X } from 'lucide-react';
 import { db } from '../../firebase';
 import { COLLECTIONS } from '../../constants/firestore';
 import {
-  NPS_ALLOWED_ROLES,
+  NPS_COMMENT_MAX_LENGTH,
   NPS_DISMISS_SNOOZE_MS,
   NPS_PROMPT_SOURCE,
   NPS_QUESTION_VERSION,
@@ -14,9 +14,10 @@ import {
   getNpsCycleKey,
   getNpsSegmentFromScore,
   isValidNpsScore,
+  normalizeNpsRole,
   toNpsDocId,
-  type NpsRole,
 } from '../../constants/nps';
+import { HOUR_MS } from '../../constants/time';
 import { notify } from '../../services/notify.service';
 
 type UserRoleLike = 'donor' | 'ngo' | 'bloodbank' | 'hospital' | 'admin' | 'superadmin' | undefined;
@@ -28,31 +29,37 @@ type NpsFeedbackPromptProps = {
   promptLabel?: string;
 };
 
-const normalizeRole = (role?: UserRoleLike): NpsRole | null => {
-  if (!role) return null;
-  if (role === 'hospital') return 'bloodbank';
-  if (NPS_ALLOWED_ROLES.includes(role as NpsRole)) return role as NpsRole;
-  return null;
-};
-
 function NpsFeedbackPrompt({
   userId,
   userRole,
   className = '',
   promptLabel = 'Quarterly NPS',
 }: NpsFeedbackPromptProps) {
-  const role = normalizeRole(userRole);
-  const cycleKey = useMemo(() => getNpsCycleKey(), []);
+  const role = normalizeNpsRole(userRole);
+  const [cycleKey, setCycleKey] = useState(() => getNpsCycleKey());
   const [visible, setVisible] = useState(false);
   const [checking, setChecking] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [score, setScore] = useState<number | null>(null);
   const [comment, setComment] = useState('');
+  const overrideTriggeredRef = useRef(false);
 
   const dismissKey = useMemo(() => (userId ? `bh_nps_dismissed_${userId}_${cycleKey}` : ''), [userId, cycleKey]);
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      const nextCycleKey = getNpsCycleKey();
+      setCycleKey((prev) => (prev === nextCycleKey ? prev : nextCycleKey));
+    }, HOUR_MS);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     let active = true;
+    let unsubscribeOverride: (() => void) | null = null;
+    overrideTriggeredRef.current = false;
+    setChecking(true);
+    setVisible(false);
 
     const run = async () => {
       if (!userId || !role) {
@@ -67,6 +74,26 @@ function NpsFeedbackPrompt({
         const responseId = toNpsDocId(userId, cycleKey);
         const responseRef = doc(db, COLLECTIONS.NPS_RESPONSES, responseId);
         const overrideRef = doc(db, COLLECTIONS.NPS_PROMPT_OVERRIDES, responseId);
+
+        // Live-listen for admin manual triggers while user stays on dashboard.
+        unsubscribeOverride = onSnapshot(overrideRef, async (nextOverrideSnapshot) => {
+          if (!active) return;
+          const overrideEnabledLive = nextOverrideSnapshot.exists() && nextOverrideSnapshot.data()?.enabled === true;
+          if (!overrideEnabledLive) return;
+          overrideTriggeredRef.current = true;
+          try {
+            const latestResponse = await getDoc(responseRef);
+            if (!active || latestResponse.exists()) return;
+            setVisible(true);
+            void setDoc(overrideRef, {
+              enabled: false,
+              updatedAt: serverTimestamp(),
+            }, { merge: true }).catch(() => {});
+          } catch {
+            // Keep listener resilient; ignore transient read failures.
+          }
+        });
+
         const [snapshot, overrideSnapshot] = await Promise.all([getDoc(responseRef), getDoc(overrideRef)]);
         if (!active) return;
         if (snapshot.exists()) {
@@ -93,7 +120,7 @@ function NpsFeedbackPrompt({
         const dismissedAt = typeof window !== 'undefined'
           ? Number(window.localStorage.getItem(dismissKey) || 0)
           : 0;
-        if (dismissedAt && Date.now() - dismissedAt < NPS_DISMISS_SNOOZE_MS) {
+        if (!overrideTriggeredRef.current && dismissedAt && Date.now() - dismissedAt < NPS_DISMISS_SNOOZE_MS) {
           setVisible(false);
           return;
         }
@@ -112,6 +139,7 @@ function NpsFeedbackPrompt({
 
     return () => {
       active = false;
+      if (unsubscribeOverride) unsubscribeOverride();
     };
   }, [cycleKey, dismissKey, role, userId]);
 
@@ -231,7 +259,7 @@ function NpsFeedbackPrompt({
           value={comment}
           onChange={(event) => setComment(event.target.value)}
           rows={3}
-          maxLength={600}
+          maxLength={NPS_COMMENT_MAX_LENGTH}
           placeholder="What influenced your score?"
           className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
         />

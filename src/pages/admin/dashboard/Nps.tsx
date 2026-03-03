@@ -24,6 +24,7 @@ import {
   computeNpsScore,
   getNpsCycleKey,
   getNpsSampleConfidence,
+  normalizeNpsRole,
   type NpsDriverTag,
   type NpsFollowUpStatus,
   type NpsRole,
@@ -62,7 +63,7 @@ const DRIVER_TAG_LABELS: Record<NpsDriverTag, string> = {
   operations: 'Operations',
 };
 
-const toMonthKey = (date: Date): string => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+const toMonthKey = (date: Date): string => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 const toMonthLabel = (monthKey: string): string => {
   const [year, month] = monthKey.split('-').map(Number);
   if (!year || !month) return monthKey;
@@ -513,17 +514,35 @@ function NpsAdminPage() {
     });
   };
 
+  const resolveSingleUserTriggerTarget = async (rawUserId: string): Promise<string | null> => {
+    const uid = rawUserId.trim();
+    if (!uid) {
+      notify.error('Enter a valid user uid to trigger feedback prompt.');
+      return null;
+    }
+    const userRef = doc(db, COLLECTIONS.USERS, uid);
+    const userSnapshot = await getDoc(userRef);
+    if (!userSnapshot.exists()) {
+      notify.error('User not found. Please enter a valid uid.');
+      return null;
+    }
+    const userData = userSnapshot.data() as Record<string, any>;
+    const role = normalizeNpsRole(userData?.role);
+    if (!role) {
+      notify.error('Feedback can be triggered only for donor, NGO, or bloodbank users.');
+      return null;
+    }
+    return uid;
+  };
+
   const triggerPromptForScope = async () => {
     const cycleKey = getNpsCycleKey();
     const actorUid = user?.uid || null;
     setTriggering(true);
     try {
       if (triggerMode === 'single_user') {
-        const normalizedUserId = triggeringUserId.trim();
-        if (!normalizedUserId) {
-          notify.error('Enter a user id to trigger feedback prompt.');
-          return;
-        }
+        const normalizedUserId = await resolveSingleUserTriggerTarget(triggeringUserId);
+        if (!normalizedUserId) return;
         await upsertPromptOverride(normalizedUserId, cycleKey, actorUid);
         notify.success(`Feedback prompt will reappear for ${normalizedUserId} in ${cycleKey}.`);
         setTriggeringUserId('');
