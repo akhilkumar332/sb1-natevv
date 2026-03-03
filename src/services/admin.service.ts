@@ -37,6 +37,7 @@ import {
 } from '../types/database.types';
 import { extractQueryData, getServerTimestamp } from '../utils/firestore.utils';
 import { countCollection } from '../utils/firestoreCount';
+import { SYSTEM_HEALTH_THRESHOLDS } from '../constants/analytics';
 import { DatabaseError, ValidationError, NotFoundError, PermissionError } from '../utils/errorHandler';
 import { logAuditEvent } from './audit.service';
 import { captureHandledError } from './errorLog.service';
@@ -1062,6 +1063,8 @@ export const generateDailyAnalytics = async (): Promise<string> => {
     const stats = await getPlatformStats();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
     // Get inventory stats
     const inventorySnapshot = await getDocs(collection(db, COLLECTIONS.BLOOD_INVENTORY));
@@ -1071,22 +1074,96 @@ export const generateDailyAnalytics = async (): Promise<string> => {
     const criticalInventories = inventory.filter(inv => inv.status === 'critical').length;
     const lowInventories = inventory.filter(inv => inv.status === 'low').length;
 
+    const [newUsersCount, newDonorsCount, todaysCompletedDonationsSnapshot, newRequestsCount, newCampaignsCount, campaignSnapshot, fulfilledRequestsSnapshot] = await Promise.all([
+      countCollection(
+        'users',
+        where('createdAt', '>=', Timestamp.fromDate(today)),
+        where('createdAt', '<', Timestamp.fromDate(tomorrow)),
+      ),
+      countCollection(
+        'users',
+        where('role', '==', 'donor'),
+        where('createdAt', '>=', Timestamp.fromDate(today)),
+        where('createdAt', '<', Timestamp.fromDate(tomorrow)),
+      ),
+      getDocs(query(
+        collection(db, COLLECTIONS.DONATIONS),
+        where('status', '==', 'completed'),
+        where('donationDate', '>=', Timestamp.fromDate(today)),
+        where('donationDate', '<', Timestamp.fromDate(tomorrow)),
+      )),
+      countCollection(
+        'bloodRequests',
+        where('requestedAt', '>=', Timestamp.fromDate(today)),
+        where('requestedAt', '<', Timestamp.fromDate(tomorrow)),
+      ),
+      countCollection(
+        'campaigns',
+        where('createdAt', '>=', Timestamp.fromDate(today)),
+        where('createdAt', '<', Timestamp.fromDate(tomorrow)),
+      ),
+      getDocs(collection(db, COLLECTIONS.CAMPAIGNS)),
+      getDocs(query(
+        collection(db, COLLECTIONS.BLOOD_REQUESTS),
+        where('status', '==', 'fulfilled'),
+        where('requestedAt', '>=', Timestamp.fromDate(today)),
+        where('requestedAt', '<', Timestamp.fromDate(tomorrow)),
+      )),
+    ]);
+
+    const todaysCompletedDonations = extractQueryData<Donation>(todaysCompletedDonationsSnapshot, [
+      'donationDate',
+      'createdAt',
+      'updatedAt',
+    ]);
+    const donationsByBloodType = todaysCompletedDonations.reduce<Record<string, number>>((acc, row) => {
+      const key = String(row.bloodType || '').trim().toUpperCase();
+      if (!key) return acc;
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const donationsByCity = todaysCompletedDonations.reduce<Record<string, number>>((acc, row) => {
+      const city = String(row.location?.city || '').trim();
+      if (!city) return acc;
+      acc[city] = (acc[city] || 0) + 1;
+      return acc;
+    }, {});
+    const campaigns = extractQueryData<Campaign>(campaignSnapshot, ['startDate', 'endDate', 'createdAt', 'updatedAt']);
+    const totalParticipation = campaigns.reduce((sum, campaign) => {
+      const participants = (campaign as any)?.participants;
+      return sum + (Array.isArray(participants) ? participants.length : 0);
+    }, 0);
+    const fulfilledRequests = extractQueryData<BloodRequest>(fulfilledRequestsSnapshot, ['requestedAt', 'neededBy', 'fulfilledAt']);
+    const averageResponseTime = fulfilledRequests.length > 0
+      ? (fulfilledRequests.reduce((sum, request) => {
+        const requestedAt = request.requestedAt instanceof Date ? request.requestedAt : request.requestedAt?.toDate?.();
+        const fulfilledAt = request.fulfilledAt instanceof Date ? request.fulfilledAt : request.fulfilledAt?.toDate?.();
+        if (!requestedAt || !fulfilledAt) return sum;
+        const hours = (fulfilledAt.getTime() - requestedAt.getTime()) / (1000 * 60 * 60);
+        return sum + Math.max(0, hours);
+      }, 0) / fulfilledRequests.length)
+      : 0;
+
     const analyticsData: Omit<Analytics, 'id'> = {
       date: Timestamp.fromDate(today),
       totalUsers: stats.users.total,
-      newUsers: 0, // Would need to calculate based on createdAt
+      newUsers: newUsersCount,
+      newDonors: newDonorsCount,
       activeUsers: stats.users.byStatus.active,
       usersByRole: stats.users.byRole,
       totalDonations: stats.donations.completed,
-      donationsByBloodType: {}, // Would need to calculate
-      donationsByCity: {}, // Would need to calculate
+      newDonations: todaysCompletedDonations.length,
+      donationsByBloodType,
+      donationsByCity,
       totalRequests: stats.requests.total,
+      newRequests: newRequestsCount,
       fulfilledRequests: stats.requests.byStatus.fulfilled,
       pendingRequests: stats.requests.byStatus.active,
-      averageResponseTime: 0, // Would need to calculate
+      averageResponseTime: Number(averageResponseTime.toFixed(2)),
       activeCampaigns: stats.campaigns.byStatus.active,
       completedCampaigns: stats.campaigns.byStatus.completed,
-      totalParticipation: 0, // Would need to calculate
+      newCampaigns: newCampaignsCount,
+      totalParticipation,
       totalBloodUnits,
       criticalInventories,
       lowInventories,
@@ -1146,8 +1223,16 @@ export const getSystemHealthReport = async () => {
       ? Math.round((stats.requests.byStatus.fulfilled / stats.requests.total) * 100)
       : 0;
 
+    const status = (
+      inventoryAlerts.length > SYSTEM_HEALTH_THRESHOLDS.inventoryAlertsDegraded
+      || emergencyRequests.length > SYSTEM_HEALTH_THRESHOLDS.emergencyRequestsDegraded
+      || stats.verifications.byStatus.pending > SYSTEM_HEALTH_THRESHOLDS.pendingVerificationsDegraded
+    )
+      ? 'degraded'
+      : 'healthy';
+
     return {
-      status: 'healthy', // Would integrate with monitoring service
+      status,
       users: {
         total: stats.users.total,
         activePercentage,

@@ -15,6 +15,7 @@ import {
   getCampaignStats,
   getNGOCampaignPerformance,
   getPlatformStats,
+  getPlatformRangeStats,
   getUserGrowthTrend,
   getBloodTypeDistribution,
   getGeographicDistribution,
@@ -24,6 +25,7 @@ import {
   type BloodBankStats,
   type CampaignStats,
   type PlatformStats,
+  type PlatformRangeStats,
   type TrendData,
   type BloodTypeDistribution,
   type GeographicDistribution,
@@ -190,13 +192,15 @@ export const useUserGrowthTrend = (
  * Hook to get blood type distribution with caching
  */
 export const useBloodTypeDistribution = (
+  dateRange?: DateRange,
   options?: Omit<UseQueryOptions<BloodTypeDistribution[]>, 'queryKey' | 'queryFn'>
 ) => {
   return useQuery({
-    queryKey: ['bloodTypeDistribution'],
-    queryFn: () => getBloodTypeDistribution(),
+    queryKey: ['bloodTypeDistribution', dateRange || null],
+    queryFn: () => getBloodTypeDistribution(dateRange),
     // Cache blood type distribution for 15 minutes (rarely changes)
     staleTime: FIFTEEN_MINUTES_MS,
+    enabled: !dateRange || (!!dateRange.startDate && !!dateRange.endDate),
     ...options,
   });
 };
@@ -205,13 +209,31 @@ export const useBloodTypeDistribution = (
  * Hook to get geographic distribution with caching
  */
 export const useGeographicDistribution = (
+  dateRange?: DateRange,
   options?: Omit<UseQueryOptions<GeographicDistribution[]>, 'queryKey' | 'queryFn'>
 ) => {
   return useQuery({
-    queryKey: ['geographicDistribution'],
-    queryFn: () => getGeographicDistribution(),
+    queryKey: ['geographicDistribution', dateRange || null],
+    queryFn: () => getGeographicDistribution(dateRange),
     // Cache geographic distribution for 15 minutes (rarely changes)
     staleTime: FIFTEEN_MINUTES_MS,
+    enabled: !dateRange || (!!dateRange.startDate && !!dateRange.endDate),
+    ...options,
+  });
+};
+
+/**
+ * Hook to get selected-range platform metrics with caching
+ */
+export const usePlatformRangeStats = (
+  dateRange: DateRange,
+  options?: Omit<UseQueryOptions<PlatformRangeStats>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: ['platformRangeStats', dateRange],
+    queryFn: () => getPlatformRangeStats(dateRange),
+    enabled: !!dateRange.startDate && !!dateRange.endDate,
+    staleTime: TEN_MINUTES_MS,
     ...options,
   });
 };

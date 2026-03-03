@@ -1,14 +1,15 @@
 import { test, expect } from '@playwright/test';
+import { ROUTES } from '../src/constants/routes';
 
 test.describe('Donor Registration Flow', () => {
   test('should navigate to registration page from login', async ({ page }) => {
-    await page.goto('/donor/login');
+    await page.goto(ROUTES.portal.donor.login);
     await page.getByRole('link', { name: /register now|register/i }).click();
-    await expect(page).toHaveURL(/.*donor\/register/);
+    await expect(page).toHaveURL(new RegExp(`${ROUTES.portal.donor.register}$`));
   });
 
   test('should display registration form', async ({ page }) => {
-    await page.goto('/donor/register');
+    await page.goto(ROUTES.portal.donor.register);
 
     // Check for form fields
     await expect(page.getByLabel(/email/i)).toBeVisible();
@@ -16,7 +17,7 @@ test.describe('Donor Registration Flow', () => {
   });
 
   test('should show validation errors for empty form', async ({ page }) => {
-    await page.goto('/donor/register');
+    await page.goto(ROUTES.portal.donor.register);
 
     // Try to submit empty form
     const submitButton = page.getByRole('button', { name: /register|sign up/i });
@@ -27,7 +28,7 @@ test.describe('Donor Registration Flow', () => {
   });
 
   test('should validate email format', async ({ page }) => {
-    await page.goto('/donor/register');
+    await page.goto(ROUTES.portal.donor.register);
 
     const emailInput = page.getByLabel(/email/i);
     await emailInput.fill('invalid-email');
@@ -38,12 +39,12 @@ test.describe('Donor Registration Flow', () => {
   });
 
   test('should navigate to login page from registration', async ({ page }) => {
-    await page.goto('/donor/register');
+    await page.goto(ROUTES.portal.donor.register);
 
     const loginLink = page.getByRole('link', { name: /login|sign in/i });
     if (await loginLink.isVisible()) {
       await loginLink.click();
-      await expect(page).toHaveURL(/.*donor\/login/);
+      await expect(page).toHaveURL(new RegExp(`${ROUTES.portal.donor.login}$`));
     }
   });
 });

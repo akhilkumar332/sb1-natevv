@@ -6,6 +6,8 @@
 
 import React, { useState } from 'react';
 import { Calendar } from 'lucide-react';
+import { THREE_HUNDRED_MS } from '../../constants/time';
+import { ANALYTICS_LIMITS, ANALYTICS_RANGE_MS } from '../../constants/analytics';
 
 type DateRangeType = 'week' | 'month' | 'quarter' | 'year' | 'custom';
 
@@ -24,6 +26,7 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   const [selectedRange, setSelectedRange] = useState<DateRangeType>(defaultRange);
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [customError, setCustomError] = useState('');
 
   const presetRanges: Array<{ label: string; value: DateRangeType }> = [
     { label: 'Last 7 Days', value: 'week' },
@@ -59,6 +62,7 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
 
   const handleRangeSelect = (range: DateRangeType) => {
     setSelectedRange(range);
+    setCustomError('');
 
     if (range !== 'custom') {
       const { start, end } = calculateDateRange(range);
@@ -67,9 +71,25 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   };
 
   const handleCustomApply = () => {
-    if (customStart && customEnd) {
-      onRangeChange(new Date(customStart), new Date(customEnd));
+    if (!customStart || !customEnd) return;
+
+    const start = new Date(customStart);
+    const end = new Date(customEnd);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      setCustomError('Please select a valid date range.');
+      return;
     }
+    if (start > end) {
+      setCustomError('Start date cannot be after end date.');
+      return;
+    }
+    const maxWindowMs = ANALYTICS_RANGE_MS.maxCustomRange;
+    if ((end.getTime() - start.getTime()) > maxWindowMs) {
+      setCustomError(`Custom range cannot exceed ${ANALYTICS_LIMITS.maxCustomRangeYears} years.`);
+      return;
+    }
+    setCustomError('');
+    onRangeChange(start, end);
   };
 
   return (
@@ -130,6 +150,11 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
           >
             Apply Custom Range
           </button>
+          {customError ? (
+            <p className="text-xs text-rose-600" style={{ transitionDuration: `${THREE_HUNDRED_MS}ms` }}>
+              {customError}
+            </p>
+          ) : null}
         </div>
       )}
     </div>

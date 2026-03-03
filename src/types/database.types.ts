@@ -976,6 +976,7 @@ export interface Analytics {
   // User Metrics
   totalUsers: number;
   newUsers: number;
+  newDonors?: number;
   activeUsers: number;
   usersByRole: {
     donors: number;
@@ -985,6 +986,7 @@ export interface Analytics {
 
   // Donation Metrics
   totalDonations: number;
+  newDonations?: number;
   donationsByBloodType: {
     [key: string]: number;
   };
@@ -994,6 +996,7 @@ export interface Analytics {
 
   // Request Metrics
   totalRequests: number;
+  newRequests?: number;
   fulfilledRequests: number;
   pendingRequests: number;
   averageResponseTime: number;
@@ -1001,6 +1004,7 @@ export interface Analytics {
   // Campaign Metrics
   activeCampaigns: number;
   completedCampaigns: number;
+  newCampaigns?: number;
   totalParticipation: number;
 
   // Inventory Metrics

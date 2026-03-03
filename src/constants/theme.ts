@@ -70,6 +70,13 @@ export const CHART_PALETTE = {
   grid: '#E5E7EB',
 } as const;
 
+export const KPI_ALIGNED_CHART_PALETTE = {
+  users: CHART_PALETTE.secondary,
+  donors: CHART_PALETTE.primary,
+  requests: CHART_PALETTE.success,
+  donations: '#9333EA',
+} as const;
+
 export const BLOOD_TYPE_CHART_COLORS: Record<string, string> = {
   'A+': '#DC2626',
   'A-': '#EA580C',

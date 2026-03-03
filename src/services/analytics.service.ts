@@ -23,6 +23,10 @@ import { countCollection } from '../utils/firestoreCount';
 import { runDedupedRequest } from '../utils/requestDedupe';
 import { DatabaseError } from '../utils/errorHandler';
 import { BLOOD_TYPE_CHART_COLORS, CHART_PALETTE } from '../constants/theme';
+import {
+  getAnalyticsByDateRange as getAnalyticsSnapshotsByDateRange,
+  getPlatformStats as getAdminPlatformStats,
+} from './admin.service';
 
 // ============================================================================
 // ANALYTICS TYPES
@@ -77,6 +81,15 @@ export interface PlatformStats {
   verifiedUsers: number;
 }
 
+export interface PlatformRangeStats {
+  newUsers: number;
+  newDonors: number;
+  completedDonations: number;
+  requestsCreated: number;
+  campaignsCreated: number;
+  source: 'snapshot' | 'raw';
+}
+
 export interface TrendData {
   date: string;
   label: string;
@@ -101,6 +114,12 @@ export interface GeographicDistribution {
   donorCount: number;
   hospitalCount: number;
 }
+
+const resolveRole = (role?: 'donor' | 'bloodbank' | 'hospital' | 'ngo') => {
+  if (!role) return undefined;
+  if (role === 'hospital') return 'bloodbank';
+  return role;
+};
 
 // ============================================================================
 // DONOR ANALYTICS
@@ -378,43 +397,156 @@ export const getNGOCampaignPerformance = async (
  */
 export const getPlatformStats = async (): Promise<PlatformStats> => {
   try {
-    const [
-      totalUsers,
-      totalDonors,
-      bloodbanks,
-      hospitals,
-      totalNGOs,
-      activeDonors,
-      verifiedUsers,
-      totalDonations,
-      totalBloodRequests,
-      totalCampaigns,
-    ] = await Promise.all([
-      countCollection('users'),
-      countCollection('users', where('role', '==', 'donor')),
-      countCollection('users', where('role', '==', 'bloodbank')),
-      countCollection('users', where('role', '==', 'hospital')),
-      countCollection('users', where('role', '==', 'ngo')),
-      countCollection('users', where('role', '==', 'donor'), where('isAvailable', '==', true)),
+    const [adminStats, activeDonors, verifiedUsers] = await Promise.all([
+      getAdminPlatformStats(),
+      countCollection('users', where('role', '==', 'donor'), where('status', '==', 'active'), where('isAvailable', '==', true)),
       countCollection('users', where('verified', '==', true)),
-      countCollection('donations'),
-      countCollection('bloodRequests'),
-      countCollection('campaigns'),
     ]);
 
     return {
-      totalUsers,
-      totalDonors,
-      totalHospitals: bloodbanks + hospitals,
-      totalNGOs,
-      totalDonations,
-      totalBloodRequests,
-      totalCampaigns,
+      totalUsers: adminStats.users.total,
+      totalDonors: adminStats.users.byRole.donors,
+      totalHospitals: adminStats.users.byRole.hospitals,
+      totalNGOs: adminStats.users.byRole.ngos,
+      totalDonations: adminStats.donations.total,
+      totalBloodRequests: adminStats.requests.total,
+      totalCampaigns: adminStats.campaigns.total,
       activeDonors,
       verifiedUsers,
     };
   } catch (error) {
     throw new DatabaseError('Failed to get platform stats');
+  }
+};
+
+/**
+ * Get range-scoped platform metrics
+ */
+export const getPlatformRangeStats = async (
+  dateRange: DateRange
+): Promise<PlatformRangeStats> => {
+  try {
+    const cacheKey = `analytics:platformRangeStats:${dateRange.startDate.toISOString()}:${dateRange.endDate.toISOString()}`;
+    return runDedupedRequest(cacheKey, async () => {
+      const snapshots = await getAnalyticsSnapshotsByDateRange(dateRange.startDate, dateRange.endDate);
+      const hasDailyRangeFields = snapshots.some((entry: any) => (
+        typeof entry.newDonations === 'number'
+        || typeof entry.newRequests === 'number'
+        || typeof entry.newCampaigns === 'number'
+        || typeof entry.newDonors === 'number'
+      ));
+
+      if (snapshots.length > 0 && hasDailyRangeFields) {
+        const fromSnapshots = snapshots.reduce((acc, entry: any) => ({
+          newUsers: acc.newUsers + Number(entry.newUsers || 0),
+          newDonors: acc.newDonors + Number(entry.newDonors || 0),
+          completedDonations: acc.completedDonations + Number(entry.newDonations || 0),
+          requestsCreated: acc.requestsCreated + Number(entry.newRequests || 0),
+          campaignsCreated: acc.campaignsCreated + Number(entry.newCampaigns || 0),
+        }), {
+          newUsers: 0,
+          newDonors: 0,
+          completedDonations: 0,
+          requestsCreated: 0,
+          campaignsCreated: 0,
+        });
+
+        return {
+          ...fromSnapshots,
+          source: 'snapshot',
+        };
+      }
+
+      let newUsers = 0;
+      let newDonors = 0;
+      let completedDonations = 0;
+      let requestsCreated = 0;
+      let campaignsCreated = 0;
+      try {
+        [newUsers, newDonors, completedDonations, requestsCreated, campaignsCreated] = await Promise.all([
+          countCollection(
+            COLLECTIONS.USERS,
+            where('createdAt', '>=', Timestamp.fromDate(dateRange.startDate)),
+            where('createdAt', '<=', Timestamp.fromDate(dateRange.endDate)),
+          ),
+          countCollection(
+            COLLECTIONS.USERS,
+            where('role', '==', 'donor'),
+            where('createdAt', '>=', Timestamp.fromDate(dateRange.startDate)),
+            where('createdAt', '<=', Timestamp.fromDate(dateRange.endDate)),
+          ),
+          countCollection(
+            COLLECTIONS.DONATIONS,
+            where('status', '==', 'completed'),
+            where('donationDate', '>=', Timestamp.fromDate(dateRange.startDate)),
+            where('donationDate', '<=', Timestamp.fromDate(dateRange.endDate)),
+          ),
+          countCollection(
+            COLLECTIONS.BLOOD_REQUESTS,
+            where('requestedAt', '>=', Timestamp.fromDate(dateRange.startDate)),
+            where('requestedAt', '<=', Timestamp.fromDate(dateRange.endDate)),
+          ),
+          countCollection(
+            COLLECTIONS.CAMPAIGNS,
+            where('createdAt', '>=', Timestamp.fromDate(dateRange.startDate)),
+            where('createdAt', '<=', Timestamp.fromDate(dateRange.endDate)),
+          ),
+        ]);
+      } catch {
+        const [usersSnapshot, donationsSnapshot, requestsSnapshot, campaignsSnapshot] = await Promise.all([
+          getDocs(collection(db, COLLECTIONS.USERS)),
+          getDocs(query(collection(db, COLLECTIONS.DONATIONS), where('status', '==', 'completed'))),
+          getDocs(collection(db, COLLECTIONS.BLOOD_REQUESTS)),
+          getDocs(collection(db, COLLECTIONS.CAMPAIGNS)),
+        ]);
+        const fromMs = dateRange.startDate.getTime();
+        const toMs = dateRange.endDate.getTime();
+
+        const users = extractQueryData<User>(usersSnapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']);
+        const donations = extractQueryData<Donation>(donationsSnapshot, ['donationDate']);
+        const requests = extractQueryData<BloodRequest>(requestsSnapshot, ['requestedAt', 'neededBy', 'fulfilledAt']);
+        const campaigns = extractQueryData<Campaign>(campaignsSnapshot, ['createdAt', 'startDate', 'endDate']);
+
+        users.forEach((user) => {
+          const createdAt = user.createdAt instanceof Date ? user.createdAt : user.createdAt?.toDate?.();
+          if (!createdAt) return;
+          const createdAtMs = createdAt.getTime();
+          if (createdAtMs >= fromMs && createdAtMs <= toMs) {
+            newUsers += 1;
+            if (user.role === 'donor') newDonors += 1;
+          }
+        });
+        donations.forEach((donation) => {
+          const donationDate = donation.donationDate instanceof Date ? donation.donationDate : donation.donationDate?.toDate?.();
+          if (!donationDate) return;
+          const donationDateMs = donationDate.getTime();
+          if (donationDateMs >= fromMs && donationDateMs <= toMs) completedDonations += 1;
+        });
+        requests.forEach((request) => {
+          const requestedAt = request.requestedAt instanceof Date ? request.requestedAt : request.requestedAt?.toDate?.();
+          if (!requestedAt) return;
+          const requestedAtMs = requestedAt.getTime();
+          if (requestedAtMs >= fromMs && requestedAtMs <= toMs) requestsCreated += 1;
+        });
+        campaigns.forEach((campaign) => {
+          const createdAt = campaign.createdAt instanceof Date ? campaign.createdAt : campaign.createdAt?.toDate?.();
+          if (!createdAt) return;
+          const createdAtMs = createdAt.getTime();
+          if (createdAtMs >= fromMs && createdAtMs <= toMs) campaignsCreated += 1;
+        });
+      }
+
+      return {
+        newUsers,
+        newDonors,
+        completedDonations,
+        requestsCreated,
+        campaignsCreated,
+        source: 'raw',
+      };
+    }, TEN_MINUTES_MS);
+  } catch (error) {
+    throw new DatabaseError('Failed to get range platform stats');
   }
 };
 
@@ -426,14 +558,50 @@ export const getUserGrowthTrend = async (
   role?: 'donor' | 'bloodbank' | 'hospital' | 'ngo'
 ): Promise<TrendData[]> => {
   try {
+    const normalizedRole = resolveRole(role);
+    if (!normalizedRole) {
+      const snapshots = await getAnalyticsSnapshotsByDateRange(dateRange.startDate, dateRange.endDate);
+      if (snapshots.length > 0) {
+        const snapshotTrend = snapshots
+          .sort((a, b) => {
+            const aMs = (a.date as any)?.toDate?.()?.getTime?.() || 0;
+            const bMs = (b.date as any)?.toDate?.()?.getTime?.() || 0;
+            return aMs - bMs;
+          })
+          .map((item) => {
+            const dateObj = (item.date as any)?.toDate?.() || item.date;
+            const monthKey = dateObj instanceof Date
+              ? `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`
+              : '';
+            return {
+              date: monthKey,
+              label: monthKey,
+              value: Number(item.newUsers || 0),
+            };
+          })
+          .filter((entry) => Boolean(entry.date));
+
+        if (snapshotTrend.length > 0) {
+          // Merge day-level snapshot rows into month buckets.
+          const bucket: Record<string, number> = {};
+          snapshotTrend.forEach((entry) => {
+            bucket[entry.date] = (bucket[entry.date] || 0) + entry.value;
+          });
+          return Object.entries(bucket)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([date, value]) => ({ date, label: date, value }));
+        }
+      }
+    }
+
     const constraints: any[] = [
       where('createdAt', '>=', Timestamp.fromDate(dateRange.startDate)),
       where('createdAt', '<=', Timestamp.fromDate(dateRange.endDate)),
       orderBy('createdAt', 'asc'),
     ];
 
-    if (role) {
-      constraints.push(where('role', '==', role));
+    if (normalizedRole) {
+      constraints.push(where('role', '==', normalizedRole));
     }
 
     const usersQuery = query(collection(db, COLLECTIONS.USERS), ...constraints);
@@ -449,19 +617,64 @@ export const getUserGrowthTrend = async (
 /**
  * Get blood type distribution across platform
  */
-export const getBloodTypeDistribution = async (): Promise<BloodTypeDistribution[]> => {
+export const getBloodTypeDistribution = async (
+  dateRange?: DateRange
+): Promise<BloodTypeDistribution[]> => {
   try {
-    return runDedupedRequest('analytics:bloodTypeDistribution', async () => {
+    const cacheKey = dateRange
+      ? `analytics:bloodTypeDistribution:${dateRange.startDate.toISOString()}:${dateRange.endDate.toISOString()}`
+      : 'analytics:bloodTypeDistribution';
+    return runDedupedRequest(cacheKey, async () => {
       const bloodTypes = Object.keys(BLOOD_TYPE_CHART_COLORS);
-      const counts = await Promise.all(
-        bloodTypes.map((bloodType) => (
-          countCollection('users', where('role', '==', 'donor'), where('bloodType', '==', bloodType))
-        ))
-      );
-      const total = counts.reduce((sum, count) => sum + count, 0);
+      let countsByType: Record<string, number> = {};
 
-      return bloodTypes.map((bloodType, index) => {
-        const count = counts[index] || 0;
+      if (!dateRange) {
+        const counts = await Promise.all(
+          bloodTypes.map((bloodType) => (
+            countCollection('users', where('role', '==', 'donor'), where('bloodType', '==', bloodType))
+          ))
+        );
+        countsByType = bloodTypes.reduce<Record<string, number>>((acc, bloodType, index) => {
+          acc[bloodType] = counts[index] || 0;
+          return acc;
+        }, {});
+      } else {
+        const fromMs = dateRange.startDate.getTime();
+        const toMs = dateRange.endDate.getTime();
+        let users: User[] = [];
+        try {
+          const usersSnapshot = await getDocs(query(
+            collection(db, COLLECTIONS.USERS),
+            where('role', '==', 'donor'),
+            where('createdAt', '>=', Timestamp.fromDate(dateRange.startDate)),
+            where('createdAt', '<=', Timestamp.fromDate(dateRange.endDate)),
+          ));
+          users = extractQueryData<User>(usersSnapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']);
+        } catch (error) {
+          const fallbackSnapshot = await getDocs(query(
+            collection(db, COLLECTIONS.USERS),
+            where('role', '==', 'donor'),
+          ));
+          users = extractQueryData<User>(fallbackSnapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']).filter((user) => {
+            const createdAt = user.createdAt instanceof Date ? user.createdAt : user.createdAt?.toDate?.();
+            if (!createdAt) return false;
+            const createdAtMs = createdAt.getTime();
+            return createdAtMs >= fromMs && createdAtMs <= toMs;
+          });
+        }
+
+        countsByType = users.reduce<Record<string, number>>((acc, user) => {
+          const key = String(user.bloodType || '').trim().toUpperCase();
+          if (!key) return acc;
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {});
+      }
+
+      const total = Object.values(countsByType).reduce((sum, count) => sum + count, 0);
+
+      return bloodTypes.map((bloodType) => {
+        const count = countsByType[bloodType] || 0;
         return ({
           bloodType,
           count,
@@ -478,11 +691,38 @@ export const getBloodTypeDistribution = async (): Promise<BloodTypeDistribution[
 /**
  * Get geographic distribution
  */
-export const getGeographicDistribution = async (): Promise<GeographicDistribution[]> => {
+export const getGeographicDistribution = async (
+  dateRange?: DateRange
+): Promise<GeographicDistribution[]> => {
   try {
-    return runDedupedRequest('analytics:geoDistribution', async () => {
-      const usersSnapshot = await getDocs(collection(db, COLLECTIONS.USERS));
-      const users = extractQueryData<User>(usersSnapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']);
+    const cacheKey = dateRange
+      ? `analytics:geoDistribution:${dateRange.startDate.toISOString()}:${dateRange.endDate.toISOString()}`
+      : 'analytics:geoDistribution';
+    return runDedupedRequest(cacheKey, async () => {
+      let users: User[] = [];
+      if (!dateRange) {
+        const usersSnapshot = await getDocs(collection(db, COLLECTIONS.USERS));
+        users = extractQueryData<User>(usersSnapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']);
+      } else {
+        try {
+          const usersSnapshot = await getDocs(query(
+            collection(db, COLLECTIONS.USERS),
+            where('createdAt', '>=', Timestamp.fromDate(dateRange.startDate)),
+            where('createdAt', '<=', Timestamp.fromDate(dateRange.endDate)),
+          ));
+          users = extractQueryData<User>(usersSnapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']);
+        } catch (error) {
+          const fromMs = dateRange.startDate.getTime();
+          const toMs = dateRange.endDate.getTime();
+          const usersSnapshot = await getDocs(collection(db, COLLECTIONS.USERS));
+          users = extractQueryData<User>(usersSnapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']).filter((user) => {
+            const createdAt = user.createdAt instanceof Date ? user.createdAt : user.createdAt?.toDate?.();
+            if (!createdAt) return false;
+            const createdAtMs = createdAt.getTime();
+            return createdAtMs >= fromMs && createdAtMs <= toMs;
+          });
+        }
+      }
 
       const distribution: Record<string, GeographicDistribution> = {};
 
