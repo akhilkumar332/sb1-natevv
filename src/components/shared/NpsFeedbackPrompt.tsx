@@ -57,6 +57,7 @@ function NpsFeedbackPrompt({
   useEffect(() => {
     let active = true;
     let unsubscribeOverride: (() => void) | null = null;
+    let unsubscribeResponse: (() => void) | null = null;
     overrideTriggeredRef.current = false;
     setChecking(true);
     setVisible(false);
@@ -74,6 +75,22 @@ function NpsFeedbackPrompt({
         const responseId = toNpsDocId(userId, cycleKey);
         const responseRef = doc(db, COLLECTIONS.NPS_RESPONSES, responseId);
         const overrideRef = doc(db, COLLECTIONS.NPS_PROMPT_OVERRIDES, responseId);
+
+        // Live-listen for response creation from other tabs/devices and hide prompt immediately.
+        unsubscribeResponse = onSnapshot(responseRef, async (nextResponseSnapshot) => {
+          if (!active || !nextResponseSnapshot.exists()) return;
+          setVisible(false);
+          try {
+            const latestOverride = await getDoc(overrideRef);
+            if (!active || !latestOverride.exists() || latestOverride.data()?.enabled !== true) return;
+            void setDoc(overrideRef, {
+              enabled: false,
+              updatedAt: serverTimestamp(),
+            }, { merge: true }).catch(() => {});
+          } catch {
+            // Keep listener resilient; ignore transient read failures.
+          }
+        });
 
         // Live-listen for admin manual triggers while user stays on dashboard.
         unsubscribeOverride = onSnapshot(overrideRef, async (nextOverrideSnapshot) => {
@@ -140,6 +157,7 @@ function NpsFeedbackPrompt({
     return () => {
       active = false;
       if (unsubscribeOverride) unsubscribeOverride();
+      if (unsubscribeResponse) unsubscribeResponse();
     };
   }, [cycleKey, dismissKey, role, userId]);
 
