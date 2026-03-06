@@ -7,15 +7,22 @@ import {
   Bell,
   Building2,
   Calendar,
+  FileImage,
+  FileText,
   ChevronDown,
   ChevronRight,
   ClipboardCheck,
   Droplets,
   Heart,
+  LayoutTemplate,
+  ListTree,
   LayoutDashboard,
   Mail,
+  Newspaper,
   Settings,
   Shield,
+  SlidersHorizontal,
+  Tags,
   Users,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -51,6 +58,13 @@ function AdminPortal() {
     appointments: Calendar,
     analytics: BarChart3,
     nps: BarChart3,
+    'cms-overview': LayoutTemplate,
+    'cms-pages': FileText,
+    'cms-blog-posts': Newspaper,
+    'cms-categories': Tags,
+    'cms-menus': ListTree,
+    'cms-media': FileImage,
+    'cms-settings': SlidersHorizontal,
     audit: Shield,
     errors: AlertTriangle,
     impersonation: Shield,
@@ -62,6 +76,7 @@ function AdminPortal() {
     users: Users,
     operations: Activity,
     insights: BarChart3,
+    content: LayoutTemplate,
     security: Shield,
     system: Settings,
   };
@@ -88,7 +103,7 @@ function AdminPortal() {
       const next: Record<string, boolean> = {};
       menuGroups.forEach((group) => {
         const containsActive = group.items.some((item) => item.to === currentPath);
-        next[group.id] = prev[group.id] ?? (containsActive || group.id === 'security');
+        next[group.id] = prev[group.id] ?? (containsActive || group.id === 'security' || group.id === 'content');
       });
       return next;
     });

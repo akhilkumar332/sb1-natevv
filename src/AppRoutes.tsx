@@ -122,7 +122,22 @@ const FindDonors = lazy(() => lazyLoad(import('./pages/FindDonors')));
 const RequestBlood = lazy(() => lazyLoad(import('./pages/RequestBlood')));
 const About = lazy(() => lazyLoad(import('./pages/About')));
 const Contact = lazy(() => lazyLoad(import('./pages/Contact')));
+const Blog = lazy(() => lazyLoad(import('./pages/Blog')));
+const BlogPost = lazy(() => lazyLoad(import('./pages/BlogPost')));
+const CmsPage = lazy(() => lazyLoad(import('./pages/CmsPage')));
 const NotFound = lazy(() => lazyLoad(import('./pages/NotFound')));
+const AdminCmsOverview = lazy(() => lazyLoad(import('./pages/admin/dashboard/CmsOverview')));
+const AdminCmsPages = lazy(() => lazyLoad(import('./pages/admin/dashboard/CmsPages')));
+const AdminCmsPageEditor = lazy(() => lazyLoad(import('./pages/admin/dashboard/CmsPageEditor')));
+const AdminCmsBlogPosts = lazy(() => lazyLoad(import('./pages/admin/dashboard/CmsBlogPosts')));
+const AdminCmsBlogPostEditor = lazy(() => lazyLoad(import('./pages/admin/dashboard/CmsBlogPostEditor')));
+const AdminCmsCategories = lazy(() => lazyLoad(import('./pages/admin/dashboard/CmsCategories')));
+const AdminCmsCategoryEditor = lazy(() => lazyLoad(import('./pages/admin/dashboard/CmsCategoryEditor')));
+const AdminCmsMenus = lazy(() => lazyLoad(import('./pages/admin/dashboard/CmsMenus')));
+const AdminCmsMenuEditor = lazy(() => lazyLoad(import('./pages/admin/dashboard/CmsMenuEditor')));
+const AdminCmsMedia = lazy(() => lazyLoad(import('./pages/admin/dashboard/CmsMedia')));
+const AdminCmsSettings = lazy(() => lazyLoad(import('./pages/admin/dashboard/CmsSettings')));
+const AdminCmsSettingsEditor = lazy(() => lazyLoad(import('./pages/admin/dashboard/CmsSettingsEditor')));
 
 
 const AppRoutes = () => {
@@ -134,6 +149,9 @@ const AppRoutes = () => {
       <Route path={ROUTES.requestBlood} element={<RequestBlood />} />
       <Route path={ROUTES.about} element={<About />} />
       <Route path={ROUTES.contact} element={<Contact />} />
+      <Route path={ROUTES.blog} element={<Blog />} />
+      <Route path={ROUTES.blogPost} element={<BlogPost />} />
+      <Route path={ROUTES.cmsPage} element={<CmsPage />} />
       
       {/* Auth Routes */}
       <Route path={ROUTES.portal.donor.register} element={<DonorRegister />} />
@@ -212,6 +230,18 @@ const AppRoutes = () => {
           <Route path="audit-security" element={<AdminAuditSecurity />} />
           <Route path="error-logs" element={<AdminErrorLogs />} />
           <Route path="contact-submissions" element={<AdminContactSubmissions />} />
+          <Route path="cms/overview" element={<AdminCmsOverview />} />
+          <Route path="cms/pages" element={<AdminCmsPages />} />
+          <Route path="cms/pages/:slug" element={<AdminCmsPageEditor />} />
+          <Route path="cms/blog-posts" element={<AdminCmsBlogPosts />} />
+          <Route path="cms/blog-posts/:slug" element={<AdminCmsBlogPostEditor />} />
+          <Route path="cms/categories" element={<AdminCmsCategories />} />
+          <Route path="cms/categories/:slug" element={<AdminCmsCategoryEditor />} />
+          <Route path="cms/menus" element={<AdminCmsMenus />} />
+          <Route path="cms/menus/:location" element={<AdminCmsMenuEditor />} />
+          <Route path="cms/media" element={<AdminCmsMedia />} />
+          <Route path="cms/settings" element={<AdminCmsSettings />} />
+          <Route path="cms/settings/edit" element={<AdminCmsSettingsEditor />} />
           <Route path="impersonation-audit" element={<ImpersonationAudit />} />
           <Route path="notifications" element={<AdminNotifications />} />
           <Route path="settings" element={<AdminSettings />} />

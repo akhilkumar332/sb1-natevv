@@ -2,8 +2,13 @@ import { useState } from 'react';
 import { Heart, Droplet, Users, Award, Target, Shield, Zap, Globe, ArrowRight, Activity, TrendingUp, Star, Gift, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../constants/routes';
+import { useCmsFrontendPageContent } from '../hooks/useCmsFrontendPageContent';
+import CmsCustomSections from '../components/cms/CmsCustomSections';
+import CmsVisualEditor from '../components/cms/CmsVisualEditor';
 
 function About() {
+  const cmsPage = useCmsFrontendPageContent('about');
+  const { content } = cmsPage;
   const values = [
     {
       icon: <Heart size={32} />,
@@ -52,24 +57,7 @@ function About() {
     }
   ];
 
-  const faqItems = [
-    {
-      question: "Who can donate blood?",
-      answer: "Most healthy adults can donate blood, but eligibility depends on local guidelines and a quick screening."
-    },
-    {
-      question: "How often can I donate blood?",
-      answer: "Donation frequency varies by donation type and local guidelines. Many centers allow whole blood donations about every 8 weeks."
-    },
-    {
-      question: "Is blood donation safe?",
-      answer: "Blood donation is generally safe at accredited centers. Single-use equipment and trained staff are standard."
-    },
-    {
-      question: "How long does a blood donation take?",
-      answer: "The full visit typically takes around an hour, while the donation itself is much shorter."
-    },
-  ];
+  const faqItems = content.faqItems || [];
 
   const testimonials = [
     {
@@ -195,19 +183,19 @@ function About() {
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center px-6 py-2 bg-red-100 rounded-full mb-8">
               <Heart className="w-5 h-5 text-red-600 mr-2" />
-              <span className="text-red-600 font-semibold">About Us</span>
+              <span className="text-red-600 font-semibold">{content.heroBadge}</span>
             </div>
 
             <h1 className="text-6xl font-extrabold mb-6">
               <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
-                Supporting Communities Through
+                {content.heroTitleGradient}
               </span>
               <br />
-              <span className="text-gray-900">Blood Donation</span>
+              <span className="text-gray-900">{content.heroTitleNormal}</span>
             </h1>
 
             <p className="text-xl text-gray-600 leading-relaxed max-w-3xl mx-auto">
-              BloodHub is a growing blood donation platform, connecting donors with those in need through thoughtful technology and compassion.
+              {content.heroDescription}
             </p>
           </div>
         </div>
@@ -229,9 +217,9 @@ function About() {
                        style={{ boxShadow: '0 20px 40px rgba(220, 38, 38, 0.3)' }}>
                     <Target className="w-8 h-8 text-white" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }} />
                   </div>
-                  <h2 className="text-3xl font-bold mb-4 text-gray-900 group-hover:text-red-600 transition-colors duration-300">Our Mission</h2>
+                  <h2 className="text-3xl font-bold mb-4 text-gray-900 group-hover:text-red-600 transition-colors duration-300">{content.missionTitle}</h2>
                   <p className="text-gray-700 leading-relaxed text-lg">
-                    To build a seamless ecosystem where people in need of blood can find donors as quickly and safely as possible.
+                    {content.missionDescription}
                   </p>
                 </div>
               </div>
@@ -249,9 +237,9 @@ function About() {
                        style={{ boxShadow: '0 20px 40px rgba(220, 38, 38, 0.3)' }}>
                     <Droplet className="w-8 h-8 text-white" style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }} />
                   </div>
-                  <h2 className="text-3xl font-bold mb-4 text-gray-900 group-hover:text-red-600 transition-colors duration-300">Our Vision</h2>
+                  <h2 className="text-3xl font-bold mb-4 text-gray-900 group-hover:text-red-600 transition-colors duration-300">{content.visionTitle}</h2>
                   <p className="text-gray-700 leading-relaxed text-lg">
-                    A future where blood is easier to access, and more people feel empowered to become life-saving heroes.
+                    {content.visionDescription}
                   </p>
                 </div>
               </div>
@@ -265,8 +253,8 @@ function About() {
         <div className="absolute inset-0 bg-gradient-to-r from-red-600 via-red-700 to-red-800"></div>
         <div className="container mx-auto px-4 relative z-10">
           <div className="text-center mb-16">
-            <h2 className="text-5xl font-bold text-white mb-4">Our Impact So Far</h2>
-            <p className="text-xl text-white/90">A growing community making a difference across India</p>
+            <h2 className="text-5xl font-bold text-white mb-4">{content.impactTitle}</h2>
+            <p className="text-xl text-white/90">{content.impactSubtitle}</p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-6xl mx-auto">
@@ -294,10 +282,10 @@ function About() {
           <div className="text-center mb-16">
             <h2 className="text-5xl font-bold mb-4">
               <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
-                Our Core Values
+                {content.valuesTitle}
               </span>
             </h2>
-            <p className="text-xl text-gray-600">The principles that guide everything we do</p>
+            <p className="text-xl text-gray-600">{content.valuesSubtitle}</p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
@@ -642,7 +630,7 @@ function About() {
       <section className="py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
-            <h2 className="text-5xl font-bold mb-12 text-center bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">Frequently Asked Questions</h2>
+            <h2 className="text-5xl font-bold mb-12 text-center bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">{content.faqTitle}</h2>
             <div className="space-y-4">
               {faqItems.map((item, index) => (
                 <div key={item.question} className="group relative bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg hover:shadow-2xl overflow-hidden border border-white/50 transition-all duration-500">
@@ -727,6 +715,8 @@ function About() {
           </div>
         </div>
       </section>
+      <CmsCustomSections content={content} />
+      <CmsVisualEditor slug="about" content={content} pageTitle="About" />
     </div>
   );
 }

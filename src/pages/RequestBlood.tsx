@@ -4,6 +4,9 @@ import { notify } from 'services/notify.service';
 import { Link } from 'react-router-dom';
 import { captureHandledError } from '../services/errorLog.service';
 import { ROUTES } from '../constants/routes';
+import { useCmsFrontendPageContent } from '../hooks/useCmsFrontendPageContent';
+import CmsCustomSections from '../components/cms/CmsCustomSections';
+import CmsVisualEditor from '../components/cms/CmsVisualEditor';
 
 // Define the interface for blood request form data
 interface BloodRequestFormData {
@@ -33,6 +36,8 @@ const SkeletonLoader: React.FC = () => {
 };
 
 function RequestBlood() {
+  const cmsPage = useCmsFrontendPageContent('request-blood');
+  const { content } = cmsPage;
   const [formData, setFormData] = useState<BloodRequestFormData>({
     patientName: '',
     patientAge: '',
@@ -168,9 +173,9 @@ function RequestBlood() {
           contactEmail: '',
           reason: '',
         });
-        notify.success('Blood request submitted successfully! We will connect you with donors soon.');
+        notify.success(content.submitSuccessMessage);
       } catch (error) {
-        notify.error('Failed to submit blood request. Please try again.');
+        notify.error(content.submitErrorMessage);
         void captureHandledError(error, {
           source: 'frontend',
           scope: 'unknown',
@@ -178,7 +183,7 @@ function RequestBlood() {
         });
       }
     } else {
-      notify.error('Please correct the errors in the form.');
+      notify.error(content.submitValidationMessage);
     }
     setIsSubmitting(false);
   };
@@ -196,19 +201,19 @@ function RequestBlood() {
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center px-6 py-2 bg-red-100 rounded-full mb-6">
               <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
-              <span className="text-red-600 font-semibold">Emergency Blood Request</span>
+              <span className="text-red-600 font-semibold">{content.heroBadge}</span>
             </div>
 
             <h1 className="text-5xl md:text-6xl font-extrabold mb-6">
-              <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
-                Request Blood
+                <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
+                {content.heroTitleGradient}
               </span>
               <br />
-              <span className="text-gray-900">Save a Life Today</span>
+              <span className="text-gray-900">{content.heroTitleNormal}</span>
             </h1>
 
             <p className="text-xl text-gray-600 leading-relaxed max-w-2xl mx-auto">
-              Fill out the form below and we'll connect you with available donors in your area. Every second counts!
+              {content.heroDescription}
             </p>
           </div>
         </div>
@@ -233,7 +238,7 @@ function RequestBlood() {
                       <div className="w-12 h-12 bg-gradient-to-r from-red-600 to-red-700 rounded-xl flex items-center justify-center mr-4">
                         <User className="w-6 h-6 text-white" />
                       </div>
-                      <h2 className="text-2xl font-bold text-gray-900">Patient Information</h2>
+                      <h2 className="text-2xl font-bold text-gray-900">{content.patientInfoTitle}</h2>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-6">
@@ -278,7 +283,7 @@ function RequestBlood() {
                     <div className="w-12 h-12 bg-gradient-to-r from-red-600 to-red-700 rounded-xl flex items-center justify-center mr-4">
                       <Droplet className="w-6 h-6 text-white" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900">Blood Type Needed *</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">{content.bloodSelectionTitle} *</h2>
                   </div>
 
                   <div className="grid grid-cols-4 md:grid-cols-8 gap-3 mb-4">
@@ -306,7 +311,7 @@ function RequestBlood() {
                     <div className="w-12 h-12 bg-gradient-to-r from-red-600 to-red-700 rounded-xl flex items-center justify-center mr-4">
                       <Clock className="w-6 h-6 text-white" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900">Urgency Level</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">{content.urgencyTitle}</h2>
                   </div>
 
                   <div className="grid md:grid-cols-3 gap-4">
@@ -334,7 +339,7 @@ function RequestBlood() {
                     <div className="w-12 h-12 bg-gradient-to-r from-red-600 to-red-700 rounded-xl flex items-center justify-center mr-4">
                       <FileText className="w-6 h-6 text-white" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900">Request Details</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">{content.hospitalInfoTitle}</h2>
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-6">
@@ -391,7 +396,7 @@ function RequestBlood() {
                     </div>
 
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Reason for Blood Request *</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">{content.reasonTitle} *</label>
                       <textarea
                         name="reason"
                         value={formData.reason}
@@ -413,7 +418,7 @@ function RequestBlood() {
                     <div className="w-12 h-12 bg-gradient-to-r from-red-600 to-red-700 rounded-xl flex items-center justify-center mr-4">
                       <Phone className="w-6 h-6 text-white" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900">Contact Information</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">{content.contactInfoTitle}</h2>
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-6">
@@ -536,20 +541,20 @@ function RequestBlood() {
         <div className="absolute inset-0 bg-gradient-to-r from-red-600 via-red-700 to-red-800"></div>
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center text-white">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">Need Help Finding Donors?</h2>
-            <p className="text-xl mb-10 opacity-90">
-              Browse our verified donor database to find compatible donors in your area
-            </p>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">{content.finalCtaTitle}</h2>
+            <p className="text-xl mb-10 opacity-90">{content.finalCtaDescription}</p>
             <Link
               to={ROUTES.donors}
               className="inline-flex items-center px-10 py-5 bg-white text-red-600 rounded-full text-xl font-bold hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
             >
               <Droplet className="w-6 h-6 mr-2" />
-              Find Donors Near You
+              {content.finalCtaButtonText}
             </Link>
           </div>
         </div>
       </section>
+      <CmsCustomSections content={content} />
+      <CmsVisualEditor slug="request-blood" content={content} pageTitle="Request Blood" />
     </div>
   );
 }

@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Droplet, Users, Building2, ArrowRight, MapPin, Shield, Award, Clock, Zap, TrendingUp, Star, Gift, Bell, CheckCircle } from 'lucide-react';
 import { ROUTES } from '../constants/routes';
+import { useCmsFrontendPageContent } from '../hooks/useCmsFrontendPageContent';
+import CmsCustomSections from '../components/cms/CmsCustomSections';
+import CmsVisualEditor from '../components/cms/CmsVisualEditor';
 
 function StatCard({ icon, value, label, gradient }: { icon: React.ReactNode; value: string; label: string; gradient: string }) {
   return (
@@ -37,37 +40,21 @@ function StatCard({ icon, value, label, gradient }: { icon: React.ReactNode; val
 
 function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const cmsPage = useCmsFrontendPageContent('home');
+  const { content } = cmsPage;
 
-  const heroSlides = [
-    {
-      badge: { icon: <Droplet className="w-5 h-5 text-red-600 mr-2" />, text: "A growing blood donation community in India" },
-      title: { gradient: "Every Drop Counts,", normal: "Every Life Matters" },
-      description: "Join a growing community of donors and supporters. Your contribution can help when it matters most.",
-      primaryBtn: { to: ROUTES.portal.donor.register, icon: <Droplet className="w-5 h-5 mr-2" />, text: "Become a Donor" },
-      secondaryBtn: { to: ROUTES.requestBlood, icon: <Heart className="w-5 h-5 mr-2" />, text: "Request Blood" }
-    },
-    {
-      badge: { icon: <Bell className="w-5 h-5 text-red-600 mr-2 animate-pulse" />, text: "When Blood Is Needed" },
-      title: { gradient: "Someone Needs Help,", normal: "Right Now" },
-      description: "In urgent moments, quick connections can make a real difference.",
-      primaryBtn: { to: ROUTES.donors, icon: <MapPin className="w-5 h-5 mr-2" />, text: "Find Nearby Requests" },
-      secondaryBtn: { to: ROUTES.portal.donor.register, icon: <Droplet className="w-5 h-5 mr-2" />, text: "Register to Help" }
-    },
-    {
-      badge: { icon: <Gift className="w-5 h-5 text-red-600 mr-2" />, text: "Recognition & Gratitude" },
-      title: { gradient: "Donate Blood,", normal: "Be Recognized" },
-      description: "We aim to celebrate donors with community recognition and meaningful milestones.",
-      primaryBtn: { to: ROUTES.portal.donor.register, icon: <Star className="w-5 h-5 mr-2" />, text: "Explore Recognition" },
-      secondaryBtn: { to: ROUTES.about, icon: <Award className="w-5 h-5 mr-2" />, text: "Learn More" }
-    },
-    {
-      badge: { icon: <Users className="w-5 h-5 text-red-600 mr-2" />, text: "Community Impact" },
-      title: { gradient: "Lives Changed,", normal: "Together" },
-      description: "Be part of a growing community working to make blood access more reliable.",
-      primaryBtn: { to: ROUTES.portal.donor.register, icon: <Heart className="w-5 h-5 mr-2" />, text: "Join Our Community" },
-      secondaryBtn: { to: ROUTES.about, icon: <TrendingUp className="w-5 h-5 mr-2" />, text: "View Impact" }
-    }
-  ];
+  const heroSlides = content.heroSlides.map((slide, index) => {
+    const badgeIcons = [<Droplet className="w-5 h-5 text-red-600 mr-2" />, <Bell className="w-5 h-5 text-red-600 mr-2 animate-pulse" />, <Gift className="w-5 h-5 text-red-600 mr-2" />, <Users className="w-5 h-5 text-red-600 mr-2" />];
+    const primaryIcons = [<Droplet className="w-5 h-5 mr-2" />, <MapPin className="w-5 h-5 mr-2" />, <Star className="w-5 h-5 mr-2" />, <Heart className="w-5 h-5 mr-2" />];
+    const secondaryIcons = [<Heart className="w-5 h-5 mr-2" />, <Droplet className="w-5 h-5 mr-2" />, <Award className="w-5 h-5 mr-2" />, <TrendingUp className="w-5 h-5 mr-2" />];
+    return {
+      badge: { icon: badgeIcons[index] || badgeIcons[0], text: slide.badge },
+      title: { gradient: slide.titleGradient, normal: slide.titleNormal },
+      description: slide.description,
+      primaryBtn: { to: slide.primaryTo || ROUTES.portal.donor.register, icon: primaryIcons[index] || primaryIcons[0], text: slide.primaryText },
+      secondaryBtn: { to: slide.secondaryTo || ROUTES.requestBlood, icon: secondaryIcons[index] || secondaryIcons[0], text: slide.secondaryText },
+    };
+  });
 
   useEffect(() => {
     // Auto-play slider
@@ -167,15 +154,15 @@ function Home() {
           <div className="flex flex-wrap items-center justify-center gap-8 text-gray-600 pb-8">
             <div className="flex items-center">
               <Shield className="w-5 h-5 mr-2 text-green-600" />
-              <span className="font-medium">Safety-first approach</span>
+              <span className="font-medium">{content.trustIndicators[0] || 'Safety-first approach'}</span>
             </div>
             <div className="flex items-center">
               <Award className="w-5 h-5 mr-2 text-blue-600" />
-              <span className="font-medium">Standards-focused</span>
+              <span className="font-medium">{content.trustIndicators[1] || 'Standards-focused'}</span>
             </div>
             <div className="flex items-center">
               <Users className="w-5 h-5 mr-2 text-purple-600" />
-              <span className="font-medium">Growing donor community</span>
+              <span className="font-medium">{content.trustIndicators[2] || 'Growing donor community'}</span>
             </div>
           </div>
         </div>
@@ -186,36 +173,30 @@ function Home() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-5xl font-bold mb-4">
-              <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">Our Growing Impact</span>
+              <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">{content.impactTitle}</span>
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">Making a difference together, one donor at a time</p>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">{content.impactSubtitle}</p>
           </div>
 
           <div className="mx-auto grid max-w-5xl grid-cols-2 gap-4 sm:gap-6 md:gap-8">
-            <StatCard
-              icon={<Heart size={32} />}
-              value="Growing"
-              label="Lives Touched"
-              gradient="bg-gradient-to-r from-red-500 to-pink-500"
-            />
-            <StatCard
-              icon={<Users size={32} />}
-              value="Thousands"
-              label="Active Donors"
-              gradient="bg-gradient-to-r from-red-600 to-red-700"
-            />
-            <StatCard
-              icon={<Droplet size={32} />}
-              value="Rising"
-              label="Units Shared"
-              gradient="bg-gradient-to-r from-red-700 to-red-800"
-            />
-            <StatCard
-              icon={<Building2 size={32} />}
-              value="Across India"
-              label="BloodBank Partners"
-              gradient="bg-gradient-to-r from-red-800 to-red-900"
-            />
+            {(content.impactStats || []).map((stat, index) => {
+              const icons = [<Heart size={32} />, <Users size={32} />, <Droplet size={32} />, <Building2 size={32} />];
+              const gradients = [
+                'bg-gradient-to-r from-red-500 to-pink-500',
+                'bg-gradient-to-r from-red-600 to-red-700',
+                'bg-gradient-to-r from-red-700 to-red-800',
+                'bg-gradient-to-r from-red-800 to-red-900',
+              ];
+              return (
+                <StatCard
+                  key={`${stat.label}-${index}`}
+                  icon={icons[index] || icons[0]}
+                  value={stat.value}
+                  label={stat.label}
+                  gradient={gradients[index] || gradients[0]}
+                />
+              );
+            })}
           </div>
         </div>
       </section>
@@ -226,9 +207,9 @@ function Home() {
         <div className="container mx-auto px-4 relative z-10">
           <div className="text-center mb-16">
             <h2 className="text-5xl font-bold mb-4">
-              <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">Why People Choose BloodHub</span>
+              <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">{content.featuresTitle}</span>
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">A quick look at what makes the experience reliable and helpful.</p>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">{content.featuresSubtitle}</p>
           </div>
 
           <div className="relative mx-auto max-w-5xl">
@@ -238,28 +219,12 @@ function Home() {
               Swipe →
             </div>
             <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory sm:gap-6 md:gap-7 lg:grid lg:grid-cols-3 lg:overflow-visible lg:pb-0">
-              {[
-                {
-                  icon: <Zap className="w-6 h-6 text-white" />,
-                  title: 'Smarter Matching',
-                  description: 'Connect the right donors to the right requests faster.',
-                },
-                {
-                  icon: <Shield className="w-6 h-6 text-white" />,
-                  title: 'Safety Focus',
-                  description: 'Verification-aware workflows to promote trust and clarity.',
-                },
-                {
-                  icon: <TrendingUp className="w-6 h-6 text-white" />,
-                  title: 'Track Impact',
-                  description: 'See your donation journey and community contribution over time.',
-                },
-              ].map((item) => (
+              {(content.featureCards || []).map((item, index) => (
                 <div key={item.title} className="group relative min-h-[250px] min-w-[260px] flex-shrink-0 snap-start overflow-hidden rounded-2xl border border-white/50 bg-white/90 p-8 shadow-lg backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:min-w-[300px] md:min-w-[340px] lg:min-w-0 lg:flex-shrink">
                   <div className="absolute -top-10 -right-10 h-28 w-28 rounded-full bg-gradient-to-r from-red-500 to-pink-500 opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-20" />
                   <div className="relative z-10">
                     <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-r from-red-600 to-red-700 shadow-lg">
-                      {item.icon}
+                      {[<Zap className="w-6 h-6 text-white" />, <Shield className="w-6 h-6 text-white" />, <TrendingUp className="w-6 h-6 text-white" />][index] || <Zap className="w-6 h-6 text-white" />}
                     </div>
                     <h3 className="text-xl font-bold text-gray-900">{item.title}</h3>
                     <p className="mt-3 text-base leading-relaxed text-gray-600">{item.description}</p>
@@ -290,32 +255,28 @@ function Home() {
               <div>
                 <div className="inline-flex items-center px-6 py-2 bg-red-100 rounded-full mb-6">
                   <Bell className="w-5 h-5 text-red-600 mr-2 animate-pulse" />
-                  <span className="text-red-600 font-semibold">Emergency Support</span>
+                  <span className="text-red-600 font-semibold">{content.emergencyBadge}</span>
                 </div>
                 <h2 className="text-5xl font-bold mb-6">
                   <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
-                    Responsive Emergency Support
+                    {content.emergencyTitle}
                   </span>
                 </h2>
                 <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                  In emergencies, time matters. We work to connect requests with nearby donors quickly and safely.
+                  {content.emergencyDescription}
                 </p>
 
                 <div className="space-y-4">
-                  {[
-                    { icon: <Clock size={24} />, title: "Timely Alerts", desc: "Notifications when a request is nearby" },
-                    { icon: <MapPin size={24} />, title: "Nearby Matching", desc: "Prioritize closer donors when possible" },
-                    { icon: <Zap size={24} />, title: "Verified Profiles", desc: "Helpful checks to build trust" }
-                  ].map((item, i) => (
+                  {(content.emergencyPoints || []).map((item, i) => (
                     <div key={i} className="flex items-start group">
                       <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-r from-red-600 to-red-700 mr-4 shadow-lg transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
                         <div className="text-white" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}>
-                          {item.icon}
+                          {[<Clock size={24} />, <MapPin size={24} />, <Zap size={24} />][i] || <Clock size={24} />}
                         </div>
                       </div>
                       <div>
                         <h4 className="font-bold text-gray-900 mb-1">{item.title}</h4>
-                        <p className="text-gray-600">{item.desc}</p>
+                        <p className="text-gray-600">{item.description}</p>
                       </div>
                     </div>
                   ))}
@@ -326,7 +287,7 @@ function Home() {
                   className="inline-flex items-center mt-8 px-8 py-4 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-full text-lg font-bold hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
                 >
                   <Bell className="w-5 h-5 mr-2" />
-                  Request Blood
+                  {content.finalCtaSecondaryText}
                   <ArrowRight className="ml-2" />
                 </Link>
               </div>
@@ -336,16 +297,11 @@ function Home() {
                 <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-3xl blur-3xl opacity-20"></div>
                 <div className="relative bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/50">
                   <div className="grid grid-cols-2 gap-6">
-                    {[
-                      { value: "Fast", label: "Response Goal", icon: <Clock size={32} /> },
-                      { value: "Nearby", label: "Local Focus", icon: <MapPin size={32} /> },
-                      { value: "Always On", label: "Availability", icon: <Bell size={32} /> },
-                      { value: "Trusted", label: "Community Care", icon: <CheckCircle size={32} /> }
-                    ].map((stat, i) => (
+                    {(content.emergencyStats || []).map((stat, i) => (
                       <div key={i} className="group relative bg-gradient-to-br from-red-50 to-pink-50 p-6 rounded-2xl text-center hover:shadow-xl transition-all duration-500">
                         <div className="inline-flex p-3 rounded-xl bg-gradient-to-r from-red-600 to-red-700 mb-4 shadow-lg transform group-hover:scale-110 group-hover:rotate-12 transition-all duration-500">
                           <div className="text-white" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}>
-                            {stat.icon}
+                            {[<Clock size={32} />, <MapPin size={32} />, <Bell size={32} />, <CheckCircle size={32} />][i] || <Clock size={32} />}
                           </div>
                         </div>
                         <div className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</div>
@@ -367,30 +323,24 @@ function Home() {
         </div>
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center text-white">
-            <h2 className="text-5xl md:text-6xl font-bold mb-6">Ready to Make a Difference?</h2>
-            <p className="text-xl md:text-2xl mb-12 opacity-90">Join a growing community of donors and supporters.</p>
+            <h2 className="text-5xl md:text-6xl font-bold mb-6">{content.ctaBandTitle}</h2>
+            <p className="text-xl md:text-2xl mb-12 opacity-90">{content.ctaBandSubtitle}</p>
             <Link
-              to={ROUTES.portal.donor.register}
+              to={content.ctaBandPrimaryTo || ROUTES.portal.donor.register}
               className="inline-flex items-center px-10 py-5 bg-white text-red-600 rounded-full text-xl font-bold hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
             >
               <Droplet className="w-6 h-6 mr-3" />
-              Become a Donor
+              {content.ctaBandPrimaryText}
               <ArrowRight className="ml-3" />
             </Link>
 
             <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
-                <div className="text-4xl font-bold mb-2">Always</div>
-                <div className="text-lg opacity-90">Emergency Support</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
-                <div className="text-4xl font-bold mb-2">Quick</div>
-                <div className="text-lg opacity-90">Response Goal</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
-                <div className="text-4xl font-bold mb-2">Trusted</div>
-                <div className="text-lg opacity-90">BloodBank Network</div>
-              </div>
+              {(content.ctaBandTiles || []).map((tile, index) => (
+                <div key={`${tile.value}-${index}`} className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                  <div className="text-4xl font-bold mb-2">{tile.value}</div>
+                  <div className="text-lg opacity-90">{tile.label}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -419,26 +369,26 @@ function Home() {
               </div>
             </div>
 
-            <h3 className="relative text-4xl font-bold mb-4 bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">Every Moment Counts</h3>
-            <p className="relative text-xl text-gray-700 mb-10 leading-relaxed max-w-2xl mx-auto">Someone, somewhere, needs blood every day. Be part of the response.</p>
+            <h3 className="relative text-4xl font-bold mb-4 bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">{content.finalCtaTitle}</h3>
+            <p className="relative text-xl text-gray-700 mb-10 leading-relaxed max-w-2xl mx-auto">{content.finalCtaDescription}</p>
 
             <div className="relative flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                to={ROUTES.portal.donor.register}
+                to={content.finalCtaPrimaryTo || ROUTES.portal.donor.register}
                 className="group/btn relative px-10 py-5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-full text-lg font-bold hover:shadow-2xl transform hover:scale-105 hover:-translate-y-1 transition-all duration-500 inline-flex items-center justify-center overflow-hidden"
                 style={{ boxShadow: '0 10px 30px rgba(220, 38, 38, 0.3)' }}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-red-700 to-red-800 opacity-0 group-hover/btn:opacity-100 transition-opacity duration-500"></div>
                 <Droplet className="w-5 h-5 mr-2 relative z-10" />
-                <span className="relative z-10">Become a Donor</span>
+                <span className="relative z-10">{content.finalCtaPrimaryText}</span>
                 <ArrowRight className="ml-2 relative z-10 group-hover/btn:translate-x-1 transition-transform duration-300" />
               </Link>
               <Link
-                to={ROUTES.requestBlood}
+                to={content.finalCtaSecondaryTo || ROUTES.requestBlood}
                 className="group/btn px-10 py-5 bg-white/80 backdrop-blur-xl text-red-600 rounded-full text-lg font-bold border-2 border-red-600 hover:bg-red-600 hover:text-white hover:shadow-2xl transform hover:scale-105 hover:-translate-y-1 transition-all duration-500 inline-flex items-center justify-center"
               >
                 <Heart className="w-5 h-5 mr-2" />
-                Request Blood
+                {content.finalCtaSecondaryText}
                 <ArrowRight className="ml-2 group-hover/btn:translate-x-1 transition-transform duration-300" />
               </Link>
             </div>
@@ -470,6 +420,8 @@ function Home() {
           </div>
         </div>
       </section>
+      <CmsCustomSections content={content} />
+      <CmsVisualEditor slug="home" content={content} pageTitle="Home Page" />
     </div>
   );
 }

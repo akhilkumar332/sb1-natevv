@@ -846,6 +846,136 @@ export interface NpsPromptOverride {
 }
 
 // ============================================================================
+// COLLECTION: cmsPages, cmsBlogPosts, cmsBlogCategories, cmsNavMenus, cmsMedia, cmsSettings
+// ============================================================================
+
+export type CmsStatus = 'draft' | 'scheduled' | 'published' | 'archived';
+export type CmsPageKind = 'generic' | 'home_section' | 'about_section' | 'contact_section';
+export type CmsMenuLocation = 'header' | 'footer_resources' | 'footer_legal';
+
+export interface CmsPage {
+  id?: string;
+  slug: string;
+  title: string;
+  kind: CmsPageKind;
+  status: CmsStatus;
+  contentJson?: string | null;
+  excerpt?: string | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  seoCanonicalUrl?: string | null;
+  seoNoIndex?: boolean;
+  seoNoFollow?: boolean;
+  ogTitle?: string | null;
+  ogDescription?: string | null;
+  ogImageUrl?: string | null;
+  twitterImageUrl?: string | null;
+  coverImageUrl?: string | null;
+  publishedAt?: Timestamp | null;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface CmsBlogCategory {
+  id?: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  colorHex?: string | null;
+  status: CmsStatus;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface CmsBlogPost {
+  id?: string;
+  slug: string;
+  title: string;
+  excerpt?: string | null;
+  contentJson?: string | null;
+  categorySlug?: string | null;
+  tags?: string[];
+  coverImageUrl?: string | null;
+  status: CmsStatus;
+  featured?: boolean;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  seoCanonicalUrl?: string | null;
+  seoNoIndex?: boolean;
+  seoNoFollow?: boolean;
+  ogTitle?: string | null;
+  ogDescription?: string | null;
+  ogImageUrl?: string | null;
+  twitterImageUrl?: string | null;
+  authorName?: string | null;
+  publishedAt?: Timestamp | null;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface CmsMenuItem {
+  id: string;
+  label: string;
+  path: string;
+  external?: boolean;
+  order: number;
+  enabled: boolean;
+}
+
+export interface CmsNavMenu {
+  id?: string;
+  location: CmsMenuLocation;
+  status?: CmsStatus;
+  items: CmsMenuItem[];
+  updatedBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface CmsMedia {
+  id?: string;
+  name: string;
+  url: string;
+  mimeType?: string | null;
+  sizeBytes?: number | null;
+  altText?: string | null;
+  tags?: string[];
+  status: CmsStatus;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface CmsSettings {
+  id?: string;
+  siteTitle: string;
+  siteTagline?: string | null;
+  defaultSeoTitle?: string | null;
+  defaultSeoDescription?: string | null;
+  canonicalBaseUrl?: string | null;
+  defaultOgImageUrl?: string | null;
+  twitterHandle?: string | null;
+  robotsPolicy?: 'index_follow' | 'noindex_nofollow';
+  blogPostsPerPage: number;
+  showFeaturedOnBlog: boolean;
+  showBlogInFooter: boolean;
+  supportEmail?: string | null;
+  supportPhone?: string | null;
+  officeCity?: string | null;
+  socialLinks?: Record<string, string>;
+  updatedBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// ============================================================================
 // COLLECTION: badges
 // ============================================================================
 

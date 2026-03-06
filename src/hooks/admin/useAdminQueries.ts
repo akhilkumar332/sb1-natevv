@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { adminQueryKeys, type AdminKpiRange, type AdminUserRoleFilter } from '../../constants/adminQueryKeys';
+import { CMS_DEFAULTS, CMS_LIMITS } from '../../constants/cms';
 import { COLLECTIONS } from '../../constants/firestore';
 import { ADMIN_QUERY_TIMINGS } from '../../constants/query';
 import {
@@ -37,6 +38,12 @@ import {
 import type {
   BloodInventory,
   BloodRequest,
+  CmsBlogCategory,
+  CmsBlogPost,
+  CmsMedia,
+  CmsNavMenu,
+  CmsPage,
+  CmsSettings,
   ContactSubmission,
   NpsPromptOverride,
   NpsResponse,
@@ -250,6 +257,176 @@ const fetchContactSubmissions = async (limitCount: number): Promise<ContactSubmi
       updatedAt: toDateValue(data.updatedAt) as any,
     } as ContactSubmission;
   });
+};
+
+const fetchCmsPages = async (limitCount: number): Promise<CmsPage[]> => {
+  const snapshot = await getDocs(query(
+    collection(db, COLLECTIONS.CMS_PAGES),
+    orderBy('updatedAt', 'desc'),
+    limit(limitCount)
+  ));
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data() as Record<string, any>;
+    return {
+      id: docSnap.id,
+      slug: typeof data.slug === 'string' ? data.slug : '',
+      title: typeof data.title === 'string' ? data.title : '',
+      kind: typeof data.kind === 'string' ? data.kind : 'generic',
+      status: typeof data.status === 'string' ? data.status : 'draft',
+      contentJson: typeof data.contentJson === 'string' ? data.contentJson : null,
+      excerpt: typeof data.excerpt === 'string' ? data.excerpt : null,
+      seoTitle: typeof data.seoTitle === 'string' ? data.seoTitle : null,
+      seoDescription: typeof data.seoDescription === 'string' ? data.seoDescription : null,
+      seoCanonicalUrl: typeof data.seoCanonicalUrl === 'string' ? data.seoCanonicalUrl : null,
+      seoNoIndex: data.seoNoIndex === true,
+      seoNoFollow: data.seoNoFollow === true,
+      ogTitle: typeof data.ogTitle === 'string' ? data.ogTitle : null,
+      ogDescription: typeof data.ogDescription === 'string' ? data.ogDescription : null,
+      ogImageUrl: typeof data.ogImageUrl === 'string' ? data.ogImageUrl : null,
+      twitterImageUrl: typeof data.twitterImageUrl === 'string' ? data.twitterImageUrl : null,
+      coverImageUrl: typeof data.coverImageUrl === 'string' ? data.coverImageUrl : null,
+      publishedAt: (toDateValue(data.publishedAt) as any) || null,
+      createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
+      updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
+      createdAt: toDateValue(data.createdAt) as any,
+      updatedAt: toDateValue(data.updatedAt) as any,
+    } as CmsPage;
+  });
+};
+
+const fetchCmsBlogPosts = async (limitCount: number): Promise<CmsBlogPost[]> => {
+  const snapshot = await getDocs(query(
+    collection(db, COLLECTIONS.CMS_BLOG_POSTS),
+    orderBy('updatedAt', 'desc'),
+    limit(limitCount)
+  ));
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data() as Record<string, any>;
+    return {
+      id: docSnap.id,
+      slug: typeof data.slug === 'string' ? data.slug : '',
+      title: typeof data.title === 'string' ? data.title : '',
+      excerpt: typeof data.excerpt === 'string' ? data.excerpt : null,
+      contentJson: typeof data.contentJson === 'string' ? data.contentJson : null,
+      categorySlug: typeof data.categorySlug === 'string' ? data.categorySlug : null,
+      tags: Array.isArray(data.tags) ? data.tags.filter((tag: unknown) => typeof tag === 'string') : [],
+      coverImageUrl: typeof data.coverImageUrl === 'string' ? data.coverImageUrl : null,
+      status: typeof data.status === 'string' ? data.status : 'draft',
+      featured: data.featured === true,
+      seoTitle: typeof data.seoTitle === 'string' ? data.seoTitle : null,
+      seoDescription: typeof data.seoDescription === 'string' ? data.seoDescription : null,
+      seoCanonicalUrl: typeof data.seoCanonicalUrl === 'string' ? data.seoCanonicalUrl : null,
+      seoNoIndex: data.seoNoIndex === true,
+      seoNoFollow: data.seoNoFollow === true,
+      ogTitle: typeof data.ogTitle === 'string' ? data.ogTitle : null,
+      ogDescription: typeof data.ogDescription === 'string' ? data.ogDescription : null,
+      ogImageUrl: typeof data.ogImageUrl === 'string' ? data.ogImageUrl : null,
+      twitterImageUrl: typeof data.twitterImageUrl === 'string' ? data.twitterImageUrl : null,
+      authorName: typeof data.authorName === 'string' ? data.authorName : null,
+      publishedAt: (toDateValue(data.publishedAt) as any) || null,
+      createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
+      updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
+      createdAt: toDateValue(data.createdAt) as any,
+      updatedAt: toDateValue(data.updatedAt) as any,
+    } as CmsBlogPost;
+  });
+};
+
+const fetchCmsBlogCategories = async (limitCount: number): Promise<CmsBlogCategory[]> => {
+  const snapshot = await getDocs(query(
+    collection(db, COLLECTIONS.CMS_BLOG_CATEGORIES),
+    orderBy('updatedAt', 'desc'),
+    limit(limitCount)
+  ));
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data() as Record<string, any>;
+    return {
+      id: docSnap.id,
+      slug: typeof data.slug === 'string' ? data.slug : '',
+      name: typeof data.name === 'string' ? data.name : '',
+      description: typeof data.description === 'string' ? data.description : null,
+      colorHex: typeof data.colorHex === 'string' ? data.colorHex : null,
+      status: typeof data.status === 'string' ? data.status : 'draft',
+      createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
+      updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
+      createdAt: toDateValue(data.createdAt) as any,
+      updatedAt: toDateValue(data.updatedAt) as any,
+    } as CmsBlogCategory;
+  });
+};
+
+const fetchCmsNavMenus = async (limitCount: number): Promise<CmsNavMenu[]> => {
+  const snapshot = await getDocs(query(
+    collection(db, COLLECTIONS.CMS_NAV_MENUS),
+    orderBy('updatedAt', 'desc'),
+    limit(limitCount)
+  ));
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data() as Record<string, any>;
+    return {
+      id: docSnap.id,
+      location: typeof data.location === 'string' ? data.location : 'header',
+      status: typeof data.status === 'string' ? data.status : 'published',
+      items: Array.isArray(data.items) ? data.items : [],
+      updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
+      createdAt: toDateValue(data.createdAt) as any,
+      updatedAt: toDateValue(data.updatedAt) as any,
+    } as CmsNavMenu;
+  });
+};
+
+const fetchCmsMedia = async (limitCount: number): Promise<CmsMedia[]> => {
+  const snapshot = await getDocs(query(
+    collection(db, COLLECTIONS.CMS_MEDIA),
+    orderBy('updatedAt', 'desc'),
+    limit(limitCount)
+  ));
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data() as Record<string, any>;
+    return {
+      id: docSnap.id,
+      name: typeof data.name === 'string' ? data.name : '',
+      url: typeof data.url === 'string' ? data.url : '',
+      mimeType: typeof data.mimeType === 'string' ? data.mimeType : null,
+      sizeBytes: Number.isFinite(data.sizeBytes) ? Number(data.sizeBytes) : null,
+      altText: typeof data.altText === 'string' ? data.altText : null,
+      tags: Array.isArray(data.tags) ? data.tags.filter((tag: unknown) => typeof tag === 'string') : [],
+      status: typeof data.status === 'string' ? data.status : 'draft',
+      createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
+      updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
+      createdAt: toDateValue(data.createdAt) as any,
+      updatedAt: toDateValue(data.updatedAt) as any,
+    } as CmsMedia;
+  });
+};
+
+const fetchCmsSettings = async (): Promise<CmsSettings | null> => {
+  const snapshot = await getDoc(doc(db, COLLECTIONS.CMS_SETTINGS, 'global'));
+  if (!snapshot.exists()) return null;
+  const data = snapshot.data() as Record<string, any>;
+  return {
+    id: snapshot.id,
+    siteTitle: typeof data.siteTitle === 'string' ? data.siteTitle : '',
+    siteTagline: typeof data.siteTagline === 'string' ? data.siteTagline : null,
+    defaultSeoTitle: typeof data.defaultSeoTitle === 'string' ? data.defaultSeoTitle : null,
+    defaultSeoDescription: typeof data.defaultSeoDescription === 'string' ? data.defaultSeoDescription : null,
+    canonicalBaseUrl: typeof data.canonicalBaseUrl === 'string' ? data.canonicalBaseUrl : CMS_DEFAULTS.canonicalBaseUrl,
+    defaultOgImageUrl: typeof data.defaultOgImageUrl === 'string' ? data.defaultOgImageUrl : CMS_DEFAULTS.defaultOgImageUrl,
+    twitterHandle: typeof data.twitterHandle === 'string' ? data.twitterHandle : CMS_DEFAULTS.twitterHandle,
+    robotsPolicy: data.robotsPolicy === 'noindex_nofollow' ? 'noindex_nofollow' : CMS_DEFAULTS.robotsPolicy,
+    blogPostsPerPage: Number.isFinite(data.blogPostsPerPage)
+      ? Math.min(CMS_LIMITS.blogPostsPageSizeMax, Math.max(CMS_LIMITS.blogPostsPageSizeMin, Number(data.blogPostsPerPage)))
+      : CMS_DEFAULTS.blogPostsPerPage,
+    showFeaturedOnBlog: data.showFeaturedOnBlog !== false,
+    showBlogInFooter: data.showBlogInFooter !== false,
+    supportEmail: typeof data.supportEmail === 'string' ? data.supportEmail : null,
+    supportPhone: typeof data.supportPhone === 'string' ? data.supportPhone : null,
+    officeCity: typeof data.officeCity === 'string' ? data.officeCity : null,
+    socialLinks: data.socialLinks && typeof data.socialLinks === 'object' ? data.socialLinks : {},
+    updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
+    createdAt: toDateValue(data.createdAt) as any,
+    updatedAt: toDateValue(data.updatedAt) as any,
+  } as CmsSettings;
 };
 
 const fetchAuditLogs = async (limitCount: number): Promise<AdminEntity[]> => {
@@ -581,6 +758,90 @@ export const useAdminContactSubmissions = (limitCount: number = 1000) =>
       staleTime: ADMIN_QUERY_TIMINGS.contactSubmissions.staleTime,
       gcTime: ADMIN_QUERY_TIMINGS.contactSubmissions.gcTime,
       refetchInterval: ADMIN_QUERY_TIMINGS.contactSubmissions.refetchInterval,
+      refetchIntervalInBackground: false,
+    },
+  );
+
+export const useAdminCmsPages = (limitCount: number = 1000) =>
+  useCachedAdminQuery<CmsPage[]>(
+    adminQueryKeys.cmsPages(limitCount),
+    ADMIN_QUERY_TIMINGS.cms.ttl,
+    ['createdAt', 'updatedAt', 'publishedAt'],
+    () => fetchCmsPages(limitCount),
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.cms.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.cms.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.cms.refetchInterval,
+      refetchIntervalInBackground: false,
+    },
+  );
+
+export const useAdminCmsBlogPosts = (limitCount: number = 1000) =>
+  useCachedAdminQuery<CmsBlogPost[]>(
+    adminQueryKeys.cmsBlogPosts(limitCount),
+    ADMIN_QUERY_TIMINGS.cms.ttl,
+    ['createdAt', 'updatedAt', 'publishedAt'],
+    () => fetchCmsBlogPosts(limitCount),
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.cms.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.cms.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.cms.refetchInterval,
+      refetchIntervalInBackground: false,
+    },
+  );
+
+export const useAdminCmsBlogCategories = (limitCount: number = 1000) =>
+  useCachedAdminQuery<CmsBlogCategory[]>(
+    adminQueryKeys.cmsBlogCategories(limitCount),
+    ADMIN_QUERY_TIMINGS.cms.ttl,
+    ['createdAt', 'updatedAt'],
+    () => fetchCmsBlogCategories(limitCount),
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.cms.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.cms.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.cms.refetchInterval,
+      refetchIntervalInBackground: false,
+    },
+  );
+
+export const useAdminCmsNavMenus = (limitCount: number = 100) =>
+  useCachedAdminQuery<CmsNavMenu[]>(
+    adminQueryKeys.cmsNavMenus(limitCount),
+    ADMIN_QUERY_TIMINGS.cms.ttl,
+    ['createdAt', 'updatedAt'],
+    () => fetchCmsNavMenus(limitCount),
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.cms.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.cms.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.cms.refetchInterval,
+      refetchIntervalInBackground: false,
+    },
+  );
+
+export const useAdminCmsMedia = (limitCount: number = 1000) =>
+  useCachedAdminQuery<CmsMedia[]>(
+    adminQueryKeys.cmsMedia(limitCount),
+    ADMIN_QUERY_TIMINGS.cms.ttl,
+    ['createdAt', 'updatedAt'],
+    () => fetchCmsMedia(limitCount),
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.cms.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.cms.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.cms.refetchInterval,
+      refetchIntervalInBackground: false,
+    },
+  );
+
+export const useAdminCmsSettings = () =>
+  useCachedAdminQuery<CmsSettings | null>(
+    adminQueryKeys.cmsSettings(),
+    ADMIN_QUERY_TIMINGS.cms.ttl,
+    ['createdAt', 'updatedAt'],
+    fetchCmsSettings,
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.cms.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.cms.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.cms.refetchInterval,
       refetchIntervalInBackground: false,
     },
   );

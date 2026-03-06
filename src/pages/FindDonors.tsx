@@ -33,6 +33,9 @@ import { useNetworkStatus } from '../contexts/NetworkStatusContext';
 import { isOnlineRequiredError, runOnlineTransaction } from '../utils/onlineOnlyTransaction';
 import { COLLECTIONS } from '../constants/firestore';
 import { ROUTES } from '../constants/routes';
+import { useCmsFrontendPageContent } from '../hooks/useCmsFrontendPageContent';
+import CmsCustomSections from '../components/cms/CmsCustomSections';
+import CmsVisualEditor from '../components/cms/CmsVisualEditor';
 import {
   EIGHT_HUNDRED_MS,
   EIGHT_SECONDS_MS,
@@ -125,6 +128,8 @@ function FindDonors() {
     metadata: { page: 'FindDonors' },
   });
   const { resolveCurrentLocation } = useLocationResolver('donor');
+  const cmsPage = useCmsFrontendPageContent('find-donors');
+  const { content } = cmsPage;
 
   const requestLocation = async () => {
     if (locationRequestInFlightRef.current) return;
@@ -143,7 +148,7 @@ function FindDonors() {
           permissionDenied: 'Location access is blocked. Please enable location to find donors.',
           positionUnavailable: 'Unable to determine your location. Please try again.',
           timeout: 'Location request timed out. Please try again.',
-          default: 'Enable location to use Find Donors.',
+          default: content.locationBannerTitle || 'Enable location to use Find Donors.',
         },
       });
       if (result?.coords) {
@@ -1091,17 +1096,17 @@ function FindDonors() {
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center px-6 py-2 bg-red-100 rounded-full mb-6">
               <Heart className="w-5 h-5 text-red-600 mr-2" />
-              <span className="text-red-600 font-semibold">Find Donors</span>
+              <span className="text-red-600 font-semibold">{content.heroBadge}</span>
             </div>
 
             <h1 className="text-5xl md:text-6xl font-extrabold mb-6">
               <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
-                Connect with Life-Savers
+                {content.heroTitle}
               </span>
             </h1>
 
             <p className="text-xl text-gray-600 mb-8">
-              Find blood donors near you and save lives. Our community of heroes is ready to help.
+              {content.heroDescription}
             </p>
           </div>
         </div>
@@ -1118,7 +1123,7 @@ function FindDonors() {
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-red-600" />
                   <input
                     type="text"
-                    placeholder="Search by location or donor name..."
+                    placeholder={content.searchPlaceholder}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all"
@@ -1257,9 +1262,9 @@ function FindDonors() {
             {!locationEnabled && (
               <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-6 py-5 text-sm text-amber-800 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="font-semibold text-amber-900">Enable location to use Find Donors</p>
+                  <p className="font-semibold text-amber-900">{content.locationBannerTitle}</p>
                   <p className="text-amber-700">
-                    We need your location to show nearby donors and accurate distances.
+                    {content.locationBannerDescription}
                   </p>
                   {locationError && <p className="mt-1 text-amber-700">{locationError}</p>}
                 </div>
@@ -1268,7 +1273,7 @@ function FindDonors() {
                   disabled={locationRequesting}
                   className="px-4 py-2 rounded-xl bg-amber-600 text-white font-semibold hover:bg-amber-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {locationRequesting ? 'Requesting...' : 'Enable Location'}
+                  {locationRequesting ? 'Requesting...' : content.locationButtonText}
                 </button>
               </div>
             )}
@@ -1305,14 +1310,14 @@ function FindDonors() {
                 <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <MapPin className="w-10 h-10 text-amber-600" />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Location required</h3>
-                <p className="text-gray-600 mb-6">Enable location services to see nearby donors.</p>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">{content.noLocationTitle}</h3>
+                <p className="text-gray-600 mb-6">{content.noLocationDescription}</p>
                 <button
                   onClick={requestLocation}
                   disabled={locationRequesting}
                   className="px-6 py-3 bg-amber-600 text-white rounded-full font-semibold hover:bg-amber-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {locationRequesting ? 'Requesting...' : 'Enable Location'}
+                  {locationRequesting ? 'Requesting...' : content.locationButtonText}
                 </button>
               </div>
             ) : loading ? (
@@ -1566,13 +1571,13 @@ function FindDonors() {
                 <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <AlertCircle className="w-10 h-10 text-red-600" />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">No donors found</h3>
-                <p className="text-gray-600 mb-6">Try adjusting your search criteria or filters</p>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">{content.noDonorsTitle}</h3>
+                <p className="text-gray-600 mb-6">{content.noDonorsDescription}</p>
                 <button
                   onClick={clearFilters}
                   className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-full font-semibold hover:shadow-lg transform hover:scale-105 transition-all"
                 >
-                  Clear Filters
+                  {content.clearFiltersText}
                 </button>
               </div>
             )}
@@ -1832,17 +1837,19 @@ function FindDonors() {
       <section className="py-16 bg-gradient-to-r from-red-600 via-red-700 to-red-800 mt-12">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center text-white">
-            <h2 className="text-4xl font-bold mb-4">Want to Become a Donor?</h2>
-            <p className="text-xl mb-8 opacity-90">Join our community of life-savers and make a difference</p>
+            <h2 className="text-4xl font-bold mb-4">{content.bottomCtaTitle}</h2>
+            <p className="text-xl mb-8 opacity-90">{content.bottomCtaDescription}</p>
             <button
               onClick={() => navigate(ROUTES.portal.donor.register)}
               className="px-8 py-4 bg-white text-red-600 rounded-full font-bold text-lg hover:shadow-2xl transform hover:scale-105 transition-all"
             >
-              Register as a Donor
+              {content.bottomCtaButton}
             </button>
           </div>
         </div>
       </section>
+      <CmsCustomSections content={content} />
+      <CmsVisualEditor slug="find-donors" content={content} pageTitle="Find Donors" />
     </div>
   );
 }

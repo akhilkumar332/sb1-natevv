@@ -535,7 +535,7 @@ const Navbar: React.FC = () => {
         const hasActiveItem = group.items.some((item) =>
           location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
         );
-        next[group.id] = prev[group.id] ?? (hasActiveItem || group.id === 'security');
+        next[group.id] = prev[group.id] ?? (hasActiveItem || group.id === 'security' || group.id === 'content');
       });
       return next;
     });
@@ -598,6 +598,7 @@ const Navbar: React.FC = () => {
                   <DesktopNavLink to={ROUTES.requestBlood}>Request Blood</DesktopNavLink>
                   <DesktopNavLink to={ROUTES.about}>About</DesktopNavLink>
                   <DesktopNavLink to={ROUTES.contact}>Contact</DesktopNavLink>
+                  <DesktopNavLink to={ROUTES.blog}>Blog</DesktopNavLink>
                 </>
               )}
 
@@ -792,6 +793,9 @@ const Navbar: React.FC = () => {
                     </div>
                     <div className="animate-slideInRight" style={{ animationDelay: '0.25s', animationFillMode: 'both' }}>
                       <MobileNavLink to={ROUTES.contact} onClick={() => setIsOpen(false)}>Contact</MobileNavLink>
+                    </div>
+                    <div className="animate-slideInRight" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
+                      <MobileNavLink to={ROUTES.blog} onClick={() => setIsOpen(false)}>Blog</MobileNavLink>
                     </div>
                   </>
                 )}

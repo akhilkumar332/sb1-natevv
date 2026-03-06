@@ -3,8 +3,53 @@ import { Link } from 'react-router-dom';
 import { Heart, Phone, Mail, MapPin, Facebook, Twitter, Instagram, Linkedin, AlertCircle, ChevronDown } from 'lucide-react';
 import LogoMark from './LogoMark';
 import { ROUTES } from '../constants/routes';
+import { usePublicCmsMenu, usePublicCmsSettings } from '../hooks/useCmsContent';
+import { CMS_DEFAULTS } from '../constants/cms';
+import { CMS_MENU_LOCATION } from '../constants/cms';
 
 function Footer() {
+  const settingsQuery = usePublicCmsSettings();
+  const footerResourcesQuery = usePublicCmsMenu(CMS_MENU_LOCATION.footerResources);
+  const footerLegalQuery = usePublicCmsMenu(CMS_MENU_LOCATION.footerLegal);
+  const supportPhone = settingsQuery.data?.supportPhone || CMS_DEFAULTS.supportPhone;
+  const supportEmail = settingsQuery.data?.supportEmail || CMS_DEFAULTS.supportEmail;
+  const officeCity = settingsQuery.data?.officeCity || CMS_DEFAULTS.officeCity;
+  const showBlogInFooter = settingsQuery.data?.showBlogInFooter ?? CMS_DEFAULTS.showBlogInFooter;
+  const socialLinks = settingsQuery.data?.socialLinks || {};
+  const socialDefaults = {
+    facebook: 'https://facebook.com',
+    x: 'https://twitter.com',
+    instagram: 'https://instagram.com',
+    linkedin: 'https://linkedin.com',
+  };
+  const toSafeExternalUrl = (value?: string | null): string | null => {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return /^https?:\/\//i.test(trimmed) ? trimmed : null;
+  };
+  const socialConfig = [
+    { key: 'facebook', href: toSafeExternalUrl(socialLinks.facebook) || socialDefaults.facebook, icon: <Facebook className="w-5 h-5 text-red-600 relative z-10" /> },
+    { key: 'x', href: toSafeExternalUrl(socialLinks.x || socialLinks.twitter) || socialDefaults.x, icon: <Twitter className="w-5 h-5 text-red-600 relative z-10" /> },
+    { key: 'instagram', href: toSafeExternalUrl(socialLinks.instagram) || socialDefaults.instagram, icon: <Instagram className="w-5 h-5 text-red-600 relative z-10" /> },
+    { key: 'linkedin', href: toSafeExternalUrl(socialLinks.linkedin) || socialDefaults.linkedin, icon: <Linkedin className="w-5 h-5 text-red-600 relative z-10" /> },
+  ] as const;
+  const defaultResourceLinks = [
+    { id: 'donor-portal', label: 'Donor Portal', path: ROUTES.portal.donor.login, external: false },
+    { id: 'bloodbank-portal', label: 'BloodBank Portal', path: ROUTES.portal.bloodbank.login, external: false },
+    { id: 'ngo-portal', label: 'NGO Portal', path: ROUTES.portal.ngo.login, external: false },
+    { id: 'faq', label: 'FAQ', path: '/faq', external: false },
+    ...(showBlogInFooter ? [{ id: 'blog', label: 'Blog', path: ROUTES.blog, external: false }] : []),
+  ];
+  const defaultLegalLinks = [
+    { id: 'privacy', label: 'Privacy Policy', path: '/privacy', external: false },
+    { id: 'terms', label: 'Terms of Service', path: '/terms', external: false },
+    { id: 'disclaimer', label: 'Disclaimer', path: '/disclaimer', external: false },
+    { id: 'sitemap', label: 'Sitemap', path: '/sitemap', external: false },
+  ];
+  const resourceLinks = footerResourcesQuery.data?.items?.length ? footerResourcesQuery.data.items : defaultResourceLinks;
+  const legalLinks = footerLegalQuery.data?.items?.length ? footerLegalQuery.data.items : defaultLegalLinks;
+
   const [openSections, setOpenSections] = useState({
     quickLinks: true,
     resources: false,
@@ -46,42 +91,18 @@ function Footer() {
             <div className="mt-6">
               <p className="text-sm font-semibold text-gray-900 mb-3">Follow Us</p>
               <div className="flex space-x-3">
-                <a
-                  href="https://facebook.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group relative w-10 h-10 bg-white/80 backdrop-blur-xl hover:bg-white rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:-translate-y-1 shadow-md hover:shadow-lg border border-red-100"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-md opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
-                  <Facebook className="w-5 h-5 text-red-600 relative z-10" />
-                </a>
-                <a
-                  href="https://twitter.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group relative w-10 h-10 bg-white/80 backdrop-blur-xl hover:bg-white rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:-translate-y-1 shadow-md hover:shadow-lg border border-red-100"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-md opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
-                  <Twitter className="w-5 h-5 text-red-600 relative z-10" />
-                </a>
-                <a
-                  href="https://instagram.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group relative w-10 h-10 bg-white/80 backdrop-blur-xl hover:bg-white rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:-translate-y-1 shadow-md hover:shadow-lg border border-red-100"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-md opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
-                  <Instagram className="w-5 h-5 text-red-600 relative z-10" />
-                </a>
-                <a
-                  href="https://linkedin.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group relative w-10 h-10 bg-white/80 backdrop-blur-xl hover:bg-white rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:-translate-y-1 shadow-md hover:shadow-lg border border-red-100"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-md opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
-                  <Linkedin className="w-5 h-5 text-red-600 relative z-10" />
-                </a>
+                {socialConfig.map((item) => (
+                  <a
+                    key={item.key}
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative w-10 h-10 bg-white/80 backdrop-blur-xl hover:bg-white rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:-translate-y-1 shadow-md hover:shadow-lg border border-red-100"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-md opacity-0 group-hover:opacity-30 transition-opacity duration-300"></div>
+                    {item.icon}
+                  </a>
+                ))}
               </div>
             </div>
           </div>
@@ -165,51 +186,29 @@ function Footer() {
             <h3 className="hidden text-lg font-bold text-gray-900 mb-4 lg:block">Resources</h3>
             <div id="footer-resources" className={`${openSections.resources ? 'block' : 'hidden'} pt-4 lg:block lg:pt-0`}>
               <ul className="space-y-3">
-                <li>
-                  <Link
-                    to={ROUTES.portal.donor.login}
-                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                  >
-                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                    Donor Portal
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to={ROUTES.portal.bloodbank.login}
-                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                  >
-                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                    BloodBank Portal
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to={ROUTES.portal.ngo.login}
-                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                  >
-                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                    NGO Portal
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/faq"
-                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                  >
-                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                    FAQ
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/blog"
-                    className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
-                  >
-                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                    Blog
-                  </Link>
-                </li>
+                {resourceLinks.map((item) => (
+                  <li key={item.id}>
+                    {item.external ? (
+                      <a
+                        href={item.path}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
+                      >
+                        <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                        {item.label}
+                      </a>
+                    ) : (
+                    <Link
+                      to={item.path}
+                      className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
+                    >
+                      <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                      {item.label}
+                    </Link>
+                    )}
+                  </li>
+                ))}
               </ul>
             </div>
           </div>
@@ -233,8 +232,8 @@ function Footer() {
                   <Phone className="w-5 h-5 mr-3 text-red-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="font-medium text-gray-900">General Inquiries</p>
-                    <a href="tel:+911800123456" className="hover:text-red-600 transition-colors">
-                      +91 1800-123-456
+                    <a href={`tel:${supportPhone}`} className="hover:text-red-600 transition-colors">
+                      {supportPhone}
                     </a>
                   </div>
                 </li>
@@ -242,8 +241,8 @@ function Footer() {
                   <Mail className="w-5 h-5 mr-3 text-red-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="font-medium text-gray-900">Email Us</p>
-                    <a href="mailto:contact@bloodhub.in" className="hover:text-red-600 transition-colors">
-                      contact@bloodhub.in
+                    <a href={`mailto:${supportEmail}`} className="hover:text-red-600 transition-colors">
+                      {supportEmail}
                     </a>
                   </div>
                 </li>
@@ -251,7 +250,7 @@ function Footer() {
                   <MapPin className="w-5 h-5 mr-3 text-red-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="font-medium text-gray-900">Head Office</p>
-                    <p className="text-sm">New Delhi, India</p>
+                    <p className="text-sm">{officeCity}</p>
                   </div>
                 </li>
               </ul>
@@ -294,30 +293,27 @@ function Footer() {
               </div>
             </div>
             <div className="flex flex-wrap justify-center gap-4 md:gap-6">
-              <Link
-                to="/privacy"
-                className="text-gray-600 hover:text-red-600 text-sm transition-colors"
-              >
-                Privacy Policy
-              </Link>
-              <Link
-                to="/terms"
-                className="text-gray-600 hover:text-red-600 text-sm transition-colors"
-              >
-                Terms of Service
-              </Link>
-              <Link
-                to="/disclaimer"
-                className="text-gray-600 hover:text-red-600 text-sm transition-colors"
-              >
-                Disclaimer
-              </Link>
-              <Link
-                to="/sitemap"
-                className="text-gray-600 hover:text-red-600 text-sm transition-colors"
-              >
-                Sitemap
-              </Link>
+              {legalLinks.map((item) => (
+                item.external ? (
+                  <a
+                    key={item.id}
+                    href={item.path}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-600 hover:text-red-600 text-sm transition-colors"
+                  >
+                    {item.label}
+                  </a>
+                ) : (
+                  <Link
+                    key={item.id}
+                    to={item.path}
+                    className="text-gray-600 hover:text-red-600 text-sm transition-colors"
+                  >
+                    {item.label}
+                  </Link>
+                )
+              ))}
             </div>
           </div>
 

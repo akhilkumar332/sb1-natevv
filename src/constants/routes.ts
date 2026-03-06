@@ -5,6 +5,9 @@ export const ROUTES = {
   requestBlood: '/request-blood',
   about: '/about',
   contact: '/contact',
+  blog: '/blog',
+  blogPost: '/blog/:slug',
+  cmsPage: '/p/:slug',
   portal: {
     donor: {
       login: '/donor/login',
@@ -80,6 +83,18 @@ export const ROUTES = {
         auditSecurity: '/admin/dashboard/audit-security',
         errorLogs: '/admin/dashboard/error-logs',
         contactSubmissions: '/admin/dashboard/contact-submissions',
+        cmsOverview: '/admin/dashboard/cms/overview',
+        cmsPages: '/admin/dashboard/cms/pages',
+        cmsPageEditor: '/admin/dashboard/cms/pages/:slug',
+        cmsBlogPosts: '/admin/dashboard/cms/blog-posts',
+        cmsBlogPostEditor: '/admin/dashboard/cms/blog-posts/:slug',
+        cmsCategories: '/admin/dashboard/cms/categories',
+        cmsCategoryEditor: '/admin/dashboard/cms/categories/:slug',
+        cmsMenus: '/admin/dashboard/cms/menus',
+        cmsMenuEditor: '/admin/dashboard/cms/menus/:location',
+        cmsMedia: '/admin/dashboard/cms/media',
+        cmsSettings: '/admin/dashboard/cms/settings',
+        cmsSettingsEditor: '/admin/dashboard/cms/settings/edit',
         impersonationAudit: '/admin/dashboard/impersonation-audit',
         notifications: '/admin/dashboard/notifications',
         settings: '/admin/dashboard/settings',
@@ -213,6 +228,19 @@ const ADMIN_DASHBOARD_MENU_GROUPS_BASE: AdminDashboardMenuGroup[] = [
     items: [
       { id: 'analytics', label: 'Analytics', path: ROUTES.portal.admin.dashboard.analyticsReports },
       { id: 'nps', label: 'NPS Score', path: ROUTES.portal.admin.dashboard.nps },
+    ],
+  },
+  {
+    id: 'content',
+    label: 'Content',
+    items: [
+      { id: 'cms-overview', label: 'CMS Overview', path: ROUTES.portal.admin.dashboard.cmsOverview },
+      { id: 'cms-pages', label: 'Frontend Pages', path: ROUTES.portal.admin.dashboard.cmsPages },
+      { id: 'cms-blog-posts', label: 'Frontend Blog', path: ROUTES.portal.admin.dashboard.cmsBlogPosts },
+      { id: 'cms-categories', label: 'Categories', path: ROUTES.portal.admin.dashboard.cmsCategories },
+      { id: 'cms-menus', label: 'Menus', path: ROUTES.portal.admin.dashboard.cmsMenus },
+      { id: 'cms-media', label: 'Media', path: ROUTES.portal.admin.dashboard.cmsMedia },
+      { id: 'cms-settings', label: 'CMS Settings', path: ROUTES.portal.admin.dashboard.cmsSettings },
     ],
   },
   {

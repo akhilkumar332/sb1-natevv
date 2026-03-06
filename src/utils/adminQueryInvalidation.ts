@@ -56,6 +56,14 @@ const recipes = {
     adminQueryKeys.npsActiveUserProfilesRoot,
     adminQueryKeys.npsPromptOverridesRoot,
   ],
+  cmsUpdated: [
+    adminQueryKeys.cmsPagesRoot,
+    adminQueryKeys.cmsBlogPostsRoot,
+    adminQueryKeys.cmsBlogCategoriesRoot,
+    adminQueryKeys.cmsNavMenusRoot,
+    adminQueryKeys.cmsMediaRoot,
+    adminQueryKeys.cmsSettingsRoot,
+  ],
   volunteerUpdated: [
     adminQueryKeys.volunteersRoot,
   ],

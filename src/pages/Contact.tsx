@@ -4,8 +4,19 @@ import { notify } from 'services/notify.service';
 import { CONTACT_SUBJECT_OPTIONS } from '../constants/contact';
 import { submitContactForm } from '../services/contact.service';
 import { captureHandledError } from '../services/errorLog.service';
+import { useCmsFrontendPageContent } from '../hooks/useCmsFrontendPageContent';
+import { usePublicCmsSettings } from '../hooks/useCmsContent';
+import { CMS_DEFAULTS } from '../constants/cms';
+import CmsCustomSections from '../components/cms/CmsCustomSections';
+import CmsVisualEditor from '../components/cms/CmsVisualEditor';
 
 function Contact() {
+  const cmsPage = useCmsFrontendPageContent('contact');
+  const { content } = cmsPage;
+  const settingsQuery = usePublicCmsSettings();
+  const supportPhone = settingsQuery.data?.supportPhone || CMS_DEFAULTS.supportPhone;
+  const supportEmail = settingsQuery.data?.supportEmail || CMS_DEFAULTS.supportEmail;
+  const officeCity = settingsQuery.data?.officeCity || CMS_DEFAULTS.officeCity;
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -59,17 +70,17 @@ function Contact() {
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center px-6 py-2 bg-red-100 rounded-full mb-8">
               <MessageCircle className="w-5 h-5 text-red-600 mr-2" />
-              <span className="text-red-600 font-semibold">Contact Us</span>
+              <span className="text-red-600 font-semibold">{content.heroBadge}</span>
             </div>
 
             <h1 className="text-6xl font-extrabold mb-6">
-              <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
-                We're Here to Help
+                <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
+                {content.heroTitle}
               </span>
             </h1>
 
             <p className="text-xl text-gray-600 leading-relaxed">
-              Have questions? Need support? Our team is available 24/7 to assist you.
+              {content.heroDescription}
             </p>
           </div>
         </div>
@@ -94,10 +105,10 @@ function Contact() {
                     </div>
                   </div>
 
-                  <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-red-600 transition-colors duration-300">Phone</h3>
-                  <p className="text-gray-700 mb-2">Available 24/7</p>
-                  <a href="tel:+911800123456" className="text-red-600 font-semibold hover:text-red-700 transition-colors">
-                    +91 1800-123-456
+                  <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-red-600 transition-colors duration-300">{content.phoneLabel}</h3>
+                  <p className="text-gray-700 mb-2">{content.phoneSubLabel}</p>
+                  <a href={`tel:${supportPhone}`} className="text-red-600 font-semibold hover:text-red-700 transition-colors">
+                    {supportPhone}
                   </a>
                 </div>
               </div>
@@ -118,10 +129,10 @@ function Contact() {
                     </div>
                   </div>
 
-                  <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-red-600 transition-colors duration-300">Email</h3>
-                  <p className="text-gray-700 mb-2">Response in 24 hours</p>
-                  <a href="mailto:support@bloodhub.in" className="text-red-600 font-semibold hover:text-red-700 transition-colors">
-                    support@bloodhub.in
+                  <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-red-600 transition-colors duration-300">{content.emailLabel}</h3>
+                  <p className="text-gray-700 mb-2">{content.emailSubLabel}</p>
+                  <a href={`mailto:${supportEmail}`} className="text-red-600 font-semibold hover:text-red-700 transition-colors">
+                    {supportEmail}
                   </a>
                 </div>
               </div>
@@ -142,9 +153,9 @@ function Contact() {
                     </div>
                   </div>
 
-                  <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-red-600 transition-colors duration-300">Office</h3>
-                  <p className="text-gray-700 mb-2">Visit us</p>
-                  <p className="text-red-600 font-semibold">Mumbai, Maharashtra</p>
+                  <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-red-600 transition-colors duration-300">{content.officeLabel}</h3>
+                  <p className="text-gray-700 mb-2">{content.officeSubLabel}</p>
+                  <p className="text-red-600 font-semibold">{officeCity}</p>
                 </div>
               </div>
             </div>
@@ -165,7 +176,7 @@ function Contact() {
                 <div className="p-12">
                   <h2 className="text-3xl font-bold mb-6">
                     <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
-                      Send us a Message
+                      {content.formTitle}
                     </span>
                   </h2>
 
@@ -243,7 +254,7 @@ function Contact() {
                       className="w-full py-4 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center"
                     >
                       <Send className="w-5 h-5 mr-2" />
-                      {submitting ? 'Sending...' : 'Send Message'}
+                      {submitting ? 'Sending...' : content.submitButton}
                     </button>
                   </form>
                 </div>
@@ -251,29 +262,17 @@ function Contact() {
                 {/* Info Sidebar */}
                 <div className="bg-gradient-to-br from-red-600 to-red-800 p-12 text-white flex flex-col justify-between">
                   <div>
-                    <h3 className="text-2xl font-bold mb-6">Why Contact Us?</h3>
+                    <h3 className="text-2xl font-bold mb-6">{content.sidebarTitle}</h3>
                     <div className="space-y-6">
-                      <div className="flex items-start">
-                        <Headphones className="w-6 h-6 mr-4 flex-shrink-0 mt-1" />
-                        <div>
-                          <h4 className="font-semibold mb-1">24/7 Support</h4>
-                          <p className="text-sm text-white/80">Our team is always available to help you</p>
+                      {(content.sidebarPoints || []).map((item, index) => (
+                        <div key={`${item.title}-${index}`} className="flex items-start">
+                          {[<Headphones className="w-6 h-6 mr-4 flex-shrink-0 mt-1" />, <Clock className="w-6 h-6 mr-4 flex-shrink-0 mt-1" />, <MessageCircle className="w-6 h-6 mr-4 flex-shrink-0 mt-1" />][index] || <Headphones className="w-6 h-6 mr-4 flex-shrink-0 mt-1" />}
+                          <div>
+                            <h4 className="font-semibold mb-1">{item.title}</h4>
+                            <p className="text-sm text-white/80">{item.description}</p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-start">
-                        <Clock className="w-6 h-6 mr-4 flex-shrink-0 mt-1" />
-                        <div>
-                          <h4 className="font-semibold mb-1">Quick Response</h4>
-                          <p className="text-sm text-white/80">We typically respond within 2 hours</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start">
-                        <MessageCircle className="w-6 h-6 mr-4 flex-shrink-0 mt-1" />
-                        <div>
-                          <h4 className="font-semibold mb-1">Expert Guidance</h4>
-                          <p className="text-sm text-white/80">Get help from blood donation experts</p>
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
 
@@ -307,16 +306,12 @@ function Contact() {
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-4xl font-bold mb-4">
               <span className="bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
-                Frequently Asked Questions
+                {content.faqTitle}
               </span>
             </h2>
-            <p className="text-gray-600 mb-12">Can't find your answer? Feel free to contact us!</p>
+            <p className="text-gray-600 mb-12">{content.faqSubtitle}</p>
             <div className="space-y-4 text-left">
-              {[
-                { q: "What are your operating hours?", a: "We provide 24/7 emergency support for urgent blood requests" },
-                { q: "How quickly can I expect a response?", a: "Typically within 2 hours during business hours, and within 6 hours for overnight inquiries" },
-                { q: "Do you have physical offices?", a: "Our headquarters is in Mumbai, but we operate digitally across India" }
-              ].map((faq, i) => (
+              {(content.faqItems || []).map((faq, i) => (
                 <div key={i} className="group relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-xl blur-lg opacity-0 group-hover:opacity-10 transition-opacity duration-500"></div>
                   <div className="relative bg-white/80 backdrop-blur-xl p-6 rounded-xl border border-white/50 hover:shadow-lg transition-all duration-500 overflow-hidden">
@@ -334,6 +329,8 @@ function Contact() {
           </div>
         </div>
       </section>
+      <CmsCustomSections content={content} />
+      <CmsVisualEditor slug="contact" content={content} pageTitle="Contact" />
     </div>
   );
 }

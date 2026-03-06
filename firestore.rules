@@ -24,7 +24,8 @@ service cloud.firestore {
      * Get user document data (with existence check)
      */
     function getUserData() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
         : null;
     }
@@ -253,6 +254,13 @@ service cloud.firestore {
         && request.resource.data.read == false
         && request.resource.data.priority in ['low', 'medium', 'high']
         && request.resource.data.createdAt is timestamp;
+    }
+
+    /**
+     * CMS public-read gate.
+     */
+    function isPublishedCmsDoc() {
+      return resource.data.status == 'published';
     }
 
     /**
@@ -943,6 +951,62 @@ service cloud.firestore {
       );
 
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+    }
+
+    // ========================================================================
+    // COLLECTION: cmsPages
+    // ========================================================================
+
+    match /cmsPages/{pageId} {
+      allow read: if isAdmin() || isPublishedCmsDoc();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: cmsBlogPosts
+    // ========================================================================
+
+    match /cmsBlogPosts/{postId} {
+      allow read: if isAdmin() || isPublishedCmsDoc();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: cmsBlogCategories
+    // ========================================================================
+
+    match /cmsBlogCategories/{categoryId} {
+      allow read: if isAdmin() || isPublishedCmsDoc();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: cmsNavMenus
+    // ========================================================================
+
+    match /cmsNavMenus/{menuId} {
+      allow read: if isAdmin() || (
+        !resource.data.keys().hasAny(['status']) || resource.data.status == 'published'
+      );
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: cmsMedia
+    // ========================================================================
+
+    match /cmsMedia/{mediaId} {
+      allow read: if isAdmin() || isPublishedCmsDoc();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ========================================================================
+    // COLLECTION: cmsSettings
+    // ========================================================================
+
+    match /cmsSettings/{settingsId} {
+      allow read: if isAdmin() || settingsId == 'global';
+      allow create, update, delete: if isAdmin();
     }
 
     // ========================================================================
