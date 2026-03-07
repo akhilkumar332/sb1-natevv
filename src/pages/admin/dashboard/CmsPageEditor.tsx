@@ -4,7 +4,16 @@ import { useQueryClient } from '@tanstack/react-query';
 import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { COLLECTIONS } from '../../../constants/firestore';
-import { CMS_FEATURE_FLAGS, CMS_FRONTEND_PAGE_PRESETS, CMS_LIMITS, CMS_PAGE_KIND, CMS_STATUS, getCmsPageDocId, toCmsSlug } from '../../../constants/cms';
+import {
+  CMS_FEATURE_FLAGS,
+  CMS_FRONTEND_PAGE_PRESETS,
+  CMS_LIMITS,
+  CMS_PAGE_KIND,
+  CMS_SEO_GUIDELINES,
+  CMS_STATUS,
+  getCmsPageDocId,
+  toCmsSlug,
+} from '../../../constants/cms';
 import { CMS_FRONTEND_PAGE_DEFAULT_CONTENT } from '../../../constants/cmsPageDefaults';
 import { useAdminCmsPages } from '../../../hooks/admin/useAdminQueries';
 import { getServerTimestamp } from '../../../utils/firestore.utils';
@@ -14,6 +23,8 @@ import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { resolveCmsFrontendContent } from '../../../utils/cmsFrontendContent';
 import { ROUTES } from '../../../constants/routes';
 import { toDateValue } from '../../../utils/dateValue';
+import { runSeoAudit } from '../../../utils/seoAudit';
+import SeoSnippetPreview from '../../../components/cms/SeoSnippetPreview';
 
 const statusOptions = Object.values(CMS_STATUS);
 const kindOptions = Object.values(CMS_PAGE_KIND);
@@ -32,6 +43,13 @@ const parseJsonObject = (value: string): Record<string, JsonLike> | null => {
   } catch {
     return null;
   }
+};
+
+const isAbsoluteHttpUrl = (value: string): boolean => /^https?:\/\/\S+$/i.test(value.trim());
+const isMediaUrlOrPath = (value: string): boolean => {
+  const normalized = value.trim();
+  if (!normalized) return true;
+  return normalized.startsWith('/') || isAbsoluteHttpUrl(normalized);
 };
 
 const toSectionLabel = (key: string): string => (
@@ -153,6 +171,9 @@ export default function CmsPageEditorPage() {
     [contentDraft]
   );
   const activePresetPath = activePreset?.path || null;
+  const resolvedContentJsonForChecks = advancedMode ? contentJson : JSON.stringify(contentDraft || {});
+  const seoTitleLen = (seoTitle.trim() || title.trim()).length;
+  const seoDescriptionLen = (seoDescription.trim() || excerpt.trim()).length;
   const publishChecks = useMemo(() => {
     const critical = [
       { id: 'title', label: 'Page title is set', passed: Boolean(title.trim()) },
@@ -161,12 +182,39 @@ export default function CmsPageEditorPage() {
     ];
     const warnings = [
       { id: 'excerpt', label: 'Summary is added', passed: Boolean(excerpt.trim()) },
-      { id: 'seoTitle', label: 'Search title is added', passed: Boolean((seoTitle.trim() || title.trim()).length >= 20) },
-      { id: 'seoDesc', label: 'Search description is added', passed: Boolean((seoDescription.trim() || excerpt.trim()).length >= 70) },
+      {
+        id: 'seoTitle',
+        label: `Search title is in range (${CMS_SEO_GUIDELINES.titleMin}-${CMS_SEO_GUIDELINES.titleMax})`,
+        passed: seoTitleLen >= CMS_SEO_GUIDELINES.titleMin && seoTitleLen <= CMS_SEO_GUIDELINES.titleMax,
+      },
+      {
+        id: 'seoDesc',
+        label: `Search description is in range (${CMS_SEO_GUIDELINES.descriptionMin}-${CMS_SEO_GUIDELINES.descriptionMax})`,
+        passed: seoDescriptionLen >= CMS_SEO_GUIDELINES.descriptionMin && seoDescriptionLen <= CMS_SEO_GUIDELINES.descriptionMax,
+      },
     ];
     return { critical, warnings };
-  }, [advancedMode, contentDraft, contentJson, excerpt, seoDescription, seoTitle, slug, title]);
+  }, [advancedMode, contentDraft, contentJson, excerpt, seoDescriptionLen, seoTitleLen, slug, title]);
   const canPublish = publishChecks.critical.every((entry) => entry.passed);
+  const previewTitle = (seoTitle.trim() || title.trim() || 'Untitled page').slice(0, CMS_LIMITS.seoTitle);
+  const previewDescription = (
+    seoDescription.trim()
+    || excerpt.trim()
+    || 'Add a short description so this page is clearer in search results.'
+  ).slice(0, CMS_LIMITS.seoDescription);
+  const previewSlug = toCmsSlug(slug || title) || 'untitled-page';
+  const previewPath = activePresetPath || (previewSlug === 'home' ? '/' : `/${previewSlug}`);
+  const previewUrl = `https://bloodhubindia.com${previewPath}`;
+  const seoAudit = runSeoAudit({
+    title,
+    seoTitle,
+    slug,
+    excerpt,
+    seoDescription,
+    contentJson: resolvedContentJsonForChecks,
+    coverImageUrl: '',
+    ogImageUrl,
+  });
 
   const hydrateContentEditor = (targetSlug: string, rawContentJson: string) => {
     const normalizedSlug = toCmsSlug(targetSlug);
@@ -409,6 +457,14 @@ export default function CmsPageEditorPage() {
       notify.error(`Content JSON exceeds ${CMS_LIMITS.contentJson} characters.`);
       return;
     }
+    if (seoCanonicalUrl.trim() && !isAbsoluteHttpUrl(seoCanonicalUrl)) {
+      notify.error('Canonical URL must start with http:// or https://');
+      return;
+    }
+    if (!isMediaUrlOrPath(ogImageUrl) || !isMediaUrlOrPath(twitterImageUrl)) {
+      notify.error('Social image URLs must be absolute URLs or start with /.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -427,6 +483,7 @@ export default function CmsPageEditorPage() {
       const resolvedSeoTitle = seoTitle.trim().slice(0, CMS_LIMITS.seoTitle) || normalizedTitle.slice(0, CMS_LIMITS.seoTitle);
       const resolvedSeoDescription = seoDescription.trim().slice(0, CMS_LIMITS.seoDescription) || excerpt.trim().slice(0, CMS_LIMITS.seoDescription) || null;
 
+      const shouldForceNoIndex = nextStatus !== CMS_STATUS.published;
       await setDoc(targetRef, {
         slug: normalizedSlug,
         title: normalizedTitle.slice(0, CMS_LIMITS.title),
@@ -436,8 +493,8 @@ export default function CmsPageEditorPage() {
         seoTitle: resolvedSeoTitle,
         seoDescription: resolvedSeoDescription,
         seoCanonicalUrl: seoCanonicalUrl.trim().slice(0, CMS_LIMITS.canonicalUrl) || null,
-        seoNoIndex,
-        seoNoFollow,
+        seoNoIndex: shouldForceNoIndex ? true : seoNoIndex,
+        seoNoFollow: shouldForceNoIndex ? true : seoNoFollow,
         ogTitle: ogTitle.trim().slice(0, CMS_LIMITS.seoTitle) || null,
         ogDescription: ogDescription.trim().slice(0, CMS_LIMITS.seoDescription) || null,
         ogImageUrl: ogImageUrl.trim().slice(0, CMS_LIMITS.canonicalUrl) || null,
@@ -461,12 +518,12 @@ export default function CmsPageEditorPage() {
           seoTitle: resolvedSeoTitle,
           seoDescription: resolvedSeoDescription,
           seoCanonicalUrl: seoCanonicalUrl.trim().slice(0, CMS_LIMITS.canonicalUrl) || null,
-          seoNoIndex,
-          seoNoFollow,
+          seoNoIndex: shouldForceNoIndex ? true : seoNoIndex,
+          seoNoFollow: shouldForceNoIndex ? true : seoNoFollow,
           ogTitle: ogTitle.trim().slice(0, CMS_LIMITS.seoTitle) || null,
           ogDescription: ogDescription.trim().slice(0, CMS_LIMITS.seoDescription) || null,
           ogImageUrl: ogImageUrl.trim().slice(0, CMS_LIMITS.canonicalUrl) || null,
-          twitterImageUrl: twitterImageUrl.trim().slice(0, CMS_LIMITS.canonicalUrl) || null,
+          twitterImageUrl: twitterImageUrl.trim().slice(0, CMS_LIMITS.canonicalUrl) || ogImageUrl.trim().slice(0, CMS_LIMITS.canonicalUrl) || null,
           contentJson: normalizedContentJson || null,
           publishedAt,
           createdBy,
@@ -602,8 +659,57 @@ export default function CmsPageEditorPage() {
             {statusOptions.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
           </select>
           <input value={excerpt} onChange={(event) => { setExcerpt(event.target.value); setIsDirty(true); }} placeholder="Summary (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2" />
-          <input value={seoTitle} onChange={(event) => { setSeoTitle(event.target.value); setIsDirty(true); }} placeholder="Search result title (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-          <input value={seoDescription} onChange={(event) => { setSeoDescription(event.target.value); setIsDirty(true); }} placeholder="Search result description (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+              <div className="space-y-1">
+                <input value={seoTitle} onChange={(event) => { setSeoTitle(event.target.value); setIsDirty(true); }} placeholder="Search title (optional)" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+                <span className="block text-[11px] text-gray-500">Recommended {CMS_SEO_GUIDELINES.titleMin}-{CMS_SEO_GUIDELINES.titleMax} characters. ({seoTitleLen}/{CMS_LIMITS.seoTitle})</span>
+              </div>
+              <div className="space-y-1">
+                <input value={seoDescription} onChange={(event) => { setSeoDescription(event.target.value); setIsDirty(true); }} placeholder="Search description (optional)" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+                <span className="block text-[11px] text-gray-500">Recommended {CMS_SEO_GUIDELINES.descriptionMin}-{CMS_SEO_GUIDELINES.descriptionMax} characters. ({seoDescriptionLen}/{CMS_LIMITS.seoDescription})</span>
+              </div>
+              <div className="md:col-span-2">
+                <SeoSnippetPreview title={previewTitle} description={previewDescription} url={previewUrl} />
+              </div>
+              <div className="md:col-span-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSeoTitle((prev) => prev.trim() || title.trim().slice(0, CMS_LIMITS.seoTitle));
+                    setIsDirty(true);
+                  }}
+                  className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Use Page Title
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSeoDescription((prev) => prev.trim() || excerpt.trim().slice(0, CMS_LIMITS.seoDescription));
+                    setIsDirty(true);
+                  }}
+                  className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Use Summary
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTwitterImageUrl((prev) => prev.trim() || ogImageUrl.trim());
+                    setIsDirty(true);
+                  }}
+                  className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Copy Social Image to Twitter
+                </button>
+              </div>
+              {seoAudit.topFixes.length ? (
+                <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                  <p className="font-semibold">Top fixes to improve SEO:</p>
+                  <ul className="mt-1 list-disc pl-5">
+                    {seoAudit.topFixes.map((fix) => <li key={fix}>{fix}</li>)}
+                  </ul>
+                </div>
+              ) : null}
           {CMS_FEATURE_FLAGS.simplifiedEditorMode ? (
             <div className="md:col-span-2">
               <button
@@ -617,15 +723,18 @@ export default function CmsPageEditorPage() {
           ) : null}
           {(!CMS_FEATURE_FLAGS.simplifiedEditorMode || showAdvancedSeo) ? (
             <>
-              <input value={seoCanonicalUrl} onChange={(event) => { setSeoCanonicalUrl(event.target.value); setIsDirty(true); }} placeholder="Preferred URL (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2" />
+              <input value={seoCanonicalUrl} onChange={(event) => { setSeoCanonicalUrl(event.target.value); setIsDirty(true); }} placeholder="Canonical URL (optional, full URL)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2" />
               <input value={ogTitle} onChange={(event) => { setOgTitle(event.target.value); setIsDirty(true); }} placeholder="Social title (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
               <input value={ogDescription} onChange={(event) => { setOgDescription(event.target.value); setIsDirty(true); }} placeholder="Social description (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-              <input value={ogImageUrl} onChange={(event) => { setOgImageUrl(event.target.value); setIsDirty(true); }} placeholder="Social image URL (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+              <input value={ogImageUrl} onChange={(event) => { setOgImageUrl(event.target.value); setIsDirty(true); }} placeholder="Social preview image URL (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
               <input value={twitterImageUrl} onChange={(event) => { setTwitterImageUrl(event.target.value); setIsDirty(true); }} placeholder="Twitter image URL (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
               <div className="flex items-center gap-4 rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2">
                 <label className="inline-flex items-center gap-2"><input type="checkbox" checked={seoNoIndex} onChange={(event) => { setSeoNoIndex(event.target.checked); setIsDirty(true); }} />Disable indexing</label>
                 <label className="inline-flex items-center gap-2"><input type="checkbox" checked={seoNoFollow} onChange={(event) => { setSeoNoFollow(event.target.checked); setIsDirty(true); }} />Disable link following</label>
               </div>
+              {status !== CMS_STATUS.published ? (
+                <p className="text-xs text-amber-700 md:col-span-2">Draft and scheduled content is automatically kept noindex/nofollow for safety.</p>
+              ) : null}
             </>
           ) : null}
 

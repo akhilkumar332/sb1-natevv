@@ -34,6 +34,15 @@ export default function CmsOverviewPage() {
   const posts = postsQuery.data || [];
   const categories = categoriesQuery.data || [];
   const media = mediaQuery.data || [];
+  const publishedPages = pages.filter((entry) => entry.status === 'published');
+  const publishedPosts = posts.filter((entry) => entry.status === 'published');
+  const pagesMissingSearchTitle = publishedPages.filter((entry) => !(entry.seoTitle || entry.title || '').trim()).length;
+  const pagesMissingSearchDescription = publishedPages.filter((entry) => !(entry.seoDescription || entry.excerpt || '').trim()).length;
+  const postsMissingSearchTitle = publishedPosts.filter((entry) => !(entry.seoTitle || entry.title || '').trim()).length;
+  const postsMissingSearchDescription = publishedPosts.filter((entry) => !(entry.seoDescription || entry.excerpt || '').trim()).length;
+  const postsMissingSocialImage = publishedPosts.filter((entry) => !(entry.ogImageUrl || entry.coverImageUrl || '').trim()).length;
+  const noindexPublishedPages = publishedPages.filter((entry) => entry.seoNoIndex === true).length;
+  const noindexPublishedPosts = publishedPosts.filter((entry) => entry.seoNoIndex === true).length;
 
   return (
     <div className="space-y-4">
@@ -76,8 +85,39 @@ export default function CmsOverviewPage() {
       </div>
 
       <div className="rounded-2xl border border-red-100 bg-white p-4 text-sm text-gray-600 shadow-sm">
-        <p>Published pages: <span className="font-semibold text-gray-900">{pages.filter((entry) => entry.status === 'published').length}</span></p>
-        <p>Published posts: <span className="font-semibold text-gray-900">{posts.filter((entry) => entry.status === 'published').length}</span></p>
+        <p>Published pages: <span className="font-semibold text-gray-900">{publishedPages.length}</span></p>
+        <p>Published posts: <span className="font-semibold text-gray-900">{publishedPosts.length}</span></p>
+      </div>
+
+      <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm">
+        <div className="mb-2">
+          <h3 className="text-base font-bold text-blue-900">SEO Health Snapshot</h3>
+          <p className="text-xs text-blue-800">Human-friendly summary of what to fix first.</p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
+            Pages missing search title: <span className="font-semibold text-gray-900">{pagesMissingSearchTitle}</span>
+          </div>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
+            Pages missing search description: <span className="font-semibold text-gray-900">{pagesMissingSearchDescription}</span>
+          </div>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
+            Posts missing search title: <span className="font-semibold text-gray-900">{postsMissingSearchTitle}</span>
+          </div>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
+            Posts missing search description: <span className="font-semibold text-gray-900">{postsMissingSearchDescription}</span>
+          </div>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
+            Posts missing social image: <span className="font-semibold text-gray-900">{postsMissingSocialImage}</span>
+          </div>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
+            Published pages/posts with noindex: <span className="font-semibold text-gray-900">{noindexPublishedPages + noindexPublishedPosts}</span>
+          </div>
+        </div>
+        <div className="mt-3 rounded-lg border border-blue-200 bg-white p-3 text-xs text-gray-700">
+          <p className="font-semibold text-blue-900">Fix priority</p>
+          <p>1) Fill missing search descriptions, 2) add social images for published posts, 3) confirm noindex usage on published content.</p>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">

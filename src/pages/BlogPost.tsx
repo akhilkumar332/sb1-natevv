@@ -1,10 +1,11 @@
 import { Link, useParams } from 'react-router-dom';
 import { CalendarDays, Tag } from 'lucide-react';
 import { ROUTES } from '../constants/routes';
-import { CMS_DEFAULTS } from '../constants/cms';
+import { CMS_DEFAULTS, CMS_SEO_DEFAULTS } from '../constants/cms';
 import { usePublishedBlogPostBySlug, usePublicCmsSettings } from '../hooks/useCmsContent';
 import { toDateValue } from '../utils/dateValue';
 import SeoHead from '../components/SeoHead';
+import { buildArticleSchema, buildBreadcrumbSchema } from '../utils/seoStructuredData';
 
 const renderContent = (contentJson?: string | null) => {
   if (!contentJson) return ['Content coming soon.'];
@@ -87,32 +88,47 @@ export default function BlogPostPage() {
   const postRobots = post.seoNoIndex || post.seoNoFollow
     ? 'noindex,nofollow'
     : robotsPolicy;
-  const structuredData = {
-    '@context': 'https://schema.org',
-    '@type': 'Article',
+  const modifiedAtIso = toDateValue(post.updatedAt)?.toISOString();
+  const publishedAtIso = publishedAt ? publishedAt.toISOString() : undefined;
+  const breadcrumbSchema = buildBreadcrumbSchema({
+    baseUrl: canonicalBaseUrl,
+    items: [
+      { name: 'Home', path: ROUTES.home },
+      { name: 'Blog', path: ROUTES.blog },
+      { name: post.title, path: canonicalPath },
+    ],
+  });
+  const articleSchema = buildArticleSchema({
+    baseUrl: canonicalBaseUrl,
+    path: canonicalPath,
     headline: post.title,
     description: resolvedDescription,
-    datePublished: publishedAt ? publishedAt.toISOString() : undefined,
-    dateModified: toDateValue(post.updatedAt)?.toISOString(),
-    image: ogImageUrl ? [ogImageUrl] : undefined,
-    author: {
-      '@type': 'Person',
-      name: post.authorName || 'BloodHub Editorial Team',
-    },
-  };
+    imageUrl: ogImageUrl,
+    datePublished: publishedAtIso,
+    dateModified: modifiedAtIso,
+    authorName: post.authorName || undefined,
+    publisherName: siteTitle,
+  });
 
   return (
     <article className="pb-10">
       <SeoHead
         title={`${resolvedTitle} | ${siteTitle}`}
         description={resolvedDescription}
+        type="article"
+        siteName={siteTitle}
+        locale={CMS_SEO_DEFAULTS.locale}
         canonicalPath={canonicalPath}
         canonicalBaseUrl={canonicalBaseUrl}
         canonicalUrl={canonicalUrl}
         ogImageUrl={ogImageUrl}
         twitterImageUrl={twitterImageUrl}
+        twitterHandle={settingsQuery.data?.twitterHandle || undefined}
+        publishedTime={publishedAtIso}
+        modifiedTime={modifiedAtIso}
+        authorName={post.authorName || undefined}
         robots={postRobots}
-        structuredData={structuredData}
+        structuredData={[breadcrumbSchema, articleSchema]}
       />
       <div className="bg-gradient-to-br from-red-50 via-white to-pink-50 py-10">
         <div className="container mx-auto px-4">

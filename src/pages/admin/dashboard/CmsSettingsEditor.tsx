@@ -4,7 +4,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { COLLECTIONS } from '../../../constants/firestore';
-import { CMS_DEFAULTS, CMS_FEATURE_FLAGS, CMS_LIMITS, CMS_SETTINGS_DOC_ID } from '../../../constants/cms';
+import {
+  CMS_DEFAULTS,
+  CMS_FEATURE_FLAGS,
+  CMS_LIMITS,
+  CMS_SEO_GUIDELINES,
+  CMS_SETTINGS_DOC_ID,
+} from '../../../constants/cms';
 import { ROUTES } from '../../../constants/routes';
 import { useAdminCmsSettings } from '../../../hooks/admin/useAdminQueries';
 import { getServerTimestamp } from '../../../utils/firestore.utils';
@@ -12,6 +18,7 @@ import { notify } from '../../../services/notify.service';
 import { useAuth } from '../../../contexts/AuthContext';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { toDateValue } from '../../../utils/dateValue';
+import SeoSnippetPreview from '../../../components/cms/SeoSnippetPreview';
 
 type SocialLinksState = {
   facebook: string;
@@ -22,6 +29,12 @@ type SocialLinksState = {
 };
 
 const toSafeUrl = (value: string): string => value.trim();
+const isAbsoluteHttpUrl = (value: string): boolean => /^https?:\/\/\S+$/i.test(value.trim());
+const isMediaUrlOrPath = (value: string): boolean => {
+  const normalized = value.trim();
+  if (!normalized) return true;
+  return normalized.startsWith('/') || isAbsoluteHttpUrl(normalized);
+};
 
 const lengthClass = (length: number, max: number, warningAt: number) => {
   if (length > max) return 'text-red-700';
@@ -64,6 +77,7 @@ export default function CmsSettingsEditorPage() {
   const titleLen = siteTitle.trim().length;
   const seoTitleLen = defaultSeoTitle.trim().length;
   const seoDescLen = defaultSeoDescription.trim().length;
+  const previewUrl = `${canonicalBaseUrl.trim().replace(/\/+$/, '') || CMS_DEFAULTS.canonicalBaseUrl}/blog`;
 
   const cleanSocialLinks = useMemo(() => {
     const entries = Object.entries(socialLinks)
@@ -114,6 +128,14 @@ export default function CmsSettingsEditorPage() {
     });
     if (hasInvalidSocialInput) {
       notify.error('Social links must be valid URLs starting with http:// or https://');
+      return;
+    }
+    if (canonicalBaseUrl.trim() && !isAbsoluteHttpUrl(canonicalBaseUrl)) {
+      notify.error('Preferred domain must start with http:// or https://');
+      return;
+    }
+    if (!isMediaUrlOrPath(defaultOgImageUrl)) {
+      notify.error('Default social image must be an absolute URL or start with /.');
       return;
     }
 
@@ -190,13 +212,22 @@ export default function CmsSettingsEditorPage() {
             <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Search Result Title</span>
             <input value={defaultSeoTitle} onChange={(event) => { setDefaultSeoTitle(event.target.value); setIsDirty(true); }} placeholder="Shown in Google results" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
             <span className={`mt-1 block text-[11px] ${lengthClass(seoTitleLen, CMS_LIMITS.seoTitle, 55)}`}>{seoTitleLen}/{CMS_LIMITS.seoTitle}</span>
+            <span className="mt-1 block text-[11px] text-gray-500">Recommended {CMS_SEO_GUIDELINES.titleMin}-{CMS_SEO_GUIDELINES.titleMax} characters.</span>
           </label>
 
           <label className="block">
             <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Search Result Description</span>
             <input value={defaultSeoDescription} onChange={(event) => { setDefaultSeoDescription(event.target.value); setIsDirty(true); }} placeholder="Short summary shown in search" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
             <span className={`mt-1 block text-[11px] ${lengthClass(seoDescLen, CMS_LIMITS.seoDescription, 145)}`}>{seoDescLen}/{CMS_LIMITS.seoDescription}</span>
+            <span className="mt-1 block text-[11px] text-gray-500">Recommended {CMS_SEO_GUIDELINES.descriptionMin}-{CMS_SEO_GUIDELINES.descriptionMax} characters.</span>
           </label>
+          <div className="md:col-span-2">
+            <SeoSnippetPreview
+              title={defaultSeoTitle || siteTitle || CMS_DEFAULTS.defaultSeoTitle}
+              description={defaultSeoDescription || siteTagline || CMS_DEFAULTS.defaultSeoDescription}
+              url={previewUrl}
+            />
+          </div>
 
           <label className="block">
             <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Blog Posts Per Page</span>

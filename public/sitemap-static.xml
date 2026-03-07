@@ -2,38 +2,20 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://bloodhubindia.com/</loc>
-    <lastmod>2026-03-06T07:32:38.449Z</lastmod>
-    <changefreq>weekly</changefreq>
+    <lastmod>2026-03-07T09:05:24.187Z</lastmod>
+    <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://bloodhubindia.com/find-donors</loc>
-    <lastmod>2026-03-06T07:32:38.449Z</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://bloodhubindia.com/request-blood</loc>
-    <lastmod>2026-03-06T07:32:38.449Z</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://bloodhubindia.com/about</loc>
-    <lastmod>2026-03-06T07:32:38.449Z</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <lastmod>2026-03-07T09:05:24.187Z</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
   <url>
     <loc>https://bloodhubindia.com/contact</loc>
-    <lastmod>2026-03-06T07:32:38.449Z</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://bloodhubindia.com/blog</loc>
-    <lastmod>2026-03-06T07:32:38.449Z</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
+    <lastmod>2026-03-07T09:05:24.187Z</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
 </urlset>

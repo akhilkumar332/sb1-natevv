@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://bloodhubindia.com/sitemap-static.xml
+Sitemap: https://bloodhubindia.com/sitemap.xml

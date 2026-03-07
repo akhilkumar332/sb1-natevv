@@ -2,10 +2,11 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Tag } from 'lucide-react';
 import { ROUTES } from '../constants/routes';
-import { CMS_DEFAULTS, CMS_LIMITS, CMS_QUERY_LIMITS } from '../constants/cms';
+import { CMS_DEFAULTS, CMS_LIMITS, CMS_QUERY_LIMITS, CMS_SEO_DEFAULTS } from '../constants/cms';
 import { usePublishedBlogPosts, usePublicCmsSettings } from '../hooks/useCmsContent';
 import { toDateValue } from '../utils/dateValue';
 import SeoHead from '../components/SeoHead';
+import { buildBlogSchema, buildBreadcrumbSchema, buildOrganizationSchema, buildWebSiteSchema } from '../utils/seoStructuredData';
 
 export default function BlogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -17,6 +18,7 @@ export default function BlogPage() {
     Math.min(CMS_LIMITS.blogPostsPageSizeMax, Number(settingsQuery.data?.blogPostsPerPage || CMS_DEFAULTS.blogPostsPerPage))
   );
   const showFeaturedOnBlog = settingsQuery.data?.showFeaturedOnBlog ?? CMS_DEFAULTS.showFeaturedOnBlog;
+  const siteTitle = settingsQuery.data?.siteTitle || CMS_DEFAULTS.siteTitle;
   const seoTitle = settingsQuery.data?.defaultSeoTitle || CMS_DEFAULTS.defaultSeoTitle;
   const seoDescription = settingsQuery.data?.defaultSeoDescription || CMS_DEFAULTS.defaultSeoDescription;
   const canonicalBaseUrl = settingsQuery.data?.canonicalBaseUrl || CMS_DEFAULTS.canonicalBaseUrl;
@@ -115,18 +117,39 @@ export default function BlogPage() {
       <SeoHead
         title={`${seoTitle} | Blog`}
         description={seoDescription}
+        type="website"
+        siteName={siteTitle}
+        locale={CMS_SEO_DEFAULTS.locale}
         canonicalPath={ROUTES.blog}
         canonicalBaseUrl={canonicalBaseUrl}
         ogImageUrl={defaultOgImageUrl || undefined}
         twitterImageUrl={defaultOgImageUrl || undefined}
+        twitterHandle={settingsQuery.data?.twitterHandle || undefined}
         robots={robotsPolicy}
-        structuredData={{
-          '@context': 'https://schema.org',
-          '@type': 'Blog',
-          name: `${seoTitle} Blog`,
-          description: seoDescription,
-          url: `${canonicalBase || (typeof window !== 'undefined' ? window.location.origin : '')}${ROUTES.blog}`,
-        }}
+        structuredData={[
+          buildOrganizationSchema({
+            baseUrl: canonicalBase || (typeof window !== 'undefined' ? window.location.origin : ''),
+            siteName: siteTitle,
+          }),
+          buildWebSiteSchema({
+            baseUrl: canonicalBase || (typeof window !== 'undefined' ? window.location.origin : ''),
+            siteName: siteTitle,
+            description: seoDescription,
+          }),
+          buildBreadcrumbSchema({
+            baseUrl: canonicalBase || (typeof window !== 'undefined' ? window.location.origin : ''),
+            items: [
+              { name: 'Home', path: ROUTES.home },
+              { name: 'Blog', path: ROUTES.blog },
+            ],
+          }),
+          buildBlogSchema({
+            baseUrl: canonicalBase || (typeof window !== 'undefined' ? window.location.origin : ''),
+            siteName: siteTitle,
+            description: seoDescription,
+            path: ROUTES.blog,
+          }),
+        ]}
       />
       <section className="bg-gradient-to-br from-red-50 via-white to-pink-50 py-14">
         <div className="container mx-auto px-4">

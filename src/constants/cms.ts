@@ -42,6 +42,16 @@ export const CMS_LIMITS = {
   twitterHandle: 30,
 } as const;
 
+export const CMS_SEO_GUIDELINES = {
+  titleMin: 30,
+  titleMax: 70,
+  descriptionMin: 70,
+  descriptionMax: 180,
+  contentMinChars: 300,
+  snippetTitleSoftMax: 60,
+  snippetDescriptionSoftMax: 160,
+} as const;
+
 export const CMS_DEFAULTS = {
   siteTitle: 'BloodHub India',
   siteTagline: 'Donate blood, save lives.',
@@ -57,6 +67,11 @@ export const CMS_DEFAULTS = {
   supportEmail: 'contact@bloodhub.in',
   supportPhone: '+91 1800-123-456',
   officeCity: 'Mumbai, Maharashtra',
+} as const;
+
+export const CMS_SEO_DEFAULTS = {
+  locale: 'en_IN',
+  siteName: 'BloodHub India',
 } as const;
 
 export const CMS_FRONTEND_PAGE_PRESETS = [

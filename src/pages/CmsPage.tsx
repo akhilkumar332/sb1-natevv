@@ -1,8 +1,9 @@
 import { useParams } from 'react-router-dom';
-import { CMS_DEFAULTS } from '../constants/cms';
+import { CMS_DEFAULTS, CMS_SEO_DEFAULTS } from '../constants/cms';
 import { ROUTES } from '../constants/routes';
 import { usePublicCmsSettings, usePublishedCmsPageBySlug } from '../hooks/useCmsContent';
 import SeoHead from '../components/SeoHead';
+import { buildBreadcrumbSchema, buildWebPageSchema } from '../utils/seoStructuredData';
 
 const renderContent = (contentJson?: string | null) => {
   if (!contentJson) return ['No content available.'];
@@ -71,18 +72,36 @@ export default function CmsPageRenderer() {
 
   const page = pageQuery.data;
   const paragraphs = renderContent(page.contentJson);
+  const breadcrumbSchema = buildBreadcrumbSchema({
+    baseUrl: canonicalBaseUrl,
+    items: [
+      { name: 'Home', path: ROUTES.home },
+      { name: page.title, path: canonicalPath },
+    ],
+  });
+  const webPageSchema = buildWebPageSchema({
+    baseUrl: canonicalBaseUrl,
+    path: canonicalPath,
+    name: page.title,
+    description: resolvedDescription,
+  });
 
   return (
     <>
       <SeoHead
         title={`${resolvedTitle} | ${siteTitle}`}
         description={resolvedDescription}
+        type="website"
+        siteName={siteTitle}
+        locale={CMS_SEO_DEFAULTS.locale}
         canonicalPath={canonicalPath}
         canonicalBaseUrl={canonicalBaseUrl}
         canonicalUrl={page.seoCanonicalUrl || undefined}
         ogImageUrl={page.ogImageUrl || page.coverImageUrl || defaultOgImageUrl || undefined}
         twitterImageUrl={page.twitterImageUrl || page.ogImageUrl || page.coverImageUrl || defaultOgImageUrl || undefined}
+        twitterHandle={settingsQuery.data?.twitterHandle || undefined}
         robots={page.seoNoIndex || page.seoNoFollow ? 'noindex,nofollow' : robotsPolicy}
+        structuredData={[breadcrumbSchema, webPageSchema]}
       />
       <section className="py-8">
         <div className="container mx-auto px-4">
