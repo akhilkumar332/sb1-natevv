@@ -26,6 +26,7 @@
     "deploy:indexes": "firebase deploy --only firestore:indexes",
     "migrate:bloodbank": "node scripts/migrate-hospital-to-bloodbank.mjs",
     "seed:cms:blog": "node scripts/seed-cms-blog-posts.mjs",
+    "sync:cms:blog:summaries": "node scripts/sync-cms-blog-summaries.mjs",
     "migrate:fcm:remove-legacy": "node scripts/migrations/remove-legacy-fcm-keys.mjs",
     "firebase:emulators": "firebase emulators:start",
     "firebase:login": "firebase login",

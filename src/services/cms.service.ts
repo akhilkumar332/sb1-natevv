@@ -47,6 +47,10 @@ const mapCmsBlogPost = (id: string, data: Record<string, any>): CmsBlogPost => (
   contentJson: typeof data.contentJson === 'string' ? data.contentJson : null,
   categorySlug: typeof data.categorySlug === 'string' ? data.categorySlug : null,
   tags: Array.isArray(data.tags) ? data.tags.filter((item: unknown) => typeof item === 'string') : [],
+  slugAliases: Array.isArray(data.slugAliases) ? data.slugAliases.filter((item: unknown) => typeof item === 'string') : [],
+  seriesSlug: typeof data.seriesSlug === 'string' ? data.seriesSlug : null,
+  relatedPostSlugs: Array.isArray(data.relatedPostSlugs) ? data.relatedPostSlugs.filter((item: unknown) => typeof item === 'string') : [],
+  featuredUntil: (toDateValue(data.featuredUntil) as any) || null,
   coverImageUrl: typeof data.coverImageUrl === 'string' ? data.coverImageUrl : null,
   status: normalizeCmsStatus(data.status),
   featured: data.featured === true,
@@ -60,12 +64,32 @@ const mapCmsBlogPost = (id: string, data: Record<string, any>): CmsBlogPost => (
   ogImageUrl: typeof data.ogImageUrl === 'string' ? data.ogImageUrl : null,
   twitterImageUrl: typeof data.twitterImageUrl === 'string' ? data.twitterImageUrl : null,
   authorName: typeof data.authorName === 'string' ? data.authorName : null,
+  workflowAssignee: typeof data.workflowAssignee === 'string' ? data.workflowAssignee : null,
+  reviewStatus: data.reviewStatus === 'in_review'
+    || data.reviewStatus === 'approved'
+    || data.reviewStatus === 'changes_requested'
+    ? data.reviewStatus
+    : 'not_requested',
+  reviewNotes: typeof data.reviewNotes === 'string' ? data.reviewNotes : null,
+  scheduledPublishAt: (toDateValue(data.scheduledPublishAt) as any) || null,
+  scheduledUnpublishAt: (toDateValue(data.scheduledUnpublishAt) as any) || null,
+  version: Number.isFinite(data.version) ? Number(data.version) : 1,
   publishedAt: (toDateValue(data.publishedAt) as any) || null,
   createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
   updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
   createdAt: toDateValue(data.createdAt) as any,
   updatedAt: toDateValue(data.updatedAt) as any,
 });
+
+const toPublishedWindow = (entry: CmsBlogPost): boolean => {
+  const publishedAt = toDateValue(entry.publishedAt);
+  const unpublishAt = toDateValue(entry.scheduledUnpublishAt);
+  return Boolean(
+    publishedAt
+    && publishedAt.getTime() <= Date.now()
+    && (!unpublishAt || unpublishAt.getTime() > Date.now())
+  );
+};
 
 const mapCmsPage = (id: string, data: Record<string, any>): CmsPage => ({
   id,
@@ -85,6 +109,17 @@ const mapCmsPage = (id: string, data: Record<string, any>): CmsPage => ({
   ogImageUrl: typeof data.ogImageUrl === 'string' ? data.ogImageUrl : null,
   twitterImageUrl: typeof data.twitterImageUrl === 'string' ? data.twitterImageUrl : null,
   coverImageUrl: typeof data.coverImageUrl === 'string' ? data.coverImageUrl : null,
+  slugAliases: Array.isArray(data.slugAliases) ? data.slugAliases.filter((item: unknown) => typeof item === 'string') : [],
+  workflowAssignee: typeof data.workflowAssignee === 'string' ? data.workflowAssignee : null,
+  reviewStatus: data.reviewStatus === 'in_review'
+    || data.reviewStatus === 'approved'
+    || data.reviewStatus === 'changes_requested'
+    ? data.reviewStatus
+    : 'not_requested',
+  reviewNotes: typeof data.reviewNotes === 'string' ? data.reviewNotes : null,
+  scheduledPublishAt: (toDateValue(data.scheduledPublishAt) as any) || null,
+  scheduledUnpublishAt: (toDateValue(data.scheduledUnpublishAt) as any) || null,
+  version: Number.isFinite(data.version) ? Number(data.version) : 1,
   publishedAt: (toDateValue(data.publishedAt) as any) || null,
   createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
   updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
@@ -109,6 +144,7 @@ export const getPublicCmsSettings = async (): Promise<CmsSettings> => {
       blogPostsPerPage: CMS_DEFAULTS.blogPostsPerPage,
       showFeaturedOnBlog: CMS_DEFAULTS.showFeaturedOnBlog,
       showBlogInFooter: CMS_DEFAULTS.showBlogInFooter,
+      requireApprovalBeforePublish: CMS_DEFAULTS.requireApprovalBeforePublish,
       supportEmail: CMS_DEFAULTS.supportEmail,
       supportPhone: CMS_DEFAULTS.supportPhone,
       officeCity: CMS_DEFAULTS.officeCity,
@@ -134,6 +170,7 @@ export const getPublicCmsSettings = async (): Promise<CmsSettings> => {
       : CMS_DEFAULTS.blogPostsPerPage,
     showFeaturedOnBlog: data.showFeaturedOnBlog !== false,
     showBlogInFooter: data.showBlogInFooter !== false,
+    requireApprovalBeforePublish: data.requireApprovalBeforePublish === true,
     supportEmail: typeof data.supportEmail === 'string' ? data.supportEmail : CMS_DEFAULTS.supportEmail,
     supportPhone: typeof data.supportPhone === 'string' ? data.supportPhone : CMS_DEFAULTS.supportPhone,
     officeCity: typeof data.officeCity === 'string' ? data.officeCity : CMS_DEFAULTS.officeCity,
@@ -146,7 +183,7 @@ export const getPublicCmsSettings = async (): Promise<CmsSettings> => {
 
 export const getPublishedBlogPosts = async (limitCount: number = CMS_QUERY_LIMITS.publicBlogList): Promise<CmsBlogPost[]> => {
   const now = Timestamp.now();
-  try {
+  const readFromPrimaryPosts = async (): Promise<CmsBlogPost[]> => {
     const snapshot = await withTimeout(getDocs(query(
       collection(db, COLLECTIONS.CMS_BLOG_POSTS),
       where('status', '==', 'published'),
@@ -154,13 +191,15 @@ export const getPublishedBlogPosts = async (limitCount: number = CMS_QUERY_LIMIT
       orderBy('publishedAt', 'desc'),
       limit(limitCount)
     )));
-    return snapshot.docs.map((docSnap) => mapCmsBlogPost(docSnap.id, docSnap.data() as Record<string, any>));
-  } catch (error) {
-    const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code || '') : '';
-    const canFallback = code.includes('failed-precondition') || code.includes('invalid-argument') || code.includes('deadline-exceeded');
-    if (!canFallback) throw error;
+    return snapshot.docs
+      .map((docSnap) => mapCmsBlogPost(docSnap.id, docSnap.data() as Record<string, any>))
+      .filter((entry) => {
+        const unpublishAt = toDateValue(entry.scheduledUnpublishAt);
+        return !unpublishAt || unpublishAt.getTime() > Date.now();
+      });
+  };
 
-    // Runtime-safe fallback for environments missing composite index.
+  const readPrimaryFallback = async (): Promise<CmsBlogPost[]> => {
     const fallbackSnapshot = await withTimeout(getDocs(query(
       collection(db, COLLECTIONS.CMS_BLOG_POSTS),
       where('status', '==', 'published'),
@@ -169,16 +208,59 @@ export const getPublishedBlogPosts = async (limitCount: number = CMS_QUERY_LIMIT
 
     return fallbackSnapshot.docs
       .map((docSnap) => mapCmsBlogPost(docSnap.id, docSnap.data() as Record<string, any>))
-      .filter((entry) => {
-        const publishedAt = toDateValue(entry.publishedAt);
-        return Boolean(publishedAt && publishedAt.getTime() <= Date.now());
-      })
+      .filter(toPublishedWindow)
       .sort((a, b) => {
         const aTs = toDateValue(a.publishedAt)?.getTime() ?? 0;
         const bTs = toDateValue(b.publishedAt)?.getTime() ?? 0;
         return bTs - aTs;
       })
       .slice(0, limitCount);
+  };
+
+  try {
+    const summarySnapshot = await withTimeout(getDocs(query(
+      collection(db, COLLECTIONS.CMS_BLOG_POST_SUMMARIES),
+      where('status', '==', 'published'),
+      where('publishedAt', '<=', now),
+      orderBy('publishedAt', 'desc'),
+      limit(limitCount)
+    )));
+    const summaryRows = summarySnapshot.docs
+      .map((docSnap) => mapCmsBlogPost(docSnap.id, docSnap.data() as Record<string, any>))
+      .filter((entry) => {
+        const unpublishAt = toDateValue(entry.scheduledUnpublishAt);
+        return !unpublishAt || unpublishAt.getTime() > Date.now();
+      });
+    if (summaryRows.length === 0) return await readFromPrimaryPosts();
+    if (summaryRows.length >= limitCount) return summaryRows;
+
+    // Top up from primary posts when summaries are partially synced.
+    const primaryRows = await readFromPrimaryPosts();
+    const byId = new Map<string, CmsBlogPost>();
+    summaryRows.forEach((row) => {
+      if (row.id) byId.set(row.id, row);
+    });
+    primaryRows.forEach((row) => {
+      if (row.id && !byId.has(row.id)) byId.set(row.id, row);
+    });
+    return Array.from(byId.values())
+      .sort((a, b) => {
+        const aTs = toDateValue(a.publishedAt)?.getTime() ?? 0;
+        const bTs = toDateValue(b.publishedAt)?.getTime() ?? 0;
+        return bTs - aTs;
+      })
+      .slice(0, limitCount);
+  } catch (error) {
+    const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code || '') : '';
+    const canFallback = code.includes('failed-precondition') || code.includes('invalid-argument') || code.includes('deadline-exceeded');
+    if (!canFallback) {
+      try {
+        return await readFromPrimaryPosts();
+      } catch {
+        throw error;
+      }
+    }
+    return await readPrimaryFallback();
   }
 };
 
@@ -194,8 +276,24 @@ export const getPublishedBlogPostBySlug = async (slug: string): Promise<CmsBlogP
     )));
 
     const first = snapshot.docs[0];
-    if (!first) return null;
-    return mapCmsBlogPost(first.id, first.data() as Record<string, any>);
+    if (first) {
+      const mapped = mapCmsBlogPost(first.id, first.data() as Record<string, any>);
+      const unpublishAt = toDateValue(mapped.scheduledUnpublishAt);
+      if (!unpublishAt || unpublishAt.getTime() > Date.now()) return mapped;
+    }
+    const aliasSnapshot = await withTimeout(getDocs(query(
+      collection(db, COLLECTIONS.CMS_BLOG_POSTS),
+      where('slugAliases', 'array-contains', slug),
+      where('status', '==', 'published'),
+      where('publishedAt', '<=', now),
+      limit(1)
+    )));
+    const aliasFirst = aliasSnapshot.docs[0];
+    if (!aliasFirst) return null;
+    const aliasMapped = mapCmsBlogPost(aliasFirst.id, aliasFirst.data() as Record<string, any>);
+    const aliasUnpublishAt = toDateValue(aliasMapped.scheduledUnpublishAt);
+    if (aliasUnpublishAt && aliasUnpublishAt.getTime() <= Date.now()) return null;
+    return aliasMapped;
   } catch (error) {
     const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code || '') : '';
     const canFallback = code.includes('failed-precondition') || code.includes('invalid-argument') || code.includes('deadline-exceeded');
@@ -208,11 +306,46 @@ export const getPublishedBlogPostBySlug = async (slug: string): Promise<CmsBlogP
       limit(1)
     )));
     const first = fallbackSnapshot.docs[0];
-    if (!first) return null;
-    const mapped = mapCmsBlogPost(first.id, first.data() as Record<string, any>);
-    const publishedAt = toDateValue(mapped.publishedAt);
-    if (!publishedAt || publishedAt.getTime() > Date.now()) return null;
-    return mapped;
+    if (first) {
+      const mapped = mapCmsBlogPost(first.id, first.data() as Record<string, any>);
+      const publishedAt = toDateValue(mapped.publishedAt);
+      const unpublishAt = toDateValue(mapped.scheduledUnpublishAt);
+      if (publishedAt && publishedAt.getTime() <= Date.now() && (!unpublishAt || unpublishAt.getTime() > Date.now())) return mapped;
+    }
+
+    try {
+      const aliasFallbackSnapshot = await withTimeout(getDocs(query(
+        collection(db, COLLECTIONS.CMS_BLOG_POSTS),
+        where('slugAliases', 'array-contains', slug),
+        where('status', '==', 'published'),
+        limit(1)
+      )));
+      const aliasFirst = aliasFallbackSnapshot.docs[0];
+      if (!aliasFirst) return null;
+      const aliasMapped = mapCmsBlogPost(aliasFirst.id, aliasFirst.data() as Record<string, any>);
+      const aliasPublishedAt = toDateValue(aliasMapped.publishedAt);
+      const aliasUnpublishAt = toDateValue(aliasMapped.scheduledUnpublishAt);
+      if (!aliasPublishedAt || aliasPublishedAt.getTime() > Date.now()) return null;
+      if (aliasUnpublishAt && aliasUnpublishAt.getTime() <= Date.now()) return null;
+      return aliasMapped;
+    } catch {
+      // Runtime-safe alias fallback for missing composite indexes.
+      const aliasFallbackSnapshot = await withTimeout(getDocs(query(
+        collection(db, COLLECTIONS.CMS_BLOG_POSTS),
+        where('slugAliases', 'array-contains', slug),
+        limit(3)
+      )));
+      const candidate = aliasFallbackSnapshot.docs
+        .map((docSnap) => mapCmsBlogPost(docSnap.id, docSnap.data() as Record<string, any>))
+        .find((entry) => {
+          const publishedAt = toDateValue(entry.publishedAt);
+          const unpublishAt = toDateValue(entry.scheduledUnpublishAt);
+          return entry.status === CMS_STATUS.published
+            && Boolean(publishedAt && publishedAt.getTime() <= Date.now())
+            && (!unpublishAt || unpublishAt.getTime() > Date.now());
+        });
+      return candidate || null;
+    }
   }
 };
 
@@ -228,8 +361,25 @@ export const getPublishedCmsPageBySlug = async (slug: string): Promise<CmsPage |
     )));
 
     const first = snapshot.docs[0];
-    if (!first) return null;
-    return mapCmsPage(first.id, first.data() as Record<string, any>);
+    if (first) {
+      const mapped = mapCmsPage(first.id, first.data() as Record<string, any>);
+      const unpublishAt = toDateValue(mapped.scheduledUnpublishAt);
+      if (!unpublishAt || unpublishAt.getTime() > Date.now()) return mapped;
+    }
+
+    const aliasSnapshot = await withTimeout(getDocs(query(
+      collection(db, COLLECTIONS.CMS_PAGES),
+      where('slugAliases', 'array-contains', slug),
+      where('status', '==', 'published'),
+      where('publishedAt', '<=', now),
+      limit(1)
+    )));
+    const aliasFirst = aliasSnapshot.docs[0];
+    if (!aliasFirst) return null;
+    const aliasMapped = mapCmsPage(aliasFirst.id, aliasFirst.data() as Record<string, any>);
+    const aliasUnpublishAt = toDateValue(aliasMapped.scheduledUnpublishAt);
+    if (aliasUnpublishAt && aliasUnpublishAt.getTime() <= Date.now()) return null;
+    return aliasMapped;
   } catch (error) {
     const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code || '') : '';
     const canFallback = code.includes('failed-precondition') || code.includes('invalid-argument') || code.includes('deadline-exceeded');
@@ -242,11 +392,46 @@ export const getPublishedCmsPageBySlug = async (slug: string): Promise<CmsPage |
       limit(1)
     )));
     const first = fallbackSnapshot.docs[0];
-    if (!first) return null;
-    const mapped = mapCmsPage(first.id, first.data() as Record<string, any>);
-    const publishedAt = toDateValue(mapped.publishedAt);
-    if (!publishedAt || publishedAt.getTime() > Date.now()) return null;
-    return mapped;
+    if (first) {
+      const mapped = mapCmsPage(first.id, first.data() as Record<string, any>);
+      const publishedAt = toDateValue(mapped.publishedAt);
+      const unpublishAt = toDateValue(mapped.scheduledUnpublishAt);
+      if (publishedAt && publishedAt.getTime() <= Date.now() && (!unpublishAt || unpublishAt.getTime() > Date.now())) return mapped;
+    }
+
+    try {
+      const aliasFallbackSnapshot = await withTimeout(getDocs(query(
+        collection(db, COLLECTIONS.CMS_PAGES),
+        where('slugAliases', 'array-contains', slug),
+        where('status', '==', 'published'),
+        limit(1)
+      )));
+      const aliasFirst = aliasFallbackSnapshot.docs[0];
+      if (!aliasFirst) return null;
+      const aliasMapped = mapCmsPage(aliasFirst.id, aliasFirst.data() as Record<string, any>);
+      const aliasPublishedAt = toDateValue(aliasMapped.publishedAt);
+      const aliasUnpublishAt = toDateValue(aliasMapped.scheduledUnpublishAt);
+      if (!aliasPublishedAt || aliasPublishedAt.getTime() > Date.now()) return null;
+      if (aliasUnpublishAt && aliasUnpublishAt.getTime() <= Date.now()) return null;
+      return aliasMapped;
+    } catch {
+      // Runtime-safe alias fallback for missing composite indexes.
+      const aliasFallbackSnapshot = await withTimeout(getDocs(query(
+        collection(db, COLLECTIONS.CMS_PAGES),
+        where('slugAliases', 'array-contains', slug),
+        limit(3)
+      )));
+      const candidate = aliasFallbackSnapshot.docs
+        .map((docSnap) => mapCmsPage(docSnap.id, docSnap.data() as Record<string, any>))
+        .find((entry) => {
+          const publishedAt = toDateValue(entry.publishedAt);
+          const unpublishAt = toDateValue(entry.scheduledUnpublishAt);
+          return entry.status === CMS_STATUS.published
+            && Boolean(publishedAt && publishedAt.getTime() <= Date.now())
+            && (!unpublishAt || unpublishAt.getTime() > Date.now());
+        });
+      return candidate || null;
+    }
   }
 };
 

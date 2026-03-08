@@ -1,8 +1,8 @@
 import { Link, useParams } from 'react-router-dom';
 import { CalendarDays, Tag } from 'lucide-react';
 import { ROUTES } from '../constants/routes';
-import { CMS_DEFAULTS, CMS_SEO_DEFAULTS } from '../constants/cms';
-import { usePublishedBlogPostBySlug, usePublicCmsSettings } from '../hooks/useCmsContent';
+import { CMS_DEFAULTS, CMS_QUERY_LIMITS, CMS_SEO_DEFAULTS } from '../constants/cms';
+import { usePublishedBlogPostBySlug, usePublishedBlogPosts, usePublicCmsSettings } from '../hooks/useCmsContent';
 import { toDateValue } from '../utils/dateValue';
 import SeoHead from '../components/SeoHead';
 import { buildArticleSchema, buildBreadcrumbSchema } from '../utils/seoStructuredData';
@@ -23,6 +23,7 @@ const renderContent = (contentJson?: string | null) => {
 export default function BlogPostPage() {
   const { slug = '' } = useParams();
   const postQuery = usePublishedBlogPostBySlug(slug);
+  const allPostsQuery = usePublishedBlogPosts(CMS_QUERY_LIMITS.publicBlogList, true);
   const settingsQuery = usePublicCmsSettings();
   const siteTitle = settingsQuery.data?.siteTitle || CMS_DEFAULTS.siteTitle;
   const defaultSeoDescription = settingsQuery.data?.defaultSeoDescription || CMS_DEFAULTS.defaultSeoDescription;
@@ -81,6 +82,8 @@ export default function BlogPostPage() {
   }
 
   const paragraphs = renderContent(post.contentJson);
+  const wordCount = paragraphs.join(' ').split(/\s+/).filter(Boolean).length;
+  const readingMinutes = Math.max(1, Math.ceil(wordCount / 220));
   const publishedAt = toDateValue(post.publishedAt);
   const canonicalUrl = post.seoCanonicalUrl || undefined;
   const ogImageUrl = post.ogImageUrl || post.coverImageUrl || defaultOgImageUrl || undefined;
@@ -109,6 +112,16 @@ export default function BlogPostPage() {
     authorName: post.authorName || undefined,
     publisherName: siteTitle,
   });
+  const relatedPosts = (allPostsQuery.data || [])
+    .filter((entry) => entry.slug !== post.slug && (
+      (post.relatedPostSlugs || []).includes(entry.slug)
+      || (post.seriesSlug && entry.seriesSlug === post.seriesSlug)
+      || (post.categorySlug && entry.categorySlug === post.categorySlug)
+      || (entry.tags || []).some((tag) => (post.tags || []).includes(tag))
+    ))
+    .slice(0, 3);
+  const shareUrl = `${canonicalBaseUrl.replace(/\/+$/, '')}${canonicalPath}`;
+  const shareText = encodeURIComponent(post.title);
 
   return (
     <article className="pb-10">
@@ -137,6 +150,17 @@ export default function BlogPostPage() {
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-500">
             <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{publishedAt ? publishedAt.toLocaleString() : 'N/A'}</span>
             {post.categorySlug ? <span className="inline-flex items-center gap-1"><Tag className="h-3.5 w-3.5" />{post.categorySlug}</span> : null}
+            {post.seriesSlug ? (
+              <Link to={`${ROUTES.blog}?series=${encodeURIComponent(post.seriesSlug)}`} className="rounded-full border border-gray-300 px-2 py-0.5 font-semibold text-gray-700 hover:bg-gray-50">
+                Series: {post.seriesSlug}
+              </Link>
+            ) : null}
+            {post.authorName ? (
+              <Link to={`${ROUTES.blog}?author=${encodeURIComponent(post.authorName)}`} className="rounded-full border border-gray-300 px-2 py-0.5 font-semibold text-gray-700 hover:bg-gray-50">
+                By {post.authorName}
+              </Link>
+            ) : null}
+            <span>{readingMinutes} min read</span>
           </div>
         </div>
       </div>
@@ -149,6 +173,34 @@ export default function BlogPostPage() {
           <div className="space-y-4 text-base leading-7 text-gray-700">
             {paragraphs.map((line, index) => <p key={`line-${index}`}>{line}</p>)}
           </div>
+          <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
+            <span className="text-sm font-semibold text-gray-700">Share:</span>
+            <a href={`https://twitter.com/intent/tweet?text=${shareText}&url=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noreferrer" className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">X</a>
+            <a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noreferrer" className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">LinkedIn</a>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                  void navigator.clipboard.writeText(shareUrl);
+                }
+              }}
+              className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Copy Link
+            </button>
+          </div>
+          {relatedPosts.length ? (
+            <div className="mt-6 rounded-xl border border-red-100 bg-red-50/40 p-4">
+              <p className="text-sm font-semibold text-gray-900">Related Articles</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {relatedPosts.map((entry) => (
+                  <Link key={entry.id} to={ROUTES.blogPost.replace(':slug', entry.slug)} className="rounded-lg border border-red-100 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-red-50">
+                    {entry.title}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </article>

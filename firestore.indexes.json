@@ -811,6 +811,20 @@
       ]
     },
     {
+      "collectionGroup": "cmsBlogPostSummaries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "publishedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "cmsPages",
       "queryScope": "COLLECTION",
       "fields": [

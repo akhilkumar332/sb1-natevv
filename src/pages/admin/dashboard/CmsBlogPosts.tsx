@@ -14,6 +14,7 @@ import { refetchQuery } from '../../../utils/queryRefetch';
 import { getServerTimestamp } from '../../../utils/firestore.utils';
 import { useAuth } from '../../../contexts/AuthContext';
 import { toDateValue } from '../../../utils/dateValue';
+import { toCmsBlogSummaryPayload } from '../../../utils/cmsBlogSummary';
 
 const PAGE_SIZE = 12;
 
@@ -28,6 +29,8 @@ export default function CmsBlogPostsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | (typeof CMS_STATUS)[keyof typeof CMS_STATUS]>('all');
   const [categoryFilter, setCategoryFilter] = useState<'all' | string>('all');
+  const [tagFilter, setTagFilter] = useState<'all' | string>('all');
+  const [seriesFilter, setSeriesFilter] = useState<'all' | string>('all');
   const [page, setPage] = useState(1);
 
   const rows = useMemo(() => postsQuery.data || [], [postsQuery.data]);
@@ -36,6 +39,18 @@ export default function CmsBlogPostsPage() {
     const set = new Set<string>();
     rows.forEach((entry) => {
       if (entry.categorySlug) set.add(entry.categorySlug);
+    });
+    return Array.from(set).sort();
+  }, [rows]);
+  const tags = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach((entry) => (entry.tags || []).forEach((tag) => set.add(tag)));
+    return Array.from(set).sort();
+  }, [rows]);
+  const series = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach((entry) => {
+      if (entry.seriesSlug) set.add(entry.seriesSlug);
     });
     return Array.from(set).sort();
   }, [rows]);
@@ -49,9 +64,11 @@ export default function CmsBlogPostsPage() {
         || (entry.categorySlug || '').toLowerCase().includes(query);
       const matchesStatus = statusFilter === 'all' || entry.status === statusFilter;
       const matchesCategory = categoryFilter === 'all' || entry.categorySlug === categoryFilter;
-      return matchesQuery && matchesStatus && matchesCategory;
+      const matchesTag = tagFilter === 'all' || (entry.tags || []).includes(tagFilter);
+      const matchesSeries = seriesFilter === 'all' || entry.seriesSlug === seriesFilter;
+      return matchesQuery && matchesStatus && matchesCategory && matchesTag && matchesSeries;
     });
-  }, [rows, searchTerm, statusFilter, categoryFilter]);
+  }, [rows, searchTerm, statusFilter, categoryFilter, tagFilter, seriesFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -95,6 +112,7 @@ export default function CmsBlogPostsPage() {
     setDeletingId(id);
     try {
       await deleteDoc(doc(db, COLLECTIONS.CMS_BLOG_POSTS, id));
+      await deleteDoc(doc(db, COLLECTIONS.CMS_BLOG_POST_SUMMARIES, id));
       await invalidateAdminRecipe(queryClient, 'cmsUpdated');
       setSelectedIds((prev) => {
         const next = new Set(prev);
@@ -129,6 +147,15 @@ export default function CmsBlogPostsPage() {
           updatedBy: user?.uid || 'admin',
           updatedAt: now,
         }, { merge: true });
+        await setDoc(doc(db, COLLECTIONS.CMS_BLOG_POST_SUMMARIES, id), {
+          ...toCmsBlogSummaryPayload({
+            ...entry,
+            status: nextStatus,
+            publishedAt: nextStatus === CMS_STATUS.published ? (entry.publishedAt || now) : null,
+            updatedBy: user?.uid || 'admin',
+            updatedAt: now,
+          }),
+        }, { merge: true });
       }));
       await invalidateAdminRecipe(queryClient, 'cmsUpdated');
       setSelectedIds(new Set());
@@ -150,7 +177,10 @@ export default function CmsBlogPostsPage() {
 
     setBulkMutating(true);
     try {
-      await Promise.all(ids.map((id) => deleteDoc(doc(db, COLLECTIONS.CMS_BLOG_POSTS, id))));
+      await Promise.all(ids.map(async (id) => {
+        await deleteDoc(doc(db, COLLECTIONS.CMS_BLOG_POSTS, id));
+        await deleteDoc(doc(db, COLLECTIONS.CMS_BLOG_POST_SUMMARIES, id));
+      }));
       await invalidateAdminRecipe(queryClient, 'cmsUpdated');
       setSelectedIds(new Set());
       notify.success(`Deleted ${ids.length} posts.`);
@@ -182,7 +212,7 @@ export default function CmsBlogPostsPage() {
       </div>
 
       <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
-        <div className="grid gap-2 md:grid-cols-4">
+        <div className="grid gap-2 md:grid-cols-6">
           <input
             value={searchTerm}
             onChange={(event) => {
@@ -218,12 +248,40 @@ export default function CmsBlogPostsPage() {
               <option key={category} value={category}>{category}</option>
             ))}
           </select>
+          <select
+            value={tagFilter}
+            onChange={(event) => {
+              setTagFilter(event.target.value);
+              setPage(1);
+            }}
+            className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="all">All tags</option>
+            {tags.map((tag) => (
+              <option key={tag} value={tag}>{tag}</option>
+            ))}
+          </select>
+          <select
+            value={seriesFilter}
+            onChange={(event) => {
+              setSeriesFilter(event.target.value);
+              setPage(1);
+            }}
+            className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="all">All series</option>
+            {series.map((seriesSlug) => (
+              <option key={seriesSlug} value={seriesSlug}>{seriesSlug}</option>
+            ))}
+          </select>
           <button
             type="button"
             onClick={() => {
               setSearchTerm('');
               setStatusFilter('all');
               setCategoryFilter('all');
+              setTagFilter('all');
+              setSeriesFilter('all');
               setPage(1);
             }}
             className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"

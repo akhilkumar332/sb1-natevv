@@ -972,6 +972,15 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // COLLECTION: cmsBlogPostSummaries
+    // ========================================================================
+
+    match /cmsBlogPostSummaries/{summaryId} {
+      allow read: if isAdmin() || isPublishedCmsDoc();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ========================================================================
     // COLLECTION: cmsBlogCategories
     // ========================================================================
 

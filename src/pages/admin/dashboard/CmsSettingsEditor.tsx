@@ -59,6 +59,7 @@ export default function CmsSettingsEditorPage() {
   const [blogPostsPerPage, setBlogPostsPerPage] = useState<number>(CMS_DEFAULTS.blogPostsPerPage);
   const [showFeaturedOnBlog, setShowFeaturedOnBlog] = useState<boolean>(CMS_DEFAULTS.showFeaturedOnBlog);
   const [showBlogInFooter, setShowBlogInFooter] = useState<boolean>(CMS_DEFAULTS.showBlogInFooter);
+  const [requireApprovalBeforePublish, setRequireApprovalBeforePublish] = useState<boolean>(CMS_DEFAULTS.requireApprovalBeforePublish);
   const [supportEmail, setSupportEmail] = useState<string>(CMS_DEFAULTS.supportEmail);
   const [supportPhone, setSupportPhone] = useState<string>(CMS_DEFAULTS.supportPhone);
   const [officeCity, setOfficeCity] = useState<string>(CMS_DEFAULTS.officeCity);
@@ -105,6 +106,7 @@ export default function CmsSettingsEditorPage() {
     setBlogPostsPerPage(next.blogPostsPerPage || CMS_DEFAULTS.blogPostsPerPage);
     setShowFeaturedOnBlog(next.showFeaturedOnBlog);
     setShowBlogInFooter(next.showBlogInFooter);
+    setRequireApprovalBeforePublish(next.requireApprovalBeforePublish === true);
     setSupportEmail(next.supportEmail || CMS_DEFAULTS.supportEmail);
     setSupportPhone(next.supportPhone || CMS_DEFAULTS.supportPhone);
     setOfficeCity(next.officeCity || CMS_DEFAULTS.officeCity);
@@ -158,6 +160,7 @@ export default function CmsSettingsEditorPage() {
         blogPostsPerPage: Math.min(CMS_LIMITS.blogPostsPageSizeMax, Math.max(CMS_LIMITS.blogPostsPageSizeMin, blogPostsPerPage)),
         showFeaturedOnBlog,
         showBlogInFooter,
+        requireApprovalBeforePublish,
         supportEmail: supportEmail.trim() || null,
         supportPhone: supportPhone.trim() || null,
         officeCity: officeCity.trim() || null,
@@ -237,6 +240,7 @@ export default function CmsSettingsEditorPage() {
           <div className="flex items-center gap-4 rounded-xl border border-gray-300 px-3 py-2 text-sm">
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showFeaturedOnBlog} onChange={(event) => { setShowFeaturedOnBlog(event.target.checked); setIsDirty(true); }} />Show featured posts</label>
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showBlogInFooter} onChange={(event) => { setShowBlogInFooter(event.target.checked); setIsDirty(true); }} />Show blog in footer</label>
+            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={requireApprovalBeforePublish} onChange={(event) => { setRequireApprovalBeforePublish(event.target.checked); setIsDirty(true); }} />Require review approval before publish</label>
           </div>
 
           <label className="block">

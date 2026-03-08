@@ -19,6 +19,15 @@ export const CMS_PAGE_KIND = {
 
 export type CmsPageKind = (typeof CMS_PAGE_KIND)[keyof typeof CMS_PAGE_KIND];
 
+export const CMS_REVIEW_STATUS = {
+  notRequested: 'not_requested',
+  inReview: 'in_review',
+  approved: 'approved',
+  changesRequested: 'changes_requested',
+} as const;
+
+export type CmsReviewStatus = (typeof CMS_REVIEW_STATUS)[keyof typeof CMS_REVIEW_STATUS];
+
 export const CMS_MENU_LOCATION = {
   header: 'header',
   footerResources: 'footer_resources',
@@ -40,6 +49,8 @@ export const CMS_LIMITS = {
   blogPostsPageSizeMax: 24,
   canonicalUrl: 300,
   twitterHandle: 30,
+  relatedPostsPerEntry: 6,
+  slugAliasesPerEntry: 20,
 } as const;
 
 export const CMS_SEO_GUIDELINES = {
@@ -64,6 +75,7 @@ export const CMS_DEFAULTS = {
   blogPostsPerPage: 9,
   showFeaturedOnBlog: true,
   showBlogInFooter: true,
+  requireApprovalBeforePublish: false,
   supportEmail: 'contact@bloodhub.in',
   supportPhone: '+91 1800-123-456',
   officeCity: 'Mumbai, Maharashtra',
@@ -84,7 +96,8 @@ export const CMS_FRONTEND_PAGE_PRESETS = [
 
 export const CMS_QUERY_LIMITS = {
   adminList: 1000,
-  publicBlogList: 48,
+  publicBlogList: 36,
+  publicBlogSummaryList: 36,
   publicPages: 200,
 } as const;
 
@@ -94,8 +107,21 @@ export const CMS_CACHE = {
   ttl: FIFTEEN_MINUTES_MS,
 } as const;
 
+export const CMS_RUNTIME = {
+  backgroundQueueDelayMs: 0,
+  blogLoadingStallMs: 15000,
+  manualScheduleTransitionBatchSize: 50,
+  blogCacheBackgroundRefreshMs: 120000,
+} as const;
+
 export const CMS_FEATURE_FLAGS = {
   simplifiedEditorMode: true,
+} as const;
+
+export const CMS_EDITOR = {
+  autosaveDebounceMs: 900,
+  draftTtlMs: 7 * 24 * 60 * 60 * 1000,
+  maxDraftEntries: 1,
 } as const;
 
 export const isValidCmsSlug = (slug: string): boolean => (

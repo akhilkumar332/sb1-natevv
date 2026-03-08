@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CMS_CACHE, CMS_QUERY_LIMITS, toCmsSlug, type CmsMenuLocation } from '../constants/cms';
+import { CMS_CACHE, CMS_QUERY_LIMITS, CMS_RUNTIME, toCmsSlug, type CmsMenuLocation } from '../constants/cms';
 import type { CmsBlogPost, CmsNavMenu, CmsPage, CmsSettings } from '../types/database.types';
 import {
   getPublicCmsMenuByLocation,
@@ -19,14 +19,21 @@ const cmsPublicQueryKeys = {
 };
 
 const BLOG_CACHE_KEY = 'cms_public_blog_posts_v1';
+const BLOG_CACHE_SCHEMA_VERSION = 2;
+
+type BlogCacheEnvelope = {
+  schemaVersion: number;
+  savedAt: number;
+  data: CmsBlogPost[];
+};
 
 const readCachedBlogPosts = (): CmsBlogPost[] | undefined => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return undefined;
+  if (typeof window === 'undefined') return undefined;
   try {
-    const raw = window.sessionStorage.getItem(BLOG_CACHE_KEY);
+    const raw = window.localStorage?.getItem(BLOG_CACHE_KEY) || window.sessionStorage?.getItem(BLOG_CACHE_KEY);
     if (!raw) return undefined;
-    const parsed = JSON.parse(raw) as { savedAt?: number; data?: CmsBlogPost[] };
-    if (!parsed?.savedAt || !Array.isArray(parsed.data) || Date.now() - parsed.savedAt > CMS_CACHE.ttl) return undefined;
+    const parsed = JSON.parse(raw) as BlogCacheEnvelope;
+    if (parsed?.schemaVersion !== BLOG_CACHE_SCHEMA_VERSION || !parsed?.savedAt || !Array.isArray(parsed.data) || Date.now() - parsed.savedAt > CMS_CACHE.ttl) return undefined;
     return parsed.data.map((entry) => ({
       ...entry,
       publishedAt: entry.publishedAt ? new Date(entry.publishedAt as unknown as string) as any : null,
@@ -39,9 +46,16 @@ const readCachedBlogPosts = (): CmsBlogPost[] | undefined => {
 };
 
 const writeCachedBlogPosts = (posts: CmsBlogPost[]): void => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return;
+  if (typeof window === 'undefined') return;
   try {
-    window.sessionStorage.setItem(BLOG_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), data: posts }));
+    const payload: BlogCacheEnvelope = {
+      schemaVersion: BLOG_CACHE_SCHEMA_VERSION,
+      savedAt: Date.now(),
+      data: posts,
+    };
+    const serialized = JSON.stringify(payload);
+    window.sessionStorage?.setItem(BLOG_CACHE_KEY, serialized);
+    window.localStorage?.setItem(BLOG_CACHE_KEY, serialized);
   } catch {
     // Keep public blog rendering resilient if cache writes fail.
   }
@@ -62,10 +76,10 @@ export const usePublishedBlogPosts = (
     queryKey: cmsPublicQueryKeys.blogPosts(limitCount),
     queryFn: () => getPublishedBlogPosts(limitCount),
     initialData: () => readCachedBlogPosts(),
-    staleTime: 0,
+    staleTime: CMS_CACHE.staleTime,
     gcTime: CMS_CACHE.gcTime,
     enabled,
-    refetchOnMount: true,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
     retry: 1,
   });
@@ -74,6 +88,12 @@ export const usePublishedBlogPosts = (
     if (!query.data?.length) return;
     writeCachedBlogPosts(query.data);
   }, [query.data]);
+
+  useEffect(() => {
+    if (!enabled || !query.data?.length) return;
+    if (Date.now() - query.dataUpdatedAt < CMS_RUNTIME.blogCacheBackgroundRefreshMs) return;
+    void query.refetch();
+  }, [enabled, query.data, query.dataUpdatedAt, query.refetch]);
 
   return query;
 };

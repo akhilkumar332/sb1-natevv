@@ -274,6 +274,7 @@ const fetchCmsPages = async (limitCount: number): Promise<CmsPage[]> => {
       kind: typeof data.kind === 'string' ? data.kind : 'generic',
       status: typeof data.status === 'string' ? data.status : 'draft',
       contentJson: typeof data.contentJson === 'string' ? data.contentJson : null,
+      slugAliases: Array.isArray(data.slugAliases) ? data.slugAliases.filter((item: unknown) => typeof item === 'string') : [],
       excerpt: typeof data.excerpt === 'string' ? data.excerpt : null,
       seoTitle: typeof data.seoTitle === 'string' ? data.seoTitle : null,
       seoDescription: typeof data.seoDescription === 'string' ? data.seoDescription : null,
@@ -284,6 +285,16 @@ const fetchCmsPages = async (limitCount: number): Promise<CmsPage[]> => {
       ogDescription: typeof data.ogDescription === 'string' ? data.ogDescription : null,
       ogImageUrl: typeof data.ogImageUrl === 'string' ? data.ogImageUrl : null,
       twitterImageUrl: typeof data.twitterImageUrl === 'string' ? data.twitterImageUrl : null,
+      workflowAssignee: typeof data.workflowAssignee === 'string' ? data.workflowAssignee : null,
+      reviewStatus: data.reviewStatus === 'in_review'
+        || data.reviewStatus === 'approved'
+        || data.reviewStatus === 'changes_requested'
+        ? data.reviewStatus
+        : 'not_requested',
+      reviewNotes: typeof data.reviewNotes === 'string' ? data.reviewNotes : null,
+      scheduledPublishAt: (toDateValue(data.scheduledPublishAt) as any) || null,
+      scheduledUnpublishAt: (toDateValue(data.scheduledUnpublishAt) as any) || null,
+      version: Number.isFinite(data.version) ? Number(data.version) : 1,
       coverImageUrl: typeof data.coverImageUrl === 'string' ? data.coverImageUrl : null,
       publishedAt: (toDateValue(data.publishedAt) as any) || null,
       createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
@@ -310,6 +321,10 @@ const fetchCmsBlogPosts = async (limitCount: number): Promise<CmsBlogPost[]> => 
       contentJson: typeof data.contentJson === 'string' ? data.contentJson : null,
       categorySlug: typeof data.categorySlug === 'string' ? data.categorySlug : null,
       tags: Array.isArray(data.tags) ? data.tags.filter((tag: unknown) => typeof tag === 'string') : [],
+      slugAliases: Array.isArray(data.slugAliases) ? data.slugAliases.filter((item: unknown) => typeof item === 'string') : [],
+      seriesSlug: typeof data.seriesSlug === 'string' ? data.seriesSlug : null,
+      relatedPostSlugs: Array.isArray(data.relatedPostSlugs) ? data.relatedPostSlugs.filter((item: unknown) => typeof item === 'string') : [],
+      featuredUntil: (toDateValue(data.featuredUntil) as any) || null,
       coverImageUrl: typeof data.coverImageUrl === 'string' ? data.coverImageUrl : null,
       status: typeof data.status === 'string' ? data.status : 'draft',
       featured: data.featured === true,
@@ -323,6 +338,16 @@ const fetchCmsBlogPosts = async (limitCount: number): Promise<CmsBlogPost[]> => 
       ogImageUrl: typeof data.ogImageUrl === 'string' ? data.ogImageUrl : null,
       twitterImageUrl: typeof data.twitterImageUrl === 'string' ? data.twitterImageUrl : null,
       authorName: typeof data.authorName === 'string' ? data.authorName : null,
+      workflowAssignee: typeof data.workflowAssignee === 'string' ? data.workflowAssignee : null,
+      reviewStatus: data.reviewStatus === 'in_review'
+        || data.reviewStatus === 'approved'
+        || data.reviewStatus === 'changes_requested'
+        ? data.reviewStatus
+        : 'not_requested',
+      reviewNotes: typeof data.reviewNotes === 'string' ? data.reviewNotes : null,
+      scheduledPublishAt: (toDateValue(data.scheduledPublishAt) as any) || null,
+      scheduledUnpublishAt: (toDateValue(data.scheduledUnpublishAt) as any) || null,
+      version: Number.isFinite(data.version) ? Number(data.version) : 1,
       publishedAt: (toDateValue(data.publishedAt) as any) || null,
       createdBy: typeof data.createdBy === 'string' ? data.createdBy : '',
       updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
@@ -419,6 +444,7 @@ const fetchCmsSettings = async (): Promise<CmsSettings | null> => {
       : CMS_DEFAULTS.blogPostsPerPage,
     showFeaturedOnBlog: data.showFeaturedOnBlog !== false,
     showBlogInFooter: data.showBlogInFooter !== false,
+    requireApprovalBeforePublish: data.requireApprovalBeforePublish === true,
     supportEmail: typeof data.supportEmail === 'string' ? data.supportEmail : null,
     supportPhone: typeof data.supportPhone === 'string' ? data.supportPhone : null,
     officeCity: typeof data.officeCity === 'string' ? data.officeCity : null,

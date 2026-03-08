@@ -2,7 +2,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Tag } from 'lucide-react';
 import { ROUTES } from '../constants/routes';
-import { CMS_DEFAULTS, CMS_LIMITS, CMS_QUERY_LIMITS, CMS_SEO_DEFAULTS } from '../constants/cms';
+import { CMS_DEFAULTS, CMS_LIMITS, CMS_QUERY_LIMITS, CMS_RUNTIME, CMS_SEO_DEFAULTS } from '../constants/cms';
 import { usePublishedBlogPosts, usePublicCmsSettings } from '../hooks/useCmsContent';
 import { toDateValue } from '../utils/dateValue';
 import SeoHead from '../components/SeoHead';
@@ -25,14 +25,14 @@ export default function BlogPage() {
   const canonicalBase = canonicalBaseUrl.replace(/\/+$/, '');
   const defaultOgImageUrl = settingsQuery.data?.defaultOgImageUrl || '';
   const robotsPolicy = settingsQuery.data?.robotsPolicy === 'noindex_nofollow' ? 'noindex,nofollow' : 'index,follow';
-  const postsQuery = usePublishedBlogPosts(CMS_QUERY_LIMITS.publicBlogList, queueReady);
+  const postsQuery = usePublishedBlogPosts(CMS_QUERY_LIMITS.publicBlogSummaryList, queueReady);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
       setQueueReady(true);
       return;
     }
-    const ticket = window.setTimeout(() => setQueueReady(true), 0);
+    const ticket = window.setTimeout(() => setQueueReady(true), CMS_RUNTIME.backgroundQueueDelayMs);
     return () => window.clearTimeout(ticket);
   }, []);
 
@@ -52,6 +52,10 @@ export default function BlogPage() {
   };
 
   const selectedCategory = searchParams.get('category') || 'all';
+  const selectedSeries = searchParams.get('series') || 'all';
+  const selectedAuthor = searchParams.get('author') || 'all';
+  const selectedSort = searchParams.get('sort') === 'oldest' ? 'oldest' : 'newest';
+  const selectedQuery = (searchParams.get('q') || '').trim().toLowerCase();
   const rawPage = Number(searchParams.get('page') || '1');
   const activePage = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
 
@@ -62,7 +66,7 @@ export default function BlogPage() {
       setLoadingStalled(false);
       return;
     }
-    const timer = window.setTimeout(() => setLoadingStalled(true), 15000);
+    const timer = window.setTimeout(() => setLoadingStalled(true), CMS_RUNTIME.blogLoadingStallMs);
     return () => window.clearTimeout(timer);
   }, [queueReady, posts.length, postsQuery.isLoading]);
 
@@ -73,32 +77,76 @@ export default function BlogPage() {
     });
     return Array.from(set).sort();
   }, [posts]);
+  const series = useMemo(() => {
+    const set = new Set<string>();
+    posts.forEach((post) => {
+      if (post.seriesSlug) set.add(post.seriesSlug);
+    });
+    return Array.from(set).sort();
+  }, [posts]);
+  const authors = useMemo(() => {
+    const set = new Set<string>();
+    posts.forEach((post) => {
+      if (post.authorName) set.add(post.authorName);
+    });
+    return Array.from(set).sort();
+  }, [posts]);
 
   const effectiveCategory = (
     selectedCategory === 'all' || categories.includes(selectedCategory)
       ? selectedCategory
       : 'all'
   );
+  const effectiveSeries = (
+    selectedSeries === 'all' || series.includes(selectedSeries)
+      ? selectedSeries
+      : 'all'
+  );
+  const effectiveAuthor = (
+    selectedAuthor === 'all' || authors.includes(selectedAuthor)
+      ? selectedAuthor
+      : 'all'
+  );
 
   const filteredPosts = useMemo(() => (
-    effectiveCategory === 'all'
-      ? posts
-      : posts.filter((post) => post.categorySlug === effectiveCategory)
-  ), [posts, effectiveCategory]);
+    posts.filter((post) => {
+      const categoryMatch = effectiveCategory === 'all' || post.categorySlug === effectiveCategory;
+      const seriesMatch = effectiveSeries === 'all' || post.seriesSlug === effectiveSeries;
+      const authorMatch = effectiveAuthor === 'all' || post.authorName === effectiveAuthor;
+      const searchMatch = !selectedQuery
+        || post.title.toLowerCase().includes(selectedQuery)
+        || (post.excerpt || '').toLowerCase().includes(selectedQuery)
+        || (post.tags || []).some((tag) => tag.toLowerCase().includes(selectedQuery));
+      return categoryMatch && seriesMatch && authorMatch && searchMatch;
+    })
+  ), [posts, effectiveCategory, effectiveSeries, effectiveAuthor, selectedQuery]);
+  const sortedPosts = useMemo(() => {
+    const next = [...filteredPosts];
+    next.sort((a, b) => {
+      const aTs = toDateValue(a.publishedAt)?.getTime() || 0;
+      const bTs = toDateValue(b.publishedAt)?.getTime() || 0;
+      return selectedSort === 'oldest' ? aTs - bTs : bTs - aTs;
+    });
+    return next;
+  }, [filteredPosts, selectedSort]);
 
   const featuredPosts = useMemo(
-    () => posts.filter((post) => post.featured).slice(0, 3),
+    () => posts.filter((post) => {
+      if (!post.featured) return false;
+      const expiry = toDateValue(post.featuredUntil);
+      return !expiry || expiry.getTime() > Date.now();
+    }).slice(0, 3),
     [posts]
   );
 
-  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / postsPerPage));
+  const totalPages = Math.max(1, Math.ceil(sortedPosts.length / postsPerPage));
   const currentPage = Math.min(activePage, totalPages);
   const pagedPosts = useMemo(() => {
     const start = (currentPage - 1) * postsPerPage;
-    return filteredPosts.slice(start, start + postsPerPage);
-  }, [filteredPosts, currentPage, postsPerPage]);
+    return sortedPosts.slice(start, start + postsPerPage);
+  }, [sortedPosts, currentPage, postsPerPage]);
 
-  const applyParams = (next: { category?: string; page?: number }) => {
+  const applyParams = (next: { category?: string; series?: string; author?: string; sort?: 'newest' | 'oldest'; q?: string; page?: number }) => {
     const params = new URLSearchParams(searchParams);
     if (typeof next.category !== 'undefined') {
       if (!next.category || next.category === 'all') params.delete('category');
@@ -109,8 +157,36 @@ export default function BlogPage() {
       if (next.page <= 1) params.delete('page');
       else params.set('page', String(next.page));
     }
+    if (typeof next.series !== 'undefined') {
+      if (!next.series || next.series === 'all') params.delete('series');
+      else params.set('series', next.series);
+      params.delete('page');
+    }
+    if (typeof next.author !== 'undefined') {
+      if (!next.author || next.author === 'all') params.delete('author');
+      else params.set('author', next.author);
+      params.delete('page');
+    }
+    if (typeof next.sort !== 'undefined') {
+      if (next.sort === 'newest') params.delete('sort');
+      else params.set('sort', next.sort);
+      params.delete('page');
+    }
+    if (typeof next.q !== 'undefined') {
+      if (!next.q.trim()) params.delete('q');
+      else params.set('q', next.q.trim());
+      params.delete('page');
+    }
     setSearchParams(params);
   };
+
+  useEffect(() => {
+    if (activePage <= totalPages) return;
+    const params = new URLSearchParams(searchParams);
+    if (totalPages <= 1) params.delete('page');
+    else params.set('page', String(totalPages));
+    setSearchParams(params);
+  }, [activePage, totalPages, searchParams, setSearchParams]);
 
   return (
     <div className="w-full public-app-page public-app-blog">
@@ -160,6 +236,40 @@ export default function BlogPage() {
 
       <section className="py-8">
         <div className="container mx-auto px-4 space-y-4">
+          <div className="grid gap-2 md:grid-cols-3">
+            <input
+              type="search"
+              value={searchParams.get('q') || ''}
+              onChange={(event) => applyParams({ q: event.target.value })}
+              placeholder="Search posts by title, summary, or tag"
+              className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+            />
+            <select
+              value={selectedSort}
+              onChange={(event) => applyParams({ sort: event.target.value as 'newest' | 'oldest' })}
+              className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                const params = new URLSearchParams(searchParams);
+                params.delete('q');
+                params.delete('sort');
+                params.delete('category');
+                params.delete('series');
+                params.delete('author');
+                params.delete('page');
+                setSearchParams(params);
+              }}
+              className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Reset filters
+            </button>
+          </div>
+
           {showFeaturedOnBlog && effectiveCategory === 'all' && currentPage === 1 && featuredPosts.length > 0 ? (
             <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
               <h2 className="text-lg font-bold text-gray-900">Featured</h2>
@@ -207,6 +317,64 @@ export default function BlogPage() {
               ))}
             </div>
           ) : null}
+          {series.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => applyParams({ series: 'all' })}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                  effectiveSeries === 'all'
+                    ? 'border-red-600 bg-red-600 text-white'
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                All Series
+              </button>
+              {series.map((entry) => (
+                <button
+                  key={entry}
+                  type="button"
+                  onClick={() => applyParams({ series: entry })}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                    effectiveSeries === entry
+                      ? 'border-red-600 bg-red-600 text-white'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {entry}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {authors.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => applyParams({ author: 'all' })}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                  effectiveAuthor === 'all'
+                    ? 'border-red-600 bg-red-600 text-white'
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                All Authors
+              </button>
+              {authors.map((entry) => (
+                <button
+                  key={entry}
+                  type="button"
+                  onClick={() => applyParams({ author: entry })}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                    effectiveAuthor === entry
+                      ? 'border-red-600 bg-red-600 text-white'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {entry}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           {postsQuery.isLoading && posts.length === 0 && !loadingStalled ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -238,9 +406,11 @@ export default function BlogPage() {
                 </button>
               </div>
             </div>
-          ) : filteredPosts.length === 0 ? (
+          ) : sortedPosts.length === 0 ? (
             <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-600 shadow-sm">
-              {effectiveCategory === 'all' ? 'No published blog posts yet.' : `No posts found for category "${effectiveCategory}".`}
+              {effectiveCategory === 'all' && effectiveSeries === 'all' && effectiveAuthor === 'all'
+                ? 'No published blog posts yet.'
+                : 'No posts found for selected filters.'}
             </div>
           ) : (
             <>
@@ -252,10 +422,18 @@ export default function BlogPage() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {pagedPosts.map((post) => {
                   const publishedAt = toDateValue(post.publishedAt);
+                  const readingMinutes = Math.max(1, Math.ceil(((post.excerpt || '').split(/\s+/).filter(Boolean).length || 120) / 180));
                   return (
                     <article key={post.id} className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                       {post.coverImageUrl ? (
-                        <img src={post.coverImageUrl} alt={post.title} className="h-40 w-full object-cover" loading="lazy" />
+                        <img
+                          src={post.coverImageUrl}
+                          alt={post.title}
+                          className="h-40 w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                          fetchPriority="low"
+                        />
                       ) : (
                         <div className="h-40 w-full bg-gradient-to-br from-red-100 to-red-50" />
                       )}
@@ -265,6 +443,7 @@ export default function BlogPage() {
                         <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
                           <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{publishedAt ? publishedAt.toLocaleDateString() : 'N/A'}</span>
                           {post.categorySlug ? <span className="inline-flex items-center gap-1"><Tag className="h-3.5 w-3.5" />{post.categorySlug}</span> : null}
+                          <span>{readingMinutes} min read</span>
                         </div>
                         <Link to={ROUTES.blogPost.replace(':slug', post.slug)} className="inline-flex rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50">
                           Read article

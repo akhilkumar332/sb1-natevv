@@ -190,7 +190,7 @@ export default function CmsVisualEditor({
     syncDraftJson({ ...draft, customSections: next });
   };
 
-  const addSectionTemplate = (template: 'text' | 'cta' | 'faq') => {
+  const addSectionTemplate = (template: 'text' | 'cta' | 'faq' | 'stats' | 'testimonial' | 'timeline') => {
     if (customSections.length >= MAX_CUSTOM_SECTIONS) {
       notify.error(`Maximum ${MAX_CUSTOM_SECTIONS} sections allowed.`);
       return;
@@ -216,6 +216,36 @@ export default function CmsVisualEditor({
           enabled: true,
           order: customSections.length + 1,
         }
+        : template === 'stats'
+          ? {
+            id: nowId,
+            title: 'Impact Snapshot',
+            body: 'Add key metrics, for example: 10,000+ donors registered.',
+            ctaLabel: '',
+            ctaHref: '',
+            enabled: true,
+            order: customSections.length + 1,
+          }
+          : template === 'testimonial'
+            ? {
+              id: nowId,
+              title: 'Testimonial',
+              body: '"BloodHub helped us get a donor in under an hour."',
+              ctaLabel: '',
+              ctaHref: '',
+              enabled: true,
+              order: customSections.length + 1,
+            }
+            : template === 'timeline'
+              ? {
+                id: nowId,
+                title: 'Timeline',
+                body: 'Step 1 -> Step 2 -> Step 3',
+                ctaLabel: '',
+                ctaHref: '',
+                enabled: true,
+                order: customSections.length + 1,
+              }
         : {
           id: nowId,
           title: 'Text Section',
@@ -294,6 +324,7 @@ export default function CmsVisualEditor({
       await queryClient.invalidateQueries({ queryKey: ['admin'] });
       setDraft(normalizedPayload);
       setDraftJson(JSON.stringify(normalizedPayload, null, 2));
+      setHasLocalEdits(false);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent(CMS_PREVIEW_EVENT, { detail: { slug, content: normalizedPayload } }));
       }
@@ -370,6 +401,9 @@ export default function CmsVisualEditor({
               <button type="button" onClick={() => addSectionTemplate('text')} className="rounded border border-gray-300 px-2 py-1 text-[11px] font-semibold text-gray-700">+ Text</button>
               <button type="button" onClick={() => addSectionTemplate('cta')} className="rounded border border-gray-300 px-2 py-1 text-[11px] font-semibold text-gray-700">+ CTA</button>
               <button type="button" onClick={() => addSectionTemplate('faq')} className="rounded border border-gray-300 px-2 py-1 text-[11px] font-semibold text-gray-700">+ FAQ</button>
+              <button type="button" onClick={() => addSectionTemplate('stats')} className="rounded border border-gray-300 px-2 py-1 text-[11px] font-semibold text-gray-700">+ Stats</button>
+              <button type="button" onClick={() => addSectionTemplate('testimonial')} className="rounded border border-gray-300 px-2 py-1 text-[11px] font-semibold text-gray-700">+ Testimonial</button>
+              <button type="button" onClick={() => addSectionTemplate('timeline')} className="rounded border border-gray-300 px-2 py-1 text-[11px] font-semibold text-gray-700">+ Timeline</button>
             </div>
             <div className="space-y-2">
               {customSections.map((section, index) => (

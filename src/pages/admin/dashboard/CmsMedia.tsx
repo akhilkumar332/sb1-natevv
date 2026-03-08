@@ -4,13 +4,14 @@ import { addDoc, collection, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { COLLECTIONS } from '../../../constants/firestore';
 import { CMS_STATUS } from '../../../constants/cms';
-import { useAdminCmsMedia } from '../../../hooks/admin/useAdminQueries';
+import { useAdminCmsBlogPosts, useAdminCmsMedia, useAdminCmsPages } from '../../../hooks/admin/useAdminQueries';
 import { getServerTimestamp } from '../../../utils/firestore.utils';
 import { notify } from '../../../services/notify.service';
 import { useAuth } from '../../../contexts/AuthContext';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { refetchQuery } from '../../../utils/queryRefetch';
+import { extractMediaUrlReferences, normalizeMediaUrlKey } from '../../../utils/cmsMediaUsage';
 
 const statusOptions = Object.values(CMS_STATUS);
 
@@ -18,6 +19,8 @@ export default function CmsMediaPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const mediaQuery = useAdminCmsMedia();
+  const pagesQuery = useAdminCmsPages();
+  const postsQuery = useAdminCmsBlogPosts();
 
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
@@ -26,12 +29,63 @@ export default function CmsMediaPage() {
   const [saving, setSaving] = useState(false);
 
   const rows = useMemo(() => mediaQuery.data || [], [mediaQuery.data]);
+  const usageByUrl = useMemo(() => {
+    const map = new Map<string, number>();
+    const mediaUrlKeys = new Set(
+      rows
+        .map((entry) => normalizeMediaUrlKey(entry.url))
+        .filter(Boolean)
+    );
+
+    const bump = (candidate?: string | null) => {
+      const key = normalizeMediaUrlKey(candidate);
+      if (!key) return;
+      map.set(key, (map.get(key) || 0) + 1);
+    };
+
+    (pagesQuery.data || []).forEach((page) => {
+      const pageRefs = new Set<string>();
+      bump(page.coverImageUrl);
+      bump(page.ogImageUrl);
+      bump(page.twitterImageUrl);
+      extractMediaUrlReferences(typeof page.contentJson === 'string' ? page.contentJson : '').forEach((ref) => {
+        if (mediaUrlKeys.has(ref)) pageRefs.add(ref);
+      });
+      pageRefs.forEach((ref) => bump(ref));
+    });
+
+    (postsQuery.data || []).forEach((post) => {
+      const postRefs = new Set<string>();
+      bump(post.coverImageUrl);
+      bump(post.ogImageUrl);
+      bump(post.twitterImageUrl);
+      extractMediaUrlReferences(typeof post.contentJson === 'string' ? post.contentJson : '').forEach((ref) => {
+        if (mediaUrlKeys.has(ref)) postRefs.add(ref);
+      });
+      postRefs.forEach((ref) => bump(ref));
+    });
+
+    return map;
+  }, [pagesQuery.data, postsQuery.data, rows]);
 
   const saveMedia = async () => {
     const normalizedName = name.trim();
     const normalizedUrl = url.trim();
+    const normalizedUrlKey = normalizeMediaUrlKey(normalizedUrl);
     if (!normalizedName || !normalizedUrl) {
       notify.error('Media name and URL are required.');
+      return;
+    }
+    if (!/^https?:\/\/\S+$/i.test(normalizedUrl) && !normalizedUrl.startsWith('/')) {
+      notify.error('Media URL must start with https://, http://, or /.');
+      return;
+    }
+    if (!altText.trim()) {
+      notify.error('Alt text is required for accessibility and SEO.');
+      return;
+    }
+    if (rows.some((entry) => normalizeMediaUrlKey(entry.url) === normalizedUrlKey)) {
+      notify.error('A media entry with this URL already exists.');
       return;
     }
 
@@ -62,6 +116,13 @@ export default function CmsMediaPage() {
 
   const removeMedia = async (id?: string) => {
     if (!id) return;
+    const target = rows.find((entry) => entry.id === id);
+    if (!target) return;
+    const usageCount = usageByUrl.get(normalizeMediaUrlKey(target.url)) || 0;
+    if (usageCount > 0) {
+      notify.error(`This media is used ${usageCount} time(s) in pages/posts. Remove references before deleting.`);
+      return;
+    }
     if (!window.confirm('Delete this media entry?')) return;
     try {
       await deleteDoc(doc(db, COLLECTIONS.CMS_MEDIA, id));
@@ -104,6 +165,7 @@ export default function CmsMediaPage() {
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">URL</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Usage</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -113,6 +175,7 @@ export default function CmsMediaPage() {
                   <td className="px-4 py-3 font-semibold text-gray-900">{entry.name}</td>
                   <td className="px-4 py-3 text-gray-700 max-w-[340px] truncate">{entry.url}</td>
                   <td className="px-4 py-3 text-gray-700">{entry.status}</td>
+                  <td className="px-4 py-3 text-gray-700">{usageByUrl.get(normalizeMediaUrlKey(entry.url)) || 0}</td>
                   <td className="px-4 py-3 text-right">
                     <button type="button" onClick={() => void removeMedia(entry.id)} className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">Delete</button>
                   </td>
