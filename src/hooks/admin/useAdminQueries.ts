@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { collection, doc, getDoc, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { adminQueryKeys, type AdminKpiRange, type AdminUserRoleFilter } from '../../constants/adminQueryKeys';
-import { CMS_DEFAULTS, CMS_LIMITS } from '../../constants/cms';
+import { CMS_DEFAULTS, CMS_LIMITS, CMS_QUERY_LIMITS } from '../../constants/cms';
 import { COLLECTIONS } from '../../constants/firestore';
 import { ADMIN_QUERY_TIMINGS } from '../../constants/query';
 import {
@@ -788,7 +788,7 @@ export const useAdminContactSubmissions = (limitCount: number = 1000) =>
     },
   );
 
-export const useAdminCmsPages = (limitCount: number = 1000) =>
+export const useAdminCmsPages = (limitCount: number = CMS_QUERY_LIMITS.adminList) =>
   useCachedAdminQuery<CmsPage[]>(
     adminQueryKeys.cmsPages(limitCount),
     ADMIN_QUERY_TIMINGS.cms.ttl,
@@ -802,7 +802,7 @@ export const useAdminCmsPages = (limitCount: number = 1000) =>
     },
   );
 
-export const useAdminCmsBlogPosts = (limitCount: number = 1000) =>
+export const useAdminCmsBlogPosts = (limitCount: number = CMS_QUERY_LIMITS.adminList) =>
   useCachedAdminQuery<CmsBlogPost[]>(
     adminQueryKeys.cmsBlogPosts(limitCount),
     ADMIN_QUERY_TIMINGS.cms.ttl,
@@ -816,7 +816,7 @@ export const useAdminCmsBlogPosts = (limitCount: number = 1000) =>
     },
   );
 
-export const useAdminCmsBlogCategories = (limitCount: number = 1000) =>
+export const useAdminCmsBlogCategories = (limitCount: number = CMS_QUERY_LIMITS.adminList) =>
   useCachedAdminQuery<CmsBlogCategory[]>(
     adminQueryKeys.cmsBlogCategories(limitCount),
     ADMIN_QUERY_TIMINGS.cms.ttl,
@@ -844,7 +844,7 @@ export const useAdminCmsNavMenus = (limitCount: number = 100) =>
     },
   );
 
-export const useAdminCmsMedia = (limitCount: number = 1000) =>
+export const useAdminCmsMedia = (limitCount: number = CMS_QUERY_LIMITS.adminList) =>
   useCachedAdminQuery<CmsMedia[]>(
     adminQueryKeys.cmsMedia(limitCount),
     ADMIN_QUERY_TIMINGS.cms.ttl,

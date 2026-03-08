@@ -25,14 +25,10 @@ import { runSeoAudit } from '../../../utils/seoAudit';
 import { toDateValue } from '../../../utils/dateValue';
 import SeoSnippetPreview from '../../../components/cms/SeoSnippetPreview';
 import { toCmsBlogSummaryPayload } from '../../../utils/cmsBlogSummary';
+import { isAbsoluteHttpUrl, isMediaUrlOrPath, validateScheduleWindow } from '../../../utils/cmsValidation';
+import { recordCmsOperationFailure } from '../../../services/cmsDiagnostics.service';
 
 const statusOptions = Object.values(CMS_STATUS);
-const isAbsoluteHttpUrl = (value: string): boolean => /^https?:\/\/\S+$/i.test(value.trim());
-const isMediaUrlOrPath = (value: string): boolean => {
-  const normalized = value.trim();
-  if (!normalized) return true;
-  return normalized.startsWith('/') || isAbsoluteHttpUrl(normalized);
-};
 const toDateTimeLocalValue = (value: unknown): string => {
   const date = toDateValue(value);
   if (!date) return '';
@@ -102,6 +98,7 @@ export default function CmsBlogPostEditorPage() {
   const [initializedFor, setInitializedFor] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const hasHydratedDraftRef = useRef(false);
+  const loadedUpdatedAtRef = useRef<number | null>(null);
 
   const rows = useMemo(() => postsQuery.data || [], [postsQuery.data]);
   const categoryOptions = useMemo(() => (categoriesQuery.data || []).filter((entry) => entry.status !== 'archived'), [categoriesQuery.data]);
@@ -190,6 +187,7 @@ export default function CmsBlogPostEditorPage() {
       setRelatedPostSlugsInput('');
       setFeaturedUntil('');
       setRevisionHistory([]);
+      loadedUpdatedAtRef.current = null;
       setInitializedFor(hydrationKey);
       return;
     }
@@ -223,6 +221,7 @@ export default function CmsBlogPostEditorPage() {
       setAuthorName(existing.authorName || '');
       setRelatedPostSlugsInput(Array.isArray(existing.relatedPostSlugs) ? existing.relatedPostSlugs.join(', ') : '');
       setFeaturedUntil(toDateTimeLocalValue(existing.featuredUntil));
+      loadedUpdatedAtRef.current = toDateValue(existing.updatedAt)?.getTime() ?? null;
     }
     setInitializedFor(hydrationKey);
   }, [initializedFor, isDirty, isNewPost, normalizedParamSlug, postsQuery.isLoading, postsQuery.isFetching, slugParam, existingForSlug, existingRevisionKey]);
@@ -451,23 +450,16 @@ export default function CmsBlogPostEditorPage() {
       notify.error('Image URLs must be absolute URLs or start with /.');
       return;
     }
-    const parsedScheduledPublishAt = scheduledPublishAt ? new Date(scheduledPublishAt) : null;
-    const parsedScheduledUnpublishAt = scheduledUnpublishAt ? new Date(scheduledUnpublishAt) : null;
+    const scheduleValidation = validateScheduleWindow(scheduledPublishAt, scheduledUnpublishAt);
+    const parsedScheduledPublishAt = scheduleValidation.publishAt;
+    const parsedScheduledUnpublishAt = scheduleValidation.unpublishAt;
     const parsedFeaturedUntil = featuredUntil ? new Date(featuredUntil) : null;
-    if (parsedScheduledPublishAt && Number.isNaN(parsedScheduledPublishAt.getTime())) {
-      notify.error('Scheduled publish date/time is invalid.');
-      return;
-    }
-    if (parsedScheduledUnpublishAt && Number.isNaN(parsedScheduledUnpublishAt.getTime())) {
-      notify.error('Scheduled unpublish date/time is invalid.');
+    if (scheduleValidation.error) {
+      notify.error(scheduleValidation.error);
       return;
     }
     if (parsedFeaturedUntil && Number.isNaN(parsedFeaturedUntil.getTime())) {
       notify.error('Featured-until date/time is invalid.');
-      return;
-    }
-    if (parsedScheduledPublishAt && parsedScheduledUnpublishAt && parsedScheduledUnpublishAt.getTime() <= parsedScheduledPublishAt.getTime()) {
-      notify.error('Scheduled unpublish must be after scheduled publish.');
       return;
     }
     if (relatedPostSlugs.includes(normalizedSlug)) {
@@ -486,6 +478,22 @@ export default function CmsBlogPostEditorPage() {
       );
       const existing = await getDoc(targetRef);
       const existingData = existing.exists() ? existing.data() : null;
+      const latestUpdatedAtMs = toDateValue(existingData?.updatedAt)?.getTime() ?? null;
+      if (
+        !isNewPost
+        && loadedUpdatedAtRef.current
+        && latestUpdatedAtMs
+        && latestUpdatedAtMs > loadedUpdatedAtRef.current
+      ) {
+        const shouldOverwrite = typeof window !== 'undefined'
+          ? window.confirm('This post was updated by someone else after you loaded it. Continue and overwrite with your version?')
+          : false;
+        if (!shouldOverwrite) {
+          notify.error('Save cancelled to avoid overwriting a newer version.');
+          setSaving(false);
+          return;
+        }
+      }
       const createdAt = existingData?.createdAt || now;
       const createdBy = existingData?.createdBy || user?.uid || 'admin';
       const publishedAt = nextStatus === CMS_STATUS.published
@@ -564,6 +572,7 @@ export default function CmsBlogPostEditorPage() {
       }
       setStatus(nextStatus);
       setIsDirty(false);
+      loadedUpdatedAtRef.current = Date.now();
       const nextRevision: RevisionEntry = {
         savedAt: new Date().toISOString(),
         title: normalizedTitle,
@@ -587,6 +596,10 @@ export default function CmsBlogPostEditorPage() {
         navigate(targetPath, { replace: true });
       }
     } catch (error) {
+      recordCmsOperationFailure(
+        'post_save',
+        error instanceof Error ? error.message : 'Failed to save post.',
+      );
       notify.error(error instanceof Error ? error.message : 'Failed to save post.');
     } finally {
       setSaving(false);

@@ -26,7 +26,9 @@ import { resolveCmsFrontendContent } from '../../../utils/cmsFrontendContent';
 import { ROUTES } from '../../../constants/routes';
 import { toDateValue } from '../../../utils/dateValue';
 import { runSeoAudit } from '../../../utils/seoAudit';
+import { parseJsonObject, isAbsoluteHttpUrl, isMediaUrlOrPath, validateScheduleWindow } from '../../../utils/cmsValidation';
 import SeoSnippetPreview from '../../../components/cms/SeoSnippetPreview';
+import { recordCmsOperationFailure } from '../../../services/cmsDiagnostics.service';
 
 const statusOptions = Object.values(CMS_STATUS);
 const kindOptions = Object.values(CMS_PAGE_KIND);
@@ -48,21 +50,6 @@ const isPlainObject = (value: unknown): value is Record<string, JsonLike> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 );
 
-const parseJsonObject = (value: string): Record<string, JsonLike> | null => {
-  try {
-    const parsed = JSON.parse(value);
-    return isPlainObject(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-};
-
-const isAbsoluteHttpUrl = (value: string): boolean => /^https?:\/\/\S+$/i.test(value.trim());
-const isMediaUrlOrPath = (value: string): boolean => {
-  const normalized = value.trim();
-  if (!normalized) return true;
-  return normalized.startsWith('/') || isAbsoluteHttpUrl(normalized);
-};
 const toDateTimeLocalValue = (value: unknown): string => {
   const date = toDateValue(value);
   if (!date) return '';
@@ -176,6 +163,7 @@ export default function CmsPageEditorPage() {
   const [initializedFor, setInitializedFor] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const hasHydratedDraftRef = useRef(false);
+  const loadedUpdatedAtRef = useRef<number | null>(null);
 
   const rows = useMemo(() => pagesQuery.data || [], [pagesQuery.data]);
   const normalizedParamSlug = toCmsSlug(slugParam || '');
@@ -264,7 +252,7 @@ export default function CmsPageEditorPage() {
     const preset = CMS_FRONTEND_PAGE_PRESETS.find((entry) => entry.slug === normalizedSlug);
     if (!preset) {
       const parsed = parseJsonObject(rawContentJson) || {};
-      setContentDraft(parsed);
+      setContentDraft(parsed as JsonLike);
       setContentJson(rawContentJson || JSON.stringify(parsed, null, 2));
       return;
     }
@@ -304,6 +292,7 @@ export default function CmsPageEditorPage() {
       setContentDraft({});
       setContentJson('{}');
       setRevisionHistory([]);
+      loadedUpdatedAtRef.current = null;
       setInitializedFor(hydrationKey);
       setIsDirty(false);
       return;
@@ -338,6 +327,7 @@ export default function CmsPageEditorPage() {
         2
       );
     hydrateContentEditor(normalizedParamSlug, rawContentJson);
+    loadedUpdatedAtRef.current = toDateValue(existing?.updatedAt)?.getTime() ?? null;
     setInitializedFor(hydrationKey);
     setIsDirty(false);
   }, [isNewPage, normalizedParamSlug, pagesQuery.isLoading, pagesQuery.isFetching, slugParam, initializedFor, existingForSlug, existingRevisionKey, isDirty]);
@@ -668,20 +658,13 @@ export default function CmsPageEditorPage() {
       notify.error('Social image URLs must be absolute URLs or start with /.');
       return;
     }
-    const parsedScheduledPublishAt = scheduledPublishAt ? new Date(scheduledPublishAt) : null;
-    const parsedScheduledUnpublishAt = scheduledUnpublishAt ? new Date(scheduledUnpublishAt) : null;
-    if (parsedScheduledPublishAt && Number.isNaN(parsedScheduledPublishAt.getTime())) {
-      notify.error('Scheduled publish date/time is invalid.');
+    const scheduleValidation = validateScheduleWindow(scheduledPublishAt, scheduledUnpublishAt);
+    if (scheduleValidation.error) {
+      notify.error(scheduleValidation.error);
       return;
     }
-    if (parsedScheduledUnpublishAt && Number.isNaN(parsedScheduledUnpublishAt.getTime())) {
-      notify.error('Scheduled unpublish date/time is invalid.');
-      return;
-    }
-    if (parsedScheduledPublishAt && parsedScheduledUnpublishAt && parsedScheduledUnpublishAt.getTime() <= parsedScheduledPublishAt.getTime()) {
-      notify.error('Scheduled unpublish must be after scheduled publish.');
-      return;
-    }
+    const parsedScheduledPublishAt = scheduleValidation.publishAt;
+    const parsedScheduledUnpublishAt = scheduleValidation.unpublishAt;
 
     setSaving(true);
     try {
@@ -694,6 +677,22 @@ export default function CmsPageEditorPage() {
       );
       const existing = await getDoc(targetRef);
       const existingData = existing.exists() ? existing.data() : null;
+      const latestUpdatedAtMs = toDateValue(existingData?.updatedAt)?.getTime() ?? null;
+      if (
+        !isNewPage
+        && loadedUpdatedAtRef.current
+        && latestUpdatedAtMs
+        && latestUpdatedAtMs > loadedUpdatedAtRef.current
+      ) {
+        const shouldOverwrite = typeof window !== 'undefined'
+          ? window.confirm('This page was updated by someone else after you loaded it. Continue and overwrite with your version?')
+          : false;
+        if (!shouldOverwrite) {
+          notify.error('Save cancelled to avoid overwriting a newer version.');
+          setSaving(false);
+          return;
+        }
+      }
       const createdAt = existingData?.createdAt || now;
       const createdBy = existingData?.createdBy || user?.uid || 'admin';
       const publishedAt = nextStatus === CMS_STATUS.published ? (existingData?.publishedAt || now) : null;
@@ -780,6 +779,7 @@ export default function CmsPageEditorPage() {
         window.localStorage.removeItem(draftStorageKey(draftScopeKey));
       }
       setIsDirty(false);
+      loadedUpdatedAtRef.current = Date.now();
       setStatus(nextStatus);
       const nextRevision: RevisionEntry = {
         savedAt: new Date().toISOString(),
@@ -804,6 +804,10 @@ export default function CmsPageEditorPage() {
         navigate(targetPath, { replace: true });
       }
     } catch (error) {
+      recordCmsOperationFailure(
+        'page_save',
+        error instanceof Error ? error.message : 'Failed to save page.',
+      );
       notify.error(error instanceof Error ? error.message : 'Failed to save page.');
     } finally {
       setSaving(false);
@@ -907,7 +911,7 @@ export default function CmsPageEditorPage() {
                   } else if (typeof v.contentJson === 'string') {
                     setContentJson(v.contentJson);
                     const parsed = parseJsonObject(v.contentJson);
-                    if (parsed) setContentDraft(parsed);
+                    if (parsed) setContentDraft(parsed as JsonLike);
                   }
                   setRestoreDraftPayload(null);
                   setIsDirty(true);
@@ -946,7 +950,7 @@ export default function CmsPageEditorPage() {
                   setContentJson(JSON.stringify(contentDraft || {}, null, 2));
                 } else {
                   const parsed = parseJsonObject(contentJson);
-                  if (parsed) setContentDraft(parsed);
+                  if (parsed) setContentDraft(parsed as JsonLike);
                 }
               }}
             />
@@ -993,7 +997,7 @@ export default function CmsPageEditorPage() {
                   setTwitterImageUrl(selected.twitterImageUrl || '');
                   setContentJson(selected.contentJson || '{}');
                   const parsed = parseJsonObject(selected.contentJson || '{}');
-                  if (parsed) setContentDraft(parsed);
+                  if (parsed) setContentDraft(parsed as JsonLike);
                   setIsDirty(true);
                   notify.success('Page content duplicated. Update title/slug before saving.');
                 }}
@@ -1200,7 +1204,7 @@ export default function CmsPageEditorPage() {
                       setExcerpt(entry.excerpt);
                       setContentJson(entry.contentJson);
                       const parsed = parseJsonObject(entry.contentJson);
-                      if (parsed) setContentDraft(parsed);
+                      if (parsed) setContentDraft(parsed as JsonLike);
                       setIsDirty(true);
                     }}
                     className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"

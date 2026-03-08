@@ -75,6 +75,7 @@ export const getOfflineWriteCoverageSummary = () => {
   const queueSafe = OFFLINE_WRITE_COVERAGE_CATALOG.filter((entry) => entry.mode === 'queue_safe').length;
   const onlineOnly = OFFLINE_WRITE_COVERAGE_CATALOG.filter((entry) => entry.mode === 'online_only').length;
   const persistenceBacked = OFFLINE_WRITE_COVERAGE_CATALOG.filter((entry) => entry.mode === 'persistence_backed').length;
+  const unknownCollection = OFFLINE_WRITE_COVERAGE_CATALOG.filter((entry) => entry.collectionKey === 'UNKNOWN').length;
   const queueCoveragePercent = total > 0 ? (queueSafe / total) * 100 : 0;
   const catalogedCoveragePercent = total > 0 ? (detectedTotal / total) * 100 : 0;
 
@@ -85,6 +86,7 @@ export const getOfflineWriteCoverageSummary = () => {
     queueSafe,
     onlineOnly,
     persistenceBacked,
+    unknownCollection,
     queueCoveragePercent,
     catalogedCoveragePercent,
   };
@@ -93,8 +95,12 @@ export const getOfflineWriteCoverageSummary = () => {
 export const getOfflineWriteExpansionTargets = (limit: number = 8) => {
   return OFFLINE_WRITE_COVERAGE_CATALOG
     .filter((entry) => entry.mode !== 'queue_safe')
-    .filter((entry) => entry.collectionKey !== 'UNKNOWN')
     .filter((entry) => !entry.id.startsWith('UNKNOWN.'))
-    .sort((a, b) => (a.module < b.module ? -1 : 1))
+    .sort((a, b) => {
+      const aUnknown = a.collectionKey === 'UNKNOWN' ? 0 : 1;
+      const bUnknown = b.collectionKey === 'UNKNOWN' ? 0 : 1;
+      if (aUnknown !== bUnknown) return aUnknown - bUnknown;
+      return a.module < b.module ? -1 : a.module > b.module ? 1 : 0;
+    })
     .slice(0, Math.max(1, limit));
 };

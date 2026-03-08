@@ -9,6 +9,7 @@ import {
   OFFLINE_OUTBOX_CONFIG,
   type OfflineMutationType,
 } from '../constants/offline';
+import { validateQueueableMutation } from '../constants/offlineMutationPolicy';
 
 type MutationType = OfflineMutationType;
 
@@ -169,6 +170,9 @@ export type OfflineMutationTelemetry = {
   pendingCount: number;
   pendingByType: Partial<Record<MutationType, number>>;
   deadLetterCount: number;
+  policyViolationCount: number;
+  lastPolicyViolation: string | null;
+  storageCompactions: number;
   healthPersistRuns: number;
   healthPersistSucceeded: number;
   healthPersistFailed: number;
@@ -181,12 +185,13 @@ export type OfflineMutationTelemetry = {
   lastFailureMessage: string | null;
   recentEvents: Array<{
     at: number;
-    kind: 'enqueue' | 'flush_start' | 'flush_complete' | 'flush_error';
+    kind: 'enqueue' | 'flush_start' | 'flush_complete' | 'flush_error' | 'policy_violation';
     mutationType?: MutationType;
     message?: string;
     processed?: number;
     succeeded?: number;
     failed?: number;
+    durationMs?: number;
   }>;
 };
 
@@ -230,6 +235,9 @@ const emptyTelemetry = (): OfflineMutationTelemetry => ({
   pendingCount: 0,
   pendingByType: {},
   deadLetterCount: 0,
+  policyViolationCount: 0,
+  lastPolicyViolation: null,
+  storageCompactions: 0,
   healthPersistRuns: 0,
   healthPersistSucceeded: 0,
   healthPersistFailed: 0,
@@ -297,7 +305,7 @@ const loadTelemetry = (): OfflineMutationTelemetry => {
         .slice(0, OFFLINE_OUTBOX_CONFIG.maxRecentEvents)
         .map((entry) => ({
           at: safeFiniteNumber((entry as any).at, Date.now()),
-          kind: ['enqueue', 'flush_start', 'flush_complete', 'flush_error'].includes(String((entry as any).kind))
+          kind: ['enqueue', 'flush_start', 'flush_complete', 'flush_error', 'policy_violation'].includes(String((entry as any).kind))
             ? (entry as any).kind
             : 'enqueue',
           mutationType: Object.values(OFFLINE_MUTATION_TYPES).includes((entry as any).mutationType)
@@ -307,6 +315,7 @@ const loadTelemetry = (): OfflineMutationTelemetry => {
           processed: Number.isFinite((entry as any).processed) ? Number((entry as any).processed) : undefined,
           succeeded: Number.isFinite((entry as any).succeeded) ? Number((entry as any).succeeded) : undefined,
           failed: Number.isFinite((entry as any).failed) ? Number((entry as any).failed) : undefined,
+          durationMs: Number.isFinite((entry as any).durationMs) ? Number((entry as any).durationMs) : undefined,
         }))
       : [];
     const parsedPendingByType = (parsed.pendingByType && typeof parsed.pendingByType === 'object')
@@ -326,6 +335,11 @@ const loadTelemetry = (): OfflineMutationTelemetry => {
       pendingCount: toSafeCounter(parsed.pendingCount),
       pendingByType: parsedPendingByType,
       deadLetterCount: toSafeCounter(parsed.deadLetterCount),
+      policyViolationCount: toSafeCounter((parsed as any).policyViolationCount),
+      lastPolicyViolation: typeof (parsed as any).lastPolicyViolation === 'string'
+        ? (parsed as any).lastPolicyViolation.slice(0, 240)
+        : null,
+      storageCompactions: toSafeCounter((parsed as any).storageCompactions),
       healthPersistRuns: toSafeCounter((parsed as any).healthPersistRuns),
       healthPersistSucceeded: toSafeCounter((parsed as any).healthPersistSucceeded),
       healthPersistFailed: toSafeCounter((parsed as any).healthPersistFailed),
@@ -403,13 +417,37 @@ telemetryState = {
   deadLetterCount: deadLetterState.length,
 };
 
+let compactingStorage = false;
+
+const compactLocalOfflineStorage = () => {
+  if (compactingStorage) return;
+  compactingStorage = true;
+  try {
+    const nextEvents = (telemetryState.recentEvents || []).slice(0, Math.max(10, Math.floor(OFFLINE_OUTBOX_CONFIG.maxRecentEvents / 2)));
+    const nextDeadLetters = deadLetterState.slice(0, Math.max(20, Math.floor(OFFLINE_OUTBOX_CONFIG.maxDeadLetterItems / 2)));
+    telemetryState = {
+      ...telemetryState,
+      recentEvents: nextEvents,
+      storageCompactions: toSafeCounter((telemetryState.storageCompactions || 0) + 1),
+    };
+    deadLetterState = nextDeadLetters;
+  } finally {
+    compactingStorage = false;
+  }
+};
+
 const saveTelemetry = () => {
   const w = safeWindow();
   if (!w) return;
   try {
     w.localStorage.setItem(TELEMETRY_STORAGE_KEY, JSON.stringify(telemetryState));
   } catch {
-    // ignore
+    compactLocalOfflineStorage();
+    try {
+      w.localStorage.setItem(TELEMETRY_STORAGE_KEY, JSON.stringify(telemetryState));
+    } catch {
+      // ignore
+    }
   }
 };
 
@@ -555,7 +593,12 @@ const saveDeadLetters = () => {
   try {
     w.localStorage.setItem(DEAD_LETTER_STORAGE_KEY, JSON.stringify(deadLetterState));
   } catch {
-    // ignore
+    compactLocalOfflineStorage();
+    try {
+      w.localStorage.setItem(DEAD_LETTER_STORAGE_KEY, JSON.stringify(deadLetterState));
+    } catch {
+      // ignore
+    }
   }
 };
 
@@ -580,6 +623,8 @@ const patchTelemetry = (patch: Partial<OfflineMutationTelemetry>) => {
   nextState.flushedFailed = toSafeCounter(nextState.flushedFailed);
   nextState.pendingCount = toSafeCounter(nextState.pendingCount);
   nextState.deadLetterCount = toSafeCounter(nextState.deadLetterCount);
+  nextState.policyViolationCount = toSafeCounter(nextState.policyViolationCount);
+  nextState.storageCompactions = toSafeCounter(nextState.storageCompactions);
   nextState.healthPersistRuns = toSafeCounter(nextState.healthPersistRuns);
   nextState.healthPersistSucceeded = toSafeCounter(nextState.healthPersistSucceeded);
   nextState.healthPersistFailed = toSafeCounter(nextState.healthPersistFailed);
@@ -593,6 +638,9 @@ const patchTelemetry = (patch: Partial<OfflineMutationTelemetry>) => {
     && nextState.pendingCount === telemetryState.pendingCount
     && shallowEqualRecord(nextState.pendingByType || {}, telemetryState.pendingByType || {})
     && nextState.deadLetterCount === telemetryState.deadLetterCount
+    && nextState.policyViolationCount === telemetryState.policyViolationCount
+    && nextState.lastPolicyViolation === telemetryState.lastPolicyViolation
+    && nextState.storageCompactions === telemetryState.storageCompactions
     && nextState.healthPersistRuns === telemetryState.healthPersistRuns
     && nextState.healthPersistSucceeded === telemetryState.healthPersistSucceeded
     && nextState.healthPersistFailed === telemetryState.healthPersistFailed
@@ -1049,6 +1097,7 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
   }
 
   flushing = true;
+  const flushStartedAt = Date.now();
   patchTelemetry({
     flushRuns: telemetryState.flushRuns + 1,
     lastFlushAt: Date.now(),
@@ -1097,6 +1146,7 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
           pushTelemetryEvent({
             at: Date.now(),
             kind: 'flush_error',
+            mutationType: mutation.type,
             message: lastFailureMessage,
           });
           continue;
@@ -1124,6 +1174,7 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
         pushTelemetryEvent({
           at: Date.now(),
           kind: 'flush_error',
+          mutationType: mutation.type,
           message: lastFailureMessage,
         });
       }
@@ -1148,6 +1199,7 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
       processed: attempted,
       succeeded,
       failed,
+      durationMs: Math.max(0, Date.now() - flushStartedAt),
     });
 
     return {
@@ -1173,6 +1225,7 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
       at: Date.now(),
       kind: 'flush_error',
       message,
+      durationMs: Math.max(0, Date.now() - flushStartedAt),
     });
     await publishPendingState();
     return {
@@ -1333,11 +1386,7 @@ export const resetOfflineMutationDeadLetters = (): void => {
 
 export const refreshOfflineMutationHealthSnapshot = async (): Promise<void> => {
   await publishPendingState();
-  telemetryListeners.forEach((listener) => listener({
-    ...telemetryState,
-    pendingByType: { ...telemetryState.pendingByType },
-    recentEvents: [...telemetryState.recentEvents],
-  }));
+  // publishPendingState already emits telemetry updates via patchTelemetry/publishTelemetry.
   deadLetterListeners.forEach((listener) => listener([...deadLetterState]));
 };
 
@@ -1350,6 +1399,31 @@ const runQueueableMutation = async <T extends MutationType>(options: {
   metadata?: Record<string, unknown>;
 }): Promise<{ queued: boolean }> => {
   const actorUid = options.actorUid || getCurrentUserUid() || null;
+  const policy = validateQueueableMutation(options.type, options.payload);
+
+  if (!policy.allowed) {
+    const policyMessage = policy.message || 'Offline mutation policy rejected this operation.';
+    patchTelemetry({
+      policyViolationCount: telemetryState.policyViolationCount + 1,
+      lastPolicyViolation: policyMessage.slice(0, 240),
+    });
+    pushTelemetryEvent({
+      at: Date.now(),
+      kind: 'policy_violation',
+      mutationType: options.type,
+      message: policyMessage.slice(0, 240),
+    });
+
+    if (
+      policy.code === 'direct_write_only'
+      && typeof navigator !== 'undefined'
+      && navigator.onLine
+    ) {
+      await options.directWrite();
+      return { queued: false };
+    }
+    throw new Error(policyMessage);
+  }
 
   const tryDirectWrite = async (): Promise<boolean> => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {

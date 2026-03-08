@@ -81,65 +81,143 @@ const detectMode = ({ method, collectionKey, relativePath, lineText }) => {
 const scanFile = async (filePath) => {
   const content = await fs.readFile(filePath, 'utf8');
   const relativePath = path.relative(SRC_DIR, filePath).replace(/\\/g, '/');
-  const lines = content.split('\n');
   const rows = [];
   const docRefCollectionByVar = new Map();
   const collectionRefCollectionByVar = new Map();
+  const collectionAliasByVar = new Map();
+  const queryCollectionByVar = new Map();
+  const snapshotCollectionByVar = new Map();
+  const docSnapshotCollectionByVar = new Map();
 
-  const docRefPattern = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*doc\s*\(\s*db\s*,\s*COLLECTIONS\.([A-Z0-9_]+)[\s\S]{0,500}?\)/g;
+  const aliasPattern = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*COLLECTIONS\.([A-Z0-9_]+)/g;
+  let aliasMatch = aliasPattern.exec(content);
+  while (aliasMatch) {
+    collectionAliasByVar.set(aliasMatch[1], aliasMatch[2]);
+    aliasMatch = aliasPattern.exec(content);
+  }
+
+  const docRefPattern = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*doc\s*\(\s*db\s*,\s*(?:COLLECTIONS\.([A-Z0-9_]+)|([A-Za-z_$][\w$]*))[\s\S]{0,500}?\)/g;
   let docRefMatch = docRefPattern.exec(content);
   while (docRefMatch) {
-    docRefCollectionByVar.set(docRefMatch[1], docRefMatch[2]);
+    const direct = docRefMatch[2];
+    const aliasedVar = docRefMatch[3];
+    const resolved = direct || (aliasedVar ? collectionAliasByVar.get(aliasedVar) : null);
+    if (resolved) {
+      docRefCollectionByVar.set(docRefMatch[1], resolved);
+    }
     docRefMatch = docRefPattern.exec(content);
   }
 
-  const docFromCollectionPattern = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*doc\s*\(\s*collection\s*\(\s*db\s*,\s*COLLECTIONS\.([A-Z0-9_]+)[\s\S]{0,500}?\)\s*[\s\S]{0,200}?\)/g;
+  const docFromCollectionPattern = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*doc\s*\(\s*collection\s*\(\s*db\s*,\s*(?:COLLECTIONS\.([A-Z0-9_]+)|([A-Za-z_$][\w$]*))[\s\S]{0,500}?\)\s*[\s\S]{0,200}?\)/g;
   let docFromCollectionMatch = docFromCollectionPattern.exec(content);
   while (docFromCollectionMatch) {
-    docRefCollectionByVar.set(docFromCollectionMatch[1], docFromCollectionMatch[2]);
+    const direct = docFromCollectionMatch[2];
+    const aliasedVar = docFromCollectionMatch[3];
+    const resolved = direct || (aliasedVar ? collectionAliasByVar.get(aliasedVar) : null);
+    if (resolved) {
+      docRefCollectionByVar.set(docFromCollectionMatch[1], resolved);
+    }
     docFromCollectionMatch = docFromCollectionPattern.exec(content);
   }
 
-  const collectionRefPattern = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*collection\s*\(\s*db\s*,\s*COLLECTIONS\.([A-Z0-9_]+)[\s\S]{0,500}?\)/g;
+  const collectionRefPattern = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*collection\s*\(\s*db\s*,\s*(?:COLLECTIONS\.([A-Z0-9_]+)|([A-Za-z_$][\w$]*))[\s\S]{0,500}?\)/g;
   let collectionRefMatch = collectionRefPattern.exec(content);
   while (collectionRefMatch) {
-    collectionRefCollectionByVar.set(collectionRefMatch[1], collectionRefMatch[2]);
+    const direct = collectionRefMatch[2];
+    const aliasedVar = collectionRefMatch[3];
+    const resolved = direct || (aliasedVar ? collectionAliasByVar.get(aliasedVar) : null);
+    if (resolved) {
+      collectionRefCollectionByVar.set(collectionRefMatch[1], resolved);
+    }
     collectionRefMatch = collectionRefPattern.exec(content);
   }
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (!line) continue;
-    FIRESTORE_WRITE_PATTERN.lastIndex = 0;
-    let match = FIRESTORE_WRITE_PATTERN.exec(line);
-    while (match) {
+  const queryPattern = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*query\s*\(\s*collection\s*\(\s*db\s*,\s*(?:COLLECTIONS\.([A-Z0-9_]+)|([A-Za-z_$][\w$]*))/g;
+  let queryMatch = queryPattern.exec(content);
+  while (queryMatch) {
+    const direct = queryMatch[2];
+    const aliasedVar = queryMatch[3];
+    const resolved = direct || (aliasedVar ? collectionAliasByVar.get(aliasedVar) : null);
+    if (resolved) {
+      queryCollectionByVar.set(queryMatch[1], resolved);
+    }
+    queryMatch = queryPattern.exec(content);
+  }
+
+  const snapshotFromGetDocsVarPattern = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*await\s+getDocs\s*\(\s*([A-Za-z_$][\w$]*)\s*\)/g;
+  let snapshotFromVarMatch = snapshotFromGetDocsVarPattern.exec(content);
+  while (snapshotFromVarMatch) {
+    const collectionKey = queryCollectionByVar.get(snapshotFromVarMatch[2]);
+    if (collectionKey) {
+      snapshotCollectionByVar.set(snapshotFromVarMatch[1], collectionKey);
+    }
+    snapshotFromVarMatch = snapshotFromGetDocsVarPattern.exec(content);
+  }
+
+  const snapshotFromGetDocsInlinePattern = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*await\s+getDocs\s*\(\s*query\s*\(\s*collection\s*\(\s*db\s*,\s*(?:COLLECTIONS\.([A-Z0-9_]+)|([A-Za-z_$][\w$]*))/g;
+  let snapshotInlineMatch = snapshotFromGetDocsInlinePattern.exec(content);
+  while (snapshotInlineMatch) {
+    const direct = snapshotInlineMatch[2];
+    const aliasedVar = snapshotInlineMatch[3];
+    const resolved = direct || (aliasedVar ? collectionAliasByVar.get(aliasedVar) : null);
+    if (resolved) {
+      snapshotCollectionByVar.set(snapshotInlineMatch[1], resolved);
+    }
+    snapshotInlineMatch = snapshotFromGetDocsInlinePattern.exec(content);
+  }
+
+  const docSnapFromSnapshotDocsPattern = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\.docs\[[^\]]+\]/g;
+  let docSnapMatch = docSnapFromSnapshotDocsPattern.exec(content);
+  while (docSnapMatch) {
+    const collectionKey = snapshotCollectionByVar.get(docSnapMatch[2]);
+    if (collectionKey) {
+      docSnapshotCollectionByVar.set(docSnapMatch[1], collectionKey);
+    }
+    docSnapMatch = docSnapFromSnapshotDocsPattern.exec(content);
+  }
+
+  const snapshotForEachPattern = /\b([A-Za-z_$][\w$]*)\s*\.\s*(?:docs\s*\.\s*)?forEach\s*\(\s*\(\s*([A-Za-z_$][\w$]*)/g;
+  let forEachMatch = snapshotForEachPattern.exec(content);
+  while (forEachMatch) {
+    const collectionKey = snapshotCollectionByVar.get(forEachMatch[1]);
+    if (collectionKey) {
+      docSnapshotCollectionByVar.set(forEachMatch[2], collectionKey);
+    }
+    forEachMatch = snapshotForEachPattern.exec(content);
+  }
+
+  FIRESTORE_WRITE_PATTERN.lastIndex = 0;
+  let match = FIRESTORE_WRITE_PATTERN.exec(content);
+  while (match) {
       const method = match[1];
-      const neighbor = [
-        line,
-        lines[index + 1] || '',
-        lines[index + 2] || '',
-        lines[index + 3] || '',
-      ].join(' ');
+      const startIdx = Math.max(0, match.index - 220);
+      const endIdx = Math.min(content.length, match.index + 520);
+      const neighbor = content.slice(startIdx, endIdx);
+      const line = content.slice(0, match.index).split('\n').length;
       const collectionMatch = COLLECTION_PATTERN.exec(neighbor);
       let collectionKey = collectionMatch ? collectionMatch[1] : 'UNKNOWN';
 
       if (collectionKey === 'UNKNOWN') {
-        const directDocArgMatch = line.match(/\b(?:setDoc|updateDoc|deleteDoc)\s*\(\s*([A-Za-z_$][\w$]*)/);
+        const escapedMethod = method.replace('.', '\\.');
+        const firstArgMatch = neighbor.match(new RegExp(`\\b${escapedMethod}\\s*\\(\\s*([A-Za-z_$][\\w$]*)(?:\\.ref)?`));
+        const firstArgVar = firstArgMatch ? firstArgMatch[1] : null;
+        const usesDocRefMember = new RegExp(`\\b${escapedMethod}\\s*\\(\\s*[A-Za-z_$][\\w$]*\\.ref`).test(neighbor);
+
+        const directDocArgMatch = firstArgVar && /^(setDoc|updateDoc|deleteDoc|tx\.set|tx\.update|tx\.delete|batch\.set|batch\.update|batch\.delete)$/.test(method)
+          ? [firstArgVar, firstArgVar]
+          : null;
         if (directDocArgMatch) {
           const maybeVar = directDocArgMatch[1];
           collectionKey = docRefCollectionByVar.get(maybeVar) || collectionKey;
+          if (collectionKey === 'UNKNOWN' && usesDocRefMember) {
+            collectionKey = docSnapshotCollectionByVar.get(maybeVar) || collectionKey;
+          }
         }
 
-        const addDocArgMatch = line.match(/\baddDoc\s*\(\s*([A-Za-z_$][\w$]*)/);
+        const addDocArgMatch = firstArgVar && method === 'addDoc' ? [firstArgVar, firstArgVar] : null;
         if (addDocArgMatch) {
           const maybeVar = addDocArgMatch[1];
           collectionKey = collectionRefCollectionByVar.get(maybeVar) || collectionKey;
-        }
-
-        const txDocArgMatch = line.match(/\b(?:tx\.set|tx\.update|tx\.delete|batch\.set|batch\.update|batch\.delete)\s*\(\s*([A-Za-z_$][\w$]*)/);
-        if (txDocArgMatch) {
-          const maybeVar = txDocArgMatch[1];
-          collectionKey = docRefCollectionByVar.get(maybeVar) || collectionKey;
         }
       }
 
@@ -150,17 +228,16 @@ const scanFile = async (filePath) => {
         lineText: neighbor,
       });
       rows.push({
-        id: `${collectionKey}.${method}.${relativePath.replace(/[^\w/.-]/g, '_')}:${index + 1}`,
+        id: `${collectionKey}.${method}.${relativePath.replace(/[^\w/.-]/g, '_')}:${line}`,
         method,
         collectionKey,
         module: toModuleFromPath(relativePath),
         path: relativePath,
-        line: index + 1,
+        line,
         area: `${collectionKey} ${method}`,
         mode,
       });
-      match = FIRESTORE_WRITE_PATTERN.exec(line);
-    }
+      match = FIRESTORE_WRITE_PATTERN.exec(content);
   }
 
   return rows;

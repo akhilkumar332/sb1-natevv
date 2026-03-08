@@ -84,13 +84,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "NPS_RESPONSES.setDoc.components/shared/NpsFeedbackPrompt.tsx:195",
+    "id": "NPS_PROMPT_OVERRIDES.setDoc.components/shared/NpsFeedbackPrompt.tsx:195",
     "method": "setDoc",
-    "collectionKey": "NPS_RESPONSES",
+    "collectionKey": "NPS_PROMPT_OVERRIDES",
     "module": "components",
     "path": "components/shared/NpsFeedbackPrompt.tsx",
     "line": 195,
-    "area": "NPS_RESPONSES setDoc",
+    "area": "NPS_PROMPT_OVERRIDES setDoc",
     "mode": "queue_safe"
   },
   {
@@ -214,13 +214,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "BLOOD_REQUESTS.updateDoc.hooks/useBloodRequest.ts:57",
+    "id": "NOTIFICATIONS.updateDoc.hooks/useBloodRequest.ts:57",
     "method": "updateDoc",
-    "collectionKey": "BLOOD_REQUESTS",
+    "collectionKey": "NOTIFICATIONS",
     "module": "hooks",
     "path": "hooks/useBloodRequest.ts",
     "line": 57,
-    "area": "BLOOD_REQUESTS updateDoc",
+    "area": "NOTIFICATIONS updateDoc",
     "mode": "queue_safe"
   },
   {
@@ -234,13 +234,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.setDoc.hooks/useDonorData.ts:317",
+    "id": "DONATION_HISTORY.setDoc.hooks/useDonorData.ts:317",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONATION_HISTORY",
     "module": "hooks",
     "path": "hooks/useDonorData.ts",
     "line": 317,
-    "area": "UNKNOWN setDoc",
+    "area": "DONATION_HISTORY setDoc",
     "mode": "queue_safe"
   },
   {
@@ -294,54 +294,34 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.updateDoc.pages/FindDonors.tsx:289",
+    "id": "DONOR_REQUESTS.updateDoc.pages/FindDonors.tsx:289",
     "method": "updateDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONOR_REQUESTS",
     "module": "pages/FindDonors.tsx",
     "path": "pages/FindDonors.tsx",
     "line": 289,
-    "area": "UNKNOWN updateDoc",
+    "area": "DONOR_REQUESTS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.updateDoc.pages/FindDonors.tsx:327",
+    "id": "DONOR_REQUESTS.updateDoc.pages/FindDonors.tsx:327",
     "method": "updateDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONOR_REQUESTS",
     "module": "pages/FindDonors.tsx",
     "path": "pages/FindDonors.tsx",
     "line": 327,
-    "area": "UNKNOWN updateDoc",
+    "area": "DONOR_REQUESTS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.writeBatch.pages/FindDonors.tsx:1013",
+    "id": "DONOR_REQUEST_BATCHES.writeBatch.pages/FindDonors.tsx:1013",
     "method": "writeBatch",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONOR_REQUEST_BATCHES",
     "module": "pages/FindDonors.tsx",
     "path": "pages/FindDonors.tsx",
     "line": 1013,
-    "area": "UNKNOWN writeBatch",
+    "area": "DONOR_REQUEST_BATCHES writeBatch",
     "mode": "online_only"
-  },
-  {
-    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:548",
-    "method": "setDoc",
-    "collectionKey": "CMS_BLOG_POST_SUMMARIES",
-    "module": "pages/admin",
-    "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
-    "line": 548,
-    "area": "CMS_BLOG_POST_SUMMARIES setDoc",
-    "mode": "queue_safe"
-  },
-  {
-    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:549",
-    "method": "setDoc",
-    "collectionKey": "CMS_BLOG_POST_SUMMARIES",
-    "module": "pages/admin",
-    "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
-    "line": 549,
-    "area": "CMS_BLOG_POST_SUMMARIES setDoc",
-    "mode": "queue_safe"
   },
   {
     "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:556",
@@ -354,23 +334,43 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_BLOG_POST_SUMMARIES.deleteDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:557",
-    "method": "deleteDoc",
+    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:557",
+    "method": "setDoc",
     "collectionKey": "CMS_BLOG_POST_SUMMARIES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
     "line": 557,
-    "area": "CMS_BLOG_POST_SUMMARIES deleteDoc",
-    "mode": "online_only"
+    "area": "CMS_BLOG_POST_SUMMARIES setDoc",
+    "mode": "queue_safe"
   },
   {
-    "id": "CMS_BLOG_POSTS.deleteDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:558",
+    "id": "CMS_BLOG_POSTS.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:564",
+    "method": "setDoc",
+    "collectionKey": "CMS_BLOG_POSTS",
+    "module": "pages/admin",
+    "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
+    "line": 564,
+    "area": "CMS_BLOG_POSTS setDoc",
+    "mode": "queue_safe"
+  },
+  {
+    "id": "CMS_BLOG_POSTS.deleteDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:565",
     "method": "deleteDoc",
     "collectionKey": "CMS_BLOG_POSTS",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
-    "line": 558,
+    "line": 565,
     "area": "CMS_BLOG_POSTS deleteDoc",
+    "mode": "online_only"
+  },
+  {
+    "id": "CMS_BLOG_POST_SUMMARIES.deleteDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:566",
+    "method": "deleteDoc",
+    "collectionKey": "CMS_BLOG_POST_SUMMARIES",
+    "module": "pages/admin",
+    "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
+    "line": 566,
+    "area": "CMS_BLOG_POST_SUMMARIES deleteDoc",
     "mode": "online_only"
   },
   {
@@ -384,13 +384,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "CMS_BLOG_POST_SUMMARIES.deleteDoc.pages/admin/dashboard/CmsBlogPosts.tsx:115",
+    "id": "CMS_BLOG_POSTS.deleteDoc.pages/admin/dashboard/CmsBlogPosts.tsx:115",
     "method": "deleteDoc",
-    "collectionKey": "CMS_BLOG_POST_SUMMARIES",
+    "collectionKey": "CMS_BLOG_POSTS",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPosts.tsx",
     "line": 115,
-    "area": "CMS_BLOG_POST_SUMMARIES deleteDoc",
+    "area": "CMS_BLOG_POSTS deleteDoc",
     "mode": "online_only"
   },
   {
@@ -424,13 +424,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "CMS_BLOG_POST_SUMMARIES.deleteDoc.pages/admin/dashboard/CmsBlogPosts.tsx:182",
+    "id": "CMS_BLOG_POSTS.deleteDoc.pages/admin/dashboard/CmsBlogPosts.tsx:182",
     "method": "deleteDoc",
-    "collectionKey": "CMS_BLOG_POST_SUMMARIES",
+    "collectionKey": "CMS_BLOG_POSTS",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPosts.tsx",
     "line": 182,
-    "area": "CMS_BLOG_POST_SUMMARIES deleteDoc",
+    "area": "CMS_BLOG_POSTS deleteDoc",
     "mode": "online_only"
   },
   {
@@ -444,13 +444,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "CMS_BLOG_CATEGORIES.setDoc.pages/admin/dashboard/CmsCategoryEditor.tsx:98",
+    "id": "CMS_BLO.setDoc.pages/admin/dashboard/CmsCategoryEditor.tsx:98",
     "method": "setDoc",
-    "collectionKey": "CMS_BLOG_CATEGORIES",
+    "collectionKey": "CMS_BLO",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsCategoryEditor.tsx",
     "line": 98,
-    "area": "CMS_BLOG_CATEGORIES setDoc",
+    "area": "CMS_BLO setDoc",
     "mode": "queue_safe"
   },
   {
@@ -504,62 +504,62 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsOverview.tsx:107",
+    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsOverview.tsx:113",
     "method": "setDoc",
     "collectionKey": "CMS_PAGES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsOverview.tsx",
-    "line": 107,
+    "line": 113,
     "area": "CMS_PAGES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_BLOG_POSTS.setDoc.pages/admin/dashboard/CmsOverview.tsx:125",
+    "id": "CMS_BLOG_POSTS.setDoc.pages/admin/dashboard/CmsOverview.tsx:131",
     "method": "setDoc",
     "collectionKey": "CMS_BLOG_POSTS",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsOverview.tsx",
-    "line": 125,
+    "line": 131,
     "area": "CMS_BLOG_POSTS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsOverview.tsx:131",
+    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsOverview.tsx:137",
     "method": "setDoc",
     "collectionKey": "CMS_BLOG_POST_SUMMARIES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsOverview.tsx",
-    "line": 131,
+    "line": 137,
     "area": "CMS_BLOG_POST_SUMMARIES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPageEditor.tsx:714",
+    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPageEditor.tsx:713",
     "method": "setDoc",
     "collectionKey": "CMS_PAGES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsPageEditor.tsx",
-    "line": 714,
+    "line": 713,
     "area": "CMS_PAGES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPageEditor.tsx:746",
+    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPageEditor.tsx:745",
     "method": "setDoc",
     "collectionKey": "CMS_PAGES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsPageEditor.tsx",
-    "line": 746,
+    "line": 745,
     "area": "CMS_PAGES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_PAGES.deleteDoc.pages/admin/dashboard/CmsPageEditor.tsx:775",
+    "id": "CMS_PAGES.deleteDoc.pages/admin/dashboard/CmsPageEditor.tsx:774",
     "method": "deleteDoc",
     "collectionKey": "CMS_PAGES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsPageEditor.tsx",
-    "line": 775,
+    "line": 774,
     "area": "CMS_PAGES deleteDoc",
     "mode": "online_only"
   },
@@ -621,7 +621,7 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "path": "pages/admin/dashboard/ContactSubmissions.tsx",
     "line": 137,
     "area": "CONTACT_SUBMISSIONS writeBatch",
-    "mode": "online_only"
+    "mode": "queue_safe"
   },
   {
     "id": "CONTACT_SUBMISSIONS.batch.delete.pages/admin/dashboard/ContactSubmissions.tsx:138",
@@ -631,7 +631,7 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "path": "pages/admin/dashboard/ContactSubmissions.tsx",
     "line": 138,
     "area": "CONTACT_SUBMISSIONS batch.delete",
-    "mode": "online_only"
+    "mode": "queue_safe"
   },
   {
     "id": "NPS_PROMPT_OVERRIDES.updateDoc.pages/admin/dashboard/Nps.tsx:510",
@@ -834,13 +834,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "INVENTORY_RESERVATIONS.setDoc.pages/bloodbank/dashboard/Inventory.tsx:1445",
+    "id": "BLOOD_INVENTORY.setDoc.pages/bloodbank/dashboard/Inventory.tsx:1445",
     "method": "setDoc",
-    "collectionKey": "INVENTORY_RESERVATIONS",
+    "collectionKey": "BLOOD_INVENTORY",
     "module": "pages/bloodbank",
     "path": "pages/bloodbank/dashboard/Inventory.tsx",
     "line": 1445,
-    "area": "INVENTORY_RESERVATIONS setDoc",
+    "area": "BLOOD_INVENTORY setDoc",
     "mode": "online_only"
   },
   {
@@ -854,13 +854,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "INVENTORY_RESERVATIONS.updateDoc.pages/bloodbank/dashboard/Inventory.tsx:1504",
+    "id": "BLOOD_INVENTORY.updateDoc.pages/bloodbank/dashboard/Inventory.tsx:1504",
     "method": "updateDoc",
-    "collectionKey": "INVENTORY_RESERVATIONS",
+    "collectionKey": "BLOOD_INVENTORY",
     "module": "pages/bloodbank",
     "path": "pages/bloodbank/dashboard/Inventory.tsx",
     "line": 1504,
-    "area": "INVENTORY_RESERVATIONS updateDoc",
+    "area": "BLOOD_INVENTORY updateDoc",
     "mode": "online_only"
   },
   {
@@ -874,33 +874,33 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "INVENTORY_RESERVATIONS.updateDoc.pages/bloodbank/dashboard/Inventory.tsx:1555",
+    "id": "BLOOD_INVENTORY.updateDoc.pages/bloodbank/dashboard/Inventory.tsx:1555",
     "method": "updateDoc",
-    "collectionKey": "INVENTORY_RESERVATIONS",
+    "collectionKey": "BLOOD_INVENTORY",
     "module": "pages/bloodbank",
     "path": "pages/bloodbank/dashboard/Inventory.tsx",
     "line": 1555,
-    "area": "INVENTORY_RESERVATIONS updateDoc",
+    "area": "BLOOD_INVENTORY updateDoc",
     "mode": "online_only"
   },
   {
-    "id": "UNKNOWN.setDoc.pages/donor/DonorDashboard.tsx:536",
+    "id": "DONATION_HISTORY.setDoc.pages/donor/DonorDashboard.tsx:536",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONATION_HISTORY",
     "module": "pages/donor",
     "path": "pages/donor/DonorDashboard.tsx",
     "line": 536,
-    "area": "UNKNOWN setDoc",
+    "area": "DONATION_HISTORY setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.setDoc.pages/donor/DonorDashboard.tsx:605",
+    "id": "DONATION_HISTORY.setDoc.pages/donor/DonorDashboard.tsx:605",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONATION_HISTORY",
     "module": "pages/donor",
     "path": "pages/donor/DonorDashboard.tsx",
     "line": 605,
-    "area": "UNKNOWN setDoc",
+    "area": "DONATION_HISTORY setDoc",
     "mode": "queue_safe"
   },
   {
@@ -924,13 +924,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "DONOR_REQUESTS.updateDoc.pages/donor/DonorDashboard.tsx:1392",
+    "id": "NOTIFICATIONS.updateDoc.pages/donor/DonorDashboard.tsx:1392",
     "method": "updateDoc",
-    "collectionKey": "DONOR_REQUESTS",
+    "collectionKey": "NOTIFICATIONS",
     "module": "pages/donor",
     "path": "pages/donor/DonorDashboard.tsx",
     "line": 1392,
-    "area": "DONOR_REQUESTS updateDoc",
+    "area": "NOTIFICATIONS updateDoc",
     "mode": "queue_safe"
   },
   {
@@ -964,53 +964,53 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "UNKNOWN.setDoc.pages/donor/DonorDashboard.tsx:1630",
+    "id": "DONATION_HISTORY.setDoc.pages/donor/DonorDashboard.tsx:1630",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONATION_HISTORY",
     "module": "pages/donor",
     "path": "pages/donor/DonorDashboard.tsx",
     "line": 1630,
-    "area": "UNKNOWN setDoc",
+    "area": "DONATION_HISTORY setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.setDoc.pages/donor/DonorDashboard.tsx:1717",
+    "id": "DONATION_HISTORY.setDoc.pages/donor/DonorDashboard.tsx:1717",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONATION_HISTORY",
     "module": "pages/donor",
     "path": "pages/donor/DonorDashboard.tsx",
     "line": 1717,
-    "area": "UNKNOWN setDoc",
+    "area": "DONATION_HISTORY setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.setDoc.pages/donor/DonorDashboard.tsx:1810",
+    "id": "DONATION_HISTORY.setDoc.pages/donor/DonorDashboard.tsx:1810",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONATION_HISTORY",
     "module": "pages/donor",
     "path": "pages/donor/DonorDashboard.tsx",
     "line": 1810,
-    "area": "UNKNOWN setDoc",
+    "area": "DONATION_HISTORY setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.setDoc.pages/donor/DonorDashboard.tsx:1859",
+    "id": "DONATION_HISTORY.setDoc.pages/donor/DonorDashboard.tsx:1859",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONATION_HISTORY",
     "module": "pages/donor",
     "path": "pages/donor/DonorDashboard.tsx",
     "line": 1859,
-    "area": "UNKNOWN setDoc",
+    "area": "DONATION_HISTORY setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.setDoc.pages/donor/DonorDashboard.tsx:1914",
+    "id": "DONATION_HISTORY.setDoc.pages/donor/DonorDashboard.tsx:1914",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONATION_HISTORY",
     "module": "pages/donor",
     "path": "pages/donor/DonorDashboard.tsx",
     "line": 1914,
-    "area": "UNKNOWN setDoc",
+    "area": "DONATION_HISTORY setDoc",
     "mode": "queue_safe"
   },
   {
@@ -1044,33 +1044,33 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.setDoc.pages/donor/DonorDashboard.tsx:2254",
+    "id": "DONATION_FEEDBACK.setDoc.pages/donor/DonorDashboard.tsx:2254",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONATION_FEEDBACK",
     "module": "pages/donor",
     "path": "pages/donor/DonorDashboard.tsx",
     "line": 2254,
-    "area": "UNKNOWN setDoc",
+    "area": "DONATION_FEEDBACK setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.setDoc.pages/donor/DonorDashboard.tsx:2278",
+    "id": "DONATION_HISTORY.setDoc.pages/donor/DonorDashboard.tsx:2278",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONATION_HISTORY",
     "module": "pages/donor",
     "path": "pages/donor/DonorDashboard.tsx",
     "line": 2278,
-    "area": "UNKNOWN setDoc",
+    "area": "DONATION_HISTORY setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.setDoc.pages/donor/DonorOnboarding.tsx:389",
+    "id": "DONATION_HISTORY.setDoc.pages/donor/DonorOnboarding.tsx:389",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONATION_HISTORY",
     "module": "pages/donor",
     "path": "pages/donor/DonorOnboarding.tsx",
     "line": 389,
-    "area": "UNKNOWN setDoc",
+    "area": "DONATION_HISTORY setDoc",
     "mode": "queue_safe"
   },
   {
@@ -1094,13 +1094,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "NOTIFICATIONS.addDoc.services/admin.service.ts:373",
+    "id": "USERS.addDoc.services/admin.service.ts:373",
     "method": "addDoc",
-    "collectionKey": "NOTIFICATIONS",
+    "collectionKey": "USERS",
     "module": "services",
     "path": "services/admin.service.ts",
     "line": 373,
-    "area": "NOTIFICATIONS addDoc",
+    "area": "USERS addDoc",
     "mode": "queue_safe"
   },
   {
@@ -1114,13 +1114,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "NOTIFICATIONS.addDoc.services/admin.service.ts:424",
+    "id": "USERS.addDoc.services/admin.service.ts:424",
     "method": "addDoc",
-    "collectionKey": "NOTIFICATIONS",
+    "collectionKey": "USERS",
     "module": "services",
     "path": "services/admin.service.ts",
     "line": 424,
-    "area": "NOTIFICATIONS addDoc",
+    "area": "USERS addDoc",
     "mode": "queue_safe"
   },
   {
@@ -1154,13 +1154,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "NOTIFICATIONS.addDoc.services/admin.service.ts:614",
+    "id": "USERS.addDoc.services/admin.service.ts:614",
     "method": "addDoc",
-    "collectionKey": "NOTIFICATIONS",
+    "collectionKey": "USERS",
     "module": "services",
     "path": "services/admin.service.ts",
     "line": 614,
-    "area": "NOTIFICATIONS addDoc",
+    "area": "USERS addDoc",
     "mode": "queue_safe"
   },
   {
@@ -1304,13 +1304,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "NOTIFICATIONS.addDoc.services/bloodbank.service.ts:461",
+    "id": "BLOOD_REQUESTS.addDoc.services/bloodbank.service.ts:461",
     "method": "addDoc",
-    "collectionKey": "NOTIFICATIONS",
+    "collectionKey": "BLOOD_REQUESTS",
     "module": "services",
     "path": "services/bloodbank.service.ts",
     "line": 461,
-    "area": "NOTIFICATIONS addDoc",
+    "area": "BLOOD_REQUESTS addDoc",
     "mode": "queue_safe"
   },
   {
@@ -1344,23 +1344,23 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.setDoc.services/bloodbank.service.ts:673",
+    "id": "APPOINTMENTS.setDoc.services/bloodbank.service.ts:673",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "APPOINTMENTS",
     "module": "services",
     "path": "services/bloodbank.service.ts",
     "line": 673,
-    "area": "UNKNOWN setDoc",
+    "area": "APPOINTMENTS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.updateDoc.services/bloodbank.service.ts:696",
+    "id": "NOTIFICATIONS.updateDoc.services/bloodbank.service.ts:696",
     "method": "updateDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "NOTIFICATIONS",
     "module": "services",
     "path": "services/bloodbank.service.ts",
     "line": 696,
-    "area": "UNKNOWN updateDoc",
+    "area": "NOTIFICATIONS updateDoc",
     "mode": "queue_safe"
   },
   {
@@ -1384,13 +1384,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "NOTIFICATIONS.addDoc.services/donor.service.ts:275",
+    "id": "BLOOD_REQUESTS.addDoc.services/donor.service.ts:275",
     "method": "addDoc",
-    "collectionKey": "NOTIFICATIONS",
+    "collectionKey": "BLOOD_REQUESTS",
     "module": "services",
     "path": "services/donor.service.ts",
     "line": 275,
-    "area": "NOTIFICATIONS addDoc",
+    "area": "BLOOD_REQUESTS addDoc",
     "mode": "queue_safe"
   },
   {
@@ -1424,13 +1424,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "NOTIFICATIONS.addDoc.services/donor.service.ts:464",
+    "id": "APPOINTMENTS.addDoc.services/donor.service.ts:464",
     "method": "addDoc",
-    "collectionKey": "NOTIFICATIONS",
+    "collectionKey": "APPOINTMENTS",
     "module": "services",
     "path": "services/donor.service.ts",
     "line": 464,
-    "area": "NOTIFICATIONS addDoc",
+    "area": "APPOINTMENTS addDoc",
     "mode": "queue_safe"
   },
   {
@@ -1524,13 +1524,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.updateDoc.services/donorRequest.service.ts:512",
+    "id": "DONOR_REQUESTS.updateDoc.services/donorRequest.service.ts:512",
     "method": "updateDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONOR_REQUESTS",
     "module": "services",
     "path": "services/donorRequest.service.ts",
     "line": 512,
-    "area": "UNKNOWN updateDoc",
+    "area": "DONOR_REQUESTS updateDoc",
     "mode": "queue_safe"
   },
   {
@@ -1564,23 +1564,23 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "UNKNOWN.setDoc.services/donorRequest.service.ts:626",
+    "id": "DONOR_REQUEST_BATCHES.setDoc.services/donorRequest.service.ts:626",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONOR_REQUEST_BATCHES",
     "module": "services",
     "path": "services/donorRequest.service.ts",
     "line": 626,
-    "area": "UNKNOWN setDoc",
+    "area": "DONOR_REQUEST_BATCHES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.setDoc.services/donorRequest.service.ts:641",
+    "id": "DONOR_REQUEST_BATCHES.setDoc.services/donorRequest.service.ts:641",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONOR_REQUEST_BATCHES",
     "module": "services",
     "path": "services/donorRequest.service.ts",
     "line": 641,
-    "area": "UNKNOWN setDoc",
+    "area": "DONOR_REQUEST_BATCHES setDoc",
     "mode": "queue_safe"
   },
   {
@@ -1644,13 +1644,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "UNKNOWN.setDoc.services/gamification.service.ts:465",
+    "id": "USER_STATS.setDoc.services/gamification.service.ts:465",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "USER_STATS",
     "module": "services",
     "path": "services/gamification.service.ts",
     "line": 465,
-    "area": "UNKNOWN setDoc",
+    "area": "USER_STATS setDoc",
     "mode": "queue_safe"
   },
   {
@@ -1734,13 +1734,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "NOTIFICATIONS.addDoc.services/ngo.service.ts:298",
+    "id": "CAMPAIGNS.addDoc.services/ngo.service.ts:298",
     "method": "addDoc",
-    "collectionKey": "NOTIFICATIONS",
+    "collectionKey": "CAMPAIGNS",
     "module": "services",
     "path": "services/ngo.service.ts",
     "line": 298,
-    "area": "NOTIFICATIONS addDoc",
+    "area": "CAMPAIGNS addDoc",
     "mode": "queue_safe"
   },
   {
@@ -1784,13 +1784,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.updateDoc.services/ngo.service.ts:612",
+    "id": "VOLUNTEERS.updateDoc.services/ngo.service.ts:612",
     "method": "updateDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "VOLUNTEERS",
     "module": "services",
     "path": "services/ngo.service.ts",
     "line": 612,
-    "area": "UNKNOWN updateDoc",
+    "area": "VOLUNTEERS updateDoc",
     "mode": "queue_safe"
   },
   {
@@ -1844,13 +1844,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "UNKNOWN.tx.set.services/notification.service.ts:204",
+    "id": "USERS.tx.set.services/notification.service.ts:204",
     "method": "tx.set",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "USERS",
     "module": "services",
     "path": "services/notification.service.ts",
     "line": 204,
-    "area": "UNKNOWN tx.set",
+    "area": "USERS tx.set",
     "mode": "online_only"
   },
   {
@@ -1884,303 +1884,303 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "OFFLINE_SYNC_HEALTH_RECORDS.setDoc.services/offlineMutationOutbox.service.ts:473",
+    "id": "OFFLINE_SYNC_HEALTH_RECORDS.setDoc.services/offlineMutationOutbox.service.ts:511",
     "method": "setDoc",
     "collectionKey": "OFFLINE_SYNC_HEALTH_RECORDS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 473,
+    "line": 511,
     "area": "OFFLINE_SYNC_HEALTH_RECORDS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.services/offlineMutationOutbox.service.ts:868",
+    "id": "USERS.updateDoc.services/offlineMutationOutbox.service.ts:916",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 868,
+    "line": 916,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.setDoc.services/offlineMutationOutbox.service.ts:876",
+    "id": "USERS.setDoc.services/offlineMutationOutbox.service.ts:924",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 876,
+    "line": 924,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "NOTIFICATIONS.updateDoc.services/offlineMutationOutbox.service.ts:884",
+    "id": "NOTIFICATIONS.updateDoc.services/offlineMutationOutbox.service.ts:932",
     "method": "updateDoc",
     "collectionKey": "NOTIFICATIONS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 884,
+    "line": 932,
     "area": "NOTIFICATIONS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CONTACT_SUBMISSIONS.updateDoc.services/offlineMutationOutbox.service.ts:892",
+    "id": "CONTACT_SUBMISSIONS.updateDoc.services/offlineMutationOutbox.service.ts:940",
     "method": "updateDoc",
     "collectionKey": "CONTACT_SUBMISSIONS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 892,
+    "line": 940,
     "area": "CONTACT_SUBMISSIONS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "NPS_RESPONSES.updateDoc.services/offlineMutationOutbox.service.ts:902",
+    "id": "NPS_RESPONSES.updateDoc.services/offlineMutationOutbox.service.ts:950",
     "method": "updateDoc",
     "collectionKey": "NPS_RESPONSES",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 902,
+    "line": 950,
     "area": "NPS_RESPONSES updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "NPS_RESPONSES.updateDoc.services/offlineMutationOutbox.service.ts:912",
+    "id": "NPS_RESPONSES.updateDoc.services/offlineMutationOutbox.service.ts:960",
     "method": "updateDoc",
     "collectionKey": "NPS_RESPONSES",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 912,
+    "line": 960,
     "area": "NPS_RESPONSES updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "NPS_RESPONSES.updateDoc.services/offlineMutationOutbox.service.ts:921",
+    "id": "NPS_RESPONSES.updateDoc.services/offlineMutationOutbox.service.ts:969",
     "method": "updateDoc",
     "collectionKey": "NPS_RESPONSES",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 921,
+    "line": 969,
     "area": "NPS_RESPONSES updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.updateDoc.services/offlineMutationOutbox.service.ts:938",
-    "method": "updateDoc",
-    "collectionKey": "UNKNOWN",
-    "module": "services",
-    "path": "services/offlineMutationOutbox.service.ts",
-    "line": 938,
-    "area": "UNKNOWN updateDoc",
-    "mode": "queue_safe"
-  },
-  {
-    "id": "CAMPAIGNS.updateDoc.services/offlineMutationOutbox.service.ts:943",
+    "id": "CAMPAIGNS.updateDoc.services/offlineMutationOutbox.service.ts:986",
     "method": "updateDoc",
     "collectionKey": "CAMPAIGNS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 943,
+    "line": 986,
     "area": "CAMPAIGNS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "APPOINTMENTS.updateDoc.services/offlineMutationOutbox.service.ts:951",
+    "id": "CAMPAIGNS.updateDoc.services/offlineMutationOutbox.service.ts:991",
+    "method": "updateDoc",
+    "collectionKey": "CAMPAIGNS",
+    "module": "services",
+    "path": "services/offlineMutationOutbox.service.ts",
+    "line": 991,
+    "area": "CAMPAIGNS updateDoc",
+    "mode": "queue_safe"
+  },
+  {
+    "id": "APPOINTMENTS.updateDoc.services/offlineMutationOutbox.service.ts:999",
     "method": "updateDoc",
     "collectionKey": "APPOINTMENTS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 951,
+    "line": 999,
     "area": "APPOINTMENTS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "DONATIONS.updateDoc.services/offlineMutationOutbox.service.ts:959",
+    "id": "DONATIONS.updateDoc.services/offlineMutationOutbox.service.ts:1007",
     "method": "updateDoc",
     "collectionKey": "DONATIONS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 959,
+    "line": 1007,
     "area": "DONATIONS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "VOLUNTEERS.updateDoc.services/offlineMutationOutbox.service.ts:967",
+    "id": "VOLUNTEERS.updateDoc.services/offlineMutationOutbox.service.ts:1015",
     "method": "updateDoc",
     "collectionKey": "VOLUNTEERS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 967,
+    "line": 1015,
     "area": "VOLUNTEERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "PARTNERSHIPS.updateDoc.services/offlineMutationOutbox.service.ts:975",
+    "id": "PARTNERSHIPS.updateDoc.services/offlineMutationOutbox.service.ts:1023",
     "method": "updateDoc",
     "collectionKey": "PARTNERSHIPS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 975,
+    "line": 1023,
     "area": "PARTNERSHIPS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "BLOOD_REQUESTS.updateDoc.services/offlineMutationOutbox.service.ts:983",
+    "id": "BLOOD_REQUESTS.updateDoc.services/offlineMutationOutbox.service.ts:1031",
     "method": "updateDoc",
     "collectionKey": "BLOOD_REQUESTS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 983,
+    "line": 1031,
     "area": "BLOOD_REQUESTS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.services/offlineMutationOutbox.service.ts:1445",
+    "id": "USERS.updateDoc.services/offlineMutationOutbox.service.ts:1519",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 1445,
+    "line": 1519,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.setDoc.services/offlineMutationOutbox.service.ts:1468",
+    "id": "USERS.setDoc.services/offlineMutationOutbox.service.ts:1542",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 1468,
+    "line": 1542,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "NOTIFICATIONS.updateDoc.services/offlineMutationOutbox.service.ts:1493",
+    "id": "NOTIFICATIONS.updateDoc.services/offlineMutationOutbox.service.ts:1567",
     "method": "updateDoc",
     "collectionKey": "NOTIFICATIONS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 1493,
+    "line": 1567,
     "area": "NOTIFICATIONS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CONTACT_SUBMISSIONS.updateDoc.services/offlineMutationOutbox.service.ts:1516",
+    "id": "CONTACT_SUBMISSIONS.updateDoc.services/offlineMutationOutbox.service.ts:1590",
     "method": "updateDoc",
     "collectionKey": "CONTACT_SUBMISSIONS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 1516,
+    "line": 1590,
     "area": "CONTACT_SUBMISSIONS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CAMPAIGNS.updateDoc.services/offlineMutationOutbox.service.ts:1539",
+    "id": "CAMPAIGNS.updateDoc.services/offlineMutationOutbox.service.ts:1613",
     "method": "updateDoc",
     "collectionKey": "CAMPAIGNS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 1539,
+    "line": 1613,
     "area": "CAMPAIGNS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "NPS_RESPONSES.updateDoc.services/offlineMutationOutbox.service.ts:1562",
+    "id": "NPS_RESPONSES.updateDoc.services/offlineMutationOutbox.service.ts:1636",
     "method": "updateDoc",
     "collectionKey": "NPS_RESPONSES",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 1562,
+    "line": 1636,
     "area": "NPS_RESPONSES updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "NPS_RESPONSES.updateDoc.services/offlineMutationOutbox.service.ts:1587",
+    "id": "NPS_RESPONSES.updateDoc.services/offlineMutationOutbox.service.ts:1661",
     "method": "updateDoc",
     "collectionKey": "NPS_RESPONSES",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 1587,
+    "line": 1661,
     "area": "NPS_RESPONSES updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "NPS_RESPONSES.updateDoc.services/offlineMutationOutbox.service.ts:1609",
+    "id": "NPS_RESPONSES.updateDoc.services/offlineMutationOutbox.service.ts:1683",
     "method": "updateDoc",
     "collectionKey": "NPS_RESPONSES",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 1609,
+    "line": 1683,
     "area": "NPS_RESPONSES updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "APPOINTMENTS.updateDoc.services/offlineMutationOutbox.service.ts:1630",
+    "id": "APPOINTMENTS.updateDoc.services/offlineMutationOutbox.service.ts:1704",
     "method": "updateDoc",
     "collectionKey": "APPOINTMENTS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 1630,
+    "line": 1704,
     "area": "APPOINTMENTS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "DONATIONS.updateDoc.services/offlineMutationOutbox.service.ts:1651",
+    "id": "DONATIONS.updateDoc.services/offlineMutationOutbox.service.ts:1725",
     "method": "updateDoc",
     "collectionKey": "DONATIONS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 1651,
+    "line": 1725,
     "area": "DONATIONS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "VOLUNTEERS.updateDoc.services/offlineMutationOutbox.service.ts:1672",
+    "id": "VOLUNTEERS.updateDoc.services/offlineMutationOutbox.service.ts:1746",
     "method": "updateDoc",
     "collectionKey": "VOLUNTEERS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 1672,
+    "line": 1746,
     "area": "VOLUNTEERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "PARTNERSHIPS.updateDoc.services/offlineMutationOutbox.service.ts:1693",
+    "id": "PARTNERSHIPS.updateDoc.services/offlineMutationOutbox.service.ts:1767",
     "method": "updateDoc",
     "collectionKey": "PARTNERSHIPS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 1693,
+    "line": 1767,
     "area": "PARTNERSHIPS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "BLOOD_REQUESTS.updateDoc.services/offlineMutationOutbox.service.ts:1714",
+    "id": "BLOOD_REQUESTS.updateDoc.services/offlineMutationOutbox.service.ts:1788",
     "method": "updateDoc",
     "collectionKey": "BLOOD_REQUESTS",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 1714,
+    "line": 1788,
     "area": "BLOOD_REQUESTS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.updateDoc.services/offlineMutationOutbox.service.ts:1760",
+    "id": "UNKNOWN.updateDoc.services/offlineMutationOutbox.service.ts:1834",
     "method": "updateDoc",
     "collectionKey": "UNKNOWN",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
-    "line": 1760,
+    "line": 1834,
     "area": "UNKNOWN updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.setDoc.services/referral.service.ts:155",
+    "id": "USERS.setDoc.services/referral.service.ts:155",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "USERS",
     "module": "services",
     "path": "services/referral.service.ts",
     "line": 155,
-    "area": "UNKNOWN setDoc",
+    "area": "USERS setDoc",
     "mode": "queue_safe"
   },
   {
@@ -2194,13 +2194,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.setDoc.services/referral.service.ts:182",
+    "id": "USERS.setDoc.services/referral.service.ts:182",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "USERS",
     "module": "services",
     "path": "services/referral.service.ts",
     "line": 182,
-    "area": "UNKNOWN setDoc",
+    "area": "USERS setDoc",
     "mode": "queue_safe"
   },
   {
@@ -2224,13 +2224,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.setDoc.services/referral.service.ts:354",
+    "id": "REFERRAL_TRACKING.setDoc.services/referral.service.ts:354",
     "method": "setDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "REFERRAL_TRACKING",
     "module": "services",
     "path": "services/referral.service.ts",
     "line": 354,
-    "area": "UNKNOWN setDoc",
+    "area": "REFERRAL_TRACKING setDoc",
     "mode": "queue_safe"
   },
   {
