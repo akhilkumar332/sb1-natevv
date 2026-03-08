@@ -33,6 +33,7 @@ import {
 import { extractQueryData, getServerTimestamp } from '../utils/firestore.utils';
 import { isEligibleToDonate } from '../utils/auth.utils';
 import { DatabaseError, ValidationError, NotFoundError } from '../utils/errorHandler';
+import { queueFirestoreDocPatch } from './offlineMutationOutbox.service';
 
 // ============================================================================
 // DONATION HISTORY
@@ -586,9 +587,14 @@ export const getDonorNotifications = async (
  */
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
   try {
-    await updateDoc(doc(db, COLLECTIONS.NOTIFICATIONS, notificationId), {
+    await queueFirestoreDocPatch({
+      collection: COLLECTIONS.NOTIFICATIONS,
+      docId: notificationId,
+      patch: {
       read: true,
-      readAt: getServerTimestamp(),
+      },
+      serverTimestampFields: ['readAt'],
+      dedupeScope: 'donor.notification.read',
     });
   } catch (error) {
     throw new DatabaseError('Failed to mark notification as read');
@@ -608,10 +614,13 @@ export const markAllNotificationsAsRead = async (donorId: string): Promise<void>
     );
 
     const snapshot = await getDocs(q);
-    const updatePromises = snapshot.docs.map(doc =>
-      updateDoc(doc.ref, {
-        read: true,
-        readAt: getServerTimestamp(),
+    const updatePromises = snapshot.docs.map((docSnap) =>
+      queueFirestoreDocPatch({
+        collection: COLLECTIONS.NOTIFICATIONS,
+        docId: docSnap.id,
+        patch: { read: true },
+        serverTimestampFields: ['readAt'],
+        dedupeScope: `donor.notification.read.${donorId}`,
       })
     );
 

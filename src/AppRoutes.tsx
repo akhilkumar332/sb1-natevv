@@ -118,6 +118,7 @@ const AdminErrorLogs = lazy(() => lazyLoad(import('./pages/admin/dashboard/Error
 const AdminContactSubmissions = lazy(() => lazyLoad(import('./pages/admin/dashboard/ContactSubmissions')));
 const AdminNotifications = lazy(() => lazyLoad(import('./pages/admin/dashboard/Notifications')));
 const AdminSettings = lazy(() => lazyLoad(import('./pages/admin/dashboard/Settings')));
+const AdminOfflineSyncHealth = lazy(() => lazyLoad(import('./pages/admin/dashboard/OfflineSyncHealth')));
 const FindDonors = lazy(() => lazyLoad(import('./pages/FindDonors')));
 const RequestBlood = lazy(() => lazyLoad(import('./pages/RequestBlood')));
 const About = lazy(() => lazyLoad(import('./pages/About')));
@@ -230,6 +231,7 @@ const AppRoutes = () => {
           <Route path="audit-security" element={<AdminAuditSecurity />} />
           <Route path="error-logs" element={<AdminErrorLogs />} />
           <Route path="contact-submissions" element={<AdminContactSubmissions />} />
+          <Route path="offline-sync-health" element={<AdminOfflineSyncHealth />} />
           <Route path="cms/overview" element={<AdminCmsOverview />} />
           <Route path="cms/pages" element={<AdminCmsPages />} />
           <Route path="cms/pages/:slug" element={<AdminCmsPageEditor />} />

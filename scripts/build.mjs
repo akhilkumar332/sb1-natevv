@@ -77,6 +77,7 @@ const suppressBaselineWarnings = (text) => {
 };
 
 try {
+  await run(process.execPath, ['scripts/generate-offline-write-inventory.mjs']);
   await run(process.execPath, ['scripts/generate-seo-artifacts.mjs']);
   await writeFirebaseConfig();
   await writeVersionFile();

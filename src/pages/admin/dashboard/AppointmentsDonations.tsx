@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../../firebase';
-import { getServerTimestamp } from '../../../utils/firestore.utils';
 import { toDateValue } from '../../../utils/dateValue';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
@@ -12,7 +9,7 @@ import { useAdminAppointments, useAdminDonations } from '../../../hooks/admin/us
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { refetchQueries } from '../../../utils/queryRefetch';
 import { runWithFeedback } from '../../../utils/runWithFeedback';
-import { COLLECTIONS } from '../../../constants/firestore';
+import { updateAdminAppointmentStatus, updateAdminDonationStatus } from '../../../services/offlineMutationOutbox.service';
 
 type AppointmentRow = {
   id: string;
@@ -115,7 +112,7 @@ function AppointmentsDonationsPage() {
   const updateAppointmentStatus = async (id: string, status: 'confirmed' | 'completed' | 'cancelled') => {
     setProcessingId(id);
     await runWithFeedback({
-      action: () => updateDoc(doc(db, COLLECTIONS.APPOINTMENTS, id), { status, updatedAt: getServerTimestamp() }),
+      action: () => updateAdminAppointmentStatus({ appointmentId: id, status }),
       successMessage: `Appointment marked ${status}`,
       errorMessage: 'Failed to update appointment status.',
       capture: { scope: 'admin', metadata: { kind: 'admin.appointment.status.update', status } },
@@ -127,7 +124,7 @@ function AppointmentsDonationsPage() {
   const updateDonationStatus = async (id: string, status: 'completed' | 'rejected' | 'pending') => {
     setProcessingId(id);
     await runWithFeedback({
-      action: () => updateDoc(doc(db, COLLECTIONS.DONATIONS, id), { status, updatedAt: getServerTimestamp() }),
+      action: () => updateAdminDonationStatus({ donationId: id, status }),
       successMessage: `Donation marked ${status}`,
       errorMessage: 'Failed to update donation status.',
       capture: { scope: 'admin', metadata: { kind: 'admin.donation.status.update', status } },

@@ -40,6 +40,7 @@ export const COLLECTIONS = {
   BLOODBANK_BRANCHES: 'bloodbankBranches',
   POINT_TRANSACTIONS: 'pointTransactions',
   DONATION_FEEDBACK: 'DonationFeedback',
+  OFFLINE_SYNC_HEALTH_RECORDS: 'offlineSyncHealthRecords',
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

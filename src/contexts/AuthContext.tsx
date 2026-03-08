@@ -55,6 +55,7 @@ import { authStorage } from '../utils/authStorage';
 import { readFcmTokenMeta, readStoredFcmToken, writeFcmTokenMeta, writeStoredFcmToken } from '../utils/fcmStorage';
 import { authMessages } from '../constants/messages';
 import { ROUTES } from '../constants/routes';
+import { updateUserProfilePatch } from '../services/offlineMutationOutbox.service';
 
 const trackImpersonationEvent = (eventName: string, params?: Record<string, any>) => {
   void import('../services/monitoring.service')
@@ -2354,16 +2355,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      await setDoc(
-        doc(db, COLLECTIONS.USERS, user.uid),
-        {
+      await updateUserProfilePatch({
+        userId: user.uid,
+        actorUid: user.uid,
+        patch: {
           ...sanitizedData,
           ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
           onboardingCompleted: true, // Set this to true upon successful completion
-          ...(existingBhId ? {} : generatedBhId ? { bhId: generatedBhId } : {})
+          ...(existingBhId ? {} : generatedBhId ? { bhId: generatedBhId } : {}),
         },
-        { merge: true }
-      );
+      });
       if (isPrivileged && sanitizedData.role && sanitizedData.role !== user.role) {
         void logAuditEvent({
           actorUid: user.uid,

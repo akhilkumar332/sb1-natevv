@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { doc, updateDoc } from 'firebase/firestore';
 import type { BloodRequest } from '../../../types/database.types';
-import { db } from '../../../firebase';
-import { getServerTimestamp } from '../../../utils/firestore.utils';
 import { toDateValue } from '../../../utils/dateValue';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
@@ -14,7 +11,7 @@ import { useAdminEmergencyRequests } from '../../../hooks/admin/useAdminQueries'
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { refetchQuery } from '../../../utils/queryRefetch';
 import { runWithFeedback } from '../../../utils/runWithFeedback';
-import { COLLECTIONS } from '../../../constants/firestore';
+import { updateAdminEmergencyRequestStatus } from '../../../services/offlineMutationOutbox.service';
 
 type UrgencyFilter = 'all' | 'critical' | 'high' | 'medium' | 'low';
 type StatusFilter = 'all' | 'active' | 'partially_fulfilled' | 'fulfilled' | 'expired' | 'cancelled';
@@ -97,11 +94,7 @@ function EmergencyRequestsPage() {
   const handleStatusUpdate = async (id: string, nextStatus: 'fulfilled' | 'cancelled') => {
     setProcessingId(id);
     await runWithFeedback({
-      action: () => updateDoc(doc(db, COLLECTIONS.BLOOD_REQUESTS, id), {
-        status: nextStatus,
-        updatedAt: getServerTimestamp(),
-        ...(nextStatus === 'fulfilled' ? { fulfilledAt: getServerTimestamp() } : {}),
-      }),
+      action: () => updateAdminEmergencyRequestStatus({ requestId: id, status: nextStatus }),
       successMessage: `Request marked as ${nextStatus}`,
       errorMessage: 'Failed to update request.',
       capture: { scope: 'admin', metadata: { kind: 'admin.emergency.status.update', nextStatus } },

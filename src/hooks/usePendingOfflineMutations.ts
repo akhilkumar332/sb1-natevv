@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   flushOfflineMutations,
+  refreshOfflineMutationHealthSnapshot,
   subscribePendingOfflineMutationState,
   type PendingOfflineMutationSummary,
 } from '../services/offlineMutationOutbox.service';
@@ -24,24 +25,25 @@ export const usePendingOfflineMutations = () => {
     });
   }, []);
 
-  const syncNow = async () => {
+  const syncNow = useCallback(async () => {
     if (syncInFlightRef.current) return;
     syncInFlightRef.current = true;
     setSyncing(true);
     try {
       await flushOfflineMutations();
+      await refreshOfflineMutationHealthSnapshot();
     } finally {
       syncInFlightRef.current = false;
       setSyncing(false);
     }
-  };
+  }, []);
 
   return useMemo(() => ({
     pendingCount: state.count,
     pendingItems: state.items,
     syncing,
     syncNow,
-  }), [state.count, state.items, syncing]);
+  }), [state.count, state.items, syncing, syncNow]);
 };
 
 export default usePendingOfflineMutations;

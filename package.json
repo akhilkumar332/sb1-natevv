@@ -4,11 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/prepare-firebase-config.mjs",
+    "predev": "node scripts/generate-offline-write-inventory.mjs && node scripts/prepare-firebase-config.mjs",
     "dev": "vite",
     "build": "node scripts/build.mjs",
     "build:prod": "node scripts/build.mjs --mode production",
     "seo:generate": "node scripts/generate-seo-artifacts.mjs",
+    "offline:inventory": "node scripts/generate-offline-write-inventory.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "node src/functions/index.js",

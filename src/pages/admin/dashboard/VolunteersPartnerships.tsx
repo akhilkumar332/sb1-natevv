@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../../firebase';
-import { getServerTimestamp } from '../../../utils/firestore.utils';
 import { toDateValue } from '../../../utils/dateValue';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
@@ -12,7 +9,7 @@ import { useAdminPartnerships, useAdminVolunteers } from '../../../hooks/admin/u
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { refetchQueries } from '../../../utils/queryRefetch';
 import { runWithFeedback } from '../../../utils/runWithFeedback';
-import { COLLECTIONS } from '../../../constants/firestore';
+import { updateAdminPartnershipStatus, updateAdminVolunteerStatus } from '../../../services/offlineMutationOutbox.service';
 
 type VolunteerRow = {
   id: string;
@@ -116,7 +113,7 @@ function VolunteersPartnershipsPage() {
   const updateVolunteerStatus = async (id: string, status: 'active' | 'inactive') => {
     setProcessingId(id);
     await runWithFeedback({
-      action: () => updateDoc(doc(db, COLLECTIONS.VOLUNTEERS, id), { status, updatedAt: getServerTimestamp() }),
+      action: () => updateAdminVolunteerStatus({ volunteerId: id, status }),
       successMessage: `Volunteer marked ${status}`,
       errorMessage: 'Failed to update volunteer status.',
       capture: { scope: 'admin', metadata: { kind: 'admin.volunteer.status.update', status } },
@@ -128,7 +125,7 @@ function VolunteersPartnershipsPage() {
   const updatePartnershipStatus = async (id: string, status: 'active' | 'pending' | 'inactive') => {
     setProcessingId(id);
     await runWithFeedback({
-      action: () => updateDoc(doc(db, COLLECTIONS.PARTNERSHIPS, id), { status, updatedAt: getServerTimestamp() }),
+      action: () => updateAdminPartnershipStatus({ partnershipId: id, status }),
       successMessage: `Partnership marked ${status}`,
       errorMessage: 'Failed to update partnership status.',
       capture: { scope: 'admin', metadata: { kind: 'admin.partnership.status.update', status } },

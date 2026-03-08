@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { BellRing, MailCheck } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../../firebase';
-import { getServerTimestamp } from '../../../utils/firestore.utils';
 import { toDateValue } from '../../../utils/dateValue';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
@@ -13,7 +10,7 @@ import { useAdminNotifications } from '../../../hooks/admin/useAdminQueries';
 import { refetchQuery } from '../../../utils/queryRefetch';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { runWithFeedback } from '../../../utils/runWithFeedback';
-import { COLLECTIONS } from '../../../constants/firestore';
+import { updateAdminNotificationReadStatus } from '../../../services/offlineMutationOutbox.service';
 
 type NotificationRow = {
   id: string;
@@ -85,10 +82,7 @@ function NotificationsPage() {
   const toggleRead = async (entry: NotificationRow, read: boolean) => {
     setProcessingId(entry.id);
     await runWithFeedback({
-      action: () => updateDoc(doc(db, COLLECTIONS.NOTIFICATIONS, entry.id), {
-        read,
-        updatedAt: getServerTimestamp(),
-      }),
+      action: () => updateAdminNotificationReadStatus({ notificationId: entry.id, read }),
       successMessage: read ? 'Marked as read' : 'Marked as unread',
       errorMessage: 'Failed to update notification.',
       capture: { scope: 'admin', metadata: { kind: 'admin.notification.read.toggle', read } },

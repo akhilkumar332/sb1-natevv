@@ -3,10 +3,7 @@ import { ChevronDown, ChevronUp, CloudOff, RefreshCw } from 'lucide-react';
 import { usePendingOfflineMutations } from '../../hooks/usePendingOfflineMutations';
 import { useNetworkStatus } from '../../contexts/NetworkStatusContext';
 import { HOUR_MS, MINUTE_MS, ONE_DAY_MS } from '../../constants/time';
-
-const mutationLabelMap: Record<string, string> = {
-  'user.notificationPreferences': 'Notification preferences update',
-};
+import { OFFLINE_MUTATION_LABELS } from '../../constants/offline';
 
 const formatRelativeTime = (ts: number) => {
   const diff = Date.now() - ts;
@@ -68,7 +65,7 @@ export const PendingActionsPanel = () => {
       {expanded && (
         <div className="mt-3 space-y-2 border-t border-amber-200 pt-3">
           {pendingItems.map((item) => {
-            const label = mutationLabelMap[item.type] || item.type;
+            const label = OFFLINE_MUTATION_LABELS[item.type] || item.type;
             return (
               <div key={item.id} className="rounded-lg border border-amber-200 bg-white px-3 py-2">
                 <div className="flex items-center justify-between gap-3">

@@ -32,6 +32,7 @@ import {
 import { extractQueryData, getServerTimestamp } from '../utils/firestore.utils';
 import { DatabaseError, ValidationError, NotFoundError } from '../utils/errorHandler';
 import { captureHandledError } from './errorLog.service';
+import { queueFirestoreDocPatch } from './offlineMutationOutbox.service';
 
 const reportNgoServiceError = (error: unknown, kind: string, metadata?: Record<string, unknown>) => {
   void captureHandledError(error, {
@@ -216,9 +217,14 @@ export const updateCampaign = async (
       }
     }
 
-    await updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId), {
-      ...allowedUpdates,
-      updatedAt: getServerTimestamp(),
+    await queueFirestoreDocPatch({
+      collection: COLLECTIONS.CAMPAIGNS,
+      docId: campaignId,
+      patch: {
+        ...allowedUpdates,
+      },
+      serverTimestampFields: ['updatedAt'],
+      dedupeScope: 'ngo.campaign.update',
     });
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) {
@@ -234,9 +240,14 @@ export const updateCampaign = async (
  */
 export const archiveCampaign = async (campaignId: string): Promise<void> => {
   try {
-    await updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId), {
-      status: 'cancelled',
-      updatedAt: getServerTimestamp(),
+    await queueFirestoreDocPatch({
+      collection: COLLECTIONS.CAMPAIGNS,
+      docId: campaignId,
+      patch: {
+        status: 'cancelled',
+      },
+      serverTimestampFields: ['updatedAt'],
+      dedupeScope: 'ngo.campaign.archive',
     });
   } catch (error) {
     throw new DatabaseError('Failed to archive campaign');
@@ -366,9 +377,14 @@ export const updateCampaignProgress = async (
       throw new ValidationError('Achieved value cannot be negative');
     }
 
-    await updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId), {
-      achieved,
-      updatedAt: getServerTimestamp(),
+    await queueFirestoreDocPatch({
+      collection: COLLECTIONS.CAMPAIGNS,
+      docId: campaignId,
+      patch: {
+        achieved,
+      },
+      serverTimestampFields: ['updatedAt'],
+      dedupeScope: 'ngo.campaign.progress',
     });
   } catch (error) {
     if (error instanceof ValidationError) {
@@ -507,9 +523,14 @@ export const updateVolunteer = async (
   try {
     const { id, createdAt, ...allowedUpdates } = updates;
 
-    await updateDoc(doc(db, COLLECTIONS.VOLUNTEERS, volunteerId), {
-      ...allowedUpdates,
-      updatedAt: getServerTimestamp(),
+    await queueFirestoreDocPatch({
+      collection: COLLECTIONS.VOLUNTEERS,
+      docId: volunteerId,
+      patch: {
+        ...allowedUpdates,
+      },
+      serverTimestampFields: ['updatedAt'],
+      dedupeScope: 'ngo.volunteer.update',
     });
   } catch (error) {
     throw new DatabaseError('Failed to update volunteer');
@@ -522,9 +543,14 @@ export const updateVolunteer = async (
  */
 export const archiveVolunteer = async (volunteerId: string): Promise<void> => {
   try {
-    await updateDoc(doc(db, COLLECTIONS.VOLUNTEERS, volunteerId), {
-      status: 'inactive',
-      updatedAt: getServerTimestamp(),
+    await queueFirestoreDocPatch({
+      collection: COLLECTIONS.VOLUNTEERS,
+      docId: volunteerId,
+      patch: {
+        status: 'inactive',
+      },
+      serverTimestampFields: ['updatedAt'],
+      dedupeScope: 'ngo.volunteer.archive',
     });
   } catch (error) {
     throw new DatabaseError('Failed to archive volunteer');
@@ -715,9 +741,14 @@ export const updatePartnership = async (
   try {
     const { id, createdAt, ...allowedUpdates } = updates;
 
-    await updateDoc(doc(db, COLLECTIONS.PARTNERSHIPS, partnershipId), {
-      ...allowedUpdates,
-      updatedAt: getServerTimestamp(),
+    await queueFirestoreDocPatch({
+      collection: COLLECTIONS.PARTNERSHIPS,
+      docId: partnershipId,
+      patch: {
+        ...allowedUpdates,
+      },
+      serverTimestampFields: ['updatedAt'],
+      dedupeScope: 'ngo.partnership.update',
     });
   } catch (error) {
     throw new DatabaseError('Failed to update partnership');
@@ -730,9 +761,14 @@ export const updatePartnership = async (
  */
 export const archivePartnership = async (partnershipId: string): Promise<void> => {
   try {
-    await updateDoc(doc(db, COLLECTIONS.PARTNERSHIPS, partnershipId), {
-      status: 'inactive',
-      updatedAt: getServerTimestamp(),
+    await queueFirestoreDocPatch({
+      collection: COLLECTIONS.PARTNERSHIPS,
+      docId: partnershipId,
+      patch: {
+        status: 'inactive',
+      },
+      serverTimestampFields: ['updatedAt'],
+      dedupeScope: 'ngo.partnership.archive',
     });
   } catch (error) {
     throw new DatabaseError('Failed to archive partnership');

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { AlertTriangle, BarChart3, CheckCircle2, CircleDotDashed, MessageSquare, RotateCcw, Users } from 'lucide-react';
 import { db } from '../../../firebase';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
@@ -37,6 +37,11 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { getServerTimestamp } from '../../../utils/firestore.utils';
 import { notify } from '../../../services/notify.service';
 import { captureHandledError } from '../../../services/errorLog.service';
+import {
+  updateAdminNpsFollowUpNotes,
+  updateAdminNpsFollowUpStatus,
+  updateAdminNpsTags,
+} from '../../../services/offlineMutationOutbox.service';
 
 type RoleFilter = 'all' | NpsRole;
 type SegmentFilter = 'all' | 'promoter' | 'passive' | 'detractor';
@@ -397,13 +402,16 @@ function NpsAdminPage() {
     };
     const previous = patchResponseInCache(row.id, optimisticPatch);
     try {
-      await updateDoc(doc(db, COLLECTIONS.NPS_RESPONSES, row.id), {
-        followUpStatus: nextStatus,
+      const result = await updateAdminNpsFollowUpStatus({
+        responseId: row.id,
+        status: nextStatus,
         followedUpBy: user?.uid || null,
-        followedUpAt: nextStatus === NPS_FOLLOW_UP_STATUS.open ? deleteField() : getServerTimestamp(),
-        updatedAt: getServerTimestamp(),
       });
-      notify.success(`Follow-up marked as ${nextStatus.replace('_', ' ')}.`);
+      notify.success(
+        result.queued
+          ? `Follow-up queued (${nextStatus.replace('_', ' ')}).`
+          : `Follow-up marked as ${nextStatus.replace('_', ' ')}.`,
+      );
       await syncNpsViews();
     } catch (error) {
       restoreResponsesCache(previous);
@@ -432,12 +440,16 @@ function NpsAdminPage() {
       updatedAt: new Date() as any,
     });
     try {
-      await updateDoc(doc(db, COLLECTIONS.NPS_RESPONSES, row.id), {
-        followUpNotes: nextNotes ? nextNotes : deleteField(),
+      const result = await updateAdminNpsFollowUpNotes({
+        responseId: row.id,
+        notes: nextNotes || null,
         followedUpBy: user?.uid || null,
-        updatedAt: getServerTimestamp(),
       });
-      notify.success(nextNotes ? 'Follow-up notes saved.' : 'Follow-up notes cleared.');
+      notify.success(
+        result.queued
+          ? (nextNotes ? 'Follow-up notes queued.' : 'Follow-up note clear queued.')
+          : (nextNotes ? 'Follow-up notes saved.' : 'Follow-up notes cleared.'),
+      );
       await syncNpsViews();
     } catch (error) {
       restoreResponsesCache(previous);
@@ -472,11 +484,11 @@ function NpsAdminPage() {
       updatedAt: new Date() as any,
     });
     try {
-      await updateDoc(doc(db, COLLECTIONS.NPS_RESPONSES, row.id), {
+      const result = await updateAdminNpsTags({
+        responseId: row.id,
         tags: nextTags,
-        updatedAt: getServerTimestamp(),
       });
-      notify.success('Driver tags saved.');
+      notify.success(result.queued ? 'Driver tags update queued.' : 'Driver tags saved.');
       await syncNpsViews();
     } catch (error) {
       restoreResponsesCache(previous);

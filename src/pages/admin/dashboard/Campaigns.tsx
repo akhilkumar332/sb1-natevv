@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../../firebase';
-import { getServerTimestamp } from '../../../utils/firestore.utils';
 import { toDateValue } from '../../../utils/dateValue';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
@@ -13,7 +10,7 @@ import { useAdminCampaigns } from '../../../hooks/admin/useAdminQueries';
 import { refetchQuery } from '../../../utils/queryRefetch';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { runWithFeedback } from '../../../utils/runWithFeedback';
-import { COLLECTIONS } from '../../../constants/firestore';
+import { updateAdminCampaignStatus } from '../../../services/offlineMutationOutbox.service';
 
 type CampaignRow = {
   id: string;
@@ -94,10 +91,7 @@ function CampaignsPage() {
   const handleStatusUpdate = async (campaignId: string, nextStatus: 'active' | 'completed' | 'cancelled') => {
     setProcessingId(campaignId);
     await runWithFeedback({
-      action: () => updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, campaignId), {
-        status: nextStatus,
-        updatedAt: getServerTimestamp(),
-      }),
+      action: () => updateAdminCampaignStatus({ campaignId, status: nextStatus }),
       successMessage: `Campaign marked ${nextStatus}`,
       errorMessage: 'Failed to update campaign status.',
       capture: { scope: 'admin', metadata: { kind: 'admin.campaign.status.update', nextStatus } },

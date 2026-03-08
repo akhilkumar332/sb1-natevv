@@ -17,7 +17,7 @@ const AdminListToolbar: FC<AdminListToolbarProps> = ({
   rightContent,
 }) => {
   return (
-    <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-xl sm:p-5">
+    <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-xl sm:p-5 dark:border-gray-700 dark:bg-[#0b1220]">
       <div className="space-y-3">
         <div className="relative">
           <input
@@ -25,9 +25,9 @@ const AdminListToolbar: FC<AdminListToolbarProps> = ({
             value={searchTerm}
             onChange={(event) => onSearchTermChange(event.target.value)}
             placeholder={searchPlaceholder}
-            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 pr-10 text-sm text-gray-700 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
+            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 pr-10 text-sm text-gray-700 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100 dark:border-gray-600 dark:bg-[#0f1726] dark:text-gray-100 dark:focus:border-red-400 dark:focus:ring-red-500/20"
           />
-          <Search className="pointer-events-none absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+          <Search className="pointer-events-none absolute right-3 top-2.5 h-5 w-5 text-gray-400 dark:text-gray-500" />
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

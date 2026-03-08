@@ -1,10 +1,16 @@
-import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { deleteField, doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { captureHandledError } from './errorLog.service';
 import { COLLECTIONS } from '../constants/firestore';
-import { FIFTEEN_SECONDS_MS, FIVE_MINUTES_MS, TWELVE_HUNDRED_MS } from '../constants/time';
+import {
+  OFFLINE_HEALTH_RECORDS_CONFIG,
+  OFFLINE_MUTATION_LABELS,
+  OFFLINE_MUTATION_TYPES,
+  OFFLINE_OUTBOX_CONFIG,
+  type OfflineMutationType,
+} from '../constants/offline';
 
-type MutationType = 'user.notificationPreferences';
+type MutationType = OfflineMutationType;
 
 type UserNotificationPreferencesMutation = {
   userId: string;
@@ -12,8 +18,92 @@ type UserNotificationPreferencesMutation = {
   notificationPreferences: Record<string, unknown>;
 };
 
+type UserProfilePatchMutation = {
+  userId: string;
+  patch: Record<string, unknown>;
+};
+
+type AdminNotificationReadMutation = {
+  notificationId: string;
+  read: boolean;
+};
+
+type AdminContactSubmissionStatusMutation = {
+  submissionId: string;
+  status: 'read' | 'unread';
+  readBy?: string | null;
+};
+
+type AdminNpsFollowUpStatusMutation = {
+  responseId: string;
+  status: 'open' | 'in_progress' | 'closed';
+  followedUpBy?: string | null;
+};
+
+type AdminNpsFollowUpNotesMutation = {
+  responseId: string;
+  notes: string | null;
+  followedUpBy?: string | null;
+};
+
+type AdminNpsTagsMutation = {
+  responseId: string;
+  tags: string[];
+};
+
+type FirestoreDocPatchMutation = {
+  collection: string;
+  docId: string;
+  patch: Record<string, unknown>;
+  deleteFields?: string[];
+  serverTimestampFields?: string[];
+};
+
+type AdminCampaignStatusMutation = {
+  campaignId: string;
+  status: 'active' | 'completed' | 'cancelled';
+};
+
+type AdminAppointmentStatusMutation = {
+  appointmentId: string;
+  status: 'confirmed' | 'completed' | 'cancelled';
+};
+
+type AdminDonationStatusMutation = {
+  donationId: string;
+  status: 'completed' | 'rejected' | 'pending';
+};
+
+type AdminVolunteerStatusMutation = {
+  volunteerId: string;
+  status: 'active' | 'inactive';
+};
+
+type AdminPartnershipStatusMutation = {
+  partnershipId: string;
+  status: 'active' | 'pending' | 'inactive';
+};
+
+type AdminEmergencyRequestStatusMutation = {
+  requestId: string;
+  status: 'fulfilled' | 'cancelled';
+};
+
 type MutationPayloadMap = {
-  'user.notificationPreferences': UserNotificationPreferencesMutation;
+  [OFFLINE_MUTATION_TYPES.userNotificationPreferences]: UserNotificationPreferencesMutation;
+  [OFFLINE_MUTATION_TYPES.userProfilePatch]: UserProfilePatchMutation;
+  [OFFLINE_MUTATION_TYPES.adminNotificationRead]: AdminNotificationReadMutation;
+  [OFFLINE_MUTATION_TYPES.adminContactSubmissionStatus]: AdminContactSubmissionStatusMutation;
+  [OFFLINE_MUTATION_TYPES.adminNpsFollowUpStatus]: AdminNpsFollowUpStatusMutation;
+  [OFFLINE_MUTATION_TYPES.adminNpsFollowUpNotes]: AdminNpsFollowUpNotesMutation;
+  [OFFLINE_MUTATION_TYPES.adminNpsTags]: AdminNpsTagsMutation;
+  [OFFLINE_MUTATION_TYPES.firestoreDocPatch]: FirestoreDocPatchMutation;
+  [OFFLINE_MUTATION_TYPES.adminCampaignStatus]: AdminCampaignStatusMutation;
+  [OFFLINE_MUTATION_TYPES.adminAppointmentStatus]: AdminAppointmentStatusMutation;
+  [OFFLINE_MUTATION_TYPES.adminDonationStatus]: AdminDonationStatusMutation;
+  [OFFLINE_MUTATION_TYPES.adminVolunteerStatus]: AdminVolunteerStatusMutation;
+  [OFFLINE_MUTATION_TYPES.adminPartnershipStatus]: AdminPartnershipStatusMutation;
+  [OFFLINE_MUTATION_TYPES.adminEmergencyRequestStatus]: AdminEmergencyRequestStatusMutation;
 };
 
 type MutationRecord<T extends MutationType = MutationType> = {
@@ -58,6 +148,18 @@ type PendingOfflineMutationsState = {
   items: PendingOfflineMutationSummary[];
 };
 
+export type OfflineMutationDeadLetterEntry = {
+  id: string;
+  mutationId: string;
+  type: MutationType;
+  actorUid: string;
+  dedupeKey: string;
+  attempts: number;
+  failedAt: number;
+  reason: string;
+  message: string | null;
+};
+
 export type OfflineMutationTelemetry = {
   enqueued: number;
   flushRuns: number;
@@ -65,6 +167,14 @@ export type OfflineMutationTelemetry = {
   flushedSucceeded: number;
   flushedFailed: number;
   pendingCount: number;
+  pendingByType: Partial<Record<MutationType, number>>;
+  deadLetterCount: number;
+  healthPersistRuns: number;
+  healthPersistSucceeded: number;
+  healthPersistFailed: number;
+  lastHealthPersistAt: number | null;
+  lastHealthPersistError: string | null;
+  lastHealthPersistRecordId: string | null;
   lastEnqueueAt: number | null;
   lastFlushAt: number | null;
   lastFailureAt: number | null;
@@ -72,6 +182,7 @@ export type OfflineMutationTelemetry = {
   recentEvents: Array<{
     at: number;
     kind: 'enqueue' | 'flush_start' | 'flush_complete' | 'flush_error';
+    mutationType?: MutationType;
     message?: string;
     processed?: number;
     succeeded?: number;
@@ -79,20 +190,27 @@ export type OfflineMutationTelemetry = {
   }>;
 };
 
-const DB_NAME = 'bloodhub_offline_mutations';
-const STORE_NAME = 'mutations';
-const DB_VERSION = 1;
-const FLUSH_INTERVAL_MS = FIFTEEN_SECONDS_MS;
-const MAX_BACKOFF_MS = FIVE_MINUTES_MS;
-const MIN_FLUSH_TRIGGER_GAP_MS = TWELVE_HUNDRED_MS;
-const TELEMETRY_STORAGE_KEY = 'bh_offline_mutation_telemetry_v1';
+const DB_NAME = OFFLINE_OUTBOX_CONFIG.dbName;
+const STORE_NAME = OFFLINE_OUTBOX_CONFIG.storeName;
+const DB_VERSION = OFFLINE_OUTBOX_CONFIG.dbVersion;
+const FLUSH_INTERVAL_MS = OFFLINE_OUTBOX_CONFIG.flushIntervalMs;
+const MAX_BACKOFF_MS = OFFLINE_OUTBOX_CONFIG.maxBackoffMs;
+const MIN_FLUSH_TRIGGER_GAP_MS = OFFLINE_OUTBOX_CONFIG.minFlushTriggerGapMs;
+const MAX_ATTEMPTS_PER_MUTATION = OFFLINE_OUTBOX_CONFIG.maxAttemptsPerMutation;
+const TELEMETRY_STORAGE_KEY = OFFLINE_OUTBOX_CONFIG.telemetryStorageKey;
+const DEAD_LETTER_STORAGE_KEY = OFFLINE_OUTBOX_CONFIG.deadLetterStorageKey;
+const MAX_TELEMETRY_COUNTER = 1_000_000;
 
 let workerStarted = false;
 let workerInterval: number | null = null;
 let flushing = false;
 let flushRequestedWhileRunning = false;
 let scheduledFlushTimer: number | null = null;
+let scheduledHealthPersistTimer: number | null = null;
 let lastFlushTriggerAt = 0;
+let lastHealthPersistAt = 0;
+let lastHealthPersistSignature = '';
+let healthPersistInFlight = false;
 let authUnsubscribe: (() => void) | null = null;
 const handleOnlineFlush = () => {
   safeFlush();
@@ -101,6 +219,7 @@ const handleOnlineFlush = () => {
 const pendingCountListeners = new Set<(count: number) => void>();
 const pendingStateListeners = new Set<(state: PendingOfflineMutationsState) => void>();
 const telemetryListeners = new Set<(telemetry: OfflineMutationTelemetry) => void>();
+const deadLetterListeners = new Set<(entries: OfflineMutationDeadLetterEntry[]) => void>();
 
 const emptyTelemetry = (): OfflineMutationTelemetry => ({
   enqueued: 0,
@@ -109,6 +228,14 @@ const emptyTelemetry = (): OfflineMutationTelemetry => ({
   flushedSucceeded: 0,
   flushedFailed: 0,
   pendingCount: 0,
+  pendingByType: {},
+  deadLetterCount: 0,
+  healthPersistRuns: 0,
+  healthPersistSucceeded: 0,
+  healthPersistFailed: 0,
+  lastHealthPersistAt: null,
+  lastHealthPersistError: null,
+  lastHealthPersistRecordId: null,
   lastEnqueueAt: null,
   lastFlushAt: null,
   lastFailureAt: null,
@@ -117,9 +244,44 @@ const emptyTelemetry = (): OfflineMutationTelemetry => ({
 });
 
 const safeWindow = () => (typeof window !== 'undefined' ? window : null);
+const getCurrentUserUid = (): string | null => {
+  try {
+    return auth?.currentUser?.uid || null;
+  } catch {
+    return null;
+  }
+};
+const subscribeAuthState = (listener: () => void): (() => void) => {
+  try {
+    if (auth && typeof auth.onAuthStateChanged === 'function') {
+      return auth.onAuthStateChanged(listener);
+    }
+  } catch {
+    // ignore mock/runtime auth binding failures
+  }
+  return () => {};
+};
 const safeFiniteNumber = (value: unknown, fallback: number): number => {
   const parsed = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const toSafeCounter = (value: unknown): number => {
+  const normalized = Math.max(0, Math.floor(safeFiniteNumber(value, 0)));
+  return Math.min(MAX_TELEMETRY_COUNTER, normalized);
+};
+
+const shallowEqualRecord = (
+  a: Record<string, number> | undefined,
+  b: Record<string, number> | undefined,
+): boolean => {
+  const aKeys = Object.keys(a || {});
+  const bKeys = Object.keys(b || {});
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    if ((a || {})[key] !== (b || {})[key]) return false;
+  }
+  return true;
 };
 
 const loadTelemetry = (): OfflineMutationTelemetry => {
@@ -132,37 +294,114 @@ const loadTelemetry = (): OfflineMutationTelemetry => {
     const safeEvents = Array.isArray(parsed.recentEvents)
       ? parsed.recentEvents
         .filter((entry) => entry && typeof entry === 'object')
-        .slice(0, 40)
+        .slice(0, OFFLINE_OUTBOX_CONFIG.maxRecentEvents)
         .map((entry) => ({
           at: safeFiniteNumber((entry as any).at, Date.now()),
           kind: ['enqueue', 'flush_start', 'flush_complete', 'flush_error'].includes(String((entry as any).kind))
             ? (entry as any).kind
             : 'enqueue',
+          mutationType: Object.values(OFFLINE_MUTATION_TYPES).includes((entry as any).mutationType)
+            ? (entry as any).mutationType
+            : undefined,
           message: typeof (entry as any).message === 'string' ? (entry as any).message : undefined,
           processed: Number.isFinite((entry as any).processed) ? Number((entry as any).processed) : undefined,
           succeeded: Number.isFinite((entry as any).succeeded) ? Number((entry as any).succeeded) : undefined,
           failed: Number.isFinite((entry as any).failed) ? Number((entry as any).failed) : undefined,
         }))
       : [];
-    return {
-      enqueued: Math.max(0, Math.floor(safeFiniteNumber(parsed.enqueued, 0))),
-      flushRuns: Math.max(0, Math.floor(safeFiniteNumber(parsed.flushRuns, 0))),
-      flushedProcessed: Math.max(0, Math.floor(safeFiniteNumber(parsed.flushedProcessed, 0))),
-      flushedSucceeded: Math.max(0, Math.floor(safeFiniteNumber(parsed.flushedSucceeded, 0))),
-      flushedFailed: Math.max(0, Math.floor(safeFiniteNumber(parsed.flushedFailed, 0))),
-      pendingCount: Math.max(0, Math.floor(safeFiniteNumber(parsed.pendingCount, 0))),
+    const parsedPendingByType = (parsed.pendingByType && typeof parsed.pendingByType === 'object')
+      ? Object.entries(parsed.pendingByType).reduce<Partial<Record<MutationType, number>>>((acc, [key, value]) => {
+          if (!Object.values(OFFLINE_MUTATION_TYPES).includes(key as MutationType)) return acc;
+          const safeValue = Math.max(0, Math.floor(safeFiniteNumber(value, 0)));
+          acc[key as MutationType] = safeValue;
+          return acc;
+        }, {})
+      : {};
+    const normalized: OfflineMutationTelemetry = {
+      enqueued: toSafeCounter(parsed.enqueued),
+      flushRuns: toSafeCounter(parsed.flushRuns),
+      flushedProcessed: toSafeCounter(parsed.flushedProcessed),
+      flushedSucceeded: toSafeCounter(parsed.flushedSucceeded),
+      flushedFailed: toSafeCounter(parsed.flushedFailed),
+      pendingCount: toSafeCounter(parsed.pendingCount),
+      pendingByType: parsedPendingByType,
+      deadLetterCount: toSafeCounter(parsed.deadLetterCount),
+      healthPersistRuns: toSafeCounter((parsed as any).healthPersistRuns),
+      healthPersistSucceeded: toSafeCounter((parsed as any).healthPersistSucceeded),
+      healthPersistFailed: toSafeCounter((parsed as any).healthPersistFailed),
+      lastHealthPersistAt: (parsed as any).lastHealthPersistAt == null
+        ? null
+        : safeFiniteNumber((parsed as any).lastHealthPersistAt, Date.now()),
+      lastHealthPersistError: typeof (parsed as any).lastHealthPersistError === 'string'
+        ? (parsed as any).lastHealthPersistError.slice(0, 240)
+        : null,
+      lastHealthPersistRecordId: typeof (parsed as any).lastHealthPersistRecordId === 'string'
+        ? (parsed as any).lastHealthPersistRecordId.slice(0, 180)
+        : null,
       lastEnqueueAt: parsed.lastEnqueueAt == null ? null : safeFiniteNumber(parsed.lastEnqueueAt, Date.now()),
       lastFlushAt: parsed.lastFlushAt == null ? null : safeFiniteNumber(parsed.lastFlushAt, Date.now()),
       lastFailureAt: parsed.lastFailureAt == null ? null : safeFiniteNumber(parsed.lastFailureAt, Date.now()),
       lastFailureMessage: typeof parsed.lastFailureMessage === 'string' ? parsed.lastFailureMessage.slice(0, 240) : null,
       recentEvents: safeEvents,
     };
+    // Self-heal historical runaway counters from older scheduler loops.
+    if (
+      normalized.healthPersistRuns >= 100_000
+      && normalized.healthPersistSucceeded === 0
+      && normalized.healthPersistFailed === normalized.healthPersistRuns
+    ) {
+      return {
+        ...normalized,
+        healthPersistRuns: 0,
+        healthPersistFailed: 0,
+        lastHealthPersistAt: null,
+        lastHealthPersistError: null,
+        lastHealthPersistRecordId: null,
+      };
+    }
+    return normalized;
   } catch {
     return emptyTelemetry();
   }
 };
 
 let telemetryState: OfflineMutationTelemetry = loadTelemetry();
+
+const loadDeadLetters = (): OfflineMutationDeadLetterEntry[] => {
+  const w = safeWindow();
+  if (!w) return [];
+  try {
+    const raw = w.localStorage.getItem(DEAD_LETTER_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((entry) => entry && typeof entry === 'object')
+      .slice(0, OFFLINE_OUTBOX_CONFIG.maxDeadLetterItems)
+      .map((entry) => ({
+        id: String((entry as any).id || ''),
+        mutationId: String((entry as any).mutationId || ''),
+        type: Object.values(OFFLINE_MUTATION_TYPES).includes((entry as any).type)
+          ? (entry as any).type
+          : OFFLINE_MUTATION_TYPES.userNotificationPreferences,
+        actorUid: String((entry as any).actorUid || ''),
+        dedupeKey: String((entry as any).dedupeKey || ''),
+        attempts: Math.max(0, Math.floor(safeFiniteNumber((entry as any).attempts, 0))),
+        failedAt: safeFiniteNumber((entry as any).failedAt, Date.now()),
+        reason: String((entry as any).reason || 'unknown'),
+        message: (entry as any).message == null ? null : String((entry as any).message).slice(0, 240),
+      }))
+      .filter((entry) => entry.id && entry.mutationId && entry.actorUid);
+  } catch {
+    return [];
+  }
+};
+
+let deadLetterState: OfflineMutationDeadLetterEntry[] = loadDeadLetters();
+telemetryState = {
+  ...telemetryState,
+  deadLetterCount: deadLetterState.length,
+};
 
 const saveTelemetry = () => {
   const w = safeWindow();
@@ -174,19 +413,200 @@ const saveTelemetry = () => {
   }
 };
 
+const toBucketStart = (timestampMs: number) => {
+  const bucketMs = OFFLINE_HEALTH_RECORDS_CONFIG.bucketMs;
+  return Math.floor(timestampMs / bucketMs) * bucketMs;
+};
+
+const buildHealthPersistSignature = (uid: string, now: number) => {
+  const bucketStart = toBucketStart(now);
+  const pendingByTypeSignature = Object.entries(telemetryState.pendingByType || {})
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([key, value]) => `${key}:${Math.max(0, Math.floor(Number(value) || 0))}`)
+    .join('|');
+  return [
+    uid,
+    bucketStart,
+    telemetryState.pendingCount,
+    pendingByTypeSignature,
+    telemetryState.deadLetterCount,
+    telemetryState.flushedProcessed,
+    telemetryState.flushedFailed,
+    telemetryState.lastFailureAt || 0,
+  ].join(':');
+};
+
+const persistOfflineSyncHealthRecordNow = async () => {
+  const uid = getCurrentUserUid();
+  if (!uid) {
+    lastHealthPersistAt = Date.now();
+    return;
+  }
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    lastHealthPersistAt = Date.now();
+    return;
+  }
+  if (healthPersistInFlight) return;
+
+  const now = Date.now();
+  const signature = buildHealthPersistSignature(uid, now);
+  if (signature === lastHealthPersistSignature) return;
+
+  const bucketStart = toBucketStart(now);
+  const recordId = `${uid}_${bucketStart}`;
+  const deadLetterSamples = deadLetterState
+    .slice(0, OFFLINE_HEALTH_RECORDS_CONFIG.maxDeadLetterSamples)
+    .map((entry) => ({
+      type: entry.type,
+      reason: entry.reason,
+      attempts: entry.attempts,
+      failedAt: entry.failedAt,
+    }));
+
+  try {
+    healthPersistInFlight = true;
+    // Throttle re-scheduling while this attempt is in flight.
+    lastHealthPersistAt = now;
+    patchTelemetry({
+      healthPersistRuns: telemetryState.healthPersistRuns + 1,
+    });
+    await setDoc(
+      doc(db, COLLECTIONS.OFFLINE_SYNC_HEALTH_RECORDS, recordId),
+      {
+        uid,
+        bucketStart,
+        updatedAt: serverTimestamp(),
+        lastEnqueueAt: telemetryState.lastEnqueueAt || null,
+        lastFlushAt: telemetryState.lastFlushAt || null,
+        lastFailureAt: telemetryState.lastFailureAt || null,
+        lastFailureMessage: telemetryState.lastFailureMessage || null,
+        pendingCount: telemetryState.pendingCount,
+        pendingByType: telemetryState.pendingByType || {},
+        deadLetterCount: telemetryState.deadLetterCount,
+        deadLetterSamples,
+        enqueued: telemetryState.enqueued,
+        flushRuns: telemetryState.flushRuns,
+        flushedProcessed: telemetryState.flushedProcessed,
+        flushedSucceeded: telemetryState.flushedSucceeded,
+        flushedFailed: telemetryState.flushedFailed,
+      },
+      { merge: true },
+    );
+    lastHealthPersistSignature = signature;
+    patchTelemetry({
+      healthPersistSucceeded: telemetryState.healthPersistSucceeded + 1,
+      lastHealthPersistAt: now,
+      lastHealthPersistError: null,
+      lastHealthPersistRecordId: recordId,
+    });
+  } catch (error) {
+    patchTelemetry({
+      healthPersistFailed: telemetryState.healthPersistFailed + 1,
+      lastHealthPersistError: String((error as any)?.message || 'persist_failed').slice(0, 240),
+      lastHealthPersistRecordId: recordId,
+    });
+    void captureHandledError(error, {
+      source: 'frontend',
+      scope: 'unknown',
+      metadata: {
+        kind: 'offline_sync_health.persist',
+        uid,
+        recordId,
+      },
+    });
+  } finally {
+    healthPersistInFlight = false;
+  }
+};
+
+const scheduleOfflineSyncHealthRecordPersist = () => {
+  if (typeof window === 'undefined') return;
+  if (healthPersistInFlight) return;
+  if (!getCurrentUserUid()) return;
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  const intervalMs = OFFLINE_HEALTH_RECORDS_CONFIG.persistIntervalMs;
+  const elapsed = Date.now() - lastHealthPersistAt;
+  const delayMs = Math.max(0, intervalMs - elapsed);
+
+  if (delayMs <= 0) {
+    void persistOfflineSyncHealthRecordNow();
+    return;
+  }
+
+  if (scheduledHealthPersistTimer !== null) return;
+  scheduledHealthPersistTimer = window.setTimeout(() => {
+    scheduledHealthPersistTimer = null;
+    void persistOfflineSyncHealthRecordNow();
+  }, delayMs);
+};
+
 const publishTelemetry = () => {
   saveTelemetry();
+  scheduleOfflineSyncHealthRecordPersist();
   telemetryListeners.forEach((listener) => listener({
     ...telemetryState,
     recentEvents: [...telemetryState.recentEvents],
   }));
 };
 
+const saveDeadLetters = () => {
+  const w = safeWindow();
+  if (!w) return;
+  try {
+    w.localStorage.setItem(DEAD_LETTER_STORAGE_KEY, JSON.stringify(deadLetterState));
+  } catch {
+    // ignore
+  }
+};
+
+const publishDeadLetters = () => {
+  saveDeadLetters();
+  scheduleOfflineSyncHealthRecordPersist();
+  deadLetterListeners.forEach((listener) => listener([...deadLetterState]));
+  patchTelemetry({
+    deadLetterCount: deadLetterState.length,
+  });
+};
+
 const patchTelemetry = (patch: Partial<OfflineMutationTelemetry>) => {
-  telemetryState = {
+  const nextState: OfflineMutationTelemetry = {
     ...telemetryState,
     ...patch,
   };
+  nextState.enqueued = toSafeCounter(nextState.enqueued);
+  nextState.flushRuns = toSafeCounter(nextState.flushRuns);
+  nextState.flushedProcessed = toSafeCounter(nextState.flushedProcessed);
+  nextState.flushedSucceeded = toSafeCounter(nextState.flushedSucceeded);
+  nextState.flushedFailed = toSafeCounter(nextState.flushedFailed);
+  nextState.pendingCount = toSafeCounter(nextState.pendingCount);
+  nextState.deadLetterCount = toSafeCounter(nextState.deadLetterCount);
+  nextState.healthPersistRuns = toSafeCounter(nextState.healthPersistRuns);
+  nextState.healthPersistSucceeded = toSafeCounter(nextState.healthPersistSucceeded);
+  nextState.healthPersistFailed = toSafeCounter(nextState.healthPersistFailed);
+
+  const isNoop = (
+    nextState.enqueued === telemetryState.enqueued
+    && nextState.flushRuns === telemetryState.flushRuns
+    && nextState.flushedProcessed === telemetryState.flushedProcessed
+    && nextState.flushedSucceeded === telemetryState.flushedSucceeded
+    && nextState.flushedFailed === telemetryState.flushedFailed
+    && nextState.pendingCount === telemetryState.pendingCount
+    && shallowEqualRecord(nextState.pendingByType || {}, telemetryState.pendingByType || {})
+    && nextState.deadLetterCount === telemetryState.deadLetterCount
+    && nextState.healthPersistRuns === telemetryState.healthPersistRuns
+    && nextState.healthPersistSucceeded === telemetryState.healthPersistSucceeded
+    && nextState.healthPersistFailed === telemetryState.healthPersistFailed
+    && nextState.lastHealthPersistAt === telemetryState.lastHealthPersistAt
+    && nextState.lastHealthPersistError === telemetryState.lastHealthPersistError
+    && nextState.lastHealthPersistRecordId === telemetryState.lastHealthPersistRecordId
+    && nextState.lastEnqueueAt === telemetryState.lastEnqueueAt
+    && nextState.lastFlushAt === telemetryState.lastFlushAt
+    && nextState.lastFailureAt === telemetryState.lastFailureAt
+    && nextState.lastFailureMessage === telemetryState.lastFailureMessage
+  );
+  if (isNoop) return;
+
+  telemetryState = nextState;
   publishTelemetry();
 };
 
@@ -194,9 +614,25 @@ const pushTelemetryEvent = (event: OfflineMutationTelemetry['recentEvents'][numb
   const existing = telemetryState.recentEvents || [];
   telemetryState = {
     ...telemetryState,
-    recentEvents: [event, ...existing].slice(0, 40),
+    recentEvents: [event, ...existing].slice(0, OFFLINE_OUTBOX_CONFIG.maxRecentEvents),
   };
   publishTelemetry();
+};
+
+const addDeadLetter = (mutation: MutationRecord, reason: string, message?: string | null) => {
+  const entry: OfflineMutationDeadLetterEntry = {
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+    mutationId: mutation.id,
+    type: mutation.type,
+    actorUid: mutation.actorUid,
+    dedupeKey: mutation.dedupeKey,
+    attempts: mutation.attempts,
+    failedAt: Date.now(),
+    reason,
+    message: message ? String(message).slice(0, 240) : null,
+  };
+  deadLetterState = [entry, ...deadLetterState].slice(0, OFFLINE_OUTBOX_CONFIG.maxDeadLetterItems);
+  publishDeadLetters();
 };
 
 const isOfflineWriteError = (error: unknown): boolean => {
@@ -324,14 +760,15 @@ const publishPendingState = async () => {
     pendingCountListeners.size === 0
     && pendingStateListeners.size === 0
     && telemetryListeners.size === 0
+    && !workerStarted
   ) {
     return;
   }
-  const actorUid = auth.currentUser?.uid || null;
+  const actorUid = getCurrentUserUid();
   if (!actorUid) {
     pendingCountListeners.forEach((listener) => listener(0));
     pendingStateListeners.forEach((listener) => listener({ count: 0, items: [] }));
-    patchTelemetry({ pendingCount: 0 });
+    patchTelemetry({ pendingCount: 0, pendingByType: {} });
     return;
   }
 
@@ -339,9 +776,15 @@ const publishPendingState = async () => {
     const summary = await withStore('readonly', async (store) => {
       const actorIndex = store.index('actorUid');
       const all = await requestToPromise<MutationRecord[]>(actorIndex.getAll(actorUid));
-      const items = (Array.isArray(all) ? all : [])
+      const normalized = Array.isArray(all) ? all : [];
+      const byType = normalized.reduce<Partial<Record<MutationType, number>>>((acc, item) => {
+        const current = acc[item.type] || 0;
+        acc[item.type] = current + 1;
+        return acc;
+      }, {});
+      const items = normalized
         .sort((a, b) => safeFiniteNumber(a.createdAt, 0) - safeFiniteNumber(b.createdAt, 0))
-        .slice(0, 25)
+        .slice(0, OFFLINE_OUTBOX_CONFIG.maxPendingItems)
         .map((item) => ({
           id: item.id,
           type: item.type,
@@ -352,17 +795,18 @@ const publishPendingState = async () => {
           lastError: item.lastError,
         }));
       return {
-        count: Array.isArray(all) ? all.length : 0,
+        count: normalized.length,
         items,
-      } as PendingOfflineMutationsState;
+        byType,
+      } as PendingOfflineMutationsState & { byType: Partial<Record<MutationType, number>> };
     });
     pendingCountListeners.forEach((listener) => listener(summary.count));
     pendingStateListeners.forEach((listener) => listener(summary));
-    patchTelemetry({ pendingCount: summary.count });
+    patchTelemetry({ pendingCount: summary.count, pendingByType: summary.byType || {} });
   } catch {
     pendingCountListeners.forEach((listener) => listener(0));
     pendingStateListeners.forEach((listener) => listener({ count: 0, items: [] }));
-    patchTelemetry({ pendingCount: 0 });
+    patchTelemetry({ pendingCount: 0, pendingByType: {} });
   }
 };
 
@@ -412,16 +856,133 @@ const upsertMutation = async <T extends MutationType>(options: EnqueueOptions<T>
   pushTelemetryEvent({
     at: Date.now(),
     kind: 'enqueue',
-    message: options.type,
+    mutationType: options.type,
+    message: OFFLINE_MUTATION_LABELS[options.type] || options.type,
   });
 };
 
 const applyMutation = async (mutation: MutationRecord): Promise<void> => {
   switch (mutation.type) {
-    case 'user.notificationPreferences': {
+    case OFFLINE_MUTATION_TYPES.userNotificationPreferences: {
       const payload = mutation.payload as UserNotificationPreferencesMutation;
       await updateDoc(doc(db, COLLECTIONS.USERS, payload.userId), {
         notificationPreferences: payload.notificationPreferences,
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+    case OFFLINE_MUTATION_TYPES.userProfilePatch: {
+      const payload = mutation.payload as UserProfilePatchMutation;
+      await setDoc(doc(db, COLLECTIONS.USERS, payload.userId), {
+        ...payload.patch,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      return;
+    }
+    case OFFLINE_MUTATION_TYPES.adminNotificationRead: {
+      const payload = mutation.payload as AdminNotificationReadMutation;
+      await updateDoc(doc(db, COLLECTIONS.NOTIFICATIONS, payload.notificationId), {
+        read: payload.read,
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+    case OFFLINE_MUTATION_TYPES.adminContactSubmissionStatus: {
+      const payload = mutation.payload as AdminContactSubmissionStatusMutation;
+      await updateDoc(doc(db, COLLECTIONS.CONTACT_SUBMISSIONS, payload.submissionId), {
+        status: payload.status,
+        readAt: payload.status === 'read' ? serverTimestamp() : deleteField(),
+        readBy: payload.status === 'read' ? (payload.readBy || null) : deleteField(),
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+    case OFFLINE_MUTATION_TYPES.adminNpsFollowUpStatus: {
+      const payload = mutation.payload as AdminNpsFollowUpStatusMutation;
+      await updateDoc(doc(db, COLLECTIONS.NPS_RESPONSES, payload.responseId), {
+        followUpStatus: payload.status,
+        followedUpBy: payload.followedUpBy || null,
+        followedUpAt: payload.status === 'open' ? deleteField() : serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+    case OFFLINE_MUTATION_TYPES.adminNpsFollowUpNotes: {
+      const payload = mutation.payload as AdminNpsFollowUpNotesMutation;
+      await updateDoc(doc(db, COLLECTIONS.NPS_RESPONSES, payload.responseId), {
+        followUpNotes: payload.notes ? payload.notes : deleteField(),
+        followedUpBy: payload.followedUpBy || null,
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+    case OFFLINE_MUTATION_TYPES.adminNpsTags: {
+      const payload = mutation.payload as AdminNpsTagsMutation;
+      await updateDoc(doc(db, COLLECTIONS.NPS_RESPONSES, payload.responseId), {
+        tags: payload.tags,
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+    case OFFLINE_MUTATION_TYPES.firestoreDocPatch: {
+      const payload = mutation.payload as FirestoreDocPatchMutation;
+      const updatePayload: Record<string, unknown> = {
+        ...payload.patch,
+      };
+      (payload.deleteFields || []).forEach((field) => {
+        updatePayload[field] = deleteField();
+      });
+      (payload.serverTimestampFields || []).forEach((field) => {
+        updatePayload[field] = serverTimestamp();
+      });
+      await updateDoc(doc(db, payload.collection, payload.docId), updatePayload);
+      return;
+    }
+    case OFFLINE_MUTATION_TYPES.adminCampaignStatus: {
+      const payload = mutation.payload as AdminCampaignStatusMutation;
+      await updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, payload.campaignId), {
+        status: payload.status,
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+    case OFFLINE_MUTATION_TYPES.adminAppointmentStatus: {
+      const payload = mutation.payload as AdminAppointmentStatusMutation;
+      await updateDoc(doc(db, COLLECTIONS.APPOINTMENTS, payload.appointmentId), {
+        status: payload.status,
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+    case OFFLINE_MUTATION_TYPES.adminDonationStatus: {
+      const payload = mutation.payload as AdminDonationStatusMutation;
+      await updateDoc(doc(db, COLLECTIONS.DONATIONS, payload.donationId), {
+        status: payload.status,
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+    case OFFLINE_MUTATION_TYPES.adminVolunteerStatus: {
+      const payload = mutation.payload as AdminVolunteerStatusMutation;
+      await updateDoc(doc(db, COLLECTIONS.VOLUNTEERS, payload.volunteerId), {
+        status: payload.status,
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+    case OFFLINE_MUTATION_TYPES.adminPartnershipStatus: {
+      const payload = mutation.payload as AdminPartnershipStatusMutation;
+      await updateDoc(doc(db, COLLECTIONS.PARTNERSHIPS, payload.partnershipId), {
+        status: payload.status,
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+    case OFFLINE_MUTATION_TYPES.adminEmergencyRequestStatus: {
+      const payload = mutation.payload as AdminEmergencyRequestStatusMutation;
+      await updateDoc(doc(db, COLLECTIONS.BLOOD_REQUESTS, payload.requestId), {
+        status: payload.status,
+        ...(payload.status === 'fulfilled' ? { fulfilledAt: serverTimestamp() } : {}),
         updatedAt: serverTimestamp(),
       });
       return;
@@ -431,7 +992,7 @@ const applyMutation = async (mutation: MutationRecord): Promise<void> => {
   }
 };
 
-const updateMutationRetry = async (mutation: MutationRecord, error: unknown): Promise<void> => {
+const updateMutationRetry = async (mutation: MutationRecord, error: unknown): Promise<number> => {
   const nextAttempts = mutation.attempts + 1;
   const message = String((error as any)?.message || error || 'mutation_flush_failed');
   const nextAttemptAt = Date.now() + computeBackoffMs(nextAttempts);
@@ -444,6 +1005,7 @@ const updateMutationRetry = async (mutation: MutationRecord, error: unknown): Pr
       lastError: message.slice(0, 240),
     } as MutationRecord);
   });
+  return nextAttempts;
 };
 
 const removeMutation = async (id: string): Promise<void> => {
@@ -476,7 +1038,7 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
     };
   }
 
-  const actorUid = auth.currentUser?.uid || null;
+  const actorUid = getCurrentUserUid();
   if (!actorUid || (typeof navigator !== 'undefined' && !navigator.onLine)) {
     return {
       processed: 0,
@@ -521,7 +1083,15 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
         succeeded += 1;
       } catch (error) {
         if (isOfflineWriteError(error)) {
-          await updateMutationRetry(mutation, error);
+          const attempts = await updateMutationRetry(mutation, error);
+          if (attempts >= MAX_ATTEMPTS_PER_MUTATION) {
+            await removeMutation(mutation.id);
+            addDeadLetter(
+              { ...mutation, attempts },
+              'max_attempts_reached',
+              (error as any)?.message || 'Offline mutation exceeded retry budget',
+            );
+          }
           failed += 1;
           lastFailureMessage = String((error as any)?.message || 'Offline mutation flush failed');
           pushTelemetryEvent({
@@ -544,6 +1114,11 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
         });
 
         await removeMutation(mutation.id);
+        addDeadLetter(
+          mutation,
+          'fatal_write_error',
+          (error as any)?.message || 'Mutation removed after non-retryable failure',
+        );
         failed += 1;
         lastFailureMessage = String((error as any)?.message || 'Offline mutation flush failed');
         pushTelemetryEvent({
@@ -554,9 +1129,10 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
       }
     }
 
+    const attempted = succeeded + failed;
     await publishPendingState();
     patchTelemetry({
-      flushedProcessed: telemetryState.flushedProcessed + queued.length,
+      flushedProcessed: telemetryState.flushedProcessed + attempted,
       flushedSucceeded: telemetryState.flushedSucceeded + succeeded,
       flushedFailed: telemetryState.flushedFailed + failed,
       ...(failed > 0
@@ -569,13 +1145,13 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
     pushTelemetryEvent({
       at: Date.now(),
       kind: 'flush_complete',
-      processed: queued.length,
+      processed: attempted,
       succeeded,
       failed,
     });
 
     return {
-      processed: queued.length,
+      processed: attempted,
       succeeded,
       failed,
       skipped,
@@ -652,8 +1228,9 @@ export const startOfflineMutationOutboxWorker = (): void => {
   workerStarted = true;
 
   window.addEventListener('online', handleOnlineFlush);
-  authUnsubscribe = auth.onAuthStateChanged(() => {
+  authUnsubscribe = subscribeAuthState(() => {
     void publishPendingState();
+    scheduleOfflineSyncHealthRecordPersist();
     safeFlush();
   });
 
@@ -662,6 +1239,8 @@ export const startOfflineMutationOutboxWorker = (): void => {
   }, FLUSH_INTERVAL_MS);
 
   safeFlush();
+  void publishPendingState();
+  scheduleOfflineSyncHealthRecordPersist();
 };
 
 export const stopOfflineMutationOutboxWorker = (): void => {
@@ -679,6 +1258,10 @@ export const stopOfflineMutationOutboxWorker = (): void => {
   if (scheduledFlushTimer !== null) {
     window.clearTimeout(scheduledFlushTimer);
     scheduledFlushTimer = null;
+  }
+  if (scheduledHealthPersistTimer !== null) {
+    window.clearTimeout(scheduledHealthPersistTimer);
+    scheduledHealthPersistTimer = null;
   }
 };
 
@@ -702,8 +1285,11 @@ export const subscribePendingOfflineMutationState = (
 
 export const getOfflineMutationTelemetry = (): OfflineMutationTelemetry => ({
   ...telemetryState,
+  pendingByType: { ...telemetryState.pendingByType },
   recentEvents: [...telemetryState.recentEvents],
 });
+
+export const getOfflineMutationDeadLetters = (): OfflineMutationDeadLetterEntry[] => [...deadLetterState];
 
 export const subscribeOfflineMutationTelemetry = (
   listener: (telemetry: OfflineMutationTelemetry) => void,
@@ -713,6 +1299,7 @@ export const subscribeOfflineMutationTelemetry = (
   void publishPendingState();
   listener({
     ...telemetryState,
+    pendingByType: { ...telemetryState.pendingByType },
     recentEvents: [...telemetryState.recentEvents],
   });
   return () => {
@@ -720,34 +1307,59 @@ export const subscribeOfflineMutationTelemetry = (
   };
 };
 
+export const subscribeOfflineMutationDeadLetters = (
+  listener: (entries: OfflineMutationDeadLetterEntry[]) => void,
+): (() => void) => {
+  deadLetterListeners.add(listener);
+  listener([...deadLetterState]);
+  return () => {
+    deadLetterListeners.delete(listener);
+  };
+};
+
 export const resetOfflineMutationTelemetry = (): void => {
-  telemetryState = emptyTelemetry();
+  telemetryState = {
+    ...emptyTelemetry(),
+    deadLetterCount: deadLetterState.length,
+  };
   publishTelemetry();
   void publishPendingState();
 };
 
-export const updateUserNotificationPreferences = async (options: {
-  userId: string;
+export const resetOfflineMutationDeadLetters = (): void => {
+  deadLetterState = [];
+  publishDeadLetters();
+};
+
+export const refreshOfflineMutationHealthSnapshot = async (): Promise<void> => {
+  await publishPendingState();
+  telemetryListeners.forEach((listener) => listener({
+    ...telemetryState,
+    pendingByType: { ...telemetryState.pendingByType },
+    recentEvents: [...telemetryState.recentEvents],
+  }));
+  deadLetterListeners.forEach((listener) => listener([...deadLetterState]));
+};
+
+const runQueueableMutation = async <T extends MutationType>(options: {
+  type: T;
+  dedupeKey: string;
   actorUid?: string;
-  notificationPreferences: Record<string, unknown>;
+  payload: MutationPayloadMap[T];
+  directWrite: () => Promise<void>;
+  metadata?: Record<string, unknown>;
 }): Promise<{ queued: boolean }> => {
-  const actorUid = options.actorUid || auth.currentUser?.uid || options.userId;
-  const dedupeKey = `user.notificationPreferences:${options.userId}`;
+  const actorUid = options.actorUid || getCurrentUserUid() || null;
 
   const tryDirectWrite = async (): Promise<boolean> => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       return false;
     }
     try {
-      await updateDoc(doc(db, COLLECTIONS.USERS, options.userId), {
-        notificationPreferences: options.notificationPreferences,
-        updatedAt: serverTimestamp(),
-      });
+      await options.directWrite();
       return true;
     } catch (error) {
-      if (isOfflineWriteError(error)) {
-        return false;
-      }
+      if (isOfflineWriteError(error)) return false;
       throw error;
     }
   };
@@ -755,20 +1367,22 @@ export const updateUserNotificationPreferences = async (options: {
   try {
     const wroteDirectly = await tryDirectWrite();
     if (wroteDirectly) {
-      // Prevent stale queued mutations from replaying and overwriting the fresh direct write.
-      try {
-        await removeQueuedMutationsByDedupeKey(actorUid, dedupeKey);
-        await publishPendingState();
-      } catch (cleanupError) {
-        void captureHandledError(cleanupError, {
-          source: 'frontend',
-          scope: 'unknown',
-          metadata: {
-            kind: 'offline_mutation.cleanup_after_direct_write',
-            mutationType: 'user.notificationPreferences',
-            targetUserId: options.userId,
-          },
-        });
+      if (actorUid) {
+        try {
+          await removeQueuedMutationsByDedupeKey(actorUid, options.dedupeKey);
+          await publishPendingState();
+        } catch (cleanupError) {
+          void captureHandledError(cleanupError, {
+            source: 'frontend',
+            scope: 'unknown',
+            metadata: {
+              kind: 'offline_mutation.cleanup_after_direct_write',
+              mutationType: options.type,
+              dedupeKey: options.dedupeKey,
+              ...(options.metadata || {}),
+            },
+          });
+        }
       }
       return { queued: false };
     }
@@ -778,23 +1392,24 @@ export const updateUserNotificationPreferences = async (options: {
       scope: 'unknown',
       metadata: {
         kind: 'offline_mutation.direct_write',
-        mutationType: 'user.notificationPreferences',
-        targetUserId: options.userId,
+        mutationType: options.type,
+        dedupeKey: options.dedupeKey,
+        ...(options.metadata || {}),
       },
     });
     throw error;
   }
 
+  if (!actorUid) {
+    throw new Error('Unable to queue offline mutation without authenticated actor.');
+  }
+
   try {
     await upsertMutation({
-      type: 'user.notificationPreferences',
+      type: options.type,
       actorUid,
-      dedupeKey,
-      payload: {
-        userId: options.userId,
-        actorUid,
-        notificationPreferences: options.notificationPreferences,
-      },
+      dedupeKey: options.dedupeKey,
+      payload: options.payload,
     });
     return { queued: true };
   } catch (error) {
@@ -803,10 +1418,351 @@ export const updateUserNotificationPreferences = async (options: {
       scope: 'unknown',
       metadata: {
         kind: 'offline_mutation.enqueue',
-        mutationType: 'user.notificationPreferences',
-        targetUserId: options.userId,
+        mutationType: options.type,
+        dedupeKey: options.dedupeKey,
+        ...(options.metadata || {}),
       },
     });
     throw error;
   }
+};
+
+export const updateUserNotificationPreferences = async (options: {
+  userId: string;
+  actorUid?: string;
+  notificationPreferences: Record<string, unknown>;
+}): Promise<{ queued: boolean }> => {
+  const actorUid = options.actorUid || getCurrentUserUid() || options.userId;
+  return runQueueableMutation({
+    type: OFFLINE_MUTATION_TYPES.userNotificationPreferences,
+    dedupeKey: `${OFFLINE_MUTATION_TYPES.userNotificationPreferences}:${options.userId}`,
+    actorUid,
+    payload: {
+      userId: options.userId,
+      actorUid,
+      notificationPreferences: options.notificationPreferences,
+    },
+    directWrite: () => updateDoc(doc(db, COLLECTIONS.USERS, options.userId), {
+      notificationPreferences: options.notificationPreferences,
+      updatedAt: serverTimestamp(),
+    }),
+    metadata: {
+      targetUserId: options.userId,
+    },
+  });
+};
+
+export const updateUserProfilePatch = async (options: {
+  userId: string;
+  patch: Record<string, unknown>;
+  actorUid?: string;
+}): Promise<{ queued: boolean }> => {
+  return runQueueableMutation({
+    type: OFFLINE_MUTATION_TYPES.userProfilePatch,
+    dedupeKey: `${OFFLINE_MUTATION_TYPES.userProfilePatch}:${options.userId}`,
+    actorUid: options.actorUid || getCurrentUserUid() || options.userId,
+    payload: {
+      userId: options.userId,
+      patch: options.patch,
+    },
+    directWrite: () => setDoc(
+      doc(db, COLLECTIONS.USERS, options.userId),
+      {
+        ...options.patch,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    ),
+    metadata: { targetUserId: options.userId },
+  });
+};
+
+export const updateAdminNotificationReadStatus = async (options: {
+  notificationId: string;
+  read: boolean;
+  actorUid?: string;
+}): Promise<{ queued: boolean }> => {
+  return runQueueableMutation({
+    type: OFFLINE_MUTATION_TYPES.adminNotificationRead,
+    dedupeKey: `${OFFLINE_MUTATION_TYPES.adminNotificationRead}:${options.notificationId}`,
+    actorUid: options.actorUid || getCurrentUserUid() || '',
+    payload: {
+      notificationId: options.notificationId,
+      read: options.read,
+    },
+    directWrite: () => updateDoc(doc(db, COLLECTIONS.NOTIFICATIONS, options.notificationId), {
+      read: options.read,
+      updatedAt: serverTimestamp(),
+    }),
+    metadata: { targetId: options.notificationId, read: options.read },
+  });
+};
+
+export const updateAdminContactSubmissionStatus = async (options: {
+  submissionId: string;
+  status: 'read' | 'unread';
+  readBy?: string | null;
+  actorUid?: string;
+}): Promise<{ queued: boolean }> => {
+  return runQueueableMutation({
+    type: OFFLINE_MUTATION_TYPES.adminContactSubmissionStatus,
+    dedupeKey: `${OFFLINE_MUTATION_TYPES.adminContactSubmissionStatus}:${options.submissionId}`,
+    actorUid: options.actorUid || getCurrentUserUid() || '',
+    payload: {
+      submissionId: options.submissionId,
+      status: options.status,
+      readBy: options.readBy || null,
+    },
+    directWrite: () => updateDoc(doc(db, COLLECTIONS.CONTACT_SUBMISSIONS, options.submissionId), {
+      status: options.status,
+      readAt: options.status === 'read' ? serverTimestamp() : deleteField(),
+      readBy: options.status === 'read' ? (options.readBy || null) : deleteField(),
+      updatedAt: serverTimestamp(),
+    }),
+    metadata: { targetId: options.submissionId, status: options.status },
+  });
+};
+
+export const updateAdminCampaignStatus = async (options: {
+  campaignId: string;
+  status: 'active' | 'completed' | 'cancelled';
+  actorUid?: string;
+}): Promise<{ queued: boolean }> => {
+  return runQueueableMutation({
+    type: OFFLINE_MUTATION_TYPES.adminCampaignStatus,
+    dedupeKey: `${OFFLINE_MUTATION_TYPES.adminCampaignStatus}:${options.campaignId}`,
+    actorUid: options.actorUid || getCurrentUserUid() || '',
+    payload: {
+      campaignId: options.campaignId,
+      status: options.status,
+    },
+    directWrite: () => updateDoc(doc(db, COLLECTIONS.CAMPAIGNS, options.campaignId), {
+      status: options.status,
+      updatedAt: serverTimestamp(),
+    }),
+    metadata: { targetId: options.campaignId, status: options.status },
+  });
+};
+
+export const updateAdminNpsFollowUpStatus = async (options: {
+  responseId: string;
+  status: 'open' | 'in_progress' | 'closed';
+  followedUpBy?: string | null;
+  actorUid?: string;
+}): Promise<{ queued: boolean }> => {
+  return runQueueableMutation({
+    type: OFFLINE_MUTATION_TYPES.adminNpsFollowUpStatus,
+    dedupeKey: `${OFFLINE_MUTATION_TYPES.adminNpsFollowUpStatus}:${options.responseId}`,
+    actorUid: options.actorUid || getCurrentUserUid() || '',
+    payload: {
+      responseId: options.responseId,
+      status: options.status,
+      followedUpBy: options.followedUpBy || null,
+    },
+    directWrite: () => updateDoc(doc(db, COLLECTIONS.NPS_RESPONSES, options.responseId), {
+      followUpStatus: options.status,
+      followedUpBy: options.followedUpBy || null,
+      followedUpAt: options.status === 'open' ? deleteField() : serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }),
+    metadata: { targetId: options.responseId, status: options.status },
+  });
+};
+
+export const updateAdminNpsFollowUpNotes = async (options: {
+  responseId: string;
+  notes: string | null;
+  followedUpBy?: string | null;
+  actorUid?: string;
+}): Promise<{ queued: boolean }> => {
+  return runQueueableMutation({
+    type: OFFLINE_MUTATION_TYPES.adminNpsFollowUpNotes,
+    dedupeKey: `${OFFLINE_MUTATION_TYPES.adminNpsFollowUpNotes}:${options.responseId}`,
+    actorUid: options.actorUid || getCurrentUserUid() || '',
+    payload: {
+      responseId: options.responseId,
+      notes: options.notes,
+      followedUpBy: options.followedUpBy || null,
+    },
+    directWrite: () => updateDoc(doc(db, COLLECTIONS.NPS_RESPONSES, options.responseId), {
+      followUpNotes: options.notes ? options.notes : deleteField(),
+      followedUpBy: options.followedUpBy || null,
+      updatedAt: serverTimestamp(),
+    }),
+    metadata: { targetId: options.responseId },
+  });
+};
+
+export const updateAdminNpsTags = async (options: {
+  responseId: string;
+  tags: string[];
+  actorUid?: string;
+}): Promise<{ queued: boolean }> => {
+  return runQueueableMutation({
+    type: OFFLINE_MUTATION_TYPES.adminNpsTags,
+    dedupeKey: `${OFFLINE_MUTATION_TYPES.adminNpsTags}:${options.responseId}`,
+    actorUid: options.actorUid || getCurrentUserUid() || '',
+    payload: {
+      responseId: options.responseId,
+      tags: options.tags,
+    },
+    directWrite: () => updateDoc(doc(db, COLLECTIONS.NPS_RESPONSES, options.responseId), {
+      tags: options.tags,
+      updatedAt: serverTimestamp(),
+    }),
+    metadata: { targetId: options.responseId },
+  });
+};
+
+export const updateAdminAppointmentStatus = async (options: {
+  appointmentId: string;
+  status: 'confirmed' | 'completed' | 'cancelled';
+  actorUid?: string;
+}): Promise<{ queued: boolean }> => {
+  return runQueueableMutation({
+    type: OFFLINE_MUTATION_TYPES.adminAppointmentStatus,
+    dedupeKey: `${OFFLINE_MUTATION_TYPES.adminAppointmentStatus}:${options.appointmentId}`,
+    actorUid: options.actorUid || getCurrentUserUid() || '',
+    payload: {
+      appointmentId: options.appointmentId,
+      status: options.status,
+    },
+    directWrite: () => updateDoc(doc(db, COLLECTIONS.APPOINTMENTS, options.appointmentId), {
+      status: options.status,
+      updatedAt: serverTimestamp(),
+    }),
+    metadata: { targetId: options.appointmentId, status: options.status },
+  });
+};
+
+export const updateAdminDonationStatus = async (options: {
+  donationId: string;
+  status: 'completed' | 'rejected' | 'pending';
+  actorUid?: string;
+}): Promise<{ queued: boolean }> => {
+  return runQueueableMutation({
+    type: OFFLINE_MUTATION_TYPES.adminDonationStatus,
+    dedupeKey: `${OFFLINE_MUTATION_TYPES.adminDonationStatus}:${options.donationId}`,
+    actorUid: options.actorUid || getCurrentUserUid() || '',
+    payload: {
+      donationId: options.donationId,
+      status: options.status,
+    },
+    directWrite: () => updateDoc(doc(db, COLLECTIONS.DONATIONS, options.donationId), {
+      status: options.status,
+      updatedAt: serverTimestamp(),
+    }),
+    metadata: { targetId: options.donationId, status: options.status },
+  });
+};
+
+export const updateAdminVolunteerStatus = async (options: {
+  volunteerId: string;
+  status: 'active' | 'inactive';
+  actorUid?: string;
+}): Promise<{ queued: boolean }> => {
+  return runQueueableMutation({
+    type: OFFLINE_MUTATION_TYPES.adminVolunteerStatus,
+    dedupeKey: `${OFFLINE_MUTATION_TYPES.adminVolunteerStatus}:${options.volunteerId}`,
+    actorUid: options.actorUid || getCurrentUserUid() || '',
+    payload: {
+      volunteerId: options.volunteerId,
+      status: options.status,
+    },
+    directWrite: () => updateDoc(doc(db, COLLECTIONS.VOLUNTEERS, options.volunteerId), {
+      status: options.status,
+      updatedAt: serverTimestamp(),
+    }),
+    metadata: { targetId: options.volunteerId, status: options.status },
+  });
+};
+
+export const updateAdminPartnershipStatus = async (options: {
+  partnershipId: string;
+  status: 'active' | 'pending' | 'inactive';
+  actorUid?: string;
+}): Promise<{ queued: boolean }> => {
+  return runQueueableMutation({
+    type: OFFLINE_MUTATION_TYPES.adminPartnershipStatus,
+    dedupeKey: `${OFFLINE_MUTATION_TYPES.adminPartnershipStatus}:${options.partnershipId}`,
+    actorUid: options.actorUid || getCurrentUserUid() || '',
+    payload: {
+      partnershipId: options.partnershipId,
+      status: options.status,
+    },
+    directWrite: () => updateDoc(doc(db, COLLECTIONS.PARTNERSHIPS, options.partnershipId), {
+      status: options.status,
+      updatedAt: serverTimestamp(),
+    }),
+    metadata: { targetId: options.partnershipId, status: options.status },
+  });
+};
+
+export const updateAdminEmergencyRequestStatus = async (options: {
+  requestId: string;
+  status: 'fulfilled' | 'cancelled';
+  actorUid?: string;
+}): Promise<{ queued: boolean }> => {
+  return runQueueableMutation({
+    type: OFFLINE_MUTATION_TYPES.adminEmergencyRequestStatus,
+    dedupeKey: `${OFFLINE_MUTATION_TYPES.adminEmergencyRequestStatus}:${options.requestId}`,
+    actorUid: options.actorUid || getCurrentUserUid() || '',
+    payload: {
+      requestId: options.requestId,
+      status: options.status,
+    },
+    directWrite: () => updateDoc(doc(db, COLLECTIONS.BLOOD_REQUESTS, options.requestId), {
+      status: options.status,
+      ...(options.status === 'fulfilled' ? { fulfilledAt: serverTimestamp() } : {}),
+      updatedAt: serverTimestamp(),
+    }),
+    metadata: { targetId: options.requestId, status: options.status },
+  });
+};
+
+export const queueFirestoreDocPatch = async (options: {
+  collection: string;
+  docId: string;
+  patch?: Record<string, unknown>;
+  deleteFields?: string[];
+  serverTimestampFields?: string[];
+  dedupeScope?: string;
+  actorUid?: string;
+}): Promise<{ queued: boolean }> => {
+  const sanitizedPatch = Object.entries(options.patch || {}).reduce<Record<string, unknown>>((acc, [key, value]) => {
+    if (value !== undefined) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+
+  return runQueueableMutation({
+    type: OFFLINE_MUTATION_TYPES.firestoreDocPatch,
+    dedupeKey: `${OFFLINE_MUTATION_TYPES.firestoreDocPatch}:${options.collection}:${options.docId}:${options.dedupeScope || 'default'}`,
+    actorUid: options.actorUid || getCurrentUserUid() || '',
+    payload: {
+      collection: options.collection,
+      docId: options.docId,
+      patch: sanitizedPatch,
+      deleteFields: options.deleteFields || [],
+      serverTimestampFields: options.serverTimestampFields || [],
+    },
+    directWrite: () => {
+      const updatePayload: Record<string, unknown> = {
+        ...sanitizedPatch,
+      };
+      (options.deleteFields || []).forEach((field) => {
+        updatePayload[field] = deleteField();
+      });
+      (options.serverTimestampFields || []).forEach((field) => {
+        updatePayload[field] = serverTimestamp();
+      });
+      return updateDoc(doc(db, options.collection, options.docId), updatePayload);
+    },
+    metadata: {
+      collection: options.collection,
+      docId: options.docId,
+      dedupeScope: options.dedupeScope || 'default',
+    },
+  });
 };

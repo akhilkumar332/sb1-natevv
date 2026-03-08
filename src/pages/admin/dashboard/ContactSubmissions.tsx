@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { MailCheck, MailOpen, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { deleteField, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { doc, writeBatch } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
@@ -11,11 +11,11 @@ import { useAdminContactSubmissions } from '../../../hooks/admin/useAdminQueries
 import { refetchQuery } from '../../../utils/queryRefetch';
 import { runWithFeedback } from '../../../utils/runWithFeedback';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
-import { getServerTimestamp } from '../../../utils/firestore.utils';
 import { COLLECTIONS } from '../../../constants/firestore';
 import { CONTACT_SUBMISSION_STATUS } from '../../../constants/contact';
 import { useAuth } from '../../../contexts/AuthContext';
 import { toDateValue } from '../../../utils/dateValue';
+import { updateAdminContactSubmissionStatus } from '../../../services/offlineMutationOutbox.service';
 
 type ContactSubmissionRow = {
   id: string;
@@ -144,11 +144,11 @@ function ContactSubmissionsPage() {
     setProcessingId(entry.id);
     try {
       await runWithFeedback({
-        action: () => updateDoc(doc(db, COLLECTIONS.CONTACT_SUBMISSIONS, entry.id), {
+        action: () => updateAdminContactSubmissionStatus({
+          submissionId: entry.id,
           status: nextStatus,
-          readAt: nextStatus === CONTACT_SUBMISSION_STATUS.read ? getServerTimestamp() : deleteField(),
-          readBy: nextStatus === CONTACT_SUBMISSION_STATUS.read ? (user?.uid || null) : deleteField(),
-          updatedAt: getServerTimestamp(),
+          readBy: nextStatus === CONTACT_SUBMISSION_STATUS.read ? (user?.uid || null) : null,
+          actorUid: user?.uid,
         }),
         successMessage: nextStatus === CONTACT_SUBMISSION_STATUS.read ? 'Marked as read' : 'Marked as unread',
         errorMessage: 'Failed to update submission status.',
