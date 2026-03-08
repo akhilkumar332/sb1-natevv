@@ -6,7 +6,12 @@ import { useOfflineMutationTelemetry } from '../../../hooks/useOfflineMutationTe
 import { useOfflineMutationDeadLetters } from '../../../hooks/useOfflineMutationDeadLetters';
 import { usePendingOfflineMutations } from '../../../hooks/usePendingOfflineMutations';
 import { useNetworkStatus } from '../../../contexts/NetworkStatusContext';
-import { OFFLINE_ANALYTICS_WINDOWS, OFFLINE_HEALTH_THRESHOLDS, OFFLINE_MUTATION_LABELS } from '../../../constants/offline';
+import {
+  OFFLINE_ANALYTICS_WINDOWS,
+  OFFLINE_FEATURE_OPERATOR_LABELS,
+  OFFLINE_HEALTH_THRESHOLDS,
+  OFFLINE_MUTATION_LABELS,
+} from '../../../constants/offline';
 import {
   getOfflineWriteCoverageSummary,
   getOfflineWriteExpansionTargets,
@@ -26,6 +31,7 @@ const WINDOW_OPTIONS: Array<{ key: WindowKey; label: string; ms: number }> = [
 ];
 
 const VIEW_MODE_STORAGE_KEY = 'bh_offline_sync_health_view_mode_v1';
+const ALERT_ACK_KEY = 'bh_offline_sync_health_alert_ack_v1';
 
 const formatAgo = (value: number | null) => {
   if (!value) return 'N/A';
@@ -79,6 +85,26 @@ const formatRefreshAgo = (value: number | null, now: number) => {
   return `${Math.floor(diff / HOUR_MS)}h ago`;
 };
 
+const parseStoredNumber = (value: string | null): number | null => {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const downloadBlob = (blob: Blob, filename: string) => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => {
+    window.URL.revokeObjectURL(url);
+  }, 1000);
+};
+
 const isNavigatorOnline = () => (
   typeof navigator === 'undefined' ? true : navigator.onLine
 );
@@ -120,6 +146,15 @@ function AdminOfflineSyncHealthPage() {
   const [lastRefreshedAt, setLastRefreshedAt] = useState<number | null>(Date.now());
   const [refreshNowTs, setRefreshNowTs] = useState(Date.now());
   const [storageProbeTick, setStorageProbeTick] = useState(0);
+  const [actionableOnly, setActionableOnly] = useState(false);
+  const [acknowledgedFailureAt, setAcknowledgedFailureAt] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return parseStoredNumber(window.localStorage.getItem(ALERT_ACK_KEY));
+    } catch {
+      return null;
+    }
+  });
   const mountedRef = useRef(true);
   const failedItemsRef = useRef<HTMLElement | null>(null);
   const runtimeRef = useRef<HTMLElement | null>(null);
@@ -136,6 +171,19 @@ function AdminOfflineSyncHealthPage() {
       // ignore storage write failures (private mode / restricted browsers)
     }
   }, [viewMode]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (acknowledgedFailureAt == null) {
+        window.localStorage.removeItem(ALERT_ACK_KEY);
+      } else {
+        window.localStorage.setItem(ALERT_ACK_KEY, String(acknowledgedFailureAt));
+      }
+    } catch {
+      // ignore
+    }
+  }, [acknowledgedFailureAt]);
 
   const selectedWindow = WINDOW_OPTIONS.find((option) => option.key === windowKey) || WINDOW_OPTIONS[2];
   const coverage = useMemo(() => getOfflineWriteCoverageSummary(), []);
@@ -155,6 +203,12 @@ function AdminOfflineSyncHealthPage() {
     .map((event) => (typeof event.durationMs === 'number' ? event.durationMs : null))
     .filter((value): value is number => value != null && value >= 0);
   const filteredDeadLetters = deadLetters.filter((entry) => entry.failedAt >= cutoff);
+  const actionableDeadLetters = filteredDeadLetters.filter((entry) => (
+    entry.reason === 'fatal_write_error'
+    || entry.attempts >= 3
+    || ['permission', 'validation', 'rule', 'internal'].includes(entry.failureClass || 'unknown')
+  ));
+  const visibleDeadLetters = actionableOnly ? actionableDeadLetters : filteredDeadLetters;
   const filteredEnqueueByType = useMemo(() => {
     return filteredEvents.reduce<Record<string, number>>((acc, event) => {
       if (event.kind !== 'enqueue') return acc;
@@ -170,11 +224,16 @@ function AdminOfflineSyncHealthPage() {
   const failureRate = telemetry.flushedProcessed > 0
     ? (telemetry.flushedFailed / telemetry.flushedProcessed) * 100
     : 0;
+  const healthPersistWindowTotal = (telemetry.healthPersistWindowSucceeded || 0) + (telemetry.healthPersistWindowFailed || 0);
   const healthPersistTotal = telemetry.healthPersistSucceeded + telemetry.healthPersistFailed;
-  const healthPersistSuccessRate = healthPersistTotal > 0
-    ? (telemetry.healthPersistSucceeded / healthPersistTotal) * 100
+  const effectiveHealthPersistTotal = healthPersistWindowTotal > 0 ? healthPersistWindowTotal : healthPersistTotal;
+  const effectiveHealthPersistSucceeded = healthPersistWindowTotal > 0
+    ? (telemetry.healthPersistWindowSucceeded || 0)
+    : telemetry.healthPersistSucceeded;
+  const healthPersistSuccessRate = effectiveHealthPersistTotal > 0
+    ? (effectiveHealthPersistSucceeded / effectiveHealthPersistTotal) * 100
     : 0;
-  const firestoreStorageHardened = persistenceStatus === 'enabled' && (healthPersistTotal === 0 || healthPersistSuccessRate >= 99);
+  const firestoreStorageHardened = persistenceStatus === 'enabled' && (effectiveHealthPersistTotal === 0 || healthPersistSuccessRate >= 99);
 
   const localStorageUsage = useMemo(
     () => getLocalStorageUsage(),
@@ -228,6 +287,46 @@ function AdminOfflineSyncHealthPage() {
     return acc;
   }, {});
   const topFailingRows = Object.entries(topFailingMutations).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  const projectedDrainMinutes = (() => {
+    const completed = flushCompleteEvents
+      .filter((event) => typeof event.durationMs === 'number' && event.durationMs > 0)
+      .map((event) => ({
+        succeeded: Math.max(0, Number(event.succeeded || 0)),
+        durationMs: Number(event.durationMs || 0),
+      }))
+      .filter((entry) => entry.succeeded > 0);
+    const totalSucceeded = completed.reduce((acc, item) => acc + item.succeeded, 0);
+    const totalMinutes = completed.reduce((acc, item) => acc + (item.durationMs / MINUTE_MS), 0);
+    if (totalSucceeded <= 0 || totalMinutes <= 0 || telemetry.pendingCount <= 0) return null;
+    const throughputPerMinute = totalSucceeded / totalMinutes;
+    if (throughputPerMinute <= 0) return null;
+    return telemetry.pendingCount / throughputPerMinute;
+  })();
+
+  const queueGrowthPerHour = (() => {
+    const enqueued = filteredEvents.filter((event) => event.kind === 'enqueue').length;
+    const completed = flushCompleteEvents.reduce((acc, event) => acc + Math.max(0, Number(event.succeeded || 0)), 0);
+    const net = enqueued - completed;
+    const hours = Math.max(1 / 60, selectedWindow.ms / HOUR_MS);
+    return net / hours;
+  })();
+
+  const failureBurstCount = filteredEvents.filter(
+    (event) => event.kind === 'flush_error' && event.at >= Date.now() - (15 * MINUTE_MS),
+  ).length;
+
+  const retryBudgetBurn = flushCompleteEvents.reduce(
+    (acc, event) => {
+      acc.processed += Math.max(0, Number(event.processed || 0));
+      acc.failed += Math.max(0, Number(event.failed || 0));
+      return acc;
+    },
+    { processed: 0, failed: 0 },
+  );
+  const retryBudgetBurnRate = retryBudgetBurn.processed > 0
+    ? (retryBudgetBurn.failed / retryBudgetBurn.processed) * 100
+    : 0;
 
   const trendBuckets = useMemo(() => {
     const bucketCount = 8;
@@ -301,8 +400,8 @@ function AdminOfflineSyncHealthPage() {
 
   const pagedDeadLetters = useMemo(() => {
     const start = (deadLetterPage - 1) * deadLetterPageSize;
-    return filteredDeadLetters.slice(start, start + deadLetterPageSize);
-  }, [filteredDeadLetters, deadLetterPage, deadLetterPageSize]);
+    return visibleDeadLetters.slice(start, start + deadLetterPageSize);
+  }, [visibleDeadLetters, deadLetterPage, deadLetterPageSize]);
 
   const pagedEnqueueRows = useMemo(() => {
     const start = (enqueuePage - 1) * enqueuePageSize;
@@ -325,9 +424,9 @@ function AdminOfflineSyncHealthPage() {
   }, [expansionTargets, expansionPage, expansionPageSize]);
 
   useEffect(() => {
-    const maxPage = Math.max(1, Math.ceil(filteredDeadLetters.length / deadLetterPageSize));
+    const maxPage = Math.max(1, Math.ceil(visibleDeadLetters.length / deadLetterPageSize));
     if (deadLetterPage > maxPage) setDeadLetterPage(maxPage);
-  }, [filteredDeadLetters.length, deadLetterPageSize, deadLetterPage]);
+  }, [visibleDeadLetters.length, deadLetterPageSize, deadLetterPage]);
 
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(enqueueRows.length / enqueuePageSize));
@@ -356,6 +455,7 @@ function AdminOfflineSyncHealthPage() {
       if (!isNavigatorOnline()) return;
       if (!isDocumentVisible()) return;
       if (refreshing || syncing) return;
+      if (telemetry.pendingCount === 0) return;
       void (async () => {
         let refreshSucceeded = false;
         try {
@@ -382,14 +482,14 @@ function AdminOfflineSyncHealthPage() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [refreshing, syncing, syncNow]);
+  }, [refreshing, syncing, syncNow, telemetry.pendingCount]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const tick = window.setInterval(() => {
       if (!isDocumentVisible()) return;
       setRefreshNowTs(Date.now());
-    }, 1000);
+    }, 5000);
     return () => {
       window.clearInterval(tick);
     };
@@ -400,7 +500,7 @@ function AdminOfflineSyncHealthPage() {
     const tick = window.setInterval(() => {
       if (!isDocumentVisible()) return;
       setStorageProbeTick((current) => current + 1);
-    }, 30000);
+    }, 60000);
     return () => {
       window.clearInterval(tick);
     };
@@ -470,6 +570,79 @@ function AdminOfflineSyncHealthPage() {
     };
   })();
 
+  const criticalUnacknowledged = (
+    systemStatus === 'critical'
+    && telemetry.lastFailureAt != null
+    && (acknowledgedFailureAt == null || telemetry.lastFailureAt > acknowledgedFailureAt)
+  );
+
+  const narrativeSignals = [
+    deadLetters.length > 0 ? `${deadLetters.length} failed item(s) require review.` : null,
+    telemetry.pendingCount > 0 ? `${telemetry.pendingCount} action(s) are still queued.` : null,
+    telemetry.policyViolationCount > 0 ? `${telemetry.policyViolationCount} update(s) were blocked by policy.` : null,
+    failureBurstCount > 0 ? `${failureBurstCount} recent error burst(s) in last 15 minutes.` : null,
+    !isOnline ? 'Device is offline, so queue drain is paused.' : null,
+  ].filter((value): value is string => Boolean(value)).slice(0, 3);
+
+  const narrativeSummary = systemStatus === 'healthy'
+    ? 'Sync is healthy. No high-risk indicators are currently active.'
+    : systemStatus === 'warning'
+      ? 'Sync has warning signals. Review queue growth and blocked/failed items.'
+      : 'Sync is critical. Immediate review is needed for failed or blocked writes.';
+
+  const acknowledgeCurrentCritical = () => {
+    if (!telemetry.lastFailureAt) return;
+    setAcknowledgedFailureAt(telemetry.lastFailureAt);
+  };
+
+  const exportFailedItems = (format: 'json' | 'csv') => {
+    if (typeof window === 'undefined' || visibleDeadLetters.length === 0) return;
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    if (format === 'json') {
+      const blob = new Blob([JSON.stringify(visibleDeadLetters, null, 2)], { type: 'application/json;charset=utf-8' });
+      downloadBlob(blob, `offline-sync-failed-items-${ts}.json`);
+      return;
+    }
+    const lines = [
+      'failedAt,type,feature,reason,failureClass,failureCode,attempts,message',
+      ...visibleDeadLetters.map((entry) => [
+        new Date(entry.failedAt).toISOString(),
+        `"${(OFFLINE_MUTATION_LABELS[entry.type] || entry.type).replace(/"/g, '""')}"`,
+        `"${(entry.feature || 'unknown').replace(/"/g, '""')}"`,
+        `"${(entry.reason || '').replace(/"/g, '""')}"`,
+        `"${(entry.failureClass || 'unknown').replace(/"/g, '""')}"`,
+        `"${(entry.failureCode || '').replace(/"/g, '""')}"`,
+        entry.attempts,
+        `"${(entry.message || '').replace(/"/g, '""')}"`,
+      ].join(',')),
+    ].join('\n');
+    const blob = new Blob([lines], { type: 'text/csv;charset=utf-8' });
+    downloadBlob(blob, `offline-sync-failed-items-${ts}.csv`);
+  };
+
+  const moduleReadinessRows = useMemo(() => {
+    const grouped = OFFLINE_WRITE_COVERAGE_CATALOG.reduce<Record<string, { total: number; queueSafe: number; unresolved: number }>>((acc, entry) => {
+      const key = entry.module;
+      if (!acc[key]) {
+        acc[key] = { total: 0, queueSafe: 0, unresolved: 0 };
+      }
+      acc[key].total += 1;
+      if (entry.mode === 'queue_safe') acc[key].queueSafe += 1;
+      if (entry.mode === 'online_only' || entry.collectionKey === 'UNKNOWN') acc[key].unresolved += 1;
+      return acc;
+    }, {});
+
+    return Object.entries(grouped)
+      .map(([module, value]) => ({
+        module,
+        total: value.total,
+        queueSafe: value.queueSafe,
+        unresolved: value.unresolved,
+        readiness: value.total > 0 ? (value.queueSafe / value.total) * 100 : 0,
+      }))
+      .sort((a, b) => b.readiness - a.readiness);
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -536,7 +709,30 @@ function AdminOfflineSyncHealthPage() {
           <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">
             System Status: {systemStatus === 'healthy' ? 'Healthy' : systemStatus === 'warning' ? 'At Risk' : 'Critical'}
           </p>
-          <p className="text-xs text-gray-700 dark:text-slate-300">{systemStatusText}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-gray-700 dark:text-slate-300">{systemStatusText}</p>
+            {criticalUnacknowledged ? (
+              <button
+                type="button"
+                onClick={acknowledgeCurrentCritical}
+                className="rounded-md border border-rose-300 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 dark:border-rose-500/40 dark:bg-slate-900 dark:text-rose-300"
+              >
+                Acknowledge
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10">
+        <h2 className="text-lg font-bold text-blue-900 dark:text-blue-200">Health Narrative</h2>
+        <p className="mt-1 text-sm text-blue-800 dark:text-blue-200/90">{narrativeSummary}</p>
+        <div className="mt-3 space-y-1 text-xs text-blue-800 dark:text-blue-200/90">
+          {narrativeSignals.length ? narrativeSignals.map((signal) => (
+            <p key={signal}>- {signal}</p>
+          )) : (
+            <p>- No active warning signals in the selected window.</p>
+          )}
         </div>
       </section>
 
@@ -594,7 +790,8 @@ function AdminOfflineSyncHealthPage() {
         >
           <p className="text-xs uppercase tracking-[0.15em] text-gray-700 dark:text-slate-300">Firestore Storage Safety</p>
           <p className="mt-1 text-xl font-bold text-gray-900 dark:text-slate-100">{firestoreStorageHardened ? 'Healthy' : 'Needs Attention'}</p>
-          <p className="mt-1 text-xs text-gray-700/90 dark:text-slate-300/90">Persist success {toPercent(healthPersistSuccessRate)} • runs {telemetry.healthPersistRuns}</p>
+          <p className="mt-1 text-xs text-gray-700/90 dark:text-slate-300/90">Persist success {toPercent(healthPersistSuccessRate)} • recent runs {effectiveHealthPersistTotal}</p>
+          <p className="mt-1 text-[11px] text-gray-600/90 dark:text-slate-400/90">Collection: offlineSyncHealthRecords</p>
         </div>
         <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm dark:border-sky-500/30 dark:bg-sky-500/10">
           <p className="text-xs uppercase tracking-[0.15em] text-sky-700 dark:text-sky-300">Local Storage Used</p>
@@ -652,30 +849,72 @@ function AdminOfflineSyncHealthPage() {
               Blocked update reason: {telemetry.lastPolicyViolation}
             </p>
           ) : null}
+          <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-gray-700 dark:text-slate-300">
+            <p className="rounded-lg border border-gray-100 px-3 py-2 dark:border-slate-700">Queue growth rate: <span className={`font-semibold ${queueGrowthPerHour > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>{queueGrowthPerHour.toFixed(1)} items/hour</span></p>
+            <p className="rounded-lg border border-gray-100 px-3 py-2 dark:border-slate-700">Projected queue drain: <span className="font-semibold">{projectedDrainMinutes == null ? 'N/A' : `${Math.ceil(projectedDrainMinutes)}m`}</span></p>
+            <p className="rounded-lg border border-gray-100 px-3 py-2 dark:border-slate-700">Retry budget burn: <span className={`font-semibold ${retryBudgetBurnRate >= 20 ? 'text-rose-700 dark:text-rose-300' : retryBudgetBurnRate >= 10 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}`}>{toPercent(retryBudgetBurnRate)}</span></p>
+            <p className="rounded-lg border border-gray-100 px-3 py-2 dark:border-slate-700">Failure bursts (15m): <span className={`font-semibold ${failureBurstCount > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>{failureBurstCount}</span></p>
+          </div>
         </section>
       </div>
 
       <section ref={failedItemsRef} className="rounded-2xl border border-rose-200 bg-rose-50 p-5 shadow-sm dark:border-rose-500/30 dark:bg-rose-500/10">
-        <h2 className="mb-3 text-lg font-bold text-rose-900 dark:text-rose-200">Failed Sync Items ({selectedWindow.label})</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-bold text-rose-900 dark:text-rose-200">Failed Sync Items ({selectedWindow.label})</h2>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActionableOnly((prev) => !prev)}
+              className={`rounded-md border px-2 py-1 text-xs font-semibold ${
+                actionableOnly
+                  ? 'border-rose-300 bg-rose-100 text-rose-800 dark:border-rose-400/50 dark:bg-rose-500/20 dark:text-rose-200'
+                  : 'border-rose-200 bg-white text-rose-700 dark:border-rose-500/30 dark:bg-slate-900 dark:text-rose-300'
+              }`}
+            >
+              {actionableOnly ? 'Showing actionable' : 'Show actionable only'}
+            </button>
+            <button
+              type="button"
+              onClick={() => exportFailedItems('json')}
+              disabled={visibleDeadLetters.length === 0}
+              className="rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 disabled:opacity-60 dark:border-rose-500/30 dark:bg-slate-900 dark:text-rose-300"
+            >
+              Export JSON
+            </button>
+            <button
+              type="button"
+              onClick={() => exportFailedItems('csv')}
+              disabled={visibleDeadLetters.length === 0}
+              className="rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 disabled:opacity-60 dark:border-rose-500/30 dark:bg-slate-900 dark:text-rose-300"
+            >
+              Export CSV
+            </button>
+          </div>
+        </div>
         <div className="space-y-2">
-          {filteredDeadLetters.length ? pagedDeadLetters.map((entry) => (
+          {visibleDeadLetters.length ? pagedDeadLetters.map((entry) => (
             <div key={entry.id} className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs dark:border-rose-500/30 dark:bg-slate-900/60">
               <p className="font-semibold text-rose-800 dark:text-rose-200">{OFFLINE_MUTATION_LABELS[entry.type] || entry.type} • {entry.reason}</p>
               <p className="mt-1 text-rose-700 dark:text-rose-300">Attempts={entry.attempts} • {new Date(entry.failedAt).toLocaleString()}</p>
+              <p className="mt-1 text-rose-700/90 dark:text-rose-300/90">{OFFLINE_FEATURE_OPERATOR_LABELS[entry.feature || 'unknown']} • {entry.failureClass}{entry.failureCode ? ` (${entry.failureCode})` : ''}</p>
               {entry.message ? <p className="mt-1 text-rose-700/90 dark:text-rose-300/90">{entry.message}</p> : null}
             </div>
           )) : (
-            <p className="rounded-lg border border-rose-200 bg-white px-3 py-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-slate-900/60 dark:text-rose-300">No failed sync items in this time window.</p>
+            <p className="rounded-lg border border-rose-200 bg-white px-3 py-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-slate-900/60 dark:text-rose-300">
+              {actionableOnly && filteredDeadLetters.length > 0
+                ? 'No actionable failed items in this time window.'
+                : 'No failed sync items in this time window.'}
+            </p>
           )}
         </div>
-        {filteredDeadLetters.length > 0 && (
+        {visibleDeadLetters.length > 0 && (
           <div className="mt-3">
             <AdminPagination
               page={deadLetterPage}
               pageSize={deadLetterPageSize}
               pageSizeOptions={[10, 25, 50]}
-              itemCount={filteredDeadLetters.length}
-              hasNextPage={deadLetterPage * deadLetterPageSize < filteredDeadLetters.length}
+              itemCount={visibleDeadLetters.length}
+              hasNextPage={deadLetterPage * deadLetterPageSize < visibleDeadLetters.length}
               onPageChange={setDeadLetterPage}
               onPageSizeChange={(next) => {
                 setDeadLetterPageSize(next);
@@ -889,6 +1128,19 @@ function AdminOfflineSyncHealthPage() {
                 />
               </div>
             )}
+          </section>
+
+          <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <h2 className="mb-3 text-lg font-bold text-gray-900 dark:text-slate-100">Module Readiness (Governance)</h2>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {moduleReadinessRows.slice(0, 6).map((row) => (
+                <div key={row.module} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/70">
+                  <p className="font-semibold text-gray-900 dark:text-slate-100">{row.module}</p>
+                  <p className="mt-1 text-gray-700 dark:text-slate-300">Readiness: <span className="font-semibold">{toPercent(row.readiness)}</span></p>
+                  <p className="text-gray-700 dark:text-slate-300">Queue-safe {row.queueSafe}/{row.total} • unresolved {row.unresolved}</p>
+                </div>
+              ))}
+            </div>
           </section>
 
           <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">

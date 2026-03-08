@@ -151,6 +151,9 @@ const AppRoutes = () => {
       <Route path={ROUTES.about} element={<About />} />
       <Route path={ROUTES.contact} element={<Contact />} />
       <Route path={ROUTES.blog} element={<Blog />} />
+      <Route path={ROUTES.blogCategory} element={<Blog />} />
+      <Route path={ROUTES.blogSeries} element={<Blog />} />
+      <Route path={ROUTES.blogAuthor} element={<Blog />} />
       <Route path={ROUTES.blogPost} element={<BlogPost />} />
       <Route path={ROUTES.cmsPage} element={<CmsPage />} />
       

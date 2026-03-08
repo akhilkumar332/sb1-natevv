@@ -30,6 +30,7 @@ export const COLLECTIONS = {
   CMS_PAGES: 'cmsPages',
   CMS_BLOG_POSTS: 'cmsBlogPosts',
   CMS_BLOG_POST_SUMMARIES: 'cmsBlogPostSummaries',
+  CMS_BLOG_POST_REVISIONS: 'cmsBlogPostRevisions',
   CMS_BLOG_CATEGORIES: 'cmsBlogCategories',
   CMS_NAV_MENUS: 'cmsNavMenus',
   CMS_MEDIA: 'cmsMedia',

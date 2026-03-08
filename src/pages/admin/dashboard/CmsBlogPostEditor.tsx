@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, setDoc, where } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { COLLECTIONS } from '../../../constants/firestore';
 import {
@@ -44,12 +44,18 @@ const toDateTimeLocalValue = (value: unknown): string => {
 };
 
 type EditorTab = 'content' | 'media' | 'seo' | 'settings';
+type EditorEngine = 'modern' | 'legacy';
 type RevisionEntry = {
   savedAt: string;
   title: string;
   status: string;
   excerpt: string;
   contentJson: string;
+};
+type ServerRevisionEntry = RevisionEntry & {
+  id: string;
+  savedBy: string;
+  version: number;
 };
 
 const REVISION_LIMIT = 10;
@@ -90,6 +96,7 @@ export default function CmsBlogPostEditorPage() {
   const [scheduledPublishAt, setScheduledPublishAt] = useState('');
   const [scheduledUnpublishAt, setScheduledUnpublishAt] = useState('');
   const [revisionHistory, setRevisionHistory] = useState<RevisionEntry[]>([]);
+  const [serverRevisionHistory, setServerRevisionHistory] = useState<ServerRevisionEntry[]>([]);
   const [seriesSlug, setSeriesSlug] = useState('');
   const [authorName, setAuthorName] = useState('');
   const [relatedPostSlugsInput, setRelatedPostSlugsInput] = useState('');
@@ -97,10 +104,13 @@ export default function CmsBlogPostEditorPage() {
   const [restoreDraftPayload, setRestoreDraftPayload] = useState<Record<string, unknown> | null>(null);
   const [activeTab, setActiveTab] = useState<EditorTab>('content');
   const [articleSourceMode, setArticleSourceMode] = useState(false);
+  const [editorEngine, setEditorEngine] = useState<EditorEngine>('modern');
   const [showAdvancedSeo, setShowAdvancedSeo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [initializedFor, setInitializedFor] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [autosaveSecondsAgo, setAutosaveSecondsAgo] = useState<number | null>(null);
   const hasHydratedDraftRef = useRef(false);
   const loadedUpdatedAtRef = useRef<number | null>(null);
 
@@ -147,8 +157,6 @@ export default function CmsBlogPostEditorPage() {
     ];
     return { critical, warnings };
   }, [title, slug, articlePlainText, excerpt, coverImageUrl, seoTitleLen, seoDescLen]);
-
-  const canPublish = publishChecks.critical.every((entry) => entry.passed);
 
   useEffect(() => {
     setIsDirty(false);
@@ -280,6 +288,7 @@ export default function CmsBlogPostEditorPage() {
     const level = rounded >= 60 ? 'Easy' : rounded >= 30 ? 'Moderate' : 'Hard';
     return { words, sentences, readingMinutes, score: rounded, level };
   }, [excerpt, articlePlainText]);
+  const currentPlainLength = articlePlainText.trim().length;
   const canonicalConflictCount = useMemo(() => {
     const canonical = seoCanonicalUrl.trim().toLowerCase();
     if (!canonical) return 0;
@@ -288,6 +297,65 @@ export default function CmsBlogPostEditorPage() {
     const inPages = (pagesQuery.data || []).filter((entry) => (entry.seoCanonicalUrl || '').trim().toLowerCase() === canonical).length;
     return inPosts + inPages;
   }, [seoCanonicalUrl, existingForSlug?.id, rows, pagesQuery.data]);
+  const publishBlockers = useMemo(() => {
+    const blockers: string[] = [];
+    if (!title.trim()) blockers.push('Title is required.');
+    if (!toCmsSlug(slug || title)) blockers.push('Slug is required and must be valid.');
+    if (!articlePlainText.trim()) blockers.push('Article content is required.');
+    if (!excerpt.trim()) blockers.push('Summary is required before publish.');
+    if (seoTitleLen < CMS_SEO_GUIDELINES.titleMin || seoTitleLen > CMS_SEO_GUIDELINES.titleMax) {
+      blockers.push(`Search title should be ${CMS_SEO_GUIDELINES.titleMin}-${CMS_SEO_GUIDELINES.titleMax} characters.`);
+    }
+    if (seoDescLen < CMS_SEO_GUIDELINES.descriptionMin || seoDescLen > CMS_SEO_GUIDELINES.descriptionMax) {
+      blockers.push(`Search description should be ${CMS_SEO_GUIDELINES.descriptionMin}-${CMS_SEO_GUIDELINES.descriptionMax} characters.`);
+    }
+    if (settingsQuery.data?.requireApprovalBeforePublish && reviewStatus !== CMS_REVIEW_STATUS.approved) {
+      blockers.push('Review status must be approved to publish.');
+    }
+    if (canonicalConflictCount > 0) blockers.push('Canonical URL conflicts with another CMS entry.');
+    return blockers;
+  }, [
+    title,
+    slug,
+    articlePlainText,
+    excerpt,
+    seoTitleLen,
+    seoDescLen,
+    settingsQuery.data?.requireApprovalBeforePublish,
+    reviewStatus,
+    canonicalConflictCount,
+  ]);
+  const blockerTabMap = useMemo(() => {
+    const map = new Map<string, EditorTab>();
+    publishBlockers.forEach((blocker) => {
+      const text = blocker.toLowerCase();
+      if (text.includes('title') || text.includes('slug') || text.includes('content') || text.includes('summary')) map.set(blocker, 'content');
+      else if (text.includes('search') || text.includes('canonical') || text.includes('seo')) map.set(blocker, 'seo');
+      else map.set(blocker, 'settings');
+    });
+    return map;
+  }, [publishBlockers]);
+  const guideState = useMemo(() => ({
+    contentReady: Boolean(title.trim() && toCmsSlug(slug || title) && articlePlainText.trim() && excerpt.trim()),
+    mediaReady: Boolean(coverImageUrl.trim()),
+    seoReady: seoTitleLen >= CMS_SEO_GUIDELINES.titleMin
+      && seoTitleLen <= CMS_SEO_GUIDELINES.titleMax
+      && seoDescLen >= CMS_SEO_GUIDELINES.descriptionMin
+      && seoDescLen <= CMS_SEO_GUIDELINES.descriptionMax
+      && canonicalConflictCount === 0,
+    reviewReady: !settingsQuery.data?.requireApprovalBeforePublish || reviewStatus === CMS_REVIEW_STATUS.approved,
+  }), [
+    title,
+    slug,
+    articlePlainText,
+    excerpt,
+    coverImageUrl,
+    seoTitleLen,
+    seoDescLen,
+    canonicalConflictCount,
+    settingsQuery.data?.requireApprovalBeforePublish,
+    reviewStatus,
+  ]);
   const linkSuggestions = useMemo(() => {
     const words = title.toLowerCase().split(/\s+/).filter((word) => word.length >= 4);
     if (!words.length) return [];
@@ -317,6 +385,44 @@ export default function CmsBlogPostEditorPage() {
       setRevisionHistory([]);
     }
   }, [previewSlug]);
+
+  useEffect(() => {
+    if (isNewPost || !normalizedParamSlug) {
+      setServerRevisionHistory([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const snapshot = await getDocs(query(
+          collection(db, COLLECTIONS.CMS_BLOG_POST_REVISIONS),
+          where('postSlug', '==', normalizedParamSlug),
+          orderBy('savedAt', 'desc'),
+          limit(10),
+        ));
+        if (cancelled) return;
+        const rows = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data() as Record<string, unknown>;
+          return {
+            id: docSnap.id,
+            savedAt: toDateValue(data.savedAt)?.toISOString() || new Date().toISOString(),
+            title: typeof data.title === 'string' ? data.title : '',
+            status: typeof data.status === 'string' ? data.status : CMS_STATUS.draft,
+            excerpt: typeof data.excerpt === 'string' ? data.excerpt : '',
+            contentJson: typeof data.contentJson === 'string' ? data.contentJson : '',
+            savedBy: typeof data.savedBy === 'string' ? data.savedBy : 'unknown',
+            version: Number.isFinite(data.version) ? Number(data.version) : 1,
+          } as ServerRevisionEntry;
+        });
+        setServerRevisionHistory(rows);
+      } catch {
+        if (!cancelled) setServerRevisionHistory([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isNewPost, normalizedParamSlug]);
 
   useEffect(() => {
     if (hasHydratedDraftRef.current) return;
@@ -371,6 +477,7 @@ export default function CmsBlogPostEditorPage() {
       };
       try {
         window.localStorage.setItem(draftStorageKey(draftScopeKey), JSON.stringify({ savedAt: Date.now(), values }));
+        setLastSavedAt(Date.now());
       } catch {
         // no-op
       }
@@ -407,6 +514,16 @@ export default function CmsBlogPostEditorPage() {
     relatedPostSlugsInput,
     featuredUntil,
   ]);
+  useEffect(() => {
+    if (!lastSavedAt || typeof window === 'undefined') {
+      setAutosaveSecondsAgo(null);
+      return;
+    }
+    const tick = () => setAutosaveSecondsAgo(Math.max(0, Math.floor((Date.now() - lastSavedAt) / 1000)));
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [lastSavedAt]);
 
   const savePost = async (targetStatus?: (typeof statusOptions)[number]) => {
     const normalizedTitle = title.trim();
@@ -418,8 +535,8 @@ export default function CmsBlogPostEditorPage() {
       return;
     }
 
-    if (nextStatus === CMS_STATUS.published && !canPublish) {
-      notify.error('Please complete all required publish checklist items.');
+    if (nextStatus === CMS_STATUS.published && publishBlockers.length > 0) {
+      notify.error(publishBlockers[0] || 'Please complete all required publish checklist items.');
       return;
     }
     if (nextStatus === CMS_STATUS.published && (settingsQuery.isLoading || settingsQuery.isFetching)) {
@@ -564,6 +681,27 @@ export default function CmsBlogPostEditorPage() {
         ...payload,
         slug: normalizedSlug,
       }), { merge: true });
+      const revisionId = `${normalizedSlug}_${Date.now()}`;
+      const revisionEntry: ServerRevisionEntry = {
+        id: revisionId,
+        savedAt: new Date().toISOString(),
+        title: normalizedTitle,
+        status: nextStatus,
+        excerpt: excerpt.trim(),
+        contentJson: contentJson.trim(),
+        savedBy: user?.uid || 'admin',
+        version: nextVersion,
+      };
+      await setDoc(doc(db, COLLECTIONS.CMS_BLOG_POST_REVISIONS, revisionId), {
+        postSlug: normalizedSlug,
+        savedAt: now,
+        title: revisionEntry.title,
+        status: revisionEntry.status,
+        excerpt: revisionEntry.excerpt,
+        contentJson: revisionEntry.contentJson,
+        savedBy: revisionEntry.savedBy,
+        version: revisionEntry.version,
+      }, { merge: true });
 
       if (currentEntry?.id && currentEntry.id !== getCmsPostDocId(normalizedSlug)) {
         const canonicalRef = doc(db, COLLECTIONS.CMS_BLOG_POSTS, getCmsPostDocId(normalizedSlug));
@@ -578,6 +716,7 @@ export default function CmsBlogPostEditorPage() {
       }
       setStatus(nextStatus);
       setIsDirty(false);
+      setLastSavedAt(Date.now());
       loadedUpdatedAtRef.current = Date.now();
       const nextRevision: RevisionEntry = {
         savedAt: new Date().toISOString(),
@@ -588,6 +727,7 @@ export default function CmsBlogPostEditorPage() {
       };
       const nextHistory = [nextRevision, ...revisionHistory].slice(0, REVISION_LIMIT);
       setRevisionHistory(nextHistory);
+      setServerRevisionHistory((prev) => [revisionEntry, ...prev].slice(0, 10));
       if (typeof window !== 'undefined') {
         try {
           window.localStorage.setItem(revisionStorageKey(normalizedSlug), JSON.stringify(nextHistory));
@@ -630,6 +770,34 @@ export default function CmsBlogPostEditorPage() {
       </div>
 
       <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {([
+              { id: 'content', label: '1. Content', ready: guideState.contentReady },
+              { id: 'media', label: '2. Media', ready: guideState.mediaReady },
+              { id: 'seo', label: '3. SEO', ready: guideState.seoReady },
+              { id: 'settings', label: '4. Review & Publish', ready: guideState.reviewReady },
+            ] as Array<{ id: EditorTab; label: string; ready: boolean }>).map((step) => (
+              <button
+                key={step.id}
+                type="button"
+                onClick={() => setActiveTab(step.id)}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                  activeTab === step.id
+                    ? 'border-red-600 bg-red-600 text-white'
+                    : step.ready
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                      : 'border-gray-300 text-gray-700'
+                }`}
+              >
+                {step.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-600">
+            {autosaveSecondsAgo === null ? 'Autosave waiting for edits' : `Last saved ${autosaveSecondsAgo}s ago`}
+          </p>
+        </div>
         {restoreDraftPayload ? (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             <p>Recovered a local unsaved draft for this post.</p>
@@ -706,9 +874,35 @@ export default function CmsBlogPostEditorPage() {
             </button>
           ))}
         </div>
+        {publishBlockers.length > 0 ? (
+          <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            <p className="font-semibold">Ready to publish checklist</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {publishBlockers.slice(0, 4).map((blocker) => (
+                <button
+                  key={blocker}
+                  type="button"
+                  onClick={() => setActiveTab(blockerTabMap.get(blocker) || 'content')}
+                  className="rounded-md border border-amber-300 bg-white px-2 py-1 text-left font-semibold text-amber-800 hover:bg-amber-100"
+                >
+                  Fix: {blocker}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">
+            Publish checklist is complete. This post is ready to go live.
+          </div>
+        )}
 
         {activeTab === 'content' ? (
           <div className="grid gap-3 md:grid-cols-2">
+            {CMS_FEATURE_FLAGS.blogEditorV2 ? (
+              <div className="md:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+                Editor v2 enhancements enabled: richer formatting controls, quick insert blocks, and keyboard shortcuts (`Ctrl/Cmd+B`, `I`, `U`).
+              </div>
+            ) : null}
             {isNewPost ? (
               <label className="block md:col-span-2">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Duplicate From Existing Post (Optional)</span>
@@ -761,15 +955,32 @@ export default function CmsBlogPostEditorPage() {
             </label>
             <label className="block md:col-span-2">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Article Content</span>
-              <div className="mb-2 flex items-center justify-end">
-                <button
-                  type="button"
-                  onClick={() => setArticleSourceMode((prev) => !prev)}
-                  className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                >
-                  {articleSourceMode ? 'Use Visual Editor' : 'Use Source JSON'}
-                </button>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-gray-500">
+                  Write for humans first. Keep paragraphs short and include actionable guidance.
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditorEngine((prev) => (prev === 'modern' ? 'legacy' : 'modern'))}
+                    className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                  >
+                    {editorEngine === 'modern' ? 'Use Legacy Editor' : 'Use Modern Editor'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setArticleSourceMode((prev) => !prev)}
+                    className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                  >
+                    {articleSourceMode ? 'Use Visual Editor' : 'Use Source JSON'}
+                  </button>
+                </div>
               </div>
+              {editorEngine === 'legacy' ? (
+                <p className="mb-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+                  Legacy mode enabled for compatibility fallback. You can switch back to modern mode anytime.
+                </p>
+              ) : null}
               {articleSourceMode ? (
                 <textarea
                   value={contentJson}
@@ -781,6 +992,7 @@ export default function CmsBlogPostEditorPage() {
               ) : (
                 <CmsRichTextEditor
                   value={parsedArticleContent.html}
+                  useLegacyCommands={editorEngine === 'legacy'}
                   onChange={(nextHtml) => {
                     setContentJson(serializeCmsRichContent(nextHtml));
                     setIsDirty(true);
@@ -1024,10 +1236,16 @@ export default function CmsBlogPostEditorPage() {
                       <div className="text-xs text-gray-600">
                         <p className="font-semibold text-gray-900">{entry.title}</p>
                         <p>{new Date(entry.savedAt).toLocaleString()} · {toHumanCmsStatus(entry.status)}</p>
+                        <p>
+                          Content size: {extractCmsPlainText(entry.contentJson).trim().length} chars
+                          {' · '}
+                          Delta vs current: {extractCmsPlainText(entry.contentJson).trim().length - currentPlainLength}
+                        </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => {
+                          if (!window.confirm('Restore this local revision into the editor? Unsaved edits will be replaced.')) return;
                           setTitle(entry.title);
                           setExcerpt(entry.excerpt);
                           setContentJson(entry.contentJson);
@@ -1044,6 +1262,42 @@ export default function CmsBlogPostEditorPage() {
                 <p className="mt-2 text-xs text-gray-500">No revisions saved yet.</p>
               )}
             </div>
+            <div className="md:col-span-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-indigo-700">Saved Versions (Server)</p>
+              {serverRevisionHistory.length ? (
+                <div className="mt-2 space-y-2">
+                  {serverRevisionHistory.map((entry) => (
+                    <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2">
+                      <div className="text-xs text-gray-600">
+                        <p className="font-semibold text-gray-900">{entry.title}</p>
+                        <p>{new Date(entry.savedAt).toLocaleString()} · {toHumanCmsStatus(entry.status)} · v{entry.version} · {entry.savedBy}</p>
+                        <p>
+                          Content size: {extractCmsPlainText(entry.contentJson).trim().length} chars
+                          {' · '}
+                          Delta vs current: {extractCmsPlainText(entry.contentJson).trim().length - currentPlainLength}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!window.confirm('Restore this server revision into the editor? Unsaved edits will be replaced.')) return;
+                          setTitle(entry.title);
+                          setExcerpt(entry.excerpt);
+                          setContentJson(entry.contentJson);
+                          setStatus(entry.status as (typeof statusOptions)[number]);
+                          setIsDirty(true);
+                        }}
+                        className="rounded-md border border-indigo-300 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                      >
+                        Restore
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-indigo-700/80">No server revisions yet for this post.</p>
+              )}
+            </div>
           </div>
         ) : null}
 
@@ -1051,7 +1305,7 @@ export default function CmsBlogPostEditorPage() {
           <button type="button" onClick={() => void savePost(CMS_STATUS.draft)} disabled={saving} className="rounded-lg border border-amber-600 bg-amber-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
             {saving && status === CMS_STATUS.draft ? 'Saving...' : 'Save Draft'}
           </button>
-          <button type="button" onClick={() => void savePost(CMS_STATUS.published)} disabled={saving || !canPublish || settingsQuery.isLoading || settingsQuery.isFetching} className="rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+          <button type="button" onClick={() => void savePost(CMS_STATUS.published)} disabled={saving || publishBlockers.length > 0 || settingsQuery.isLoading || settingsQuery.isFetching} className="rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
             {saving && status === CMS_STATUS.published ? 'Publishing...' : 'Publish'}
           </button>
           <button
@@ -1062,6 +1316,16 @@ export default function CmsBlogPostEditorPage() {
             Cancel
           </button>
         </div>
+        {publishBlockers.length > 0 ? (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+            <p className="font-semibold">Publish blockers</p>
+            <ul className="mt-1 list-disc pl-5">
+              {publishBlockers.slice(0, 6).map((blocker) => (
+                <li key={blocker}>{blocker}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     </div>
   );

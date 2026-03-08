@@ -6,6 +6,9 @@ export const ROUTES = {
   about: '/about',
   contact: '/contact',
   blog: '/blog',
+  blogCategory: '/blog/category/:categorySlug',
+  blogSeries: '/blog/series/:seriesSlug',
+  blogAuthor: '/blog/author/:authorName',
   blogPost: '/blog/:slug',
   cmsPage: '/p/:slug',
   portal: {

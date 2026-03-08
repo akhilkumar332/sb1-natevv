@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Tag } from 'lucide-react';
 import { ROUTES } from '../constants/routes';
@@ -8,7 +8,22 @@ import { toDateValue } from '../utils/dateValue';
 import SeoHead from '../components/SeoHead';
 import { buildBlogSchema, buildBreadcrumbSchema, buildOrganizationSchema, buildWebSiteSchema } from '../utils/seoStructuredData';
 
+const toHumanLabel = (value: string) => value
+  .split(/[-_]/g)
+  .map((part) => part.trim())
+  .filter(Boolean)
+  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+  .join(' ');
+
+const getPaginationItems = (currentPage: number, totalPages: number): Array<number | 'ellipsis'> => {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, idx) => idx + 1);
+  if (currentPage <= 3) return [1, 2, 3, 4, 'ellipsis', totalPages];
+  if (currentPage >= totalPages - 2) return [1, 'ellipsis', totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  return [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages];
+};
+
 export default function BlogPage() {
+  const { categorySlug: routeCategorySlug, seriesSlug: routeSeriesSlug, authorName: routeAuthorName } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [queueReady, setQueueReady] = useState(false);
   const [loadingStalled, setLoadingStalled] = useState(false);
@@ -25,7 +40,13 @@ export default function BlogPage() {
   const canonicalBase = canonicalBaseUrl.replace(/\/+$/, '');
   const defaultOgImageUrl = settingsQuery.data?.defaultOgImageUrl || '';
   const robotsPolicy = settingsQuery.data?.robotsPolicy === 'noindex_nofollow' ? 'noindex,nofollow' : 'index,follow';
-  const postsQuery = usePublishedBlogPosts(CMS_QUERY_LIMITS.publicBlogSummaryList, queueReady);
+  const rawPage = Number(searchParams.get('page') || '1');
+  const activePage = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
+  const requestedPosts = Math.max(
+    CMS_QUERY_LIMITS.publicBlogSummaryList,
+    activePage * postsPerPage + postsPerPage,
+  );
+  const postsQuery = usePublishedBlogPosts(requestedPosts, queueReady);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -51,13 +72,11 @@ export default function BlogPage() {
     }
   };
 
-  const selectedCategory = searchParams.get('category') || 'all';
-  const selectedSeries = searchParams.get('series') || 'all';
-  const selectedAuthor = searchParams.get('author') || 'all';
+  const selectedCategory = searchParams.get('category') || (routeCategorySlug || 'all');
+  const selectedSeries = searchParams.get('series') || (routeSeriesSlug || 'all');
+  const selectedAuthor = searchParams.get('author') || (routeAuthorName ? decodeURIComponent(routeAuthorName) : 'all');
   const selectedSort = searchParams.get('sort') === 'oldest' ? 'oldest' : 'newest';
   const selectedQuery = (searchParams.get('q') || '').trim().toLowerCase();
-  const rawPage = Number(searchParams.get('page') || '1');
-  const activePage = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
 
   const posts = postsQuery.data || [];
 
@@ -141,10 +160,20 @@ export default function BlogPage() {
 
   const totalPages = Math.max(1, Math.ceil(sortedPosts.length / postsPerPage));
   const currentPage = Math.min(activePage, totalPages);
+  const pageItems = useMemo(() => getPaginationItems(currentPage, totalPages), [currentPage, totalPages]);
   const pagedPosts = useMemo(() => {
     const start = (currentPage - 1) * postsPerPage;
     return sortedPosts.slice(start, start + postsPerPage);
   }, [sortedPosts, currentPage, postsPerPage]);
+  const pageStartItem = sortedPosts.length === 0 ? 0 : (currentPage - 1) * postsPerPage + 1;
+  const pageEndItem = sortedPosts.length === 0 ? 0 : Math.min(sortedPosts.length, currentPage * postsPerPage);
+  const hasActiveFilters = Boolean(
+    selectedQuery
+      || effectiveCategory !== 'all'
+      || effectiveSeries !== 'all'
+      || effectiveAuthor !== 'all'
+      || selectedSort !== 'newest'
+  );
 
   const applyParams = (next: { category?: string; series?: string; author?: string; sort?: 'newest' | 'oldest'; q?: string; page?: number }) => {
     const params = new URLSearchParams(searchParams);
@@ -229,8 +258,12 @@ export default function BlogPage() {
       />
       <section className="bg-gradient-to-br from-red-50 via-white to-pink-50 py-14">
         <div className="container mx-auto px-4">
-          <h1 className="text-4xl font-extrabold text-gray-900">Blog</h1>
-          <p className="mt-2 max-w-2xl text-gray-600">Stories, updates, and practical blood donation guidance from the BloodHub team.</p>
+          <h1 className="text-4xl font-extrabold text-gray-900">
+            {routeCategorySlug ? `Category: ${toHumanLabel(routeCategorySlug)}` : routeSeriesSlug ? `Series: ${toHumanLabel(routeSeriesSlug)}` : routeAuthorName ? `Author: ${decodeURIComponent(routeAuthorName)}` : 'Blog'}
+          </h1>
+          <p className="mt-2 max-w-2xl text-gray-600">
+            Stories, updates, and practical blood donation guidance from the BloodHub team.
+          </p>
         </div>
       </section>
 
@@ -312,7 +345,7 @@ export default function BlogPage() {
                       : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  {category}
+                  {toHumanLabel(category)}
                 </button>
               ))}
             </div>
@@ -341,7 +374,7 @@ export default function BlogPage() {
                       : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  {entry}
+                  {toHumanLabel(entry)}
                 </button>
               ))}
             </div>
@@ -411,6 +444,15 @@ export default function BlogPage() {
               {effectiveCategory === 'all' && effectiveSeries === 'all' && effectiveAuthor === 'all'
                 ? 'No published blog posts yet.'
                 : 'No posts found for selected filters.'}
+              {hasActiveFilters ? (
+                <p className="mt-2 text-xs text-gray-500">
+                  Try clearing filters or searching with broader keywords.
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-gray-500">
+                  Check back soon for new donation stories and practical guides.
+                </p>
+              )}
             </div>
           ) : (
             <>
@@ -442,7 +484,7 @@ export default function BlogPage() {
                         <p className="line-clamp-3 text-sm text-gray-600">{post.excerpt || 'No excerpt available for this post.'}</p>
                         <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
                           <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{publishedAt ? publishedAt.toLocaleDateString() : 'N/A'}</span>
-                          {post.categorySlug ? <span className="inline-flex items-center gap-1"><Tag className="h-3.5 w-3.5" />{post.categorySlug}</span> : null}
+                          {post.categorySlug ? <span className="inline-flex items-center gap-1"><Tag className="h-3.5 w-3.5" />{toHumanLabel(post.categorySlug)}</span> : null}
                           <span>{readingMinutes} min read</span>
                         </div>
                         <Link to={ROUTES.blogPost.replace(':slug', post.slug)} className="inline-flex rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50">
@@ -455,8 +497,19 @@ export default function BlogPage() {
               </div>
 
               <div className="flex items-center justify-between rounded-2xl border border-red-100 bg-white px-4 py-3 text-sm shadow-sm">
-                <p className="text-gray-600">Page {currentPage} of {totalPages}</p>
-                <div className="flex gap-2">
+                <div>
+                  <p className="text-gray-600">Page {currentPage} of {totalPages}</p>
+                  <p className="text-xs text-gray-500">Showing {pageStartItem}-{pageEndItem} of {sortedPosts.length} posts</p>
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applyParams({ page: 1 })}
+                    disabled={currentPage <= 1}
+                    className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
+                  >
+                    First
+                  </button>
                   <button
                     type="button"
                     onClick={() => applyParams({ page: Math.max(1, currentPage - 1) })}
@@ -465,6 +518,24 @@ export default function BlogPage() {
                   >
                     Prev
                   </button>
+                  {pageItems.map((item, index) => (
+                    item === 'ellipsis' ? (
+                      <span key={`ellipsis-${index}`} className="px-1 text-gray-400">...</span>
+                    ) : (
+                      <button
+                        key={`page-${item}`}
+                        type="button"
+                        onClick={() => applyParams({ page: item })}
+                        className={`rounded-md border px-3 py-1.5 font-semibold ${
+                          item === currentPage
+                            ? 'border-red-600 bg-red-600 text-white'
+                            : 'border-gray-300 text-gray-700'
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  ))}
                   <button
                     type="button"
                     onClick={() => applyParams({ page: Math.min(totalPages, currentPage + 1) })}
@@ -472,6 +543,14 @@ export default function BlogPage() {
                     className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
                   >
                     Next
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyParams({ page: totalPages })}
+                    disabled={currentPage >= totalPages}
+                    className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
+                  >
+                    Last
                   </button>
                 </div>
               </div>

@@ -24,6 +24,19 @@ export const OFFLINE_MUTATION_TYPES = {
 } as const;
 
 export type OfflineMutationType = typeof OFFLINE_MUTATION_TYPES[keyof typeof OFFLINE_MUTATION_TYPES];
+export type OfflineMutationFeature =
+  | 'user_profile'
+  | 'notifications'
+  | 'admin_comms'
+  | 'admin_nps'
+  | 'admin_campaigns'
+  | 'admin_appointments'
+  | 'admin_donations'
+  | 'admin_volunteers'
+  | 'admin_partnerships'
+  | 'admin_emergency'
+  | 'firestore_patch'
+  | 'unknown';
 
 export const OFFLINE_MUTATION_LABELS: Record<OfflineMutationType, string> = {
   [OFFLINE_MUTATION_TYPES.userNotificationPreferences]: 'Notification preferences update',
@@ -42,6 +55,38 @@ export const OFFLINE_MUTATION_LABELS: Record<OfflineMutationType, string> = {
   [OFFLINE_MUTATION_TYPES.adminEmergencyRequestStatus]: 'Admin emergency request status update',
 };
 
+export const OFFLINE_MUTATION_FEATURES: Record<OfflineMutationType, OfflineMutationFeature> = {
+  [OFFLINE_MUTATION_TYPES.userNotificationPreferences]: 'notifications',
+  [OFFLINE_MUTATION_TYPES.userProfilePatch]: 'user_profile',
+  [OFFLINE_MUTATION_TYPES.adminNotificationRead]: 'notifications',
+  [OFFLINE_MUTATION_TYPES.adminContactSubmissionStatus]: 'admin_comms',
+  [OFFLINE_MUTATION_TYPES.adminNpsFollowUpStatus]: 'admin_nps',
+  [OFFLINE_MUTATION_TYPES.adminNpsFollowUpNotes]: 'admin_nps',
+  [OFFLINE_MUTATION_TYPES.adminNpsTags]: 'admin_nps',
+  [OFFLINE_MUTATION_TYPES.firestoreDocPatch]: 'firestore_patch',
+  [OFFLINE_MUTATION_TYPES.adminCampaignStatus]: 'admin_campaigns',
+  [OFFLINE_MUTATION_TYPES.adminAppointmentStatus]: 'admin_appointments',
+  [OFFLINE_MUTATION_TYPES.adminDonationStatus]: 'admin_donations',
+  [OFFLINE_MUTATION_TYPES.adminVolunteerStatus]: 'admin_volunteers',
+  [OFFLINE_MUTATION_TYPES.adminPartnershipStatus]: 'admin_partnerships',
+  [OFFLINE_MUTATION_TYPES.adminEmergencyRequestStatus]: 'admin_emergency',
+};
+
+export const OFFLINE_FEATURE_OPERATOR_LABELS: Record<OfflineMutationFeature, string> = {
+  user_profile: 'User profile updates',
+  notifications: 'Notification updates',
+  admin_comms: 'Contact submissions',
+  admin_nps: 'NPS follow-up',
+  admin_campaigns: 'Campaign status updates',
+  admin_appointments: 'Appointment status updates',
+  admin_donations: 'Donation status updates',
+  admin_volunteers: 'Volunteer status updates',
+  admin_partnerships: 'Partnership status updates',
+  admin_emergency: 'Emergency request status updates',
+  firestore_patch: 'Generic document updates',
+  unknown: 'Unknown feature area',
+};
+
 export const OFFLINE_OUTBOX_CONFIG = {
   dbName: 'bloodhub_offline_mutations',
   storeName: 'mutations',
@@ -51,8 +96,10 @@ export const OFFLINE_OUTBOX_CONFIG = {
   minFlushTriggerGapMs: TWELVE_HUNDRED_MS,
   maxAttemptsPerMutation: 6,
   maxRecentEvents: 40,
+  maxRecentEventsPerKind: 20,
   maxPendingItems: 25,
   maxDeadLetterItems: 100,
+  maxHealthPersistWindowRuns: 1000,
   telemetryStorageKey: 'bh_offline_mutation_telemetry_v2',
   deadLetterStorageKey: 'bh_offline_mutation_dead_letter_v1',
 } as const;

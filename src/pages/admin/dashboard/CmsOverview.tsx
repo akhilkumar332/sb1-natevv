@@ -68,6 +68,11 @@ export default function CmsOverviewPage() {
     return !updatedAt || updatedAt.getTime() < staleCutoff;
   }).length;
   const scheduledItems = [...pages, ...posts].filter((entry) => entry.status === 'scheduled').length;
+  const overdueScheduledItems = [...pages, ...posts].filter((entry) => {
+    if (entry.status !== 'scheduled') return false;
+    const publishAt = toDateValue(entry.scheduledPublishAt);
+    return Boolean(publishAt && publishAt.getTime() <= Date.now());
+  }).length;
   const seoPriorityQueue = [
     ...publishedPages
       .filter((entry) => !(entry.seoDescription || entry.excerpt || '').trim())
@@ -267,6 +272,9 @@ export default function CmsOverviewPage() {
           </div>
           <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
             Scheduled items queued: <span className="font-semibold text-gray-900">{scheduledItems}</span>
+          </div>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
+            Overdue scheduled items: <span className="font-semibold text-gray-900">{overdueScheduledItems}</span>
           </div>
           <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
             Orphan post candidates: <span className="font-semibold text-gray-900">{orphanPosts}</span>

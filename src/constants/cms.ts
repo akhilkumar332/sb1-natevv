@@ -116,6 +116,7 @@ export const CMS_RUNTIME = {
 
 export const CMS_FEATURE_FLAGS = {
   simplifiedEditorMode: true,
+  blogEditorV2: true,
 } as const;
 
 export const CMS_EDITOR = {

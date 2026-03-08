@@ -3,10 +3,12 @@ import { auth, db } from '../firebase';
 import { captureHandledError } from './errorLog.service';
 import { COLLECTIONS } from '../constants/firestore';
 import {
+  OFFLINE_MUTATION_FEATURES,
   OFFLINE_HEALTH_RECORDS_CONFIG,
   OFFLINE_MUTATION_LABELS,
   OFFLINE_MUTATION_TYPES,
   OFFLINE_OUTBOX_CONFIG,
+  type OfflineMutationFeature,
   type OfflineMutationType,
 } from '../constants/offline';
 import { validateQueueableMutation } from '../constants/offlineMutationPolicy';
@@ -110,6 +112,8 @@ type MutationPayloadMap = {
 type MutationRecord<T extends MutationType = MutationType> = {
   id: string;
   type: T;
+  feature?: OfflineMutationFeature;
+  traceId?: string;
   actorUid: string;
   payload: MutationPayloadMap[T];
   dedupeKey: string;
@@ -122,6 +126,8 @@ type MutationRecord<T extends MutationType = MutationType> = {
 
 type EnqueueOptions<T extends MutationType> = {
   type: T;
+  feature?: OfflineMutationFeature;
+  traceId?: string;
   actorUid: string;
   dedupeKey: string;
   payload: MutationPayloadMap[T];
@@ -153,12 +159,51 @@ export type OfflineMutationDeadLetterEntry = {
   id: string;
   mutationId: string;
   type: MutationType;
+  feature: OfflineMutationFeature;
   actorUid: string;
   dedupeKey: string;
   attempts: number;
   failedAt: number;
   reason: string;
   message: string | null;
+  traceId: string | null;
+  failureClass: OfflineFailureClass;
+  failureCode: string | null;
+};
+
+export type OfflineFailureClass =
+  | 'network'
+  | 'auth'
+  | 'validation'
+  | 'permission'
+  | 'conflict'
+  | 'rule'
+  | 'internal'
+  | 'unknown';
+
+type OfflineTelemetryEventOutcome =
+  | 'queued'
+  | 'started'
+  | 'completed'
+  | 'failed'
+  | 'blocked'
+  | 'skipped'
+  | 'succeeded';
+
+export type OfflineMutationTelemetryEvent = {
+  at: number;
+  kind: 'enqueue' | 'flush_start' | 'flush_complete' | 'flush_error' | 'policy_violation';
+  mutationType?: MutationType;
+  feature?: OfflineMutationFeature;
+  traceId?: string;
+  outcome?: OfflineTelemetryEventOutcome;
+  failureClass?: OfflineFailureClass;
+  failureCode?: string;
+  message?: string;
+  processed?: number;
+  succeeded?: number;
+  failed?: number;
+  durationMs?: number;
 };
 
 export type OfflineMutationTelemetry = {
@@ -176,6 +221,9 @@ export type OfflineMutationTelemetry = {
   healthPersistRuns: number;
   healthPersistSucceeded: number;
   healthPersistFailed: number;
+  healthPersistWindowRuns: number;
+  healthPersistWindowSucceeded: number;
+  healthPersistWindowFailed: number;
   lastHealthPersistAt: number | null;
   lastHealthPersistError: string | null;
   lastHealthPersistRecordId: string | null;
@@ -183,16 +231,7 @@ export type OfflineMutationTelemetry = {
   lastFlushAt: number | null;
   lastFailureAt: number | null;
   lastFailureMessage: string | null;
-  recentEvents: Array<{
-    at: number;
-    kind: 'enqueue' | 'flush_start' | 'flush_complete' | 'flush_error' | 'policy_violation';
-    mutationType?: MutationType;
-    message?: string;
-    processed?: number;
-    succeeded?: number;
-    failed?: number;
-    durationMs?: number;
-  }>;
+  recentEvents: OfflineMutationTelemetryEvent[];
 };
 
 const DB_NAME = OFFLINE_OUTBOX_CONFIG.dbName;
@@ -241,6 +280,9 @@ const emptyTelemetry = (): OfflineMutationTelemetry => ({
   healthPersistRuns: 0,
   healthPersistSucceeded: 0,
   healthPersistFailed: 0,
+  healthPersistWindowRuns: 0,
+  healthPersistWindowSucceeded: 0,
+  healthPersistWindowFailed: 0,
   lastHealthPersistAt: null,
   lastHealthPersistError: null,
   lastHealthPersistRecordId: null,
@@ -279,6 +321,65 @@ const toSafeCounter = (value: unknown): number => {
   return Math.min(MAX_TELEMETRY_COUNTER, normalized);
 };
 
+const safeFailureClass = (value: unknown): OfflineFailureClass => {
+  const normalized = String(value || '').toLowerCase();
+  if (['network', 'auth', 'validation', 'permission', 'conflict', 'rule', 'internal'].includes(normalized)) {
+    return normalized as OfflineFailureClass;
+  }
+  return 'unknown';
+};
+
+const toShortCode = (value: unknown): string | null => {
+  if (value == null) return null;
+  const code = String(value).trim().slice(0, 120);
+  return code ? code : null;
+};
+
+const generateTraceId = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+
+const classifyOfflineFailure = (error: unknown): { failureClass: OfflineFailureClass; failureCode: string | null } => {
+  const anyErr = error as { code?: string; message?: string };
+  const codeRaw = String(anyErr?.code || '');
+  const code = codeRaw.toLowerCase();
+  const message = String(anyErr?.message || '').toLowerCase();
+
+  if (code.includes('permission') || code === 'unauthenticated') {
+    return {
+      failureClass: code === 'unauthenticated' ? 'auth' : 'permission',
+      failureCode: toShortCode(codeRaw || 'permission_denied'),
+    };
+  }
+  if (code.includes('invalid-argument') || code.includes('failed-precondition') || message.includes('invalid')) {
+    return { failureClass: 'validation', failureCode: toShortCode(codeRaw || 'validation_error') };
+  }
+  if (code.includes('aborted') || message.includes('conflict')) {
+    return { failureClass: 'conflict', failureCode: toShortCode(codeRaw || 'conflict') };
+  }
+  if (code.includes('resource-exhausted') || code.includes('quota')) {
+    return { failureClass: 'rule', failureCode: toShortCode(codeRaw || 'resource_exhausted') };
+  }
+  if (isOfflineWriteError(error)) {
+    return { failureClass: 'network', failureCode: toShortCode(codeRaw || 'offline') };
+  }
+  if (code.includes('internal')) {
+    return { failureClass: 'internal', failureCode: toShortCode(codeRaw || 'internal') };
+  }
+  return { failureClass: 'unknown', failureCode: toShortCode(codeRaw || null) };
+};
+
+const safeFeatureFromType = (type: MutationType | undefined): OfflineMutationFeature => {
+  if (!type) return 'unknown';
+  return OFFLINE_MUTATION_FEATURES[type] || 'unknown';
+};
+
+const safeFeatureValue = (value: unknown, fallbackType?: MutationType): OfflineMutationFeature => {
+  const raw = String(value || '') as OfflineMutationFeature;
+  if (Object.values(OFFLINE_MUTATION_FEATURES).includes(raw) || raw === 'unknown') {
+    return raw;
+  }
+  return safeFeatureFromType(fallbackType);
+};
+
 const shallowEqualRecord = (
   a: Record<string, number> | undefined,
   b: Record<string, number> | undefined,
@@ -311,6 +412,11 @@ const loadTelemetry = (): OfflineMutationTelemetry => {
           mutationType: Object.values(OFFLINE_MUTATION_TYPES).includes((entry as any).mutationType)
             ? (entry as any).mutationType
             : undefined,
+          feature: safeFeatureValue((entry as any).feature, (entry as any).mutationType),
+          traceId: typeof (entry as any).traceId === 'string' ? (entry as any).traceId.slice(0, 64) : undefined,
+          outcome: typeof (entry as any).outcome === 'string' ? (entry as any).outcome : undefined,
+          failureClass: safeFailureClass((entry as any).failureClass),
+          failureCode: toShortCode((entry as any).failureCode) ?? undefined,
           message: typeof (entry as any).message === 'string' ? (entry as any).message : undefined,
           processed: Number.isFinite((entry as any).processed) ? Number((entry as any).processed) : undefined,
           succeeded: Number.isFinite((entry as any).succeeded) ? Number((entry as any).succeeded) : undefined,
@@ -343,6 +449,9 @@ const loadTelemetry = (): OfflineMutationTelemetry => {
       healthPersistRuns: toSafeCounter((parsed as any).healthPersistRuns),
       healthPersistSucceeded: toSafeCounter((parsed as any).healthPersistSucceeded),
       healthPersistFailed: toSafeCounter((parsed as any).healthPersistFailed),
+      healthPersistWindowRuns: toSafeCounter((parsed as any).healthPersistWindowRuns),
+      healthPersistWindowSucceeded: toSafeCounter((parsed as any).healthPersistWindowSucceeded),
+      healthPersistWindowFailed: toSafeCounter((parsed as any).healthPersistWindowFailed),
       lastHealthPersistAt: (parsed as any).lastHealthPersistAt == null
         ? null
         : safeFiniteNumber((parsed as any).lastHealthPersistAt, Date.now()),
@@ -368,6 +477,9 @@ const loadTelemetry = (): OfflineMutationTelemetry => {
         ...normalized,
         healthPersistRuns: 0,
         healthPersistFailed: 0,
+        healthPersistWindowRuns: 0,
+        healthPersistWindowFailed: 0,
+        healthPersistWindowSucceeded: 0,
         lastHealthPersistAt: null,
         lastHealthPersistError: null,
         lastHealthPersistRecordId: null,
@@ -398,12 +510,16 @@ const loadDeadLetters = (): OfflineMutationDeadLetterEntry[] => {
         type: Object.values(OFFLINE_MUTATION_TYPES).includes((entry as any).type)
           ? (entry as any).type
           : OFFLINE_MUTATION_TYPES.userNotificationPreferences,
+        feature: safeFeatureValue((entry as any).feature, (entry as any).type),
         actorUid: String((entry as any).actorUid || ''),
         dedupeKey: String((entry as any).dedupeKey || ''),
         attempts: Math.max(0, Math.floor(safeFiniteNumber((entry as any).attempts, 0))),
         failedAt: safeFiniteNumber((entry as any).failedAt, Date.now()),
         reason: String((entry as any).reason || 'unknown'),
         message: (entry as any).message == null ? null : String((entry as any).message).slice(0, 240),
+        traceId: typeof (entry as any).traceId === 'string' ? String((entry as any).traceId).slice(0, 64) : null,
+        failureClass: safeFailureClass((entry as any).failureClass),
+        failureCode: toShortCode((entry as any).failureCode),
       }))
       .filter((entry) => entry.id && entry.mutationId && entry.actorUid);
   } catch {
@@ -474,6 +590,29 @@ const buildHealthPersistSignature = (uid: string, now: number) => {
   ].join(':');
 };
 
+const withHealthPersistWindowUpdate = (kind: 'run' | 'success' | 'failed') => {
+  const maxRuns = OFFLINE_OUTBOX_CONFIG.maxHealthPersistWindowRuns;
+  let runs = toSafeCounter(telemetryState.healthPersistWindowRuns || 0);
+  let succeeded = toSafeCounter(telemetryState.healthPersistWindowSucceeded || 0);
+  let failed = toSafeCounter(telemetryState.healthPersistWindowFailed || 0);
+
+  if (runs >= maxRuns) {
+    runs = Math.floor(runs / 2);
+    succeeded = Math.floor(succeeded / 2);
+    failed = Math.floor(failed / 2);
+  }
+
+  if (kind === 'run') runs += 1;
+  if (kind === 'success') succeeded += 1;
+  if (kind === 'failed') failed += 1;
+
+  return {
+    healthPersistWindowRuns: runs,
+    healthPersistWindowSucceeded: succeeded,
+    healthPersistWindowFailed: failed,
+  };
+};
+
 const persistOfflineSyncHealthRecordNow = async () => {
   const uid = getCurrentUserUid();
   if (!uid) {
@@ -496,7 +635,10 @@ const persistOfflineSyncHealthRecordNow = async () => {
     .slice(0, OFFLINE_HEALTH_RECORDS_CONFIG.maxDeadLetterSamples)
     .map((entry) => ({
       type: entry.type,
+      feature: entry.feature,
       reason: entry.reason,
+      failureClass: entry.failureClass,
+      failureCode: entry.failureCode || null,
       attempts: entry.attempts,
       failedAt: entry.failedAt,
     }));
@@ -507,6 +649,7 @@ const persistOfflineSyncHealthRecordNow = async () => {
     lastHealthPersistAt = now;
     patchTelemetry({
       healthPersistRuns: telemetryState.healthPersistRuns + 1,
+      ...withHealthPersistWindowUpdate('run'),
     });
     await setDoc(
       doc(db, COLLECTIONS.OFFLINE_SYNC_HEALTH_RECORDS, recordId),
@@ -533,6 +676,7 @@ const persistOfflineSyncHealthRecordNow = async () => {
     lastHealthPersistSignature = signature;
     patchTelemetry({
       healthPersistSucceeded: telemetryState.healthPersistSucceeded + 1,
+      ...withHealthPersistWindowUpdate('success'),
       lastHealthPersistAt: now,
       lastHealthPersistError: null,
       lastHealthPersistRecordId: recordId,
@@ -540,6 +684,7 @@ const persistOfflineSyncHealthRecordNow = async () => {
   } catch (error) {
     patchTelemetry({
       healthPersistFailed: telemetryState.healthPersistFailed + 1,
+      ...withHealthPersistWindowUpdate('failed'),
       lastHealthPersistError: String((error as any)?.message || 'persist_failed').slice(0, 240),
       lastHealthPersistRecordId: recordId,
     });
@@ -628,6 +773,9 @@ const patchTelemetry = (patch: Partial<OfflineMutationTelemetry>) => {
   nextState.healthPersistRuns = toSafeCounter(nextState.healthPersistRuns);
   nextState.healthPersistSucceeded = toSafeCounter(nextState.healthPersistSucceeded);
   nextState.healthPersistFailed = toSafeCounter(nextState.healthPersistFailed);
+  nextState.healthPersistWindowRuns = toSafeCounter(nextState.healthPersistWindowRuns);
+  nextState.healthPersistWindowSucceeded = toSafeCounter(nextState.healthPersistWindowSucceeded);
+  nextState.healthPersistWindowFailed = toSafeCounter(nextState.healthPersistWindowFailed);
 
   const isNoop = (
     nextState.enqueued === telemetryState.enqueued
@@ -644,6 +792,9 @@ const patchTelemetry = (patch: Partial<OfflineMutationTelemetry>) => {
     && nextState.healthPersistRuns === telemetryState.healthPersistRuns
     && nextState.healthPersistSucceeded === telemetryState.healthPersistSucceeded
     && nextState.healthPersistFailed === telemetryState.healthPersistFailed
+    && nextState.healthPersistWindowRuns === telemetryState.healthPersistWindowRuns
+    && nextState.healthPersistWindowSucceeded === telemetryState.healthPersistWindowSucceeded
+    && nextState.healthPersistWindowFailed === telemetryState.healthPersistWindowFailed
     && nextState.lastHealthPersistAt === telemetryState.lastHealthPersistAt
     && nextState.lastHealthPersistError === telemetryState.lastHealthPersistError
     && nextState.lastHealthPersistRecordId === telemetryState.lastHealthPersistRecordId
@@ -660,24 +811,62 @@ const patchTelemetry = (patch: Partial<OfflineMutationTelemetry>) => {
 
 const pushTelemetryEvent = (event: OfflineMutationTelemetry['recentEvents'][number]) => {
   const existing = telemetryState.recentEvents || [];
+  const normalizedEvent: OfflineMutationTelemetryEvent = {
+    ...event,
+    traceId: event.traceId ? String(event.traceId).slice(0, 64) : undefined,
+    feature: safeFeatureValue(event.feature, event.mutationType),
+    failureClass: safeFailureClass(event.failureClass),
+    failureCode: toShortCode(event.failureCode) ?? undefined,
+  };
+
+  const duplicate = existing.find((entry) => (
+    entry.kind === normalizedEvent.kind
+    && entry.mutationType === normalizedEvent.mutationType
+    && entry.message === normalizedEvent.message
+    && Math.abs((normalizedEvent.at || 0) - (entry.at || 0)) < 2000
+  ));
+  if (duplicate) return;
+
+  const combined = [normalizedEvent, ...existing];
+  const perKindLimit = OFFLINE_OUTBOX_CONFIG.maxRecentEventsPerKind;
+  const byKindCount: Record<string, number> = {};
+  const nextEvents: OfflineMutationTelemetryEvent[] = [];
+  for (const item of combined) {
+    const kindKey = item.kind;
+    const current = byKindCount[kindKey] || 0;
+    if (current >= perKindLimit) continue;
+    byKindCount[kindKey] = current + 1;
+    nextEvents.push(item);
+    if (nextEvents.length >= OFFLINE_OUTBOX_CONFIG.maxRecentEvents) break;
+  }
+
   telemetryState = {
     ...telemetryState,
-    recentEvents: [event, ...existing].slice(0, OFFLINE_OUTBOX_CONFIG.maxRecentEvents),
+    recentEvents: nextEvents,
   };
   publishTelemetry();
 };
 
-const addDeadLetter = (mutation: MutationRecord, reason: string, message?: string | null) => {
+const addDeadLetter = (
+  mutation: MutationRecord,
+  reason: string,
+  message?: string | null,
+  diagnostics?: { failureClass?: OfflineFailureClass; failureCode?: string | null },
+) => {
   const entry: OfflineMutationDeadLetterEntry = {
     id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
     mutationId: mutation.id,
     type: mutation.type,
+    feature: mutation.feature || safeFeatureFromType(mutation.type),
     actorUid: mutation.actorUid,
     dedupeKey: mutation.dedupeKey,
     attempts: mutation.attempts,
     failedAt: Date.now(),
     reason,
     message: message ? String(message).slice(0, 240) : null,
+    traceId: mutation.traceId || null,
+    failureClass: diagnostics?.failureClass || 'unknown',
+    failureCode: diagnostics?.failureCode || null,
   };
   deadLetterState = [entry, ...deadLetterState].slice(0, OFFLINE_OUTBOX_CONFIG.maxDeadLetterItems);
   publishDeadLetters();
@@ -872,6 +1061,8 @@ const upsertMutation = async <T extends MutationType>(options: EnqueueOptions<T>
       const merged: MutationRecord<T> = {
         ...head,
         type: options.type,
+        feature: options.feature || safeFeatureFromType(options.type),
+        traceId: options.traceId || head.traceId || generateTraceId(),
         payload: options.payload,
         updatedAt: now,
         nextAttemptAt: now,
@@ -885,6 +1076,8 @@ const upsertMutation = async <T extends MutationType>(options: EnqueueOptions<T>
     const record: MutationRecord<T> = {
       id: generateId(),
       type: options.type,
+      feature: options.feature || safeFeatureFromType(options.type),
+      traceId: options.traceId || generateTraceId(),
       actorUid: options.actorUid,
       payload: options.payload,
       dedupeKey: options.dedupeKey,
@@ -905,6 +1098,9 @@ const upsertMutation = async <T extends MutationType>(options: EnqueueOptions<T>
     at: Date.now(),
     kind: 'enqueue',
     mutationType: options.type,
+    feature: options.feature || safeFeatureFromType(options.type),
+    traceId: options.traceId,
+    outcome: 'queued',
     message: OFFLINE_MUTATION_LABELS[options.type] || options.type,
   });
 };
@@ -1098,6 +1294,7 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
 
   flushing = true;
   const flushStartedAt = Date.now();
+  const flushTraceId = generateTraceId();
   patchTelemetry({
     flushRuns: telemetryState.flushRuns + 1,
     lastFlushAt: Date.now(),
@@ -1105,6 +1302,8 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
   pushTelemetryEvent({
     at: Date.now(),
     kind: 'flush_start',
+    traceId: flushTraceId,
+    outcome: 'started',
   });
 
   try {
@@ -1132,6 +1331,7 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
         succeeded += 1;
       } catch (error) {
         if (isOfflineWriteError(error)) {
+          const retryableFailure = classifyOfflineFailure(error);
           const attempts = await updateMutationRetry(mutation, error);
           if (attempts >= MAX_ATTEMPTS_PER_MUTATION) {
             await removeMutation(mutation.id);
@@ -1139,6 +1339,7 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
               { ...mutation, attempts },
               'max_attempts_reached',
               (error as any)?.message || 'Offline mutation exceeded retry budget',
+              retryableFailure,
             );
           }
           failed += 1;
@@ -1147,6 +1348,11 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
             at: Date.now(),
             kind: 'flush_error',
             mutationType: mutation.type,
+            feature: mutation.feature || safeFeatureFromType(mutation.type),
+            traceId: mutation.traceId || flushTraceId,
+            outcome: 'failed',
+            failureClass: retryableFailure.failureClass,
+            failureCode: retryableFailure.failureCode ?? undefined,
             message: lastFailureMessage,
           });
           continue;
@@ -1164,10 +1370,12 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
         });
 
         await removeMutation(mutation.id);
+        const fatalFailure = classifyOfflineFailure(error);
         addDeadLetter(
           mutation,
           'fatal_write_error',
           (error as any)?.message || 'Mutation removed after non-retryable failure',
+          fatalFailure,
         );
         failed += 1;
         lastFailureMessage = String((error as any)?.message || 'Offline mutation flush failed');
@@ -1175,6 +1383,11 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
           at: Date.now(),
           kind: 'flush_error',
           mutationType: mutation.type,
+          feature: mutation.feature || safeFeatureFromType(mutation.type),
+          traceId: mutation.traceId || flushTraceId,
+          outcome: 'failed',
+          failureClass: fatalFailure.failureClass,
+          failureCode: fatalFailure.failureCode ?? undefined,
           message: lastFailureMessage,
         });
       }
@@ -1196,6 +1409,8 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
     pushTelemetryEvent({
       at: Date.now(),
       kind: 'flush_complete',
+      traceId: flushTraceId,
+      outcome: 'completed',
       processed: attempted,
       succeeded,
       failed,
@@ -1224,6 +1439,10 @@ export const flushOfflineMutations = async (): Promise<FlushResult> => {
     pushTelemetryEvent({
       at: Date.now(),
       kind: 'flush_error',
+      traceId: flushTraceId,
+      outcome: 'failed',
+      failureClass: classifyOfflineFailure(error).failureClass,
+      failureCode: classifyOfflineFailure(error).failureCode ?? undefined,
       message,
       durationMs: Math.max(0, Date.now() - flushStartedAt),
     });
@@ -1399,6 +1618,8 @@ const runQueueableMutation = async <T extends MutationType>(options: {
   metadata?: Record<string, unknown>;
 }): Promise<{ queued: boolean }> => {
   const actorUid = options.actorUid || getCurrentUserUid() || null;
+  const traceId = generateTraceId();
+  const feature = safeFeatureFromType(options.type);
   const policy = validateQueueableMutation(options.type, options.payload);
 
   if (!policy.allowed) {
@@ -1411,6 +1632,11 @@ const runQueueableMutation = async <T extends MutationType>(options: {
       at: Date.now(),
       kind: 'policy_violation',
       mutationType: options.type,
+      feature,
+      traceId,
+      outcome: 'blocked',
+      failureClass: 'rule',
+      failureCode: toShortCode(policy.code) ?? undefined,
       message: policyMessage.slice(0, 240),
     });
 
@@ -1481,6 +1707,8 @@ const runQueueableMutation = async <T extends MutationType>(options: {
   try {
     await upsertMutation({
       type: options.type,
+      feature,
+      traceId,
       actorUid,
       dedupeKey: options.dedupeKey,
       payload: options.payload,

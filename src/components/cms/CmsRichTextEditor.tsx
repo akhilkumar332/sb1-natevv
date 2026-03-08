@@ -6,11 +6,12 @@ type Props = {
   onChange: (next: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  useLegacyCommands?: boolean;
 };
 
 const buttonClass = 'rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50';
 
-export default function CmsRichTextEditor({ value, onChange, placeholder, disabled = false }: Props) {
+export default function CmsRichTextEditor({ value, onChange, placeholder, disabled = false, useLegacyCommands = false }: Props) {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const isFocusedRef = useRef(false);
   const htmlValue = useMemo(() => sanitizeRichHtml(value), [value]);
@@ -30,7 +31,32 @@ export default function CmsRichTextEditor({ value, onChange, placeholder, disabl
   const exec = (command: string, commandValue?: string) => {
     if (disabled) return;
     editorRef.current?.focus();
-    document.execCommand(command, false, commandValue);
+    try {
+      document.execCommand(command, false, commandValue);
+    } catch {
+      if (!useLegacyCommands && editorRef.current) {
+        const marker = command === 'bold' ? '**text**'
+          : command === 'italic' ? '*text*'
+            : command === 'underline' ? '__text__'
+              : '';
+        if (marker) {
+          editorRef.current.innerHTML = `${editorRef.current.innerHTML}${marker}`;
+        }
+      }
+    }
+    emitChange();
+  };
+
+  const insertHtml = (html: string) => {
+    if (disabled) return;
+    editorRef.current?.focus();
+    try {
+      document.execCommand('insertHTML', false, sanitizeRichHtml(html));
+    } catch {
+      if (editorRef.current) {
+        editorRef.current.innerHTML = `${editorRef.current.innerHTML}${sanitizeRichHtml(html)}`;
+      }
+    }
     emitChange();
   };
 
@@ -52,6 +78,8 @@ export default function CmsRichTextEditor({ value, onChange, placeholder, disabl
         <button type="button" className={buttonClass} disabled={disabled} onClick={() => exec('formatBlock', 'h2')}>H2</button>
         <button type="button" className={buttonClass} disabled={disabled} onClick={() => exec('formatBlock', 'h3')}>H3</button>
         <button type="button" className={buttonClass} disabled={disabled} onClick={addLink}>Link</button>
+        <button type="button" className={buttonClass} disabled={disabled} onClick={() => insertHtml('<blockquote>Highlight key point...</blockquote>')}>Callout</button>
+        <button type="button" className={buttonClass} disabled={disabled} onClick={() => insertHtml('<hr />')}>Divider</button>
         <button type="button" className={buttonClass} disabled={disabled} onClick={() => exec('removeFormat')}>Clear</button>
       </div>
       <div
@@ -64,6 +92,21 @@ export default function CmsRichTextEditor({ value, onChange, placeholder, disabl
           emitChange();
         }}
         onInput={emitChange}
+        onKeyDown={(event) => {
+          if (disabled) return;
+          if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
+            event.preventDefault();
+            exec('bold');
+          }
+          if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'i') {
+            event.preventDefault();
+            exec('italic');
+          }
+          if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'u') {
+            event.preventDefault();
+            exec('underline');
+          }
+        }}
         data-placeholder={placeholder || 'Start writing...'}
         className="min-h-[220px] p-3 text-sm leading-6 text-gray-800 outline-none empty:before:pointer-events-none empty:before:text-gray-400 empty:before:content-[attr(data-placeholder)] [&_a]:text-blue-700 [&_a]:underline"
       />

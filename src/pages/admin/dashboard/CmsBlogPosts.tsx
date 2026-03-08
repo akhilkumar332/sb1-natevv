@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { deleteDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { COLLECTIONS } from '../../../constants/firestore';
-import { CMS_STATUS } from '../../../constants/cms';
+import { CMS_REVIEW_STATUS, CMS_STATUS } from '../../../constants/cms';
 import { toHumanCmsStatus } from '../../../constants/cmsHuman';
 import { ROUTES } from '../../../constants/routes';
 import { useAdminCmsBlogPosts } from '../../../hooks/admin/useAdminQueries';
@@ -18,6 +18,13 @@ import { toDateValue } from '../../../utils/dateValue';
 import { toCmsBlogSummaryPayload } from '../../../utils/cmsBlogSummary';
 
 const PAGE_SIZE = 12;
+const FILTER_STORAGE_KEY = 'cms_blog_posts_filters_v1';
+const toHumanLabel = (value: string) => value
+  .split(/[-_]/g)
+  .map((part) => part.trim())
+  .filter(Boolean)
+  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+  .join(' ');
 
 export default function CmsBlogPostsPage() {
   const { user } = useAuth();
@@ -33,6 +40,8 @@ export default function CmsBlogPostsPage() {
   const [tagFilter, setTagFilter] = useState<'all' | string>('all');
   const [seriesFilter, setSeriesFilter] = useState<'all' | string>('all');
   const [page, setPage] = useState(1);
+  const [activeQueue, setActiveQueue] = useState<'all' | 'needs-review' | 'ready-publish' | 'scheduled' | 'seo-fix'>('all');
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
 
   const rows = useMemo(() => postsQuery.data || [], [postsQuery.data]);
 
@@ -59,6 +68,16 @@ export default function CmsBlogPostsPage() {
   const filteredRows = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     return rows.filter((entry) => {
+      const hasWeakSeo = (entry.seoTitle || '').trim().length < 30
+        || (entry.seoDescription || '').trim().length < 80
+        || !(entry.coverImageUrl || '').trim()
+        || !(entry.excerpt || '').trim();
+      const hasSchedule = Boolean(toDateValue(entry.scheduledPublishAt));
+      const matchesQueue = activeQueue === 'all'
+        || (activeQueue === 'needs-review' && entry.reviewStatus === CMS_REVIEW_STATUS.inReview)
+        || (activeQueue === 'ready-publish' && entry.reviewStatus === CMS_REVIEW_STATUS.approved && entry.status !== CMS_STATUS.published)
+        || (activeQueue === 'scheduled' && hasSchedule)
+        || (activeQueue === 'seo-fix' && hasWeakSeo);
       const matchesQuery = !query
         || entry.title.toLowerCase().includes(query)
         || entry.slug.toLowerCase().includes(query)
@@ -67,9 +86,23 @@ export default function CmsBlogPostsPage() {
       const matchesCategory = categoryFilter === 'all' || entry.categorySlug === categoryFilter;
       const matchesTag = tagFilter === 'all' || (entry.tags || []).includes(tagFilter);
       const matchesSeries = seriesFilter === 'all' || entry.seriesSlug === seriesFilter;
-      return matchesQuery && matchesStatus && matchesCategory && matchesTag && matchesSeries;
+      return matchesQueue && matchesQuery && matchesStatus && matchesCategory && matchesTag && matchesSeries;
     });
-  }, [rows, searchTerm, statusFilter, categoryFilter, tagFilter, seriesFilter]);
+  }, [rows, activeQueue, searchTerm, statusFilter, categoryFilter, tagFilter, seriesFilter]);
+
+  const queueCounts = useMemo(() => {
+    const needsReview = rows.filter((entry) => entry.reviewStatus === CMS_REVIEW_STATUS.inReview).length;
+    const readyPublish = rows.filter((entry) => entry.reviewStatus === CMS_REVIEW_STATUS.approved && entry.status !== CMS_STATUS.published).length;
+    const scheduled = rows.filter((entry) => Boolean(toDateValue(entry.scheduledPublishAt))).length;
+    const seoFix = rows.filter((entry) => {
+      const weakSeo = (entry.seoTitle || '').trim().length < 30
+        || (entry.seoDescription || '').trim().length < 80
+        || !(entry.coverImageUrl || '').trim()
+        || !(entry.excerpt || '').trim();
+      return weakSeo;
+    }).length;
+    return { needsReview, readyPublish, scheduled, seoFix };
+  }, [rows]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -82,8 +115,50 @@ export default function CmsBlogPostsPage() {
     () => filteredRows.map((entry) => entry.id).filter((id): id is string => Boolean(id)),
     [filteredRows]
   );
+  const selectedRows = useMemo(() => rows.filter((entry) => entry.id && selectedIds.has(entry.id)), [rows, selectedIds]);
   const selectedCount = selectedIds.size;
   const areAllFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id));
+  const selectedPublishedCount = selectedRows.filter((entry) => entry.status === CMS_STATUS.published).length;
+  const selectedDraftCount = selectedRows.filter((entry) => entry.status === CMS_STATUS.draft).length;
+  const selectedScheduledCount = selectedRows.filter((entry) => Boolean(toDateValue(entry.scheduledPublishAt))).length;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(FILTER_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      if (typeof parsed.searchTerm === 'string') setSearchTerm(parsed.searchTerm);
+      if (parsed.statusFilter === 'all' || Object.values(CMS_STATUS).includes(parsed.statusFilter as (typeof CMS_STATUS)[keyof typeof CMS_STATUS])) {
+        setStatusFilter(parsed.statusFilter as 'all' | (typeof CMS_STATUS)[keyof typeof CMS_STATUS]);
+      }
+      if (typeof parsed.categoryFilter === 'string') setCategoryFilter(parsed.categoryFilter || 'all');
+      if (typeof parsed.tagFilter === 'string') setTagFilter(parsed.tagFilter || 'all');
+      if (typeof parsed.seriesFilter === 'string') setSeriesFilter(parsed.seriesFilter || 'all');
+      if (parsed.activeQueue === 'all' || parsed.activeQueue === 'needs-review' || parsed.activeQueue === 'ready-publish' || parsed.activeQueue === 'scheduled' || parsed.activeQueue === 'seo-fix') {
+        setActiveQueue(parsed.activeQueue);
+      }
+    } catch {
+      // ignore storage parsing errors
+    }
+    setFiltersHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!filtersHydrated || typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({
+        searchTerm,
+        statusFilter,
+        categoryFilter,
+        tagFilter,
+        seriesFilter,
+        activeQueue,
+      }));
+    } catch {
+      // ignore storage write errors
+    }
+  }, [filtersHydrated, searchTerm, statusFilter, categoryFilter, tagFilter, seriesFilter, activeQueue]);
 
   const toggleSelected = (id?: string) => {
     if (!id) return;
@@ -213,6 +288,13 @@ export default function CmsBlogPostsPage() {
       </div>
 
       <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => { setActiveQueue('all'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'all' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>All ({rows.length})</button>
+          <button type="button" onClick={() => { setActiveQueue('needs-review'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'needs-review' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>Needs Review ({queueCounts.needsReview})</button>
+          <button type="button" onClick={() => { setActiveQueue('ready-publish'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'ready-publish' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>Ready To Publish ({queueCounts.readyPublish})</button>
+          <button type="button" onClick={() => { setActiveQueue('scheduled'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'scheduled' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>Scheduled ({queueCounts.scheduled})</button>
+          <button type="button" onClick={() => { setActiveQueue('seo-fix'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'seo-fix' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>SEO Needs Fix ({queueCounts.seoFix})</button>
+        </div>
         <div className="grid gap-2 md:grid-cols-6">
           <input
             value={searchTerm}
@@ -283,6 +365,7 @@ export default function CmsBlogPostsPage() {
               setCategoryFilter('all');
               setTagFilter('all');
               setSeriesFilter('all');
+              setActiveQueue('all');
               setPage(1);
             }}
             className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
@@ -325,6 +408,11 @@ export default function CmsBlogPostsPage() {
             Delete Selected
           </button>
           <span className="text-xs text-gray-500">Filtered: {filteredRows.length}</span>
+          {selectedCount > 0 ? (
+            <span className="text-xs text-gray-500">
+              Selected impact: {selectedPublishedCount} published, {selectedDraftCount} drafts, {selectedScheduledCount} scheduled
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -362,7 +450,7 @@ export default function CmsBlogPostsPage() {
                   </td>
                   <td className="px-4 py-3 font-semibold text-gray-900">{entry.title}</td>
                   <td className="px-4 py-3 text-gray-700">{entry.slug}</td>
-                  <td className="px-4 py-3 text-gray-700">{entry.categorySlug || '-'}</td>
+                  <td className="px-4 py-3 text-gray-700">{entry.categorySlug ? toHumanLabel(entry.categorySlug) : '-'}</td>
                   <td className="px-4 py-3 text-gray-700">{toHumanCmsStatus(entry.status)}</td>
                   <td className="px-4 py-3 text-gray-700">{toDateValue(entry.publishedAt)?.toLocaleString() || '-'}</td>
                   <td className="px-4 py-3 text-right">

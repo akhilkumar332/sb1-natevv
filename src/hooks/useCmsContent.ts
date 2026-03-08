@@ -5,15 +5,19 @@ import type { CmsBlogPost, CmsNavMenu, CmsPage, CmsSettings } from '../types/dat
 import {
   getPublicCmsMenuByLocation,
   getPublicCmsSettings,
+  getPublishedBlogPostsPage,
   getPublishedBlogPostBySlug,
   getPublishedBlogPosts,
   getPublishedCmsPageBySlug,
+  type CmsPublishedBlogPageCursor,
+  type CmsPublishedBlogPage,
 } from '../services/cms.service';
 
 const cmsPublicQueryKeys = {
   settings: ['cms', 'public', 'settings'] as const,
   blogPosts: (limitCount: number) => ['cms', 'public', 'blogPosts', { limitCount }] as const,
   blogPostBySlug: (slug: string) => ['cms', 'public', 'blogPostBySlug', slug] as const,
+  blogPostsPage: (pageSize: number, cursor: string | null) => ['cms', 'public', 'blogPostsPage', { pageSize, cursor }] as const,
   pageBySlug: (slug: string) => ['cms', 'public', 'pageBySlug', slug] as const,
   menuByLocation: (location: CmsMenuLocation) => ['cms', 'public', 'menuByLocation', location] as const,
 };
@@ -97,6 +101,19 @@ export const usePublishedBlogPosts = (
 
   return query;
 };
+
+export const usePublishedBlogPostsPage = (
+  pageSize: number = 9,
+  cursor: CmsPublishedBlogPageCursor = null,
+  enabled: boolean = true,
+) => useQuery<CmsPublishedBlogPage>({
+  queryKey: cmsPublicQueryKeys.blogPostsPage(pageSize, cursor),
+  queryFn: () => getPublishedBlogPostsPage({ pageSize, cursor }),
+  enabled,
+  staleTime: CMS_CACHE.staleTime,
+  gcTime: CMS_CACHE.gcTime,
+  retry: 1,
+});
 
 export const usePublishedBlogPostBySlug = (slug: string) => useQuery<CmsBlogPost | null>({
   queryKey: cmsPublicQueryKeys.blogPostBySlug(toCmsSlug(slug)),
