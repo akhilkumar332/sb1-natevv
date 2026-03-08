@@ -533,41 +533,57 @@ const normalizeMenuItems = (value: unknown): CmsNavMenu['items'] => {
 };
 
 export const getPublicCmsMenuByLocation = async (location: CmsMenuLocation): Promise<CmsNavMenu | null> => {
-  const canonicalRef = doc(db, COLLECTIONS.CMS_NAV_MENUS, getCmsMenuDocId(location));
-  const canonicalSnap = await getDoc(canonicalRef);
-
-  if (canonicalSnap.exists()) {
-    const data = canonicalSnap.data() as Record<string, any>;
-    if (!data.status || data.status === CMS_STATUS.published) {
-      return {
-        id: canonicalSnap.id,
-        location,
-        status: normalizeCmsStatus(data.status),
-        items: normalizeMenuItems(data.items),
-        updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
-        createdAt: toDateValue(data.createdAt) as any,
-        updatedAt: toDateValue(data.updatedAt) as any,
-      };
-    }
-    return null;
-  }
-
-  const fallbackSnap = await getDocs(query(
-    collection(db, COLLECTIONS.CMS_NAV_MENUS),
-    where('location', '==', location),
-    where('status', '==', CMS_STATUS.published),
-    limit(1)
-  ));
-  const first = fallbackSnap.docs[0];
-  if (!first) return null;
-  const data = first.data() as Record<string, any>;
-  return {
-    id: first.id,
-    location,
-    status: CMS_STATUS.published,
-    items: normalizeMenuItems(data.items),
-    updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
-    createdAt: toDateValue(data.createdAt) as any,
-    updatedAt: toDateValue(data.updatedAt) as any,
+  const fallbackRead = async (): Promise<CmsNavMenu | null> => {
+    const fallbackSnap = await getDocs(query(
+      collection(db, COLLECTIONS.CMS_NAV_MENUS),
+      where('location', '==', location),
+      where('status', '==', CMS_STATUS.published),
+      limit(1)
+    ));
+    const first = fallbackSnap.docs[0];
+    if (!first) return null;
+    const data = first.data() as Record<string, any>;
+    return {
+      id: first.id,
+      location,
+      status: CMS_STATUS.published,
+      items: normalizeMenuItems(data.items),
+      updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
+      createdAt: toDateValue(data.createdAt) as any,
+      updatedAt: toDateValue(data.updatedAt) as any,
+    };
   };
+
+  try {
+    const canonicalRef = doc(db, COLLECTIONS.CMS_NAV_MENUS, getCmsMenuDocId(location));
+    const canonicalSnap = await getDoc(canonicalRef);
+
+    if (canonicalSnap.exists()) {
+      const data = canonicalSnap.data() as Record<string, any>;
+      if (!data.status || data.status === CMS_STATUS.published) {
+        return {
+          id: canonicalSnap.id,
+          location,
+          status: normalizeCmsStatus(data.status),
+          items: normalizeMenuItems(data.items),
+          updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
+          createdAt: toDateValue(data.createdAt) as any,
+          updatedAt: toDateValue(data.updatedAt) as any,
+        };
+      }
+      return null;
+    }
+
+    return await fallbackRead();
+  } catch (error) {
+    const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code || '') : '';
+    if (code.includes('permission-denied') || code.includes('unauthenticated')) {
+      try {
+        return await fallbackRead();
+      } catch {
+        return null;
+      }
+    }
+    throw error;
+  }
 };

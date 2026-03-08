@@ -155,4 +155,5 @@ export const usePublicCmsMenu = (location: CmsMenuLocation) => useQuery<CmsNavMe
   queryFn: () => getPublicCmsMenuByLocation(location),
   staleTime: CMS_CACHE.staleTime,
   gcTime: CMS_CACHE.gcTime,
+  retry: false,
 });

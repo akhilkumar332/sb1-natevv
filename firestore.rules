@@ -995,7 +995,7 @@ service cloud.firestore {
 
     match /cmsNavMenus/{menuId} {
       allow read: if isAdmin() || (
-        !resource.data.keys().hasAny(['status']) || resource.data.status == 'published'
+        resource == null || !resource.data.keys().hasAny(['status']) || resource.data.status == 'published'
       );
       allow create, update, delete: if isAdmin();
     }
