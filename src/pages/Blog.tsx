@@ -475,7 +475,6 @@ export default function BlogPage() {
                               className="h-40 w-full object-cover"
                               loading="lazy"
                               decoding="async"
-                              fetchpriority="low"
                             />
                           ) : (
                             <div className="h-40 w-full bg-gradient-to-br from-red-100 to-red-50" />
