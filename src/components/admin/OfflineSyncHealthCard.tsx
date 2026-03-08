@@ -1,8 +1,10 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Activity, RefreshCw, WifiOff } from 'lucide-react';
 import { useNetworkStatus } from '../../contexts/NetworkStatusContext';
 import { useOfflineMutationTelemetry } from '../../hooks/useOfflineMutationTelemetry';
 import { useOfflineMutationDeadLetters } from '../../hooks/useOfflineMutationDeadLetters';
 import { OFFLINE_MUTATION_LABELS } from '../../constants/offline';
+import AdminPagination from './AdminPagination';
 
 const formatTime = (value: number | null) => {
   if (!value) return 'N/A';
@@ -17,6 +19,42 @@ function OfflineSyncHealthCard() {
   const { isOnline } = useNetworkStatus();
   const { telemetry, resetTelemetry } = useOfflineMutationTelemetry();
   const { entries: deadLetters, resetDeadLetters } = useOfflineMutationDeadLetters();
+  const [typePage, setTypePage] = useState(1);
+  const [eventsPage, setEventsPage] = useState(1);
+  const [deadLetterPage, setDeadLetterPage] = useState(1);
+  const typePageSize = 5;
+  const eventsPageSize = 5;
+  const deadLetterPageSize = 3;
+
+  const queuedByTypeRows = useMemo(
+    () => Object.entries(telemetry.pendingByType || {}),
+    [telemetry.pendingByType],
+  );
+  const pagedQueuedByTypeRows = useMemo(() => {
+    const start = (typePage - 1) * typePageSize;
+    return queuedByTypeRows.slice(start, start + typePageSize);
+  }, [queuedByTypeRows, typePage]);
+  const pagedRecentEvents = useMemo(() => {
+    const start = (eventsPage - 1) * eventsPageSize;
+    return telemetry.recentEvents.slice(start, start + eventsPageSize);
+  }, [telemetry.recentEvents, eventsPage]);
+  const pagedDeadLetters = useMemo(() => {
+    const start = (deadLetterPage - 1) * deadLetterPageSize;
+    return deadLetters.slice(start, start + deadLetterPageSize);
+  }, [deadLetters, deadLetterPage]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(queuedByTypeRows.length / typePageSize));
+    if (typePage > maxPage) setTypePage(maxPage);
+  }, [queuedByTypeRows.length, typePage]);
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(telemetry.recentEvents.length / eventsPageSize));
+    if (eventsPage > maxPage) setEventsPage(maxPage);
+  }, [telemetry.recentEvents.length, eventsPage]);
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(deadLetters.length / deadLetterPageSize));
+    if (deadLetterPage > maxPage) setDeadLetterPage(maxPage);
+  }, [deadLetters.length, deadLetterPage]);
 
   return (
     <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -65,17 +103,30 @@ function OfflineSyncHealthCard() {
         </p>
       </div>
 
-      {Object.keys(telemetry.pendingByType || {}).length > 0 && (
+      {queuedByTypeRows.length > 0 && (
         <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-800/70">
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-gray-500 dark:text-slate-400">Queued By Type</p>
           <div className="space-y-1 text-xs text-gray-600 dark:text-slate-300">
-            {Object.entries(telemetry.pendingByType).map(([type, count]) => (
+            {pagedQueuedByTypeRows.map(([type, count]) => (
               <p key={type} className="flex items-center justify-between">
                 <span>{OFFLINE_MUTATION_LABELS[type as keyof typeof OFFLINE_MUTATION_LABELS] || type}</span>
                 <span className="font-semibold">{count || 0}</span>
               </p>
             ))}
           </div>
+          {queuedByTypeRows.length > typePageSize && (
+            <div className="mt-2">
+              <AdminPagination
+                page={typePage}
+                pageSize={typePageSize}
+                pageSizeOptions={[5]}
+                itemCount={queuedByTypeRows.length}
+                hasNextPage={typePage * typePageSize < queuedByTypeRows.length}
+                onPageChange={setTypePage}
+                onPageSizeChange={(next) => { void next; }}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -90,7 +141,7 @@ function OfflineSyncHealthCard() {
         <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-800/70">
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-gray-500 dark:text-slate-400">Recent Events</p>
           <div className="space-y-1 text-xs text-gray-600 dark:text-slate-300">
-            {telemetry.recentEvents.slice(0, 5).map((event, index) => (
+            {pagedRecentEvents.map((event, index) => (
               <p key={`${event.at}-${event.kind}-${index}`}>
                 {new Date(event.at).toLocaleTimeString()} • {event.kind}
                 {typeof event.processed === 'number' ? ` (${event.succeeded ?? 0}/${event.processed})` : ''}
@@ -98,6 +149,19 @@ function OfflineSyncHealthCard() {
               </p>
             ))}
           </div>
+          {telemetry.recentEvents.length > eventsPageSize && (
+            <div className="mt-2">
+              <AdminPagination
+                page={eventsPage}
+                pageSize={eventsPageSize}
+                pageSizeOptions={[5]}
+                itemCount={telemetry.recentEvents.length}
+                hasNextPage={eventsPage * eventsPageSize < telemetry.recentEvents.length}
+                onPageChange={setEventsPage}
+                onPageSizeChange={(next) => { void next; }}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -105,12 +169,25 @@ function OfflineSyncHealthCard() {
         <div className="mt-3 rounded-lg border border-rose-100 bg-rose-50 p-3 dark:border-rose-500/30 dark:bg-rose-500/10">
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-rose-700 dark:text-rose-300">Dead Letter (Latest 3)</p>
           <div className="space-y-1 text-xs text-rose-900 dark:text-rose-200">
-            {deadLetters.slice(0, 3).map((entry) => (
+            {pagedDeadLetters.map((entry) => (
               <p key={entry.id}>
                 {new Date(entry.failedAt).toLocaleTimeString()} • {OFFLINE_MUTATION_LABELS[entry.type] || entry.type} • {entry.reason}
               </p>
             ))}
           </div>
+          {deadLetters.length > deadLetterPageSize && (
+            <div className="mt-2">
+              <AdminPagination
+                page={deadLetterPage}
+                pageSize={deadLetterPageSize}
+                pageSizeOptions={[3]}
+                itemCount={deadLetters.length}
+                hasNextPage={deadLetterPage * deadLetterPageSize < deadLetters.length}
+                onPageChange={setDeadLetterPage}
+                onPageSizeChange={(next) => { void next; }}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

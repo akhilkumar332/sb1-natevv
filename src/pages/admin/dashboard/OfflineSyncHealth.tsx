@@ -80,6 +80,8 @@ function AdminOfflineSyncHealthPage() {
   const [deadLetterPageSize, setDeadLetterPageSize] = useState(10);
   const [enqueuePage, setEnqueuePage] = useState(1);
   const [enqueuePageSize, setEnqueuePageSize] = useState(8);
+  const [queueTypePage, setQueueTypePage] = useState(1);
+  const [queueTypePageSize, setQueueTypePageSize] = useState(8);
   const [matrixPage, setMatrixPage] = useState(1);
   const [matrixPageSize, setMatrixPageSize] = useState(10);
   const [expansionPage, setExpansionPage] = useState(1);
@@ -197,6 +199,14 @@ function AdminOfflineSyncHealthPage() {
     const start = (enqueuePage - 1) * enqueuePageSize;
     return enqueueRows.slice(start, start + enqueuePageSize);
   }, [enqueueRows, enqueuePage, enqueuePageSize]);
+  const queueTypeRows = useMemo(
+    () => Object.entries(telemetry.pendingByType || {}),
+    [telemetry.pendingByType],
+  );
+  const pagedQueueTypeRows = useMemo(() => {
+    const start = (queueTypePage - 1) * queueTypePageSize;
+    return queueTypeRows.slice(start, start + queueTypePageSize);
+  }, [queueTypeRows, queueTypePage, queueTypePageSize]);
 
   const pagedMatrixRows = useMemo(() => {
     const start = (matrixPage - 1) * matrixPageSize;
@@ -217,6 +227,10 @@ function AdminOfflineSyncHealthPage() {
     const maxPage = Math.max(1, Math.ceil(enqueueRows.length / enqueuePageSize));
     if (enqueuePage > maxPage) setEnqueuePage(maxPage);
   }, [enqueueRows.length, enqueuePageSize, enqueuePage]);
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(queueTypeRows.length / queueTypePageSize));
+    if (queueTypePage > maxPage) setQueueTypePage(maxPage);
+  }, [queueTypeRows.length, queueTypePageSize, queueTypePage]);
 
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(OFFLINE_WRITE_COVERAGE_CATALOG.length / matrixPageSize));
@@ -485,7 +499,7 @@ function AdminOfflineSyncHealthPage() {
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <h2 className="mb-3 text-lg font-bold text-gray-900 dark:text-slate-100">Queue By Mutation Type</h2>
           <div className="space-y-2">
-            {Object.entries(telemetry.pendingByType || {}).length ? Object.entries(telemetry.pendingByType || {}).map(([type, count]) => (
+            {queueTypeRows.length ? pagedQueueTypeRows.map(([type, count]) => (
               <div key={type} className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-sm dark:border-slate-700">
                 <span className="text-gray-700 dark:text-slate-300">{OFFLINE_MUTATION_LABELS[type as keyof typeof OFFLINE_MUTATION_LABELS] || type}</span>
                 <span className="font-semibold text-gray-900 dark:text-slate-100">{count || 0}</span>
@@ -496,6 +510,22 @@ function AdminOfflineSyncHealthPage() {
               </p>
             )}
           </div>
+          {queueTypeRows.length > 0 && (
+            <div className="mt-3">
+              <AdminPagination
+                page={queueTypePage}
+                pageSize={queueTypePageSize}
+                pageSizeOptions={[8, 16, 32]}
+                itemCount={queueTypeRows.length}
+                hasNextPage={queueTypePage * queueTypePageSize < queueTypeRows.length}
+                onPageChange={setQueueTypePage}
+                onPageSizeChange={(next) => {
+                  setQueueTypePageSize(next);
+                  setQueueTypePage(1);
+                }}
+              />
+            </div>
+          )}
         </section>
 
         <section className="rounded-2xl border border-rose-200 bg-rose-50 p-5 shadow-sm dark:border-rose-500/30 dark:bg-rose-500/10">
