@@ -1,9 +1,11 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Tag } from 'lucide-react';
 import { ROUTES } from '../constants/routes';
-import { CMS_DEFAULTS, CMS_LIMITS, CMS_QUERY_LIMITS, CMS_RUNTIME, CMS_SEO_DEFAULTS } from '../constants/cms';
+import { CMS_DEFAULTS, CMS_LIMITS, CMS_QUERY_LIMITS, CMS_RUNTIME, CMS_SEO_DEFAULTS, toCmsSlug } from '../constants/cms';
 import { usePublishedBlogPosts, usePublicCmsSettings } from '../hooks/useCmsContent';
+import { getPublishedBlogPostBySlug, getPublishedBlogPosts } from '../services/cms.service';
 import { toDateValue } from '../utils/dateValue';
 import SeoHead from '../components/SeoHead';
 import { buildBlogSchema, buildBreadcrumbSchema, buildOrganizationSchema, buildWebSiteSchema } from '../utils/seoStructuredData';
@@ -23,9 +25,9 @@ const getPaginationItems = (currentPage: number, totalPages: number): Array<numb
 };
 
 export default function BlogPage() {
+  const queryClient = useQueryClient();
   const { categorySlug: routeCategorySlug, seriesSlug: routeSeriesSlug, authorName: routeAuthorName } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [queueReady, setQueueReady] = useState(false);
   const [loadingStalled, setLoadingStalled] = useState(false);
   const settingsQuery = usePublicCmsSettings();
   const postsPerPage = Math.max(
@@ -41,20 +43,38 @@ export default function BlogPage() {
   const robotsPolicy = settingsQuery.data?.robotsPolicy === 'noindex_nofollow' ? 'noindex,nofollow' : 'index,follow';
   const rawPage = Number(searchParams.get('page') || '1');
   const activePage = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
-  const requestedPosts = Math.max(
+  const initialRequestedPosts = Math.min(
     CMS_QUERY_LIMITS.publicBlogSummaryList,
-    activePage * postsPerPage + postsPerPage,
+    Math.max(postsPerPage * 2, activePage * postsPerPage + postsPerPage),
   );
-  const postsQuery = usePublishedBlogPosts(requestedPosts, queueReady);
+  const [requestedPosts, setRequestedPosts] = useState(initialRequestedPosts);
+  const postsQuery = usePublishedBlogPosts(requestedPosts, true);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      setQueueReady(true);
-      return;
+    setRequestedPosts(initialRequestedPosts);
+  }, [initialRequestedPosts]);
+
+  useEffect(() => {
+    if (requestedPosts >= CMS_QUERY_LIMITS.publicBlogSummaryList) return;
+    if (typeof window === 'undefined') return;
+    const topUp = () => {
+      setRequestedPosts(CMS_QUERY_LIMITS.publicBlogSummaryList);
+      void queryClient.prefetchQuery({
+        queryKey: ['cms', 'public', 'blogPosts', { limitCount: CMS_QUERY_LIMITS.publicBlogSummaryList }],
+        queryFn: () => getPublishedBlogPosts(CMS_QUERY_LIMITS.publicBlogSummaryList),
+        staleTime: 60_000,
+      });
+    };
+    const win = window as Window & { requestIdleCallback?: (cb: () => void) => number; cancelIdleCallback?: (id: number) => void };
+    if (typeof win.requestIdleCallback === 'function') {
+      const idleId = win.requestIdleCallback(topUp);
+      return () => {
+        if (typeof win.cancelIdleCallback === 'function') win.cancelIdleCallback(idleId);
+      };
     }
-    const ticket = window.setTimeout(() => setQueueReady(true), CMS_RUNTIME.backgroundQueueDelayMs);
-    return () => window.clearTimeout(ticket);
-  }, []);
+    const timer = window.setTimeout(topUp, Math.max(0, CMS_RUNTIME.backgroundQueueDelayMs));
+    return () => window.clearTimeout(timer);
+  }, [queryClient, requestedPosts]);
 
   const refreshAppCache = async () => {
     try {
@@ -78,15 +98,24 @@ export default function BlogPage() {
   const selectedQuery = (searchParams.get('q') || '').trim().toLowerCase();
 
   const posts = postsQuery.data || [];
+  const prefetchPostBySlug = (postSlug: string) => {
+    const normalizedSlug = toCmsSlug(postSlug);
+    if (!normalizedSlug) return;
+    void queryClient.prefetchQuery({
+      queryKey: ['cms', 'public', 'blogPostBySlug', normalizedSlug],
+      queryFn: () => getPublishedBlogPostBySlug(normalizedSlug),
+      staleTime: 60_000,
+    });
+  };
 
   useEffect(() => {
-    if (!queueReady || !postsQuery.isLoading || posts.length > 0) {
+    if (!postsQuery.isLoading || posts.length > 0) {
       setLoadingStalled(false);
       return;
     }
     const timer = window.setTimeout(() => setLoadingStalled(true), CMS_RUNTIME.blogLoadingStallMs);
     return () => window.clearTimeout(timer);
-  }, [queueReady, posts.length, postsQuery.isLoading]);
+  }, [posts.length, postsQuery.isLoading]);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -446,7 +475,7 @@ export default function BlogPage() {
                               className="h-40 w-full object-cover"
                               loading="lazy"
                               decoding="async"
-                              fetchPriority="low"
+                              fetchpriority="low"
                             />
                           ) : (
                             <div className="h-40 w-full bg-gradient-to-br from-red-100 to-red-50" />
@@ -459,7 +488,13 @@ export default function BlogPage() {
                               {post.categorySlug ? <span className="inline-flex items-center gap-1"><Tag className="h-3.5 w-3.5" />{toHumanLabel(post.categorySlug)}</span> : null}
                               <span>{readingMinutes} min read</span>
                             </div>
-                            <Link to={ROUTES.blogPost.replace(':slug', post.slug)} className="inline-flex rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50">
+                            <Link
+                              to={ROUTES.blogPost.replace(':slug', post.slug)}
+                              className="inline-flex rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50"
+                              onMouseEnter={() => prefetchPostBySlug(post.slug)}
+                              onFocus={() => prefetchPostBySlug(post.slug)}
+                              onTouchStart={() => prefetchPostBySlug(post.slug)}
+                            >
                               Read article
                             </Link>
                           </div>

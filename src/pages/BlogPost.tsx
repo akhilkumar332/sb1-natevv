@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CalendarDays, Tag } from 'lucide-react';
+import { CalendarDays, Tag, Linkedin, Share2, Copy, Check } from 'lucide-react';
 import { ROUTES } from '../constants/routes';
 import { CMS_DEFAULTS, CMS_QUERY_LIMITS, CMS_SEO_DEFAULTS } from '../constants/cms';
 import { usePublishedBlogPostBySlug, usePublishedBlogPosts, usePublicCmsSettings } from '../hooks/useCmsContent';
@@ -8,6 +8,14 @@ import { toDateValue } from '../utils/dateValue';
 import SeoHead from '../components/SeoHead';
 import { buildArticleSchema, buildBreadcrumbSchema } from '../utils/seoStructuredData';
 import { parseCmsRichContent } from '../utils/cmsRichContent';
+
+function XBrandIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
+      <path d="M18.9 2H22l-6.77 7.73L23.2 22h-6.27l-4.91-6.76L6.1 22H3l7.23-8.26L.8 2h6.35l4.44 6.2L18.9 2zm-1.1 18h1.74L6.22 3.9H4.35L17.8 20z" />
+    </svg>
+  );
+}
 
 export default function BlogPostPage() {
   const { slug = '' } = useParams();
@@ -18,7 +26,7 @@ export default function BlogPostPage() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [showJumpTop, setShowJumpTop] = useState(false);
   const postQuery = usePublishedBlogPostBySlug(slug);
-  const allPostsQuery = usePublishedBlogPosts(CMS_QUERY_LIMITS.publicBlogList, true);
+  const allPostsQuery = usePublishedBlogPosts(CMS_QUERY_LIMITS.publicBlogList, Boolean(postQuery.data));
   const settingsQuery = usePublicCmsSettings();
   const post = postQuery.data || null;
   const siteTitle = settingsQuery.data?.siteTitle || CMS_DEFAULTS.siteTitle;
@@ -195,14 +203,6 @@ export default function BlogPostPage() {
     authorName: post.authorName || undefined,
     publisherName: siteTitle,
   });
-  const relatedPosts = (allPostsQuery.data || [])
-    .filter((entry) => entry.slug !== post.slug && (
-      (post.relatedPostSlugs || []).includes(entry.slug)
-      || (post.seriesSlug && entry.seriesSlug === post.seriesSlug)
-      || (post.categorySlug && entry.categorySlug === post.categorySlug)
-      || (entry.tags || []).some((tag) => (post.tags || []).includes(tag))
-    ))
-    .slice(0, 3);
   const featuredPosts = (allPostsQuery.data || [])
     .filter((entry) => {
       if (entry.slug === post.slug || !entry.featured) return false;
@@ -241,7 +241,7 @@ export default function BlogPostPage() {
       <div className="bg-gradient-to-br from-red-50 via-white to-pink-50 py-10">
         <div className="container mx-auto px-4">
           <Link to={ROUTES.blog} className="text-sm font-semibold text-red-700 hover:underline">← Back to Blog</Link>
-          <h1 className="mt-3 max-w-4xl text-3xl font-extrabold text-gray-900 sm:text-4xl">{post.title}</h1>
+          <h1 className="mt-3 max-w-5xl text-3xl font-extrabold text-gray-900 sm:text-4xl">{post.title}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-500">
             <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{publishedAt ? publishedAt.toLocaleString() : 'N/A'}</span>
             {post.categorySlug ? <span className="inline-flex items-center gap-1"><Tag className="h-3.5 w-3.5" />{post.categorySlug}</span> : null}
@@ -261,7 +261,7 @@ export default function BlogPostPage() {
       </div>
 
       <div className="container mx-auto px-4 py-6">
-        <div className="mx-auto max-w-3xl rounded-2xl border border-red-100 bg-white p-6 shadow-sm sm:p-8">
+        <div className="mx-auto max-w-5xl rounded-2xl border border-red-100 bg-white p-6 shadow-sm sm:p-8">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-gray-700">Reader settings</span>
@@ -294,8 +294,26 @@ export default function BlogPostPage() {
           )}
           <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
             <span className="text-sm font-semibold text-gray-700">Share:</span>
-            <a href={`https://twitter.com/intent/tweet?text=${shareText}&url=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noreferrer" className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">X</a>
-            <a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noreferrer" className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">LinkedIn</a>
+            <a
+              href={`https://twitter.com/intent/tweet?text=${shareText}&url=${encodeURIComponent(shareUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Share on X"
+              title="Share on X"
+              className="rounded-md border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
+            >
+              <XBrandIcon className="h-4 w-4" />
+            </a>
+            <a
+              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Share on LinkedIn"
+              title="Share on LinkedIn"
+              className="rounded-md border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
+            >
+              <Linkedin className="h-4 w-4" />
+            </a>
             <button
               type="button"
               onClick={() => {
@@ -303,9 +321,11 @@ export default function BlogPostPage() {
                   void navigator.share({ title: post.title, url: shareUrl }).catch(() => undefined);
                 }
               }}
-              className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+              aria-label="Share"
+              title="Share"
+              className="rounded-md border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
             >
-              Share
+              <Share2 className="h-4 w-4" />
             </button>
             <button
               type="button"
@@ -317,23 +337,13 @@ export default function BlogPostPage() {
                   }).catch(() => undefined);
                 }
               }}
-              className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+              aria-label={copiedLink ? 'Copied link' : 'Copy link'}
+              title={copiedLink ? 'Copied' : 'Copy link'}
+              className="rounded-md border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
             >
-              {copiedLink ? 'Copied' : 'Copy Link'}
+              {copiedLink ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             </button>
           </div>
-          {relatedPosts.length ? (
-            <div className="mt-6 rounded-xl border border-red-100 bg-red-50/40 p-4">
-              <p className="text-sm font-semibold text-gray-900">Related Articles</p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                {relatedPosts.map((entry) => (
-                  <Link key={entry.id} to={ROUTES.blogPost.replace(':slug', entry.slug)} className="rounded-lg border border-red-100 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-red-50">
-                    {entry.title}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : null}
           {featuredPosts.length ? (
             <div className="mt-6 rounded-xl border border-red-100 bg-white p-4">
               <p className="text-sm font-semibold text-gray-900">Featured Articles</p>

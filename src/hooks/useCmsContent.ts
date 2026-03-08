@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CMS_CACHE, CMS_QUERY_LIMITS, CMS_RUNTIME, toCmsSlug, type CmsMenuLocation } from '../constants/cms';
 import type { CmsBlogPost, CmsNavMenu, CmsPage, CmsSettings } from '../types/database.types';
 import {
@@ -76,6 +76,7 @@ export const usePublishedBlogPosts = (
   limitCount: number = CMS_QUERY_LIMITS.publicBlogList,
   enabled: boolean = true
 ) => {
+  const queryClient = useQueryClient();
   const query = useQuery<CmsBlogPost[]>({
     queryKey: cmsPublicQueryKeys.blogPosts(limitCount),
     queryFn: () => getPublishedBlogPosts(limitCount),
@@ -91,7 +92,15 @@ export const usePublishedBlogPosts = (
   useEffect(() => {
     if (!query.data?.length) return;
     writeCachedBlogPosts(query.data);
-  }, [query.data]);
+    query.data.forEach((entry) => {
+      if (!entry.slug) return;
+      queryClient.setQueryData(cmsPublicQueryKeys.blogPostBySlug(entry.slug), (prev: CmsBlogPost | null | undefined) => prev || entry);
+      (entry.slugAliases || []).forEach((alias) => {
+        if (!alias) return;
+        queryClient.setQueryData(cmsPublicQueryKeys.blogPostBySlug(alias), (prev: CmsBlogPost | null | undefined) => prev || entry);
+      });
+    });
+  }, [query.data, queryClient]);
 
   useEffect(() => {
     if (!enabled || !query.data?.length) return;
@@ -118,6 +127,16 @@ export const usePublishedBlogPostsPage = (
 export const usePublishedBlogPostBySlug = (slug: string) => useQuery<CmsBlogPost | null>({
   queryKey: cmsPublicQueryKeys.blogPostBySlug(toCmsSlug(slug)),
   queryFn: () => getPublishedBlogPostBySlug(toCmsSlug(slug)),
+  initialData: () => {
+    const normalizedSlug = toCmsSlug(slug);
+    if (!normalizedSlug) return null;
+    const cached = readCachedBlogPosts();
+    if (!cached?.length) return null;
+    return cached.find((entry) => (
+      entry.slug === normalizedSlug
+      || (Array.isArray(entry.slugAliases) && entry.slugAliases.includes(normalizedSlug))
+    )) || null;
+  },
   enabled: Boolean(toCmsSlug(slug)),
   staleTime: CMS_CACHE.staleTime,
   gcTime: CMS_CACHE.gcTime,

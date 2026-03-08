@@ -1,6 +1,7 @@
 // src/components/Navbar.tsx
 import React, { useEffect, useState, Suspense } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Menu, X, LogOut, LayoutDashboard, Heart, ChevronDown, ChevronRight, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import LogoMark from './LogoMark';
@@ -22,6 +23,8 @@ import {
   toPortalRole,
   type PortalRole,
 } from '../constants/routes';
+import { CMS_QUERY_LIMITS } from '../constants/cms';
+import { getPublishedBlogPosts } from '../services/cms.service';
 
 import { TEN_MINUTES_MS } from '../constants/time';
 const TOP_BADGE_TTL_MS = TEN_MINUTES_MS;
@@ -113,15 +116,19 @@ const useTopDonorBadge = (user: any) => {
 interface NavLinkProps {
   to: string;
   children: React.ReactNode;
+  onIntent?: () => void;
 }
 
-function DesktopNavLink({ to, children }: NavLinkProps) {
+function DesktopNavLink({ to, children, onIntent }: NavLinkProps) {
   const location = useLocation();
   const isActive = location.pathname === to;
 
   return (
     <Link
       to={to}
+      onMouseEnter={onIntent}
+      onFocus={onIntent}
+      onTouchStart={onIntent}
       className={`relative px-4 py-2 text-sm font-semibold transition-all duration-300 ${
         isActive
           ? 'text-red-600'
@@ -136,7 +143,7 @@ function DesktopNavLink({ to, children }: NavLinkProps) {
   );
 }
 
-function MobileNavLink({ to, children, onClick }: NavLinkProps & { onClick?: () => void }) {
+function MobileNavLink({ to, children, onClick, onIntent }: NavLinkProps & { onClick?: () => void }) {
   const location = useLocation();
   const isActive = location.pathname === to;
 
@@ -144,6 +151,9 @@ function MobileNavLink({ to, children, onClick }: NavLinkProps & { onClick?: () 
     <Link
       to={to}
       onClick={onClick}
+      onMouseEnter={onIntent}
+      onFocus={onIntent}
+      onTouchStart={onIntent}
       className={`block px-4 py-3 rounded-xl text-base font-medium transition-all ${
         isActive
           ? 'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg'
@@ -483,6 +493,7 @@ function MobileUserMenu({
 }
 
 const Navbar: React.FC = () => {
+  const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [pendingPortal, setPendingPortal] = useState<PortalRole | null>(null);
   const [adminMobileExpandedGroups, setAdminMobileExpandedGroups] = useState<Record<string, boolean>>({});
@@ -526,6 +537,13 @@ const Navbar: React.FC = () => {
       ? (user?.role as PortalRole)
       : null);
   const adminMobileGroups = React.useMemo(() => getAdminDashboardMenuGroups(isSuperAdmin), [isSuperAdmin]);
+  const prefetchBlogList = React.useCallback(() => {
+    void queryClient.prefetchQuery({
+      queryKey: ['cms', 'public', 'blogPosts', { limitCount: CMS_QUERY_LIMITS.publicBlogSummaryList }],
+      queryFn: () => getPublishedBlogPosts(CMS_QUERY_LIMITS.publicBlogSummaryList),
+      staleTime: 60_000,
+    });
+  }, [queryClient]);
 
   useEffect(() => {
     if (!isAdminDashboard) return;
@@ -598,7 +616,7 @@ const Navbar: React.FC = () => {
                   <DesktopNavLink to={ROUTES.requestBlood}>Request Blood</DesktopNavLink>
                   <DesktopNavLink to={ROUTES.about}>About</DesktopNavLink>
                   <DesktopNavLink to={ROUTES.contact}>Contact</DesktopNavLink>
-                  <DesktopNavLink to={ROUTES.blog}>Blog</DesktopNavLink>
+                  <DesktopNavLink to={ROUTES.blog} onIntent={prefetchBlogList}>Blog</DesktopNavLink>
                 </>
               )}
 
@@ -795,7 +813,7 @@ const Navbar: React.FC = () => {
                       <MobileNavLink to={ROUTES.contact} onClick={() => setIsOpen(false)}>Contact</MobileNavLink>
                     </div>
                     <div className="animate-slideInRight" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
-                      <MobileNavLink to={ROUTES.blog} onClick={() => setIsOpen(false)}>Blog</MobileNavLink>
+                      <MobileNavLink to={ROUTES.blog} onClick={() => setIsOpen(false)} onIntent={prefetchBlogList}>Blog</MobileNavLink>
                     </div>
                   </>
                 )}

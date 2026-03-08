@@ -1,13 +1,16 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Heart, Phone, Mail, MapPin, Facebook, Twitter, Instagram, Linkedin, AlertCircle, ChevronDown } from 'lucide-react';
 import LogoMark from './LogoMark';
 import { ROUTES } from '../constants/routes';
 import { usePublicCmsMenu, usePublicCmsSettings } from '../hooks/useCmsContent';
-import { CMS_DEFAULTS } from '../constants/cms';
+import { CMS_DEFAULTS, CMS_QUERY_LIMITS } from '../constants/cms';
 import { CMS_MENU_LOCATION } from '../constants/cms';
+import { getPublishedBlogPosts } from '../services/cms.service';
 
 function Footer() {
+  const queryClient = useQueryClient();
   const settingsQuery = usePublicCmsSettings();
   const footerResourcesQuery = usePublicCmsMenu(CMS_MENU_LOCATION.footerResources);
   const footerLegalQuery = usePublicCmsMenu(CMS_MENU_LOCATION.footerLegal);
@@ -58,6 +61,13 @@ function Footer() {
 
   const toggleSection = (section: 'quickLinks' | 'resources' | 'contact') => {
     setOpenSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+  const prefetchBlogList = () => {
+    void queryClient.prefetchQuery({
+      queryKey: ['cms', 'public', 'blogPosts', { limitCount: CMS_QUERY_LIMITS.publicBlogSummaryList }],
+      queryFn: () => getPublishedBlogPosts(CMS_QUERY_LIMITS.publicBlogSummaryList),
+      staleTime: 60_000,
+    });
   };
 
   return (
@@ -202,6 +212,9 @@ function Footer() {
                     <Link
                       to={item.path}
                       className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
+                      onMouseEnter={item.path === ROUTES.blog ? prefetchBlogList : undefined}
+                      onFocus={item.path === ROUTES.blog ? prefetchBlogList : undefined}
+                      onTouchStart={item.path === ROUTES.blog ? prefetchBlogList : undefined}
                     >
                       <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
                       {item.label}
