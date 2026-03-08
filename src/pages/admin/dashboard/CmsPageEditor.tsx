@@ -158,7 +158,6 @@ export default function CmsPageEditorPage() {
   const [revisionHistory, setRevisionHistory] = useState<RevisionEntry[]>([]);
   const [restoreDraftPayload, setRestoreDraftPayload] = useState<Record<string, unknown> | null>(null);
   const [activeSection, setActiveSection] = useState<string>('');
-  const [advancedMode, setAdvancedMode] = useState(false);
   const [showAdvancedSeo, setShowAdvancedSeo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [initializedFor, setInitializedFor] = useState<string | null>(null);
@@ -194,14 +193,14 @@ export default function CmsPageEditorPage() {
     [contentDraft]
   );
   const activePresetPath = activePreset?.path || null;
-  const resolvedContentJsonForChecks = advancedMode ? contentJson : JSON.stringify(contentDraft || {});
+  const resolvedContentJsonForChecks = JSON.stringify(contentDraft || {});
   const seoTitleLen = (seoTitle.trim() || title.trim()).length;
   const seoDescriptionLen = (seoDescription.trim() || excerpt.trim()).length;
   const publishChecks = useMemo(() => {
     const critical = [
       { id: 'title', label: 'Page title is set', passed: Boolean(title.trim()) },
       { id: 'slug', label: 'Page slug is valid', passed: Boolean(toCmsSlug(slug || title)) },
-      { id: 'content', label: 'Content is present', passed: Boolean((advancedMode ? contentJson : JSON.stringify(contentDraft || {})).trim() && (advancedMode ? contentJson : JSON.stringify(contentDraft || {})) !== '{}' ) },
+      { id: 'content', label: 'Content is present', passed: Boolean(JSON.stringify(contentDraft || {}).trim() && JSON.stringify(contentDraft || {}) !== '{}' ) },
     ];
     const warnings = [
       { id: 'excerpt', label: 'Summary is added', passed: Boolean(excerpt.trim()) },
@@ -217,7 +216,7 @@ export default function CmsPageEditorPage() {
       },
     ];
     return { critical, warnings };
-  }, [advancedMode, contentDraft, contentJson, excerpt, seoDescriptionLen, seoTitleLen, slug, title]);
+  }, [contentDraft, excerpt, seoDescriptionLen, seoTitleLen, slug, title]);
   const canPublish = publishChecks.critical.every((entry) => entry.passed);
   const previewTitle = (seoTitle.trim() || title.trim() || 'Untitled page').slice(0, CMS_LIMITS.seoTitle);
   const previewDescription = (
@@ -342,6 +341,10 @@ export default function CmsPageEditorPage() {
       setActiveSection(contentSections[0]);
     }
   }, [activeSection, contentSections]);
+
+  useEffect(() => {
+    setContentJson(JSON.stringify(contentDraft || {}, null, 2));
+  }, [contentDraft]);
 
   useEffect(() => {
     const key = revisionStorageKey(previewSlug);
@@ -635,17 +638,7 @@ export default function CmsPageEditorPage() {
       return;
     }
 
-    const normalizedContentJson = advancedMode
-      ? contentJson.trim()
-      : JSON.stringify(contentDraft || {}, null, 2);
-
-    if (advancedMode) {
-      const parsed = parseJsonObject(normalizedContentJson);
-      if (!parsed) {
-        notify.error('Advanced JSON must be a valid JSON object.');
-        return;
-      }
-    }
+    const normalizedContentJson = JSON.stringify(contentDraft || {}, null, 2);
 
     if (normalizedContentJson.length > CMS_LIMITS.contentJson) {
       notify.error(`Content JSON exceeds ${CMS_LIMITS.contentJson} characters.`);
@@ -910,9 +903,14 @@ export default function CmsPageEditorPage() {
                     setContentDraft(v.contentDraft as JsonLike);
                     setContentJson(JSON.stringify(v.contentDraft, null, 2));
                   } else if (typeof v.contentJson === 'string') {
-                    setContentJson(v.contentJson);
                     const parsed = parseJsonObject(v.contentJson);
-                    if (parsed) setContentDraft(parsed as JsonLike);
+                    if (parsed) {
+                      setContentDraft(parsed as JsonLike);
+                      setContentJson(JSON.stringify(parsed, null, 2));
+                    } else {
+                      setContentDraft({});
+                      setContentJson('{}');
+                    }
                   }
                   setRestoreDraftPayload(null);
                   setIsDirty(true);
@@ -939,24 +937,6 @@ export default function CmsPageEditorPage() {
         ) : null}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold text-gray-900">Page Editor</p>
-          <label className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700">
-            <input
-              type="checkbox"
-              checked={advancedMode}
-              onChange={(event) => {
-                const next = event.target.checked;
-                setIsDirty(true);
-                setAdvancedMode(next);
-                if (next) {
-                  setContentJson(JSON.stringify(contentDraft || {}, null, 2));
-                } else {
-                  const parsed = parseJsonObject(contentJson);
-                  if (parsed) setContentDraft(parsed as JsonLike);
-                }
-              }}
-            />
-            Advanced JSON mode
-          </label>
         </div>
         <div className="mb-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
           <p className="text-sm font-semibold text-gray-900">Publish Readiness</p>
@@ -996,9 +976,9 @@ export default function CmsPageEditorPage() {
                   setOgDescription(selected.ogDescription || '');
                   setOgImageUrl(selected.ogImageUrl || '');
                   setTwitterImageUrl(selected.twitterImageUrl || '');
-                  setContentJson(selected.contentJson || '{}');
-                  const parsed = parseJsonObject(selected.contentJson || '{}');
-                  if (parsed) setContentDraft(parsed as JsonLike);
+                  const parsed = parseJsonObject(selected.contentJson || '{}') || {};
+                  setContentDraft(parsed as JsonLike);
+                  setContentJson(JSON.stringify(parsed, null, 2));
                   setIsDirty(true);
                   notify.success('Page content duplicated. Update title/slug before saving.');
                 }}
@@ -1119,16 +1099,7 @@ export default function CmsPageEditorPage() {
             </>
           ) : null}
 
-          {advancedMode ? (
-            <textarea
-              value={contentJson}
-              onChange={(event) => { setContentJson(event.target.value); setIsDirty(true); }}
-              rows={12}
-              placeholder='{"heroTitle":"..."}'
-              className="rounded-xl border border-gray-300 px-3 py-2 font-mono text-xs md:col-span-2"
-            />
-          ) : (
-            <div className="space-y-3 md:col-span-2">
+          <div className="space-y-3 md:col-span-2">
               {contentSections.length > 0 ? (
                 <>
                   <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-1">
@@ -1185,7 +1156,6 @@ export default function CmsPageEditorPage() {
                 </div>
               )}
             </div>
-          )}
         </div>
 
         <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
@@ -1203,9 +1173,9 @@ export default function CmsPageEditorPage() {
                     onClick={() => {
                       setTitle(entry.title);
                       setExcerpt(entry.excerpt);
-                      setContentJson(entry.contentJson);
-                      const parsed = parseJsonObject(entry.contentJson);
-                      if (parsed) setContentDraft(parsed as JsonLike);
+                      const parsed = parseJsonObject(entry.contentJson) || {};
+                      setContentDraft(parsed as JsonLike);
+                      setContentJson(JSON.stringify(parsed, null, 2));
                       setIsDirty(true);
                     }}
                     className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"

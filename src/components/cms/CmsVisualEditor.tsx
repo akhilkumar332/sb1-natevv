@@ -80,10 +80,8 @@ export default function CmsVisualEditor({
 
   const [open, setOpen] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [advancedMode, setAdvancedMode] = useState(false);
   const [activeTab, setActiveTab] = useState<'sections' | 'fields' | 'theme'>('sections');
   const [draft, setDraft] = useState<Record<string, unknown>>(() => toEditableObject(content));
-  const [draftJson, setDraftJson] = useState(() => JSON.stringify(toEditableObject(content), null, 2));
   const [hasLocalEdits, setHasLocalEdits] = useState(false);
 
   const customSections = useMemo(
@@ -108,7 +106,6 @@ export default function CmsVisualEditor({
     if (hasLocalEdits) return;
     const next = toEditableObject(content);
     setDraft(next);
-    setDraftJson(JSON.stringify(next, null, 2));
   }, [content, hasLocalEdits]);
 
   if (!isEditMode) {
@@ -132,7 +129,6 @@ export default function CmsVisualEditor({
   const syncDraftJson = (next: Record<string, unknown>) => {
     setHasLocalEdits(true);
     setDraft(next);
-    setDraftJson(JSON.stringify(next, null, 2));
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(CMS_PREVIEW_EVENT, { detail: { slug, content: next } }));
     }
@@ -273,17 +269,7 @@ export default function CmsVisualEditor({
   const persist = async (mode: 'save' | 'publish') => {
     setSaving(true);
     try {
-      let payload = draft;
-      if (advancedMode) {
-        try {
-          const parsed = JSON.parse(draftJson);
-          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('JSON must be an object.');
-          payload = parsed as Record<string, unknown>;
-        } catch (error) {
-          notify.error(error instanceof Error ? error.message : 'Invalid JSON content.');
-          return;
-        }
-      }
+      const payload = draft;
 
       const safeSections = parseCustomSections((payload as Record<string, unknown>).customSections)
         .map((entry, index) => ({
@@ -323,7 +309,6 @@ export default function CmsVisualEditor({
       await queryClient.invalidateQueries({ queryKey: ['cms'] });
       await queryClient.invalidateQueries({ queryKey: ['admin'] });
       setDraft(normalizedPayload);
-      setDraftJson(JSON.stringify(normalizedPayload, null, 2));
       setHasLocalEdits(false);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent(CMS_PREVIEW_EVENT, { detail: { slug, content: normalizedPayload } }));
@@ -436,38 +421,23 @@ export default function CmsVisualEditor({
             <div className="rounded-xl border border-gray-200 p-2">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Core Fields</p>
-              <button type="button" onClick={() => setAdvancedMode((prev) => !prev)} className="rounded border border-gray-300 px-2 py-1 text-xs">
-                {advancedMode ? 'Simple' : 'Advanced JSON'}
-              </button>
             </div>
-            {advancedMode ? (
-              <textarea
-                value={draftJson}
-                onChange={(event) => {
-                  setHasLocalEdits(true);
-                  setDraftJson(event.target.value);
-                }}
-                rows={12}
-                className="w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
-              />
-            ) : (
-              <div className="space-y-1.5">
-                {editablePrimitiveKeys.map(([key, value]) => (
-                  <label key={key} className="block">
-                    <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600">{key}</span>
-                    {typeof value === 'boolean' ? (
-                      <input type="checkbox" checked={value} onChange={(event) => updatePrimitive(key, event.target.checked)} />
-                    ) : (
-                      <input
-                        value={String(value)}
-                        onChange={(event) => updatePrimitive(key, typeof value === 'number' ? Number(event.target.value || 0) : event.target.value)}
-                        className="w-full rounded border border-gray-300 px-2 py-1.5 text-xs"
-                      />
-                    )}
-                  </label>
-                ))}
-              </div>
-            )}
+            <div className="space-y-1.5">
+              {editablePrimitiveKeys.map(([key, value]) => (
+                <label key={key} className="block">
+                  <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600">{key}</span>
+                  {typeof value === 'boolean' ? (
+                    <input type="checkbox" checked={value} onChange={(event) => updatePrimitive(key, event.target.checked)} />
+                  ) : (
+                    <input
+                      value={String(value)}
+                      onChange={(event) => updatePrimitive(key, typeof value === 'number' ? Number(event.target.value || 0) : event.target.value)}
+                      className="w-full rounded border border-gray-300 px-2 py-1.5 text-xs"
+                    />
+                  )}
+                </label>
+              ))}
+            </div>
             </div>
           ) : null}
         </div>

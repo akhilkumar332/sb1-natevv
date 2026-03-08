@@ -203,6 +203,13 @@ export default function BlogPostPage() {
       || (entry.tags || []).some((tag) => (post.tags || []).includes(tag))
     ))
     .slice(0, 3);
+  const featuredPosts = (allPostsQuery.data || [])
+    .filter((entry) => {
+      if (entry.slug === post.slug || !entry.featured) return false;
+      const expiry = toDateValue(entry.featuredUntil);
+      return !expiry || expiry.getTime() > Date.now();
+    })
+    .slice(0, 3);
   const shareUrl = `${canonicalBaseUrl.replace(/\/+$/, '')}${canonicalPath}`;
   const shareText = encodeURIComponent(post.title);
   const textSizeClass = readerTextSize === 'sm' ? 'text-sm' : readerTextSize === 'lg' ? 'text-lg' : 'text-base';
@@ -321,6 +328,18 @@ export default function BlogPostPage() {
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
                 {relatedPosts.map((entry) => (
                   <Link key={entry.id} to={ROUTES.blogPost.replace(':slug', entry.slug)} className="rounded-lg border border-red-100 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-red-50">
+                    {entry.title}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {featuredPosts.length ? (
+            <div className="mt-6 rounded-xl border border-red-100 bg-white p-4">
+              <p className="text-sm font-semibold text-gray-900">Featured Articles</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {featuredPosts.map((entry) => (
+                  <Link key={`featured-${entry.id}`} to={ROUTES.blogPost.replace(':slug', entry.slug)} className="rounded-lg border border-red-100 bg-red-50/30 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-red-50">
                     {entry.title}
                   </Link>
                 ))}

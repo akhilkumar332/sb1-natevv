@@ -32,7 +32,6 @@ export default function BlogPage() {
     CMS_LIMITS.blogPostsPageSizeMin,
     Math.min(CMS_LIMITS.blogPostsPageSizeMax, Number(settingsQuery.data?.blogPostsPerPage || CMS_DEFAULTS.blogPostsPerPage))
   );
-  const showFeaturedOnBlog = settingsQuery.data?.showFeaturedOnBlog ?? CMS_DEFAULTS.showFeaturedOnBlog;
   const siteTitle = settingsQuery.data?.siteTitle || CMS_DEFAULTS.siteTitle;
   const seoTitle = settingsQuery.data?.defaultSeoTitle || CMS_DEFAULTS.defaultSeoTitle;
   const seoDescription = settingsQuery.data?.defaultSeoDescription || CMS_DEFAULTS.defaultSeoDescription;
@@ -149,15 +148,6 @@ export default function BlogPage() {
     return next;
   }, [filteredPosts, selectedSort]);
 
-  const featuredPosts = useMemo(
-    () => posts.filter((post) => {
-      if (!post.featured) return false;
-      const expiry = toDateValue(post.featuredUntil);
-      return !expiry || expiry.getTime() > Date.now();
-    }).slice(0, 3),
-    [posts]
-  );
-
   const totalPages = Math.max(1, Math.ceil(sortedPosts.length / postsPerPage));
   const currentPage = Math.min(activePage, totalPages);
   const pageItems = useMemo(() => getPaginationItems(currentPage, totalPages), [currentPage, totalPages]);
@@ -174,7 +164,15 @@ export default function BlogPage() {
       || effectiveAuthor !== 'all'
       || selectedSort !== 'newest'
   );
-
+  const activeFilterPills = useMemo(() => {
+    const pills: Array<{ kind: 'q' | 'category' | 'series' | 'author' | 'sort'; label: string }> = [];
+    if (selectedQuery) pills.push({ kind: 'q', label: `Search: ${selectedQuery}` });
+    if (effectiveCategory !== 'all') pills.push({ kind: 'category', label: `Topic: ${toHumanLabel(effectiveCategory)}` });
+    if (effectiveSeries !== 'all') pills.push({ kind: 'series', label: `Series: ${toHumanLabel(effectiveSeries)}` });
+    if (effectiveAuthor !== 'all') pills.push({ kind: 'author', label: `Author: ${effectiveAuthor}` });
+    if (selectedSort !== 'newest') pills.push({ kind: 'sort', label: 'Sort: Oldest first' });
+    return pills;
+  }, [selectedQuery, effectiveCategory, effectiveSeries, effectiveAuthor, selectedSort]);
   const applyParams = (next: { category?: string; series?: string; author?: string; sort?: 'newest' | 'oldest'; q?: string; page?: number }) => {
     const params = new URLSearchParams(searchParams);
     if (typeof next.category !== 'undefined') {
@@ -268,294 +266,270 @@ export default function BlogPage() {
       </section>
 
       <section className="py-8">
-        <div className="container mx-auto px-4 space-y-4">
-          <div className="grid gap-2 md:grid-cols-3">
-            <input
-              type="search"
-              value={searchParams.get('q') || ''}
-              onChange={(event) => applyParams({ q: event.target.value })}
-              placeholder="Search posts by title, summary, or tag"
-              className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
-            />
-            <select
-              value={selectedSort}
-              onChange={(event) => applyParams({ sort: event.target.value as 'newest' | 'oldest' })}
-              className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-            </select>
-            <button
-              type="button"
-              onClick={() => {
-                const params = new URLSearchParams(searchParams);
-                params.delete('q');
-                params.delete('sort');
-                params.delete('category');
-                params.delete('series');
-                params.delete('author');
-                params.delete('page');
-                setSearchParams(params);
-              }}
-              className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-            >
-              Reset filters
-            </button>
-          </div>
-
-          {showFeaturedOnBlog && effectiveCategory === 'all' && currentPage === 1 && featuredPosts.length > 0 ? (
-            <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
-              <h2 className="text-lg font-bold text-gray-900">Featured</h2>
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                {featuredPosts.map((post) => (
-                  <Link
-                    key={`featured-${post.id}`}
-                    to={ROUTES.blogPost.replace(':slug', post.slug)}
-                    className="rounded-xl border border-red-100 p-3 transition hover:bg-red-50"
+        <div className="container mx-auto px-4">
+          <div className="grid gap-4 lg:grid-cols-[15%_85%]">
+            <aside className="space-y-2 lg:sticky lg:top-24 lg:self-start">
+              <div className="rounded-xl border border-red-100 bg-white p-2 shadow-sm">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600">Filters</p>
+                <label className="text-[11px] font-semibold text-gray-700">Search articles</label>
+                <input
+                  type="search"
+                  value={searchParams.get('q') || ''}
+                  onChange={(event) => applyParams({ q: event.target.value })}
+                  placeholder="Try donation, platelets, eligibility..."
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs"
+                />
+                <label className="mt-2 block text-[11px] font-semibold text-gray-700">Sort articles</label>
+                <select
+                  value={selectedSort}
+                  onChange={(event) => applyParams({ sort: event.target.value as 'newest' | 'oldest' })}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs"
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                </select>
+                <p className="mt-2 text-[11px] font-semibold text-gray-700">Topics</p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    onClick={() => applyParams({ category: 'all' })}
+                    className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${
+                      effectiveCategory === 'all'
+                        ? 'border-red-600 bg-red-600 text-white'
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
                   >
-                    <p className="line-clamp-2 text-sm font-semibold text-gray-900">{post.title}</p>
-                    <p className="mt-1 line-clamp-2 text-xs text-gray-600">{post.excerpt || 'Read the full article.'}</p>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {categories.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                  onClick={() => applyParams({ category: 'all' })}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                    effectiveCategory === 'all'
-                      ? 'border-red-600 bg-red-600 text-white'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
-              >
-                All
-              </button>
-              {categories.map((category) => (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => applyParams({ category })}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                    effectiveCategory === category
-                      ? 'border-red-600 bg-red-600 text-white'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
+                    All topics
+                  </button>
+                  {categories.map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => applyParams({ category })}
+                      className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${
+                        effectiveCategory === category
+                          ? 'border-red-600 bg-red-600 text-white'
+                          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {toHumanLabel(category)}
+                    </button>
+                  ))}
+                </div>
+                <label className="mt-2 block text-[11px] font-semibold text-gray-700">Series</label>
+                <select
+                  value={effectiveSeries}
+                  onChange={(event) => applyParams({ series: event.target.value })}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs"
                 >
-                  {toHumanLabel(category)}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          {series.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => applyParams({ series: 'all' })}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                  effectiveSeries === 'all'
-                    ? 'border-red-600 bg-red-600 text-white'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                All Series
-              </button>
-              {series.map((entry) => (
-                <button
-                  key={entry}
-                  type="button"
-                  onClick={() => applyParams({ series: entry })}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                    effectiveSeries === entry
-                      ? 'border-red-600 bg-red-600 text-white'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
+                  <option value="all">All series</option>
+                  {series.map((entry) => (
+                    <option key={entry} value={entry}>{toHumanLabel(entry)}</option>
+                  ))}
+                </select>
+                <label className="mt-2 block text-[11px] font-semibold text-gray-700">Written by</label>
+                <select
+                  value={effectiveAuthor}
+                  onChange={(event) => applyParams({ author: event.target.value })}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs"
                 >
-                  {toHumanLabel(entry)}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          {authors.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => applyParams({ author: 'all' })}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                  effectiveAuthor === 'all'
-                    ? 'border-red-600 bg-red-600 text-white'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                All Authors
-              </button>
-              {authors.map((entry) => (
+                  <option value="all">All authors</option>
+                  {authors.map((entry) => (
+                    <option key={entry} value={entry}>{entry}</option>
+                  ))}
+                </select>
                 <button
-                  key={entry}
                   type="button"
-                  onClick={() => applyParams({ author: entry })}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                    effectiveAuthor === entry
-                      ? 'border-red-600 bg-red-600 text-white'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
+                  onClick={() => {
+                    const params = new URLSearchParams(searchParams);
+                    params.delete('q');
+                    params.delete('sort');
+                    params.delete('category');
+                    params.delete('series');
+                    params.delete('author');
+                    params.delete('page');
+                    setSearchParams(params);
+                  }}
+                  className="mt-2 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
                 >
-                  {entry}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          {postsQuery.isLoading && posts.length === 0 && !loadingStalled ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div key={`blog-skeleton-${index}`} className="h-56 animate-pulse rounded-2xl border border-red-100 bg-white" />
-              ))}
-            </div>
-          ) : postsQuery.isLoading && posts.length === 0 && loadingStalled ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center text-amber-900 shadow-sm">
-              Blog is taking longer than expected to load.
-              <div className="mt-3 flex justify-center gap-2">
-                <button type="button" onClick={() => void postsQuery.refetch()} className="rounded-md border border-amber-300 px-3 py-1.5 text-xs font-semibold hover:bg-amber-100">
-                  Retry
-                </button>
-                <button type="button" onClick={() => void refreshAppCache()} className="rounded-md border border-amber-600 bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
-                  Refresh App Cache
+                  Reset filters
                 </button>
               </div>
-            </div>
-          ) : postsQuery.isError && posts.length === 0 ? (
-            <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-600 shadow-sm">
-              Failed to load blog posts. Please try again.
-              <div className="mt-3 flex justify-center gap-2">
-                <button type="button" onClick={() => void postsQuery.refetch()} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
-                  Retry
-                </button>
-                <button type="button" onClick={() => void refreshAppCache()} className="rounded-md border border-red-600 bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">
-                  Refresh App Cache
-                </button>
+            </aside>
+            <div className="space-y-4">
+              <div className="rounded-xl border border-red-100 bg-white px-3 py-2 shadow-sm">
+                <p className="text-sm font-semibold text-gray-800">{sortedPosts.length} article{sortedPosts.length === 1 ? '' : 's'} found</p>
+                <p className="text-xs text-gray-500">Filters update results instantly.</p>
+                {activeFilterPills.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {activeFilterPills.map((pill) => (
+                      <button
+                        key={`pill-${pill.kind}`}
+                        type="button"
+                        onClick={() => {
+                          if (pill.kind === 'q') applyParams({ q: '' });
+                          if (pill.kind === 'category') applyParams({ category: 'all' });
+                          if (pill.kind === 'series') applyParams({ series: 'all' });
+                          if (pill.kind === 'author') applyParams({ author: 'all' });
+                          if (pill.kind === 'sort') applyParams({ sort: 'newest' });
+                        }}
+                        className="rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-100"
+                      >
+                        {pill.label} ×
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
-            </div>
-          ) : sortedPosts.length === 0 ? (
-            <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-600 shadow-sm">
-              {effectiveCategory === 'all' && effectiveSeries === 'all' && effectiveAuthor === 'all'
-                ? 'No published blog posts yet.'
-                : 'No posts found for selected filters.'}
-              {hasActiveFilters ? (
-                <p className="mt-2 text-xs text-gray-500">
-                  Try clearing filters or searching with broader keywords.
-                </p>
+              {postsQuery.isLoading && posts.length === 0 && !loadingStalled ? (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <div key={`blog-skeleton-${index}`} className="h-56 animate-pulse rounded-2xl border border-red-100 bg-white" />
+                  ))}
+                </div>
+              ) : postsQuery.isLoading && posts.length === 0 && loadingStalled ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center text-amber-900 shadow-sm">
+                  Blog is taking longer than expected to load.
+                  <div className="mt-3 flex justify-center gap-2">
+                    <button type="button" onClick={() => void postsQuery.refetch()} className="rounded-md border border-amber-300 px-3 py-1.5 text-xs font-semibold hover:bg-amber-100">
+                      Retry
+                    </button>
+                    <button type="button" onClick={() => void refreshAppCache()} className="rounded-md border border-amber-600 bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
+                      Refresh App Cache
+                    </button>
+                  </div>
+                </div>
+              ) : postsQuery.isError && posts.length === 0 ? (
+                <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-600 shadow-sm">
+                  Failed to load blog posts. Please try again.
+                  <div className="mt-3 flex justify-center gap-2">
+                    <button type="button" onClick={() => void postsQuery.refetch()} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                      Retry
+                    </button>
+                    <button type="button" onClick={() => void refreshAppCache()} className="rounded-md border border-red-600 bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">
+                      Refresh App Cache
+                    </button>
+                  </div>
+                </div>
+              ) : sortedPosts.length === 0 ? (
+                <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-600 shadow-sm">
+                  {effectiveCategory === 'all' && effectiveSeries === 'all' && effectiveAuthor === 'all'
+                    ? 'No published blog posts yet.'
+                    : 'No posts found for selected filters.'}
+                  {hasActiveFilters ? (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Try clearing filters or searching with broader keywords.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Check back soon for new donation stories and practical guides.
+                    </p>
+                  )}
+                </div>
               ) : (
-                <p className="mt-2 text-xs text-gray-500">
-                  Check back soon for new donation stories and practical guides.
-                </p>
+                <>
+                  {postsQuery.isError ? (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
+                      Showing cached posts. Latest refresh failed.
+                    </div>
+                  ) : null}
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {pagedPosts.map((post) => {
+                      const publishedAt = toDateValue(post.publishedAt);
+                      const readingMinutes = Math.max(1, Math.ceil(((post.excerpt || '').split(/\s+/).filter(Boolean).length || 120) / 180));
+                      return (
+                        <article key={post.id} className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                          {post.coverImageUrl ? (
+                            <img
+                              src={post.coverImageUrl}
+                              alt={post.title}
+                              className="h-40 w-full object-cover"
+                              loading="lazy"
+                              decoding="async"
+                              fetchPriority="low"
+                            />
+                          ) : (
+                            <div className="h-40 w-full bg-gradient-to-br from-red-100 to-red-50" />
+                          )}
+                          <div className="space-y-3 p-4">
+                            <h2 className="line-clamp-2 text-lg font-bold text-gray-900">{post.title}</h2>
+                            <p className="line-clamp-3 text-sm text-gray-600">{post.excerpt || 'No excerpt available for this post.'}</p>
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                              <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{publishedAt ? publishedAt.toLocaleDateString() : 'N/A'}</span>
+                              {post.categorySlug ? <span className="inline-flex items-center gap-1"><Tag className="h-3.5 w-3.5" />{toHumanLabel(post.categorySlug)}</span> : null}
+                              <span>{readingMinutes} min read</span>
+                            </div>
+                            <Link to={ROUTES.blogPost.replace(':slug', post.slug)} className="inline-flex rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50">
+                              Read article
+                            </Link>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-2xl border border-red-100 bg-white px-4 py-3 text-sm shadow-sm">
+                    <div>
+                      <p className="text-gray-600">Page {currentPage} of {totalPages}</p>
+                      <p className="text-xs text-gray-500">Showing {pageStartItem}-{pageEndItem} of {sortedPosts.length} posts</p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => applyParams({ page: 1 })}
+                        disabled={currentPage <= 1}
+                        className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
+                      >
+                        First
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyParams({ page: Math.max(1, currentPage - 1) })}
+                        disabled={currentPage <= 1}
+                        className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
+                      >
+                        Prev
+                      </button>
+                      {pageItems.map((item, index) => (
+                        item === 'ellipsis' ? (
+                          <span key={`ellipsis-${index}`} className="px-1 text-gray-400">...</span>
+                        ) : (
+                          <button
+                            key={`page-${item}`}
+                            type="button"
+                            onClick={() => applyParams({ page: item })}
+                            className={`rounded-md border px-3 py-1.5 font-semibold ${
+                              item === currentPage
+                                ? 'border-red-600 bg-red-600 text-white'
+                                : 'border-gray-300 text-gray-700'
+                            }`}
+                          >
+                            {item}
+                          </button>
+                        )
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => applyParams({ page: Math.min(totalPages, currentPage + 1) })}
+                        disabled={currentPage >= totalPages}
+                        className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyParams({ page: totalPages })}
+                        disabled={currentPage >= totalPages}
+                        className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
+                      >
+                        Last
+                      </button>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
-          ) : (
-            <>
-              {postsQuery.isError ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
-                  Showing cached posts. Latest refresh failed.
-                </div>
-              ) : null}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {pagedPosts.map((post) => {
-                  const publishedAt = toDateValue(post.publishedAt);
-                  const readingMinutes = Math.max(1, Math.ceil(((post.excerpt || '').split(/\s+/).filter(Boolean).length || 120) / 180));
-                  return (
-                    <article key={post.id} className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                      {post.coverImageUrl ? (
-                        <img
-                          src={post.coverImageUrl}
-                          alt={post.title}
-                          className="h-40 w-full object-cover"
-                          loading="lazy"
-                          decoding="async"
-                          fetchPriority="low"
-                        />
-                      ) : (
-                        <div className="h-40 w-full bg-gradient-to-br from-red-100 to-red-50" />
-                      )}
-                      <div className="space-y-3 p-4">
-                        <h2 className="line-clamp-2 text-lg font-bold text-gray-900">{post.title}</h2>
-                        <p className="line-clamp-3 text-sm text-gray-600">{post.excerpt || 'No excerpt available for this post.'}</p>
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
-                          <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{publishedAt ? publishedAt.toLocaleDateString() : 'N/A'}</span>
-                          {post.categorySlug ? <span className="inline-flex items-center gap-1"><Tag className="h-3.5 w-3.5" />{toHumanLabel(post.categorySlug)}</span> : null}
-                          <span>{readingMinutes} min read</span>
-                        </div>
-                        <Link to={ROUTES.blogPost.replace(':slug', post.slug)} className="inline-flex rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50">
-                          Read article
-                        </Link>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-
-              <div className="flex items-center justify-between rounded-2xl border border-red-100 bg-white px-4 py-3 text-sm shadow-sm">
-                <div>
-                  <p className="text-gray-600">Page {currentPage} of {totalPages}</p>
-                  <p className="text-xs text-gray-500">Showing {pageStartItem}-{pageEndItem} of {sortedPosts.length} posts</p>
-                </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => applyParams({ page: 1 })}
-                    disabled={currentPage <= 1}
-                    className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
-                  >
-                    First
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyParams({ page: Math.max(1, currentPage - 1) })}
-                    disabled={currentPage <= 1}
-                    className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
-                  >
-                    Prev
-                  </button>
-                  {pageItems.map((item, index) => (
-                    item === 'ellipsis' ? (
-                      <span key={`ellipsis-${index}`} className="px-1 text-gray-400">...</span>
-                    ) : (
-                      <button
-                        key={`page-${item}`}
-                        type="button"
-                        onClick={() => applyParams({ page: item })}
-                        className={`rounded-md border px-3 py-1.5 font-semibold ${
-                          item === currentPage
-                            ? 'border-red-600 bg-red-600 text-white'
-                            : 'border-gray-300 text-gray-700'
-                        }`}
-                      >
-                        {item}
-                      </button>
-                    )
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => applyParams({ page: Math.min(totalPages, currentPage + 1) })}
-                    disabled={currentPage >= totalPages}
-                    className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyParams({ page: totalPages })}
-                    disabled={currentPage >= totalPages}
-                    className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
-                  >
-                    Last
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
+          </div>
         </div>
       </section>
     </div>

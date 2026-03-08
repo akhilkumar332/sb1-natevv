@@ -160,6 +160,27 @@ export default function CmsBlogPostsPage() {
     }
   }, [filtersHydrated, searchTerm, statusFilter, categoryFilter, tagFilter, seriesFilter, activeQueue]);
 
+  useEffect(() => {
+    if (categoryFilter !== 'all' && !categories.includes(categoryFilter)) {
+      setCategoryFilter('all');
+      setPage(1);
+    }
+  }, [categoryFilter, categories]);
+
+  useEffect(() => {
+    if (tagFilter !== 'all' && !tags.includes(tagFilter)) {
+      setTagFilter('all');
+      setPage(1);
+    }
+  }, [tagFilter, tags]);
+
+  useEffect(() => {
+    if (seriesFilter !== 'all' && !series.includes(seriesFilter)) {
+      setSeriesFilter('all');
+      setPage(1);
+    }
+  }, [seriesFilter, series]);
+
   const toggleSelected = (id?: string) => {
     if (!id) return;
     setSelectedIds((prev) => {

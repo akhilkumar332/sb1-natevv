@@ -6,12 +6,11 @@ type Props = {
   onChange: (next: string) => void;
   placeholder?: string;
   disabled?: boolean;
-  useLegacyCommands?: boolean;
 };
 
 const buttonClass = 'rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50';
 
-export default function CmsRichTextEditor({ value, onChange, placeholder, disabled = false, useLegacyCommands = false }: Props) {
+export default function CmsRichTextEditor({ value, onChange, placeholder, disabled = false }: Props) {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const isFocusedRef = useRef(false);
   const htmlValue = useMemo(() => sanitizeRichHtml(value), [value]);
@@ -34,7 +33,7 @@ export default function CmsRichTextEditor({ value, onChange, placeholder, disabl
     try {
       document.execCommand(command, false, commandValue);
     } catch {
-      if (!useLegacyCommands && editorRef.current) {
+      if (editorRef.current) {
         const marker = command === 'bold' ? '**text**'
           : command === 'italic' ? '*text*'
             : command === 'underline' ? '__text__'

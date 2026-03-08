@@ -44,7 +44,6 @@ const toDateTimeLocalValue = (value: unknown): string => {
 };
 
 type EditorTab = 'content' | 'media' | 'seo' | 'settings';
-type EditorEngine = 'modern' | 'legacy';
 type RevisionEntry = {
   savedAt: string;
   title: string;
@@ -56,6 +55,12 @@ type ServerRevisionEntry = RevisionEntry & {
   id: string;
   savedBy: string;
   version: number;
+};
+
+const toModernBlogContentJson = (value: unknown): string => {
+  const raw = typeof value === 'string' ? value : '';
+  if (!raw.trim()) return '';
+  return serializeCmsRichContent(parseCmsRichContent(raw).html);
 };
 
 const REVISION_LIMIT = 10;
@@ -103,8 +108,6 @@ export default function CmsBlogPostEditorPage() {
   const [featuredUntil, setFeaturedUntil] = useState('');
   const [restoreDraftPayload, setRestoreDraftPayload] = useState<Record<string, unknown> | null>(null);
   const [activeTab, setActiveTab] = useState<EditorTab>('content');
-  const [articleSourceMode, setArticleSourceMode] = useState(false);
-  const [editorEngine, setEditorEngine] = useState<EditorEngine>('modern');
   const [showAdvancedSeo, setShowAdvancedSeo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [initializedFor, setInitializedFor] = useState<string | null>(null);
@@ -214,7 +217,7 @@ export default function CmsBlogPostEditorPage() {
       setExcerpt(existing.excerpt || '');
       setSeoTitle(existing.seoTitle || '');
       setSeoDescription(existing.seoDescription || '');
-      setContentJson(existing.contentJson || '');
+      setContentJson(toModernBlogContentJson(existing.contentJson || ''));
       setTagsInput(Array.isArray(existing.tags) ? existing.tags.join(', ') : '');
       setCategorySlug(existing.categorySlug || '');
       setCoverImageUrl(existing.coverImageUrl || '');
@@ -561,7 +564,11 @@ export default function CmsBlogPostEditorPage() {
       return;
     }
 
-    if ((contentJson || '').trim().length > CMS_LIMITS.contentJson) {
+    const normalizedContentJson = contentJson.trim()
+      ? serializeCmsRichContent(parsedArticleContent.html)
+      : '';
+
+    if (normalizedContentJson.length > CMS_LIMITS.contentJson) {
       notify.error(`Post content exceeds ${CMS_LIMITS.contentJson} characters.`);
       return;
     }
@@ -644,7 +651,7 @@ export default function CmsBlogPostEditorPage() {
         slug: normalizedSlug,
         status: nextStatus,
         excerpt: excerpt.trim().slice(0, CMS_LIMITS.excerpt) || null,
-        contentJson: contentJson.trim().slice(0, CMS_LIMITS.contentJson) || null,
+        contentJson: normalizedContentJson.slice(0, CMS_LIMITS.contentJson) || null,
         tags: normalizedTags,
         slugAliases,
         seriesSlug: toCmsSlug(seriesSlug) || null,
@@ -688,7 +695,7 @@ export default function CmsBlogPostEditorPage() {
         title: normalizedTitle,
         status: nextStatus,
         excerpt: excerpt.trim(),
-        contentJson: contentJson.trim(),
+        contentJson: normalizedContentJson,
         savedBy: user?.uid || 'admin',
         version: nextVersion,
       };
@@ -723,7 +730,7 @@ export default function CmsBlogPostEditorPage() {
         title: normalizedTitle,
         status: nextStatus,
         excerpt: excerpt.trim(),
-        contentJson: contentJson.trim(),
+        contentJson: normalizedContentJson,
       };
       const nextHistory = [nextRevision, ...revisionHistory].slice(0, REVISION_LIMIT);
       setRevisionHistory(nextHistory);
@@ -812,7 +819,7 @@ export default function CmsBlogPostEditorPage() {
                   setExcerpt(typeof v.excerpt === 'string' ? v.excerpt : excerpt);
                   setSeoTitle(typeof v.seoTitle === 'string' ? v.seoTitle : seoTitle);
                   setSeoDescription(typeof v.seoDescription === 'string' ? v.seoDescription : seoDescription);
-                  setContentJson(typeof v.contentJson === 'string' ? v.contentJson : contentJson);
+                  setContentJson(typeof v.contentJson === 'string' ? toModernBlogContentJson(v.contentJson) : contentJson);
                   setTagsInput(typeof v.tagsInput === 'string' ? v.tagsInput : tagsInput);
                   setCategorySlug(typeof v.categorySlug === 'string' ? v.categorySlug : categorySlug);
                   setCoverImageUrl(typeof v.coverImageUrl === 'string' ? v.coverImageUrl : coverImageUrl);
@@ -914,7 +921,7 @@ export default function CmsBlogPostEditorPage() {
                     setTitle(`${selected.title} Copy`);
                     setSlug(toCmsSlug(`${selected.slug}-copy`));
                     setExcerpt(selected.excerpt || '');
-                    setContentJson(selected.contentJson || '');
+                    setContentJson(toModernBlogContentJson(selected.contentJson || ''));
                     setTagsInput((selected.tags || []).join(', '));
                     setCategorySlug(selected.categorySlug || '');
                     setCoverImageUrl(selected.coverImageUrl || '');
@@ -959,47 +966,15 @@ export default function CmsBlogPostEditorPage() {
                 <p className="text-[11px] text-gray-500">
                   Write for humans first. Keep paragraphs short and include actionable guidance.
                 </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditorEngine((prev) => (prev === 'modern' ? 'legacy' : 'modern'))}
-                    className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                  >
-                    {editorEngine === 'modern' ? 'Use Legacy Editor' : 'Use Modern Editor'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setArticleSourceMode((prev) => !prev)}
-                    className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                  >
-                    {articleSourceMode ? 'Use Visual Editor' : 'Use Source JSON'}
-                  </button>
-                </div>
               </div>
-              {editorEngine === 'legacy' ? (
-                <p className="mb-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
-                  Legacy mode enabled for compatibility fallback. You can switch back to modern mode anytime.
-                </p>
-              ) : null}
-              {articleSourceMode ? (
-                <textarea
-                  value={contentJson}
-                  onChange={(event) => { setContentJson(event.target.value); setIsDirty(true); }}
-                  rows={10}
-                  placeholder="Edit raw content JSON"
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 font-mono text-xs"
-                />
-              ) : (
-                <CmsRichTextEditor
-                  value={parsedArticleContent.html}
-                  useLegacyCommands={editorEngine === 'legacy'}
-                  onChange={(nextHtml) => {
-                    setContentJson(serializeCmsRichContent(nextHtml));
-                    setIsDirty(true);
-                  }}
-                  placeholder="Write your article content here..."
-                />
-              )}
+              <CmsRichTextEditor
+                value={parsedArticleContent.html}
+                onChange={(nextHtml) => {
+                  setContentJson(serializeCmsRichContent(nextHtml));
+                  setIsDirty(true);
+                }}
+                placeholder="Write your article content here..."
+              />
             </label>
             <label className="block md:col-span-2">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Tags</span>
@@ -1027,12 +1002,7 @@ export default function CmsBlogPostEditorPage() {
                       key={`${entry.source}-${entry.path}`}
                       type="button"
                       onClick={() => {
-                        if (articleSourceMode) {
-                          const snippet = `[${entry.label}](${entry.path})`;
-                          setContentJson((prev) => `${prev.trim()}\n\n${snippet}`.trim());
-                        } else {
-                          setContentJson((prev) => appendInternalLinkToCmsRichContent(prev, entry.label, entry.path));
-                        }
+                        setContentJson((prev) => appendInternalLinkToCmsRichContent(prev, entry.label, entry.path));
                         setIsDirty(true);
                       }}
                       className="rounded-md border border-blue-200 bg-white px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100"
@@ -1248,7 +1218,7 @@ export default function CmsBlogPostEditorPage() {
                           if (!window.confirm('Restore this local revision into the editor? Unsaved edits will be replaced.')) return;
                           setTitle(entry.title);
                           setExcerpt(entry.excerpt);
-                          setContentJson(entry.contentJson);
+                          setContentJson(toModernBlogContentJson(entry.contentJson));
                           setIsDirty(true);
                         }}
                         className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
@@ -1283,7 +1253,7 @@ export default function CmsBlogPostEditorPage() {
                           if (!window.confirm('Restore this server revision into the editor? Unsaved edits will be replaced.')) return;
                           setTitle(entry.title);
                           setExcerpt(entry.excerpt);
-                          setContentJson(entry.contentJson);
+                          setContentJson(toModernBlogContentJson(entry.contentJson));
                           setStatus(entry.status as (typeof statusOptions)[number]);
                           setIsDirty(true);
                         }}

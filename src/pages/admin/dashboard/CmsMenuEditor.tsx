@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { COLLECTIONS } from '../../../constants/firestore';
-import { CMS_FEATURE_FLAGS, CMS_LIMITS, CMS_MENU_LOCATION, getCmsMenuDocId } from '../../../constants/cms';
+import { CMS_LIMITS, CMS_MENU_LOCATION, getCmsMenuDocId } from '../../../constants/cms';
 import { ROUTES } from '../../../constants/routes';
 import { useAdminCmsNavMenus } from '../../../hooks/admin/useAdminQueries';
 import { getServerTimestamp } from '../../../utils/firestore.utils';
@@ -41,7 +41,7 @@ const normalizeMenuItemsPayload = (value: unknown) => {
   const isExternalPath = (path: string): boolean => /^(https?:\/\/|mailto:|tel:)/i.test(path);
   const isValidInternalPath = (path: string): boolean => /^\/\S*$/.test(path);
 
-  return value.map((rawItem, index) => {
+  const normalized = value.map((rawItem, index) => {
     if (!rawItem || typeof rawItem !== 'object') {
       throw new Error(`Menu item #${index + 1} must be an object.`);
     }
@@ -68,9 +68,17 @@ const normalizeMenuItemsPayload = (value: unknown) => {
 
     return { id, label, path, external, order, enabled };
   });
-};
 
-const toMenuItemsJson = (items: MenuItemInput[]) => JSON.stringify(items, null, 2);
+  const seenIds = new Set<string>();
+  normalized.forEach((item, index) => {
+    if (seenIds.has(item.id)) {
+      throw new Error(`Menu item #${index + 1} uses duplicate id "${item.id}". IDs must be unique.`);
+    }
+    seenIds.add(item.id);
+  });
+
+  return normalized;
+};
 
 export default function CmsMenuEditorPage() {
   const { user } = useAuth();
@@ -86,8 +94,6 @@ export default function CmsMenuEditorPage() {
   const [location, setLocation] = useState<(typeof locationOptions)[number]>(initialLocation);
   const [status, setStatus] = useState<MenuStatus>('published');
   const [items, setItems] = useState<MenuItemInput[]>([{ id: 'home', label: 'Home', path: '/', external: false, order: 1, enabled: true }]);
-  const [developerMode, setDeveloperMode] = useState(false);
-  const [itemsJson, setItemsJson] = useState(toMenuItemsJson(items));
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [hydratedRevisionKey, setHydratedRevisionKey] = useState<string | null>(null);
@@ -117,12 +123,10 @@ export default function CmsMenuEditorPage() {
         : [{ id: 'home', label: 'Home', path: '/', external: false, order: 1, enabled: true }];
       setStatus(existing.status === 'draft' ? 'draft' : 'published');
       setItems(nextItems);
-      setItemsJson(toMenuItemsJson(nextItems));
     } else {
       const fallback = [{ id: 'home', label: 'Home', path: '/', external: false, order: 1, enabled: true }];
       setStatus('published');
       setItems(fallback);
-      setItemsJson(toMenuItemsJson(fallback));
     }
     setHydratedRevisionKey(revisionKey);
   }, [hydratedRevisionKey, isDirty, locationParam, rows]);
@@ -132,7 +136,6 @@ export default function CmsMenuEditorPage() {
     setItems((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], ...patch, order: index + 1 };
-      setItemsJson(toMenuItemsJson(next));
       return next;
     });
   };
@@ -140,30 +143,21 @@ export default function CmsMenuEditorPage() {
   const addItem = () => {
     setIsDirty(true);
     setItems((prev) => {
-      const next = [...prev, { id: `item-${prev.length + 1}`, label: '', path: '/', external: false, order: prev.length + 1, enabled: true }];
-      setItemsJson(toMenuItemsJson(next));
-      return next;
+      return [...prev, { id: `item-${prev.length + 1}`, label: '', path: '/', external: false, order: prev.length + 1, enabled: true }];
     });
   };
 
   const removeItem = (index: number) => {
     setIsDirty(true);
     setItems((prev) => {
-      const next = prev.filter((_, idx) => idx !== index).map((entry, idx) => ({ ...entry, order: idx + 1 }));
-      setItemsJson(toMenuItemsJson(next));
-      return next;
+      return prev.filter((_, idx) => idx !== index).map((entry, idx) => ({ ...entry, order: idx + 1 }));
     });
   };
 
   const saveMenu = async () => {
     let parsed: Array<{ id: string; label: string; path: string; external: boolean; order: number; enabled: boolean }> = [];
     try {
-      if (developerMode) {
-        const candidate = JSON.parse(itemsJson);
-        parsed = normalizeMenuItemsPayload(candidate);
-      } else {
-        parsed = normalizeMenuItemsPayload(items);
-      }
+      parsed = normalizeMenuItemsPayload(items);
     } catch (error) {
       notify.error(error instanceof Error ? error.message : 'Invalid menu items.');
       return;
@@ -186,7 +180,6 @@ export default function CmsMenuEditorPage() {
 
       await invalidateAdminRecipe(queryClient, 'cmsUpdated');
       setItems(parsed.map((entry, index) => ({ ...entry, order: index + 1 })));
-      setItemsJson(toMenuItemsJson(parsed));
       setIsDirty(false);
       setHydratedRevisionKey(null);
       notify.success('Menu saved.');
@@ -260,38 +253,6 @@ export default function CmsMenuEditorPage() {
             ))}
           </div>
         </div>
-
-        {CMS_FEATURE_FLAGS.simplifiedEditorMode ? (
-          <label className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700">
-            <input
-              type="checkbox"
-              checked={developerMode}
-              onChange={(event) => {
-                const next = event.target.checked;
-                if (!next) {
-                  try {
-                    const parsed = normalizeMenuItemsPayload(JSON.parse(itemsJson));
-                    setItems(parsed.map((entry, index) => ({ ...entry, order: index + 1 })));
-                  } catch (error) {
-                    notify.error(error instanceof Error ? error.message : 'Invalid menu JSON.');
-                    return;
-                  }
-                }
-                setDeveloperMode(next);
-              }}
-            />
-            Advanced JSON mode
-          </label>
-        ) : null}
-
-        {(!CMS_FEATURE_FLAGS.simplifiedEditorMode || developerMode) ? (
-          <textarea
-            value={itemsJson}
-            onChange={(event) => { setItemsJson(event.target.value); setIsDirty(true); }}
-            rows={12}
-            className="w-full rounded-xl border border-gray-300 px-3 py-2 font-mono text-xs"
-          />
-        ) : null}
 
         <div className="flex gap-2">
           <button type="button" onClick={() => void saveMenu()} disabled={saving} className="rounded-lg border border-red-600 bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
