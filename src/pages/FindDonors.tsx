@@ -638,6 +638,7 @@ function FindDonors() {
     selectedDistance,
     user?.uid,
   ]);
+  const hasSearchQuery = searchTerm.trim().length > 0;
 
   const filteredAvailableCount = useMemo(() => {
     return filteredDonors
@@ -761,7 +762,7 @@ function FindDonors() {
   const trayIds = useMemo(() => new Set(trayDonors.map((donor) => donor.id)), [trayDonors]);
   const trayCount = trayDonors.length;
   const trayPreview = trayDonors.slice(-2);
-  const studioRecipients = useFilteredRecipients ? filteredRecipients : trayDonors;
+  const studioRecipients = useFilteredRecipients ? (hasSearchQuery ? filteredRecipients : []) : trayDonors;
   const studioCount = studioRecipients.length;
 
   const addToTray = (donor: Donor) => {
@@ -818,7 +819,7 @@ function FindDonors() {
   };
 
   const openRequestStudio = () => {
-    if (trayDonors.length === 0 && filteredRecipients.length > 0) {
+    if (trayDonors.length === 0 && hasSearchQuery && filteredRecipients.length > 0) {
       setUseFilteredRecipients(true);
     } else if (trayDonors.length > 0) {
       setUseFilteredRecipients(false);
@@ -1064,15 +1065,17 @@ function FindDonors() {
     ), { duration: 30000 });
   };
 
-  const totalPages = Math.max(1, Math.ceil(filteredDonors.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const pageDonors = filteredDonors.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const visibleDonors = hasSearchQuery ? filteredDonors : [];
+  const visibleAvailableCount = hasSearchQuery ? filteredAvailableCount : 0;
+  const visibleTotalPages = Math.max(1, Math.ceil(visibleDonors.length / pageSize));
+  const safePage = Math.min(currentPage, visibleTotalPages);
+  const pageDonors = visibleDonors.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
+    if (currentPage > visibleTotalPages) {
+      setCurrentPage(visibleTotalPages);
     }
-  }, [currentPage, totalPages]);
+  }, [currentPage, visibleTotalPages]);
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -1117,7 +1120,7 @@ function FindDonors() {
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
             {/* Search Bar */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 mb-6 border border-gray-100">
+            <div className="sticky top-16 z-30 bg-white/95 backdrop-blur rounded-2xl shadow-xl p-6 mb-6 border border-gray-100 md:top-20">
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1 relative">
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-red-600" />
@@ -1279,25 +1282,27 @@ function FindDonors() {
             )}
 
             {/* Results Header */}
-            <div className="flex flex-col items-start justify-between gap-3 mb-6 sm:flex-row sm:items-center">
-              <p className="text-gray-600">
-                Showing <span className="font-bold text-red-600">{pageDonors.length}</span> of{' '}
-                <span className="font-bold text-red-600">{filteredDonors.length}</span> donors
-              </p>
-              <div className="flex items-center gap-3">
-                <p className="text-sm text-gray-500">
-                  Page {safePage} of {totalPages}
+            {hasSearchQuery && (
+              <div className="flex flex-col items-start justify-between gap-3 mb-6 sm:flex-row sm:items-center">
+                <p className="text-gray-600">
+                  Showing <span className="font-bold text-red-600">{pageDonors.length}</span> of{' '}
+                  <span className="font-bold text-red-600">{visibleDonors.length}</span> donors
                 </p>
-                <button
-                  type="button"
-                  onClick={openRequestStudio}
-                  className="inline-flex items-center gap-2 rounded-full border border-red-100 bg-white px-4 py-2 text-xs font-semibold text-red-600 shadow-sm hover:bg-red-50"
-                >
-                  Request Studio
-                  <ChevronRight className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-3">
+                  <p className="text-sm text-gray-500">
+                    Page {safePage} of {visibleTotalPages}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openRequestStudio}
+                    className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-gradient-to-r from-red-600 to-red-700 px-4 py-2 text-xs font-semibold text-white shadow-md ring-2 ring-red-100 transition-all hover:from-red-700 hover:to-red-800 hover:shadow-lg"
+                  >
+                    Request Studio
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
             {donorError && !loading && (
               <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 {donorError}
@@ -1320,6 +1325,14 @@ function FindDonors() {
                   {locationRequesting ? 'Requesting...' : content.locationButtonText}
                 </button>
               </div>
+            ) : !hasSearchQuery ? (
+              <div className="text-center py-16">
+                <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Search className="w-10 h-10 text-red-600" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Start with a search</h3>
+                <p className="text-gray-600 mb-6">Enter a name or location to find matching donors.</p>
+              </div>
             ) : loading ? (
               <div className={`grid grid-cols-1 md:grid-cols-2 ${compactMode ? 'lg:grid-cols-5 gap-3' : 'lg:grid-cols-4 gap-4'}`}>
                 {[...Array(6)].map((_, i) => (
@@ -1334,7 +1347,7 @@ function FindDonors() {
                   </div>
                 ))}
               </div>
-            ) : filteredDonors.length > 0 ? (
+            ) : visibleDonors.length > 0 ? (
               <div className={`grid grid-cols-1 md:grid-cols-2 ${compactMode ? 'lg:grid-cols-5 gap-3' : 'lg:grid-cols-4 gap-4'}`}>
                 {pageDonors.map((donor) => {
                   const isRequested = pendingRequestTargets.has(donor.id);
@@ -1581,7 +1594,7 @@ function FindDonors() {
                 </button>
               </div>
             )}
-            {!loading && totalPages > 1 && (
+            {!loading && hasSearchQuery && visibleTotalPages > 1 && (
               <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
                 <button
                   onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
@@ -1590,7 +1603,7 @@ function FindDonors() {
                 >
                   Prev
                 </button>
-                {Array.from({ length: totalPages }).map((_, index) => {
+                {Array.from({ length: visibleTotalPages }).map((_, index) => {
                   const page = index + 1;
                   const isActive = page === safePage;
                   return (
@@ -1608,8 +1621,8 @@ function FindDonors() {
                   );
                 })}
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  disabled={safePage >= totalPages}
+                  onClick={() => setCurrentPage((prev) => Math.min(visibleTotalPages, prev + 1))}
+                  disabled={safePage >= visibleTotalPages}
                   className="px-4 py-2 rounded-full border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next
@@ -1685,7 +1698,7 @@ function FindDonors() {
                 </div>
                 <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   {useFilteredRecipients
-                    ? `${filteredAvailableCount} available donors match your filters${filteredAvailableCount > MAX_DONOR_REQUEST_BATCH_TARGETS ? ` (showing first ${MAX_DONOR_REQUEST_BATCH_TARGETS})` : ''}.`
+                    ? `${visibleAvailableCount} available donors match your filters${visibleAvailableCount > MAX_DONOR_REQUEST_BATCH_TARGETS ? ` (showing first ${MAX_DONOR_REQUEST_BATCH_TARGETS})` : ''}.`
                     : 'Using your tray selection.'}
                 </p>
               </div>

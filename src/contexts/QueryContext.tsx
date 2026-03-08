@@ -8,6 +8,7 @@ import React from 'react';
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { captureHandledError } from '../services/errorLog.service';
 import { QUERY_DEFAULTS } from '../constants/query';
+import { installQueryCachePersistence, restorePersistedQueryCache } from '../utils/queryCachePersistence';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -52,6 +53,7 @@ const queryClient = new QueryClient({
     },
   },
 });
+restorePersistedQueryCache(queryClient);
 
 interface QueryProviderProps {
   children: React.ReactNode;
@@ -61,6 +63,13 @@ interface QueryProviderProps {
  * Query Provider Component
  */
 export const QueryProvider: React.FC<QueryProviderProps> = ({ children }) => {
+  React.useEffect(() => {
+    const teardownPersistence = installQueryCachePersistence(queryClient);
+    return () => {
+      teardownPersistence();
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       {children}

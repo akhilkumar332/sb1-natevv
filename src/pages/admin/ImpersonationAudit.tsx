@@ -12,6 +12,7 @@ import {
 import {
   collection,
   DocumentData,
+  FirestoreError,
   getDocs,
   limit,
   orderBy,
@@ -19,7 +20,7 @@ import {
   QueryDocumentSnapshot,
   startAfter,
 } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { auth, db } from '../../firebase';
 import { timestampToDate } from '../../utils/firestore.utils';
 import { useAuth } from '../../contexts/AuthContext';
 import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
@@ -63,6 +64,23 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 const PAGE_SIZE_OPTIONS = [50, 100, 200] as const;
+const FALLBACK_MAX_SCAN = 2000;
+
+const isRecoverableOrderedQueryError = (error: unknown) => {
+  const code = typeof error === 'object' && error && 'code' in error
+    ? String((error as { code?: unknown }).code || '')
+    : '';
+  return code.includes('failed-precondition')
+    || code.includes('invalid-argument')
+    || code.includes('deadline-exceeded');
+};
+
+const isAuthTransientQueryError = (error: unknown) => {
+  const code = typeof error === 'object' && error && 'code' in error
+    ? String((error as { code?: unknown }).code || '')
+    : '';
+  return code.includes('unauthenticated') || code.includes('permission-denied');
+};
 
 const mapEventDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): ImpersonationEvent => {
   const data = docSnap.data() as Record<string, any>;
@@ -83,7 +101,7 @@ const mapEventDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): Impersonatio
 };
 
 const ImpersonationAudit = () => {
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, user, loading: authStateLoading, authLoading, profileResolved } = useAuth();
   const reportImpersonationAuditError = useScopedErrorReporter({
     scope: 'admin',
     metadata: { page: 'ImpersonationAudit' },
@@ -96,14 +114,23 @@ const ImpersonationAudit = () => {
   const [pageSize, setPageSize] = useState<number>(100);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [hasNextPage, setHasNextPage] = useState<boolean>(false);
+  const [usingFallbackPagination, setUsingFallbackPagination] = useState<boolean>(false);
   const [pageCursors, setPageCursors] = useState<Record<number, QueryDocumentSnapshot<DocumentData> | null>>({
     1: null,
   });
+  const isAuthReadyForAudit = Boolean(
+    profileResolved
+    && !authStateLoading
+    && !authLoading
+    && user?.uid
+    && auth.currentUser?.uid
+    && user.uid === auth.currentUser.uid
+  );
 
   const fetchEvents = useCallback(async (
     page: number,
     cursor: QueryDocumentSnapshot<DocumentData> | null,
-    options?: { reset?: boolean }
+    options?: { reset?: boolean; authRetryCount?: number }
   ) => {
     if (!isSuperAdmin) {
       setEvents([]);
@@ -113,52 +140,157 @@ const ImpersonationAudit = () => {
       setLoading(false);
       return;
     }
+    if (!isAuthReadyForAudit) {
+      setLoading(true);
+      return;
+    }
     const shouldReset = options?.reset === true;
-    setLoading(true);
-    setError(null);
-    try {
-      const baseQuery = cursor
-        ? query(
-            collection(db, COLLECTIONS.IMPERSONATION_EVENTS),
-            orderBy('createdAt', 'desc'),
-            startAfter(cursor),
-            limit(pageSize + 1)
-          )
-        : query(
-            collection(db, COLLECTIONS.IMPERSONATION_EVENTS),
-            orderBy('createdAt', 'desc'),
-            limit(pageSize + 1)
-          );
-
-      const snapshot = await getDocs(baseQuery);
-      const docs = snapshot.docs;
-      const moreAvailable = docs.length > pageSize;
-      const pageDocs = moreAvailable ? docs.slice(0, pageSize) : docs;
-
-      setEvents(pageDocs.map(mapEventDoc));
+    const authRetryCount = Number(options?.authRetryCount || 0);
+    const loadFallbackPage = async () => {
+      const fallbackLimit = Math.min(FALLBACK_MAX_SCAN, Math.max(pageSize + 1, (page * pageSize) + 1));
+      const fallbackSnapshot = await getDocs(query(
+        collection(db, COLLECTIONS.IMPERSONATION_EVENTS),
+        limit(fallbackLimit)
+      ));
+      const sortedFallbackEvents = fallbackSnapshot.docs
+        .map(mapEventDoc)
+        .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+      const startIndex = Math.max(0, (page - 1) * pageSize);
+      const endIndex = startIndex + pageSize;
+      const moreAvailable = sortedFallbackEvents.length > endIndex;
+      setEvents(sortedFallbackEvents.slice(startIndex, endIndex));
       setCurrentPage(page);
       setHasNextPage(moreAvailable);
-
-      const lastDoc = pageDocs.length > 0 ? pageDocs[pageDocs.length - 1] : null;
       setPageCursors((prev) => {
         const next: Record<number, QueryDocumentSnapshot<DocumentData> | null> = shouldReset
           ? { 1: null }
           : { ...prev };
-        next[page] = cursor;
-        if (moreAvailable && lastDoc) {
-          next[page + 1] = lastDoc;
+        next[page] = null;
+        if (moreAvailable) {
+          next[page + 1] = null;
         } else {
           delete next[page + 1];
         }
         return next;
       });
+    };
+    setLoading(true);
+    setError(null);
+    try {
+      if (usingFallbackPagination) {
+        await loadFallbackPage();
+      } else {
+        const baseQuery = cursor
+          ? query(
+              collection(db, COLLECTIONS.IMPERSONATION_EVENTS),
+              orderBy('createdAt', 'desc'),
+              startAfter(cursor),
+              limit(pageSize + 1)
+            )
+          : query(
+              collection(db, COLLECTIONS.IMPERSONATION_EVENTS),
+              orderBy('createdAt', 'desc'),
+              limit(pageSize + 1)
+            );
+
+        const snapshot = await getDocs(baseQuery);
+        const docs = snapshot.docs;
+        const moreAvailable = docs.length > pageSize;
+        const pageDocs = moreAvailable ? docs.slice(0, pageSize) : docs;
+
+        setEvents(pageDocs.map(mapEventDoc));
+        setCurrentPage(page);
+        setHasNextPage(moreAvailable);
+
+        const lastDoc = pageDocs.length > 0 ? pageDocs[pageDocs.length - 1] : null;
+        setPageCursors((prev) => {
+          const next: Record<number, QueryDocumentSnapshot<DocumentData> | null> = shouldReset
+            ? { 1: null }
+            : { ...prev };
+          next[page] = cursor;
+          if (moreAvailable && lastDoc) {
+            next[page + 1] = lastDoc;
+          } else {
+            delete next[page + 1];
+          }
+          return next;
+        });
+      }
     } catch (err) {
-      reportImpersonationAuditError(err, 'impersonation.audit.load_events');
-      setError('Unable to load impersonation events. Please try again.');
+      let nextError: unknown = err;
+      if (authRetryCount < 1 && isAuthTransientQueryError(nextError)) {
+        try {
+          await auth.currentUser?.getIdToken(true);
+        } catch {
+          // Ignore token refresh errors and surface original query error on retry failure.
+        }
+        try {
+          await new Promise<void>((resolve) => {
+            window.setTimeout(() => resolve(), 200);
+          });
+          if (usingFallbackPagination) {
+            await loadFallbackPage();
+          } else {
+            const retryQuery = cursor
+              ? query(
+                  collection(db, COLLECTIONS.IMPERSONATION_EVENTS),
+                  orderBy('createdAt', 'desc'),
+                  startAfter(cursor),
+                  limit(pageSize + 1)
+                )
+              : query(
+                  collection(db, COLLECTIONS.IMPERSONATION_EVENTS),
+                  orderBy('createdAt', 'desc'),
+                  limit(pageSize + 1)
+                );
+            const retrySnapshot = await getDocs(retryQuery);
+            const retryDocs = retrySnapshot.docs;
+            const moreAvailable = retryDocs.length > pageSize;
+            const pageDocs = moreAvailable ? retryDocs.slice(0, pageSize) : retryDocs;
+            setEvents(pageDocs.map(mapEventDoc));
+            setCurrentPage(page);
+            setHasNextPage(moreAvailable);
+            const lastDoc = pageDocs.length > 0 ? pageDocs[pageDocs.length - 1] : null;
+            setPageCursors((prev) => {
+              const next: Record<number, QueryDocumentSnapshot<DocumentData> | null> = shouldReset
+                ? { 1: null }
+                : { ...prev };
+              next[page] = cursor;
+              if (moreAvailable && lastDoc) {
+                next[page + 1] = lastDoc;
+              } else {
+                delete next[page + 1];
+              }
+              return next;
+            });
+          }
+          return;
+        } catch (retryErr) {
+          nextError = retryErr;
+        }
+      }
+      if (!usingFallbackPagination && isRecoverableOrderedQueryError(nextError)) {
+        try {
+          setUsingFallbackPagination(true);
+          await loadFallbackPage();
+        } catch (fallbackErr) {
+          const fallbackCode = typeof fallbackErr === 'object' && fallbackErr && 'code' in fallbackErr
+            ? String((fallbackErr as FirestoreError).code || '')
+            : '';
+          reportImpersonationAuditError(fallbackErr, 'impersonation.audit.load_events.fallback', { code: fallbackCode });
+          setError('Unable to load impersonation events. Please try again.');
+        }
+      } else {
+        const errorCode = typeof nextError === 'object' && nextError && 'code' in nextError
+          ? String((nextError as FirestoreError).code || '')
+          : '';
+        reportImpersonationAuditError(nextError, 'impersonation.audit.load_events', { code: errorCode });
+        setError('Unable to load impersonation events. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
-  }, [isSuperAdmin, pageSize]);
+  }, [isAuthReadyForAudit, isSuperAdmin, pageSize, reportImpersonationAuditError, usingFallbackPagination]);
 
   useEffect(() => {
     if (!isSuperAdmin) {
@@ -169,11 +301,17 @@ const ImpersonationAudit = () => {
       setLoading(false);
       return;
     }
+    if (!isAuthReadyForAudit) {
+      setLoading(true);
+      setError(null);
+      return;
+    }
     setCurrentPage(1);
     setHasNextPage(false);
+    setUsingFallbackPagination(false);
     setPageCursors({ 1: null });
     void fetchEvents(1, null, { reset: true });
-  }, [fetchEvents, isSuperAdmin, pageSize]);
+  }, [fetchEvents, isAuthReadyForAudit, isSuperAdmin, pageSize]);
 
   const refreshCurrentPage = () => {
     const cursor = pageCursors[currentPage] ?? null;
