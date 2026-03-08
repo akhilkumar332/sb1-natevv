@@ -5,6 +5,7 @@ import { deleteDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { COLLECTIONS } from '../../../constants/firestore';
 import { CMS_STATUS } from '../../../constants/cms';
+import { toHumanCmsStatus } from '../../../constants/cmsHuman';
 import { ROUTES } from '../../../constants/routes';
 import { useAdminCmsBlogPosts } from '../../../hooks/admin/useAdminQueries';
 import { notify } from '../../../services/notify.service';
@@ -108,7 +109,7 @@ export default function CmsBlogPostsPage() {
 
   const removePost = async (id?: string) => {
     if (!id) return;
-    if (!window.confirm('Delete this blog post?')) return;
+    if (!window.confirm('Delete this blog post?\n\nThis permanently removes the post and its summary.')) return;
     setDeletingId(id);
     try {
       await deleteDoc(doc(db, COLLECTIONS.CMS_BLOG_POSTS, id));
@@ -133,7 +134,7 @@ export default function CmsBlogPostsPage() {
       notify.error('Select at least one post.');
       return;
     }
-    if (!window.confirm(`Update ${ids.length} selected posts to "${nextStatus}"?`)) return;
+    if (!window.confirm(`Update ${ids.length} selected posts to "${toHumanCmsStatus(nextStatus)}"?`)) return;
 
     setBulkMutating(true);
     try {
@@ -173,7 +174,7 @@ export default function CmsBlogPostsPage() {
       notify.error('Select at least one post.');
       return;
     }
-    if (!window.confirm(`Delete ${ids.length} selected posts? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete ${ids.length} selected posts?\n\nThis cannot be undone.`)) return;
 
     setBulkMutating(true);
     try {
@@ -197,7 +198,7 @@ export default function CmsBlogPostsPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">CMS Blog Posts</h2>
-            <p className="text-sm text-gray-600">Manage posts and open editor in a dedicated page.</p>
+            <p className="text-sm text-gray-600">Manage articles with a clear publish workflow.</p>
           </div>
           <div className="flex items-center gap-2">
             <Link
@@ -232,7 +233,7 @@ export default function CmsBlogPostsPage() {
           >
             <option value="all">All statuses</option>
             {Object.values(CMS_STATUS).map((status) => (
-              <option key={status} value={status}>{status}</option>
+              <option key={status} value={status}>{toHumanCmsStatus(status)}</option>
             ))}
           </select>
           <select
@@ -313,7 +314,7 @@ export default function CmsBlogPostsPage() {
             disabled={bulkMutating || selectedCount === 0}
             className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-50"
           >
-            Archive Selected
+            Hide Selected
           </button>
           <button
             type="button"
@@ -362,7 +363,7 @@ export default function CmsBlogPostsPage() {
                   <td className="px-4 py-3 font-semibold text-gray-900">{entry.title}</td>
                   <td className="px-4 py-3 text-gray-700">{entry.slug}</td>
                   <td className="px-4 py-3 text-gray-700">{entry.categorySlug || '-'}</td>
-                  <td className="px-4 py-3 text-gray-700">{entry.status}</td>
+                  <td className="px-4 py-3 text-gray-700">{toHumanCmsStatus(entry.status)}</td>
                   <td className="px-4 py-3 text-gray-700">{toDateValue(entry.publishedAt)?.toLocaleString() || '-'}</td>
                   <td className="px-4 py-3 text-right">
                     <Link

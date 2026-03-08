@@ -6,19 +6,7 @@ import { usePublishedBlogPostBySlug, usePublishedBlogPosts, usePublicCmsSettings
 import { toDateValue } from '../utils/dateValue';
 import SeoHead from '../components/SeoHead';
 import { buildArticleSchema, buildBreadcrumbSchema } from '../utils/seoStructuredData';
-
-const renderContent = (contentJson?: string | null) => {
-  if (!contentJson) return ['Content coming soon.'];
-  try {
-    const parsed = JSON.parse(contentJson) as { blocks?: Array<{ text?: string }> };
-    if (!Array.isArray(parsed.blocks)) return [contentJson];
-    return parsed.blocks
-      .map((block) => (typeof block?.text === 'string' ? block.text : ''))
-      .filter(Boolean);
-  } catch {
-    return [contentJson];
-  }
-};
+import { parseCmsRichContent } from '../utils/cmsRichContent';
 
 export default function BlogPostPage() {
   const { slug = '' } = useParams();
@@ -81,8 +69,8 @@ export default function BlogPostPage() {
     );
   }
 
-  const paragraphs = renderContent(post.contentJson);
-  const wordCount = paragraphs.join(' ').split(/\s+/).filter(Boolean).length;
+  const renderedContent = parseCmsRichContent(post.contentJson);
+  const wordCount = renderedContent.plainText.split(/\s+/).filter(Boolean).length;
   const readingMinutes = Math.max(1, Math.ceil(wordCount / 220));
   const publishedAt = toDateValue(post.publishedAt);
   const canonicalUrl = post.seoCanonicalUrl || undefined;
@@ -170,9 +158,16 @@ export default function BlogPostPage() {
           {post.coverImageUrl ? (
             <img src={post.coverImageUrl} alt={post.title} className="mb-6 h-auto w-full rounded-xl object-cover" loading="lazy" />
           ) : null}
-          <div className="space-y-4 text-base leading-7 text-gray-700">
-            {paragraphs.map((line, index) => <p key={`line-${index}`}>{line}</p>)}
-          </div>
+          {renderedContent.html ? (
+            <div
+              className="text-base leading-7 text-gray-700 [&_a]:text-blue-700 [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-red-200 [&_blockquote]:pl-3 [&_h2]:mt-6 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:mt-5 [&_h3]:text-xl [&_h3]:font-semibold [&_li]:mb-1 [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mb-4 [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6"
+              dangerouslySetInnerHTML={{ __html: renderedContent.html }}
+            />
+          ) : (
+            <div className="space-y-4 text-base leading-7 text-gray-700">
+              <p>Content coming soon.</p>
+            </div>
+          )}
           <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
             <span className="text-sm font-semibold text-gray-700">Share:</span>
             <a href={`https://twitter.com/intent/tweet?text=${shareText}&url=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noreferrer" className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">X</a>

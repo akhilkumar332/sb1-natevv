@@ -79,6 +79,14 @@ const formatRefreshAgo = (value: number | null, now: number) => {
   return `${Math.floor(diff / HOUR_MS)}h ago`;
 };
 
+const isNavigatorOnline = () => (
+  typeof navigator === 'undefined' ? true : navigator.onLine
+);
+
+const isDocumentVisible = () => (
+  typeof document === 'undefined' ? true : document.visibilityState === 'visible'
+);
+
 const percentile = (values: number[], p: number) => {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -170,7 +178,7 @@ function AdminOfflineSyncHealthPage() {
 
   const localStorageUsage = useMemo(
     () => getLocalStorageUsage(),
-    [telemetry.pendingCount, telemetry.recentEvents.length, telemetry.healthPersistRuns, deadLetters.length, storageProbeTick],
+    [storageProbeTick],
   );
 
   const avgAttempts = pendingItems.length > 0
@@ -251,8 +259,10 @@ function AdminOfflineSyncHealthPage() {
   const handleRefresh = async () => {
     if (refreshing || syncing) return;
     setRefreshing(true);
+    let refreshSucceeded = false;
     try {
       await syncNow();
+      refreshSucceeded = true;
     } catch (error) {
       void captureHandledError(error, {
         source: 'frontend',
@@ -263,8 +273,10 @@ function AdminOfflineSyncHealthPage() {
       });
     } finally {
       if (mountedRef.current) {
-        setStorageProbeTick((tick) => tick + 1);
-        setLastRefreshedAt(Date.now());
+        if (refreshSucceeded) {
+          setStorageProbeTick((tick) => tick + 1);
+          setLastRefreshedAt(Date.now());
+        }
         setRefreshing(false);
       }
     }
@@ -283,7 +295,7 @@ function AdminOfflineSyncHealthPage() {
   );
 
   const queueTypeRows = useMemo(
-    () => Object.entries(telemetry.pendingByType || {}),
+    () => Object.entries(telemetry.pendingByType || {}).sort((a, b) => b[1] - a[1]),
     [telemetry.pendingByType],
   );
 
@@ -341,12 +353,14 @@ function AdminOfflineSyncHealthPage() {
     if (typeof window === 'undefined') return undefined;
     let cancelled = false;
     const timer = window.setInterval(() => {
-      if (!navigator.onLine) return;
-      if (document.visibilityState !== 'visible') return;
+      if (!isNavigatorOnline()) return;
+      if (!isDocumentVisible()) return;
       if (refreshing || syncing) return;
       void (async () => {
+        let refreshSucceeded = false;
         try {
           await syncNow();
+          refreshSucceeded = true;
         } catch (error) {
           void captureHandledError(error, {
             source: 'frontend',
@@ -357,8 +371,10 @@ function AdminOfflineSyncHealthPage() {
           });
         }
         if (!cancelled) {
-          setStorageProbeTick((tick) => tick + 1);
-          setLastRefreshedAt(Date.now());
+          if (refreshSucceeded) {
+            setStorageProbeTick((tick) => tick + 1);
+            setLastRefreshedAt(Date.now());
+          }
         }
       })();
     }, 15000);
@@ -371,9 +387,20 @@ function AdminOfflineSyncHealthPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const tick = window.setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
+      if (!isDocumentVisible()) return;
       setRefreshNowTs(Date.now());
     }, 1000);
+    return () => {
+      window.clearInterval(tick);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const tick = window.setInterval(() => {
+      if (!isDocumentVisible()) return;
+      setStorageProbeTick((current) => current + 1);
+    }, 30000);
     return () => {
       window.clearInterval(tick);
     };

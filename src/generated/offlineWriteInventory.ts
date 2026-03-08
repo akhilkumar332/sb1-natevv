@@ -324,63 +324,53 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:556",
+    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:562",
     "method": "setDoc",
     "collectionKey": "CMS_BLOG_POST_SUMMARIES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
-    "line": 556,
+    "line": 562,
     "area": "CMS_BLOG_POST_SUMMARIES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:557",
+    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:563",
     "method": "setDoc",
     "collectionKey": "CMS_BLOG_POST_SUMMARIES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
-    "line": 557,
+    "line": 563,
     "area": "CMS_BLOG_POST_SUMMARIES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_BLOG_POSTS.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:564",
+    "id": "CMS_BLOG_POSTS.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:570",
     "method": "setDoc",
     "collectionKey": "CMS_BLOG_POSTS",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
-    "line": 564,
+    "line": 570,
     "area": "CMS_BLOG_POSTS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_BLOG_POSTS.deleteDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:565",
+    "id": "CMS_BLOG_POSTS.deleteDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:571",
     "method": "deleteDoc",
     "collectionKey": "CMS_BLOG_POSTS",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
-    "line": 565,
+    "line": 571,
     "area": "CMS_BLOG_POSTS deleteDoc",
     "mode": "online_only"
   },
   {
-    "id": "CMS_BLOG_POST_SUMMARIES.deleteDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:566",
+    "id": "CMS_BLOG_POST_SUMMARIES.deleteDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:572",
     "method": "deleteDoc",
     "collectionKey": "CMS_BLOG_POST_SUMMARIES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
-    "line": 566,
+    "line": 572,
     "area": "CMS_BLOG_POST_SUMMARIES deleteDoc",
-    "mode": "online_only"
-  },
-  {
-    "id": "CMS_BLOG_POSTS.deleteDoc.pages/admin/dashboard/CmsBlogPosts.tsx:114",
-    "method": "deleteDoc",
-    "collectionKey": "CMS_BLOG_POSTS",
-    "module": "pages/admin",
-    "path": "pages/admin/dashboard/CmsBlogPosts.tsx",
-    "line": 114,
-    "area": "CMS_BLOG_POSTS deleteDoc",
     "mode": "online_only"
   },
   {
@@ -394,34 +384,34 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "CMS_BLOG_POSTS.setDoc.pages/admin/dashboard/CmsBlogPosts.tsx:144",
-    "method": "setDoc",
-    "collectionKey": "CMS_BLOG_POSTS",
-    "module": "pages/admin",
-    "path": "pages/admin/dashboard/CmsBlogPosts.tsx",
-    "line": 144,
-    "area": "CMS_BLOG_POSTS setDoc",
-    "mode": "queue_safe"
-  },
-  {
-    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsBlogPosts.tsx:150",
-    "method": "setDoc",
-    "collectionKey": "CMS_BLOG_POST_SUMMARIES",
-    "module": "pages/admin",
-    "path": "pages/admin/dashboard/CmsBlogPosts.tsx",
-    "line": 150,
-    "area": "CMS_BLOG_POST_SUMMARIES setDoc",
-    "mode": "queue_safe"
-  },
-  {
-    "id": "CMS_BLOG_POSTS.deleteDoc.pages/admin/dashboard/CmsBlogPosts.tsx:181",
+    "id": "CMS_BLOG_POSTS.deleteDoc.pages/admin/dashboard/CmsBlogPosts.tsx:116",
     "method": "deleteDoc",
     "collectionKey": "CMS_BLOG_POSTS",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPosts.tsx",
-    "line": 181,
+    "line": 116,
     "area": "CMS_BLOG_POSTS deleteDoc",
     "mode": "online_only"
+  },
+  {
+    "id": "CMS_BLOG_POSTS.setDoc.pages/admin/dashboard/CmsBlogPosts.tsx:145",
+    "method": "setDoc",
+    "collectionKey": "CMS_BLOG_POSTS",
+    "module": "pages/admin",
+    "path": "pages/admin/dashboard/CmsBlogPosts.tsx",
+    "line": 145,
+    "area": "CMS_BLOG_POSTS setDoc",
+    "mode": "queue_safe"
+  },
+  {
+    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsBlogPosts.tsx:151",
+    "method": "setDoc",
+    "collectionKey": "CMS_BLOG_POST_SUMMARIES",
+    "module": "pages/admin",
+    "path": "pages/admin/dashboard/CmsBlogPosts.tsx",
+    "line": 151,
+    "area": "CMS_BLOG_POST_SUMMARIES setDoc",
+    "mode": "queue_safe"
   },
   {
     "id": "CMS_BLOG_POSTS.deleteDoc.pages/admin/dashboard/CmsBlogPosts.tsx:182",
@@ -434,72 +424,82 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "CMS_BLOG_CATEGORIES.deleteDoc.pages/admin/dashboard/CmsCategories.tsx:26",
+    "id": "CMS_BLOG_POSTS.deleteDoc.pages/admin/dashboard/CmsBlogPosts.tsx:183",
+    "method": "deleteDoc",
+    "collectionKey": "CMS_BLOG_POSTS",
+    "module": "pages/admin",
+    "path": "pages/admin/dashboard/CmsBlogPosts.tsx",
+    "line": 183,
+    "area": "CMS_BLOG_POSTS deleteDoc",
+    "mode": "online_only"
+  },
+  {
+    "id": "CMS_BLOG_CATEGORIES.deleteDoc.pages/admin/dashboard/CmsCategories.tsx:27",
     "method": "deleteDoc",
     "collectionKey": "CMS_BLOG_CATEGORIES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsCategories.tsx",
-    "line": 26,
+    "line": 27,
     "area": "CMS_BLOG_CATEGORIES deleteDoc",
     "mode": "online_only"
   },
   {
-    "id": "CMS_BLO.setDoc.pages/admin/dashboard/CmsCategoryEditor.tsx:98",
+    "id": "CMS_BLO.setDoc.pages/admin/dashboard/CmsCategoryEditor.tsx:99",
     "method": "setDoc",
     "collectionKey": "CMS_BLO",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsCategoryEditor.tsx",
-    "line": 98,
+    "line": 99,
     "area": "CMS_BLO setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_BLOG_CATEGORIES.setDoc.pages/admin/dashboard/CmsCategoryEditor.tsx:112",
+    "id": "CMS_BLOG_CATEGORIES.setDoc.pages/admin/dashboard/CmsCategoryEditor.tsx:113",
     "method": "setDoc",
     "collectionKey": "CMS_BLOG_CATEGORIES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsCategoryEditor.tsx",
-    "line": 112,
+    "line": 113,
     "area": "CMS_BLOG_CATEGORIES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_BLOG_CATEGORIES.deleteDoc.pages/admin/dashboard/CmsCategoryEditor.tsx:123",
+    "id": "CMS_BLOG_CATEGORIES.deleteDoc.pages/admin/dashboard/CmsCategoryEditor.tsx:124",
     "method": "deleteDoc",
     "collectionKey": "CMS_BLOG_CATEGORIES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsCategoryEditor.tsx",
-    "line": 123,
+    "line": 124,
     "area": "CMS_BLOG_CATEGORIES deleteDoc",
     "mode": "online_only"
   },
   {
-    "id": "CMS_MEDIA.addDoc.pages/admin/dashboard/CmsMedia.tsx:95",
+    "id": "CMS_MEDIA.addDoc.pages/admin/dashboard/CmsMedia.tsx:96",
     "method": "addDoc",
     "collectionKey": "CMS_MEDIA",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsMedia.tsx",
-    "line": 95,
+    "line": 96,
     "area": "CMS_MEDIA addDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_MEDIA.deleteDoc.pages/admin/dashboard/CmsMedia.tsx:128",
+    "id": "CMS_MEDIA.deleteDoc.pages/admin/dashboard/CmsMedia.tsx:129",
     "method": "deleteDoc",
     "collectionKey": "CMS_MEDIA",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsMedia.tsx",
-    "line": 128,
+    "line": 129,
     "area": "CMS_MEDIA deleteDoc",
     "mode": "online_only"
   },
   {
-    "id": "CMS_NAV_MENUS.setDoc.pages/admin/dashboard/CmsMenuEditor.tsx:177",
+    "id": "CMS_NAV_MENUS.setDoc.pages/admin/dashboard/CmsMenuEditor.tsx:178",
     "method": "setDoc",
     "collectionKey": "CMS_NAV_MENUS",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsMenuEditor.tsx",
-    "line": 177,
+    "line": 178,
     "area": "CMS_NAV_MENUS setDoc",
     "mode": "queue_safe"
   },
@@ -534,72 +534,72 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPageEditor.tsx:713",
+    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPageEditor.tsx:714",
     "method": "setDoc",
     "collectionKey": "CMS_PAGES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsPageEditor.tsx",
-    "line": 713,
+    "line": 714,
     "area": "CMS_PAGES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPageEditor.tsx:745",
+    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPageEditor.tsx:746",
     "method": "setDoc",
     "collectionKey": "CMS_PAGES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsPageEditor.tsx",
-    "line": 745,
+    "line": 746,
     "area": "CMS_PAGES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_PAGES.deleteDoc.pages/admin/dashboard/CmsPageEditor.tsx:774",
+    "id": "CMS_PAGES.deleteDoc.pages/admin/dashboard/CmsPageEditor.tsx:775",
     "method": "deleteDoc",
     "collectionKey": "CMS_PAGES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsPageEditor.tsx",
-    "line": 774,
+    "line": 775,
     "area": "CMS_PAGES deleteDoc",
     "mode": "online_only"
   },
   {
-    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPages.tsx:65",
+    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPages.tsx:66",
     "method": "setDoc",
     "collectionKey": "CMS_PAGES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsPages.tsx",
-    "line": 65,
+    "line": 66,
     "area": "CMS_PAGES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPages.tsx:69",
+    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPages.tsx:70",
     "method": "setDoc",
-    "collectionKey": "CMS_PAGES",
-    "module": "pages/admin",
-    "path": "pages/admin/dashboard/CmsPages.tsx",
-    "line": 69,
-    "area": "CMS_PAGES setDoc",
-    "mode": "queue_safe"
-  },
-  {
-    "id": "CMS_PAGES.deleteDoc.pages/admin/dashboard/CmsPages.tsx:70",
-    "method": "deleteDoc",
     "collectionKey": "CMS_PAGES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsPages.tsx",
     "line": 70,
-    "area": "CMS_PAGES deleteDoc",
-    "mode": "online_only"
+    "area": "CMS_PAGES setDoc",
+    "mode": "queue_safe"
   },
   {
-    "id": "CMS_PAGES.deleteDoc.pages/admin/dashboard/CmsPages.tsx:99",
+    "id": "CMS_PAGES.deleteDoc.pages/admin/dashboard/CmsPages.tsx:71",
     "method": "deleteDoc",
     "collectionKey": "CMS_PAGES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsPages.tsx",
-    "line": 99,
+    "line": 71,
+    "area": "CMS_PAGES deleteDoc",
+    "mode": "online_only"
+  },
+  {
+    "id": "CMS_PAGES.deleteDoc.pages/admin/dashboard/CmsPages.tsx:100",
+    "method": "deleteDoc",
+    "collectionKey": "CMS_PAGES",
+    "module": "pages/admin",
+    "path": "pages/admin/dashboard/CmsPages.tsx",
+    "line": 100,
     "area": "CMS_PAGES deleteDoc",
     "mode": "online_only"
   },

@@ -11,6 +11,7 @@ import { getServerTimestamp } from '../../../utils/firestore.utils';
 import { notify } from '../../../services/notify.service';
 import { useAuth } from '../../../contexts/AuthContext';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
+import { toHumanCmsStatus } from '../../../constants/cmsHuman';
 
 const statusOptions = Object.values(CMS_STATUS);
 
@@ -143,7 +144,7 @@ export default function CmsCategoryEditorPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">CMS Category Editor</h2>
-            <p className="text-sm text-gray-600">Edit category metadata in a dedicated editor view.</p>
+            <p className="text-sm text-gray-600">Edit category details in simple, human-friendly fields.</p>
           </div>
           <Link
             to={ROUTES.portal.admin.dashboard.cmsCategories}
@@ -161,7 +162,7 @@ export default function CmsCategoryEditorPage() {
         <div className="flex items-center gap-2">
           <input value={colorHex} onChange={(event) => setColorHex(event.target.value)} placeholder="#dc2626" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
           <select value={status} onChange={(event) => setStatus(event.target.value as (typeof statusOptions)[number])} className="rounded-xl border border-gray-300 px-3 py-2 text-sm">
-            {statusOptions.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
+            {statusOptions.map((entry) => <option key={entry} value={entry}>{toHumanCmsStatus(entry)}</option>)}
           </select>
         </div>
         <div className="md:col-span-2 flex gap-2">

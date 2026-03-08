@@ -4,19 +4,7 @@ import { ROUTES } from '../constants/routes';
 import { usePublicCmsSettings, usePublishedCmsPageBySlug } from '../hooks/useCmsContent';
 import SeoHead from '../components/SeoHead';
 import { buildBreadcrumbSchema, buildWebPageSchema } from '../utils/seoStructuredData';
-
-const renderContent = (contentJson?: string | null) => {
-  if (!contentJson) return ['No content available.'];
-  try {
-    const parsed = JSON.parse(contentJson) as { blocks?: Array<{ text?: string }> };
-    if (!Array.isArray(parsed.blocks)) return [contentJson];
-    return parsed.blocks
-      .map((block) => (typeof block?.text === 'string' ? block.text : ''))
-      .filter(Boolean);
-  } catch {
-    return [contentJson];
-  }
-};
+import { parseCmsRichContent } from '../utils/cmsRichContent';
 
 export default function CmsPageRenderer() {
   const { slug = '' } = useParams();
@@ -71,7 +59,7 @@ export default function CmsPageRenderer() {
   }
 
   const page = pageQuery.data;
-  const paragraphs = renderContent(page.contentJson);
+  const renderedContent = parseCmsRichContent(page.contentJson);
   const breadcrumbSchema = buildBreadcrumbSchema({
     baseUrl: canonicalBaseUrl,
     items: [
@@ -108,9 +96,16 @@ export default function CmsPageRenderer() {
           <div className="mx-auto max-w-3xl rounded-2xl border border-red-100 bg-white p-6 shadow-sm sm:p-8">
             <h1 className="text-3xl font-extrabold text-gray-900">{page.title}</h1>
             {page.excerpt ? <p className="mt-3 text-sm text-gray-600">{page.excerpt}</p> : null}
-            <div className="mt-6 space-y-4 text-base leading-7 text-gray-700">
-              {paragraphs.map((line, index) => <p key={`line-${index}`}>{line}</p>)}
-            </div>
+            {renderedContent.html ? (
+              <div
+                className="mt-6 text-base leading-7 text-gray-700 [&_a]:text-blue-700 [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-red-200 [&_blockquote]:pl-3 [&_h2]:mt-6 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:mt-5 [&_h3]:text-xl [&_h3]:font-semibold [&_li]:mb-1 [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:mb-4 [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6"
+                dangerouslySetInnerHTML={{ __html: renderedContent.html }}
+              />
+            ) : (
+              <div className="mt-6 space-y-4 text-base leading-7 text-gray-700">
+                <p>No content available.</p>
+              </div>
+            )}
           </div>
         </div>
       </section>

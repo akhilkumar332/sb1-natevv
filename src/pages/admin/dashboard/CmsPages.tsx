@@ -7,6 +7,7 @@ import { COLLECTIONS } from '../../../constants/firestore';
 import { CMS_FRONTEND_PAGE_PRESETS, CMS_LIMITS, CMS_STATUS, getCmsPageDocId } from '../../../constants/cms';
 import { CMS_FRONTEND_PAGE_DEFAULT_CONTENT } from '../../../constants/cmsPageDefaults';
 import { ROUTES } from '../../../constants/routes';
+import { toHumanCmsStatus } from '../../../constants/cmsHuman';
 import { useAdminCmsPages } from '../../../hooks/admin/useAdminQueries';
 import { getServerTimestamp } from '../../../utils/firestore.utils';
 import { notify } from '../../../services/notify.service';
@@ -93,7 +94,7 @@ export default function CmsPagesPage() {
 
   const removePage = async (id?: string) => {
     if (!id) return;
-    if (!window.confirm('Delete this CMS page?')) return;
+    if (!window.confirm('Delete this page from CMS?\n\nThis removes the page configuration and cannot be undone.')) return;
     setDeletingId(id);
     try {
       await deleteDoc(doc(db, COLLECTIONS.CMS_PAGES, id));
@@ -112,7 +113,7 @@ export default function CmsPagesPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">CMS Pages</h2>
-            <p className="text-sm text-gray-600">Manage existing frontend pages and open editor in a separate page.</p>
+            <p className="text-sm text-gray-600">Manage website pages in a human-friendly workflow.</p>
           </div>
           <div className="flex items-center gap-2">
             <Link
@@ -150,7 +151,7 @@ export default function CmsPagesPage() {
                   <div className="text-sm font-semibold text-gray-900">{preset.label}</div>
                   <div className="text-xs text-gray-500">{preset.path}</div>
                   <div className="mt-1 text-[11px] font-semibold text-red-700">
-                    {existing ? `CMS: ${existing.status}` : 'CMS: not created'}
+                    {existing ? `CMS: ${toHumanCmsStatus(existing.status)}` : 'CMS: Not created yet'}
                   </div>
                 </Link>
                 <button
@@ -185,7 +186,7 @@ export default function CmsPagesPage() {
                   <td className="px-4 py-3 font-semibold text-gray-900">{entry.title}</td>
                   <td className="px-4 py-3 text-gray-700">{entry.slug}</td>
                   <td className="px-4 py-3 text-gray-700">{entry.kind}</td>
-                  <td className="px-4 py-3 text-gray-700">{entry.status}</td>
+                  <td className="px-4 py-3 text-gray-700">{toHumanCmsStatus(entry.status)}</td>
                   <td className="px-4 py-3 text-right">
                     {CMS_FRONTEND_PAGE_PRESETS.some((preset) => preset.slug === entry.slug) ? (
                       <Link

@@ -4,6 +4,7 @@ import { addDoc, collection, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { COLLECTIONS } from '../../../constants/firestore';
 import { CMS_STATUS } from '../../../constants/cms';
+import { toHumanCmsStatus } from '../../../constants/cmsHuman';
 import { useAdminCmsBlogPosts, useAdminCmsMedia, useAdminCmsPages } from '../../../hooks/admin/useAdminQueries';
 import { getServerTimestamp } from '../../../utils/firestore.utils';
 import { notify } from '../../../services/notify.service';
@@ -123,7 +124,7 @@ export default function CmsMediaPage() {
       notify.error(`This media is used ${usageCount} time(s) in pages/posts. Remove references before deleting.`);
       return;
     }
-    if (!window.confirm('Delete this media entry?')) return;
+    if (!window.confirm('Delete this media entry?\n\nMake sure no content relies on it before continuing.')) return;
     try {
       await deleteDoc(doc(db, COLLECTIONS.CMS_MEDIA, id));
       await invalidateAdminRecipe(queryClient, 'cmsUpdated');
@@ -139,7 +140,7 @@ export default function CmsMediaPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">CMS Media</h2>
-            <p className="text-sm text-gray-600">Manage media metadata references used by CMS content.</p>
+            <p className="text-sm text-gray-600">Manage media records used across pages and posts.</p>
           </div>
           <AdminRefreshButton onClick={() => refetchQuery(mediaQuery)} isRefreshing={mediaQuery.isFetching} label="Refresh media" />
         </div>
@@ -150,7 +151,7 @@ export default function CmsMediaPage() {
         <input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
         <input value={altText} onChange={(event) => setAltText(event.target.value)} placeholder="Alt text" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
         <select value={status} onChange={(event) => setStatus(event.target.value as (typeof statusOptions)[number])} className="rounded-xl border border-gray-300 px-3 py-2 text-sm">
-          {statusOptions.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
+          {statusOptions.map((entry) => <option key={entry} value={entry}>{toHumanCmsStatus(entry)}</option>)}
         </select>
         <button type="button" onClick={() => void saveMedia()} disabled={saving} className="rounded-lg border border-red-600 bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 md:col-span-2">
           {saving ? 'Saving...' : 'Save Media'}
@@ -174,7 +175,7 @@ export default function CmsMediaPage() {
                 <tr key={entry.id}>
                   <td className="px-4 py-3 font-semibold text-gray-900">{entry.name}</td>
                   <td className="px-4 py-3 text-gray-700 max-w-[340px] truncate">{entry.url}</td>
-                  <td className="px-4 py-3 text-gray-700">{entry.status}</td>
+                  <td className="px-4 py-3 text-gray-700">{toHumanCmsStatus(entry.status)}</td>
                   <td className="px-4 py-3 text-gray-700">{usageByUrl.get(normalizeMediaUrlKey(entry.url)) || 0}</td>
                   <td className="px-4 py-3 text-right">
                     <button type="button" onClick={() => void removeMedia(entry.id)} className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">Delete</button>

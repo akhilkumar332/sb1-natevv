@@ -24,9 +24,12 @@ import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { runSeoAudit } from '../../../utils/seoAudit';
 import { toDateValue } from '../../../utils/dateValue';
 import SeoSnippetPreview from '../../../components/cms/SeoSnippetPreview';
+import CmsRichTextEditor from '../../../components/cms/CmsRichTextEditor';
 import { toCmsBlogSummaryPayload } from '../../../utils/cmsBlogSummary';
 import { isAbsoluteHttpUrl, isMediaUrlOrPath, validateScheduleWindow } from '../../../utils/cmsValidation';
 import { recordCmsOperationFailure } from '../../../services/cmsDiagnostics.service';
+import { toHumanCmsStatus } from '../../../constants/cmsHuman';
+import { appendInternalLinkToCmsRichContent, extractCmsPlainText, parseCmsRichContent, serializeCmsRichContent } from '../../../utils/cmsRichContent';
 
 const statusOptions = Object.values(CMS_STATUS);
 const toDateTimeLocalValue = (value: unknown): string => {
@@ -93,6 +96,7 @@ export default function CmsBlogPostEditorPage() {
   const [featuredUntil, setFeaturedUntil] = useState('');
   const [restoreDraftPayload, setRestoreDraftPayload] = useState<Record<string, unknown> | null>(null);
   const [activeTab, setActiveTab] = useState<EditorTab>('content');
+  const [articleSourceMode, setArticleSourceMode] = useState(false);
   const [showAdvancedSeo, setShowAdvancedSeo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [initializedFor, setInitializedFor] = useState<string | null>(null);
@@ -118,12 +122,14 @@ export default function CmsBlogPostEditorPage() {
   const excerptLen = excerpt.trim().length;
   const seoTitleLen = (seoTitle.trim() || title.trim()).length;
   const seoDescLen = (seoDescription.trim() || excerpt.trim()).length;
+  const parsedArticleContent = useMemo(() => parseCmsRichContent(contentJson), [contentJson]);
+  const articlePlainText = useMemo(() => extractCmsPlainText(contentJson), [contentJson]);
 
   const publishChecks = useMemo(() => {
     const critical = [
       { id: 'title', label: 'Post title is set', passed: Boolean(title.trim()) },
       { id: 'slug', label: 'Post slug is valid', passed: Boolean(toCmsSlug(slug || title)) },
-      { id: 'content', label: 'Post content is present', passed: Boolean(contentJson.trim()) },
+      { id: 'content', label: 'Post content is present', passed: Boolean(articlePlainText.trim()) },
     ];
     const warnings = [
       { id: 'excerpt', label: 'Summary (excerpt) is added', passed: Boolean(excerpt.trim()) },
@@ -140,7 +146,7 @@ export default function CmsBlogPostEditorPage() {
       },
     ];
     return { critical, warnings };
-  }, [title, slug, contentJson, excerpt, coverImageUrl, seoTitleLen, seoDescLen]);
+  }, [title, slug, articlePlainText, excerpt, coverImageUrl, seoTitleLen, seoDescLen]);
 
   const canPublish = publishChecks.critical.every((entry) => entry.passed);
 
@@ -262,7 +268,7 @@ export default function CmsBlogPostEditorPage() {
     [relatedPostSlugsInput]
   );
   const readability = useMemo(() => {
-    const text = `${excerpt}\n${contentJson}`.replace(/\s+/g, ' ').trim();
+    const text = `${excerpt}\n${articlePlainText}`.replace(/\s+/g, ' ').trim();
     const words = text ? text.split(' ').filter(Boolean).length : 0;
     const sentences = Math.max(1, (text.match(/[.!?]+/g) || []).length);
     const syllables = (text.toLowerCase().match(/[aeiouy]{1,2}/g) || []).length;
@@ -273,7 +279,7 @@ export default function CmsBlogPostEditorPage() {
     const rounded = Number.isFinite(flesch) ? Math.round(flesch) : 0;
     const level = rounded >= 60 ? 'Easy' : rounded >= 30 ? 'Moderate' : 'Hard';
     return { words, sentences, readingMinutes, score: rounded, level };
-  }, [excerpt, contentJson]);
+  }, [excerpt, articlePlainText]);
   const canonicalConflictCount = useMemo(() => {
     const canonical = seoCanonicalUrl.trim().toLowerCase();
     if (!canonical) return 0;
@@ -486,7 +492,7 @@ export default function CmsBlogPostEditorPage() {
         && latestUpdatedAtMs > loadedUpdatedAtRef.current
       ) {
         const shouldOverwrite = typeof window !== 'undefined'
-          ? window.confirm('This post was updated by someone else after you loaded it. Continue and overwrite with your version?')
+          ? window.confirm('This post was updated after you opened it. Continue and replace with your current version?')
           : false;
         if (!shouldOverwrite) {
           notify.error('Save cancelled to avoid overwriting a newer version.');
@@ -755,7 +761,33 @@ export default function CmsBlogPostEditorPage() {
             </label>
             <label className="block md:col-span-2">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Article Content</span>
-              <textarea value={contentJson} onChange={(event) => { setContentJson(event.target.value); setIsDirty(true); }} rows={10} placeholder="Write your article content here..." className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+              <div className="mb-2 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={() => setArticleSourceMode((prev) => !prev)}
+                  className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  {articleSourceMode ? 'Use Visual Editor' : 'Use Source JSON'}
+                </button>
+              </div>
+              {articleSourceMode ? (
+                <textarea
+                  value={contentJson}
+                  onChange={(event) => { setContentJson(event.target.value); setIsDirty(true); }}
+                  rows={10}
+                  placeholder="Edit raw content JSON"
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 font-mono text-xs"
+                />
+              ) : (
+                <CmsRichTextEditor
+                  value={parsedArticleContent.html}
+                  onChange={(nextHtml) => {
+                    setContentJson(serializeCmsRichContent(nextHtml));
+                    setIsDirty(true);
+                  }}
+                  placeholder="Write your article content here..."
+                />
+              )}
             </label>
             <label className="block md:col-span-2">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Tags</span>
@@ -783,8 +815,12 @@ export default function CmsBlogPostEditorPage() {
                       key={`${entry.source}-${entry.path}`}
                       type="button"
                       onClick={() => {
-                        const snippet = `[${entry.label}](${entry.path})`;
-                        setContentJson((prev) => `${prev.trim()}\n\n${snippet}`.trim());
+                        if (articleSourceMode) {
+                          const snippet = `[${entry.label}](${entry.path})`;
+                          setContentJson((prev) => `${prev.trim()}\n\n${snippet}`.trim());
+                        } else {
+                          setContentJson((prev) => appendInternalLinkToCmsRichContent(prev, entry.label, entry.path));
+                        }
                         setIsDirty(true);
                       }}
                       className="rounded-md border border-blue-200 bg-white px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100"
@@ -950,7 +986,7 @@ export default function CmsBlogPostEditorPage() {
             <label className="block">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Status</span>
               <select value={status} onChange={(event) => { setStatus(event.target.value as (typeof statusOptions)[number]); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm">
-                {statusOptions.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
+                {statusOptions.map((entry) => <option key={entry} value={entry}>{toHumanCmsStatus(entry)}</option>)}
               </select>
             </label>
             <label className="block">
@@ -980,14 +1016,14 @@ export default function CmsBlogPostEditorPage() {
               <textarea value={reviewNotes} onChange={(event) => { setReviewNotes(event.target.value); setIsDirty(true); }} rows={3} placeholder="Context for reviewers and publishers" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
             </label>
             <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Revision History (Local)</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Saved Versions (Local)</p>
               {revisionHistory.length ? (
                 <div className="mt-2 space-y-2">
                   {revisionHistory.map((entry, index) => (
                     <div key={`${entry.savedAt}-${index}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
                       <div className="text-xs text-gray-600">
                         <p className="font-semibold text-gray-900">{entry.title}</p>
-                        <p>{new Date(entry.savedAt).toLocaleString()} · {entry.status}</p>
+                        <p>{new Date(entry.savedAt).toLocaleString()} · {toHumanCmsStatus(entry.status)}</p>
                       </div>
                       <button
                         type="button"

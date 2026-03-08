@@ -12,6 +12,7 @@ import { notify } from '../../../services/notify.service';
 import { useAuth } from '../../../contexts/AuthContext';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { toDateValue } from '../../../utils/dateValue';
+import { toHumanCmsStatus } from '../../../constants/cmsHuman';
 
 type MenuStatus = 'published' | 'draft';
 
@@ -207,7 +208,7 @@ export default function CmsMenuEditorPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">CMS Menu Editor</h2>
-            <p className="text-sm text-gray-600">Visual menu editing with optional developer JSON mode.</p>
+            <p className="text-sm text-gray-600">Edit navigation using simple labels and destinations.</p>
           </div>
           <Link
             to={ROUTES.portal.admin.dashboard.cmsMenus}
@@ -234,8 +235,8 @@ export default function CmsMenuEditorPage() {
             {locationOptions.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
           </select>
           <select value={status} onChange={(event) => { setStatus(event.target.value as MenuStatus); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm">
-            <option value="published">published</option>
-            <option value="draft">draft</option>
+            <option value="published">{toHumanCmsStatus('published')}</option>
+            <option value="draft">{toHumanCmsStatus('draft')}</option>
           </select>
         </div>
 
@@ -279,7 +280,7 @@ export default function CmsMenuEditorPage() {
                 setDeveloperMode(next);
               }}
             />
-            Developer Mode JSON
+            Advanced JSON mode
           </label>
         ) : null}
 

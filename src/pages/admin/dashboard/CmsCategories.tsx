@@ -10,6 +10,7 @@ import { notify } from '../../../services/notify.service';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { refetchQuery } from '../../../utils/queryRefetch';
+import { toHumanCmsStatus } from '../../../constants/cmsHuman';
 
 export default function CmsCategoriesPage() {
   const queryClient = useQueryClient();
@@ -20,7 +21,7 @@ export default function CmsCategoriesPage() {
 
   const removeCategory = async (id?: string) => {
     if (!id) return;
-    if (!window.confirm('Delete this category?')) return;
+    if (!window.confirm('Delete this category?\n\nPosts using this category may need reassignment.')) return;
     setDeletingId(id);
     try {
       await deleteDoc(doc(db, COLLECTIONS.CMS_BLOG_CATEGORIES, id));
@@ -39,7 +40,7 @@ export default function CmsCategoriesPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">CMS Categories</h2>
-            <p className="text-sm text-gray-600">Manage categories and open editor in a dedicated page.</p>
+            <p className="text-sm text-gray-600">Manage content categories in one place.</p>
           </div>
           <div className="flex items-center gap-2">
             <Link
@@ -70,7 +71,7 @@ export default function CmsCategoriesPage() {
                 <tr key={entry.id}>
                   <td className="px-4 py-3 font-semibold text-gray-900">{entry.name}</td>
                   <td className="px-4 py-3 text-gray-700">{entry.slug}</td>
-                  <td className="px-4 py-3 text-gray-700">{entry.status}</td>
+                  <td className="px-4 py-3 text-gray-700">{toHumanCmsStatus(entry.status)}</td>
                   <td className="px-4 py-3 text-gray-700">{entry.colorHex || '-'}</td>
                   <td className="px-4 py-3 text-right">
                     <Link

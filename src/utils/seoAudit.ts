@@ -1,4 +1,5 @@
 import { CMS_SEO_GUIDELINES } from '../constants/cms';
+import { extractCmsPlainText } from './cmsRichContent';
 
 type AuditInput = {
   title?: string | null;
@@ -19,21 +20,10 @@ export type SeoAuditResult = {
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
-const getBlocksText = (contentJson?: string | null): string => {
-  if (!contentJson) return '';
-  try {
-    const parsed = JSON.parse(contentJson) as { blocks?: Array<{ text?: string }> };
-    if (!Array.isArray(parsed.blocks)) return contentJson;
-    return parsed.blocks.map((b) => (typeof b?.text === 'string' ? b.text : '')).join(' ').trim();
-  } catch {
-    return contentJson;
-  }
-};
-
 export const runSeoAudit = (input: AuditInput): SeoAuditResult => {
   const resolvedTitle = (input.seoTitle || input.title || '').trim();
   const resolvedDescription = (input.seoDescription || input.excerpt || '').trim();
-  const bodyText = getBlocksText(input.contentJson);
+  const bodyText = extractCmsPlainText(input.contentJson);
   const firstWord = resolvedTitle.split(/\s+/)[0]?.toLowerCase() || '';
 
   const checks = [

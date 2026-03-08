@@ -29,6 +29,7 @@ import { runSeoAudit } from '../../../utils/seoAudit';
 import { parseJsonObject, isAbsoluteHttpUrl, isMediaUrlOrPath, validateScheduleWindow } from '../../../utils/cmsValidation';
 import SeoSnippetPreview from '../../../components/cms/SeoSnippetPreview';
 import { recordCmsOperationFailure } from '../../../services/cmsDiagnostics.service';
+import { toHumanCmsStatus } from '../../../constants/cmsHuman';
 
 const statusOptions = Object.values(CMS_STATUS);
 const kindOptions = Object.values(CMS_PAGE_KIND);
@@ -685,7 +686,7 @@ export default function CmsPageEditorPage() {
         && latestUpdatedAtMs > loadedUpdatedAtRef.current
       ) {
         const shouldOverwrite = typeof window !== 'undefined'
-          ? window.confirm('This page was updated by someone else after you loaded it. Continue and overwrite with your version?')
+          ? window.confirm('This page was updated after you opened it. Continue and replace with your current version?')
           : false;
         if (!shouldOverwrite) {
           notify.error('Save cancelled to avoid overwriting a newer version.');
@@ -954,7 +955,7 @@ export default function CmsPageEditorPage() {
                 }
               }}
             />
-            Developer Mode JSON
+            Advanced JSON mode
           </label>
         </div>
         <div className="mb-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
@@ -1026,7 +1027,7 @@ export default function CmsPageEditorPage() {
             {kindOptions.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
           </select>
           <select value={status} onChange={(event) => { setStatus(event.target.value as (typeof statusOptions)[number]); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm">
-            {statusOptions.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
+            {statusOptions.map((entry) => <option key={entry} value={entry}>{toHumanCmsStatus(entry)}</option>)}
           </select>
           <input value={workflowAssignee} onChange={(event) => { setWorkflowAssignee(event.target.value); setIsDirty(true); }} placeholder="Workflow assignee (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
           <select value={reviewStatus} onChange={(event) => { setReviewStatus(event.target.value as (typeof CMS_REVIEW_STATUS)[keyof typeof CMS_REVIEW_STATUS]); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm">
@@ -1188,14 +1189,14 @@ export default function CmsPageEditorPage() {
         </div>
 
         <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Revision History (Local)</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Saved Versions (Local)</p>
           {revisionHistory.length ? (
             <div className="mt-2 space-y-2">
               {revisionHistory.map((entry, index) => (
                 <div key={`${entry.savedAt}-${index}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
                   <div className="text-xs text-gray-600">
                     <p className="font-semibold text-gray-900">{entry.title}</p>
-                    <p>{new Date(entry.savedAt).toLocaleString()} · {entry.status}</p>
+                    <p>{new Date(entry.savedAt).toLocaleString()} · {toHumanCmsStatus(entry.status)}</p>
                   </div>
                   <button
                     type="button"

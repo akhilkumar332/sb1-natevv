@@ -6,6 +6,7 @@ import { useAdminCmsNavMenus } from '../../../hooks/admin/useAdminQueries';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { refetchQuery } from '../../../utils/queryRefetch';
 import { toDateValue } from '../../../utils/dateValue';
+import { toHumanCmsStatus } from '../../../constants/cmsHuman';
 
 export default function CmsMenusPage() {
   const menusQuery = useAdminCmsNavMenus();
@@ -18,7 +19,7 @@ export default function CmsMenusPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">CMS Menus</h2>
-            <p className="text-sm text-gray-600">Manage navigation payloads and open editor in a dedicated page.</p>
+            <p className="text-sm text-gray-600">Manage website navigation menus in a guided editor.</p>
           </div>
           <AdminRefreshButton onClick={() => refetchQuery(menusQuery)} isRefreshing={menusQuery.isFetching} label="Refresh menus" />
         </div>
@@ -55,7 +56,7 @@ export default function CmsMenusPage() {
               {rows.map((entry) => (
                 <tr key={entry.id}>
                   <td className="px-4 py-3 font-semibold text-gray-900">{entry.location}</td>
-                  <td className="px-4 py-3 text-gray-700">{entry.status || 'published'}</td>
+                  <td className="px-4 py-3 text-gray-700">{toHumanCmsStatus(entry.status || 'published')}</td>
                   <td className="px-4 py-3 text-gray-700">{Array.isArray(entry.items) ? entry.items.length : 0}</td>
                   <td className="px-4 py-3 text-gray-700">{toDateValue(entry.updatedAt)?.toLocaleString() || '-'}</td>
                   <td className="px-4 py-3 text-right">

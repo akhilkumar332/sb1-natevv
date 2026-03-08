@@ -184,7 +184,7 @@ export default function CmsOverviewPage() {
     <div className="space-y-4">
       <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
         <h2 className="text-2xl font-bold text-gray-900">CMS Overview</h2>
-        <p className="text-sm text-gray-600">Manage frontend website content, blog, and configuration from one place.</p>
+        <p className="text-sm text-gray-600">Manage website content with clear priorities and next actions.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
@@ -273,8 +273,8 @@ export default function CmsOverviewPage() {
           </div>
         </div>
         <div className="mt-3 rounded-lg border border-blue-200 bg-white p-3 text-xs text-gray-700">
-          <p className="font-semibold text-blue-900">Fix priority</p>
-          <p>1) Fill missing search descriptions, 2) add social images for published posts, 3) refresh stale content and confirm noindex usage.</p>
+          <p className="font-semibold text-blue-900">Recommended Actions</p>
+          <p>1) Add missing search descriptions, 2) add social images for live posts, 3) refresh stale content and review hidden-from-search pages.</p>
         </div>
         {seoPriorityQueue.length ? (
           <div className="mt-3 rounded-lg border border-blue-200 bg-white p-3 text-xs text-gray-700">
