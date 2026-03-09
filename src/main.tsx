@@ -12,14 +12,28 @@ import * as serviceWorkerRegistration from './utils/serviceWorkerRegistration';
 import { initPerformanceMonitoring } from './utils/performanceMonitoring';
 import { initGlobalErrorLogging } from './utils/errorLoggingBootstrap';
 import { initializeFirestoreOfflinePersistence } from './firebase';
-import { startOfflineMutationOutboxWorker } from './services/offlineMutationOutbox.service';
 import '../index.css';
 
 // Initialize performance monitoring
-initPerformanceMonitoring();
-initGlobalErrorLogging();
-void initializeFirestoreOfflinePersistence();
-startOfflineMutationOutboxWorker();
+const initRuntimeOptimizations = () => {
+  initPerformanceMonitoring();
+  initGlobalErrorLogging();
+  void initializeFirestoreOfflinePersistence();
+};
+
+if (typeof window !== 'undefined') {
+  if ('requestIdleCallback' in window) {
+    (window as Window & { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(() => {
+      initRuntimeOptimizations();
+    });
+  } else {
+    globalThis.setTimeout(() => {
+      initRuntimeOptimizations();
+    }, 0);
+  }
+} else {
+  initRuntimeOptimizations();
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -39,5 +53,7 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>
 );
 
-// Register service worker for PWA support
-serviceWorkerRegistration.register();
+// Register service worker for PWA support only in production.
+if (import.meta.env.PROD) {
+  serviceWorkerRegistration.register();
+}

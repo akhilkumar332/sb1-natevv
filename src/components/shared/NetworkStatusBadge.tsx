@@ -56,19 +56,7 @@ export const NetworkStatusBadge = () => {
     );
   }
 
-  if (persistenceStatus !== 'enabled') {
-    return (
-      <button
-        type="button"
-        onClick={cycleMode}
-        className="fixed right-4 top-16 z-40 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-700 shadow-sm"
-        title={dataSaverText}
-      >
-        <Wifi className="h-3.5 w-3.5" />
-        Online (No offline cache) • {dataSaverText}
-      </button>
-    );
-  }
+  if (persistenceStatus !== 'enabled') return null;
 
   if (isLowBandwidth) {
     return (

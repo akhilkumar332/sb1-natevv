@@ -1,3 +1,5 @@
+import { MEMORY_CACHE_LIMITS } from '../constants/memory';
+
 type CacheStorageType = 'session' | 'local';
 
 type ReadCacheOptions<T, R = T> = {
@@ -19,6 +21,7 @@ type WriteCacheOptions<T> = {
 };
 
 type CacheEnvelope<T> = {
+  __cacheLifecycle?: 1;
   timestamp: number;
   data: T;
 };
@@ -30,12 +33,49 @@ const getStorage = (storage: CacheStorageType): Storage | null => {
 
 const asEnvelope = <T>(value: unknown): CacheEnvelope<T> | null => {
   if (!value || typeof value !== 'object') return null;
-  const candidate = value as { timestamp?: unknown; data?: unknown };
+  const candidate = value as { __cacheLifecycle?: unknown; timestamp?: unknown; data?: unknown };
   if (typeof candidate.timestamp !== 'number') return null;
   return {
+    __cacheLifecycle: candidate.__cacheLifecycle === 1 ? 1 : undefined,
     timestamp: candidate.timestamp,
     data: candidate.data as T,
   };
+};
+
+const isManagedEnvelope = <T>(envelope: CacheEnvelope<T> | null): envelope is CacheEnvelope<T> & { __cacheLifecycle: 1 } =>
+  Boolean(envelope && envelope.__cacheLifecycle === 1);
+
+const estimateBytes = (value: string): number => value.length * 2;
+
+const collectEnvelopeEntries = (storage: Storage): Array<{ key: string; timestamp: number }> => {
+  const entries: Array<{ key: string; timestamp: number }> = [];
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (!key) continue;
+    const raw = storage.getItem(key);
+    if (!raw) continue;
+    try {
+      const parsed = asEnvelope<unknown>(JSON.parse(raw));
+      if (!isManagedEnvelope(parsed) || !Number.isFinite(parsed.timestamp)) continue;
+      entries.push({ key, timestamp: parsed.timestamp });
+    } catch {
+      // Ignore non-envelope cache values.
+    }
+  }
+  return entries;
+};
+
+const pruneStorageEnvelopes = (storage: Storage, maxEntries: number): void => {
+  if (maxEntries <= 0) return;
+  const entries = collectEnvelopeEntries(storage);
+  if (entries.length < maxEntries) return;
+  const toRemoveCount = entries.length - maxEntries + 1;
+  entries
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .slice(0, toRemoveCount)
+    .forEach((entry) => {
+      storage.removeItem(entry.key);
+    });
 };
 
 export const readCacheWithTtl = <T, R = T>(options: ReadCacheOptions<T, R>): R | null => {
@@ -80,10 +120,22 @@ export const writeCache = <T>(options: WriteCacheOptions<T>): void => {
 
   try {
     const payload: CacheEnvelope<T> = {
+      __cacheLifecycle: 1,
       timestamp: Date.now(),
       data: options.data,
     };
-    storage.setItem(options.key, JSON.stringify(payload));
+    const serialized = JSON.stringify(payload);
+    if (estimateBytes(serialized) > MEMORY_CACHE_LIMITS.maxStorageEntryBytes) {
+      options.onError?.(
+        new Error('Cache entry exceeds max storage entry size.'),
+        `${options.kindPrefix || 'cache'}.write_skipped_oversize`,
+        { key: options.key, storage: options.storage, maxBytes: MEMORY_CACHE_LIMITS.maxStorageEntryBytes }
+      );
+      return;
+    }
+
+    pruneStorageEnvelopes(storage, MEMORY_CACHE_LIMITS.maxStorageEnvelopeEntries);
+    storage.setItem(options.key, serialized);
   } catch (error) {
     options.onError?.(
       error,
@@ -127,6 +179,7 @@ export const migrateCacheIfNeeded = <T>(options: MigrateCacheOptions<T>) => {
       toStorage.setItem(
         options.key,
         JSON.stringify({
+          __cacheLifecycle: 1,
           timestamp: parsed.timestamp,
           data: transformedData,
         })

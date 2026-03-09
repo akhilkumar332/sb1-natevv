@@ -21,6 +21,8 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "memory:baseline": "node scripts/memory-baseline.mjs",
+    "memory:check": "node scripts/check-memory-budgets.mjs",
     "deploy": "npm run build:prod && firebase deploy",
     "deploy:hosting": "npm run build:prod && firebase deploy --only hosting",
     "deploy:rules": "firebase deploy --only firestore:rules,storage:rules",

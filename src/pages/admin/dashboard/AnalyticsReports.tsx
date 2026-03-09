@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FileDown, Gauge } from 'lucide-react';
 import { AdminAnalyticsDashboard } from '../../../components/analytics/AdminAnalyticsDashboard';
+import MemoryDiagnosticsCard from '../../../components/admin/MemoryDiagnosticsCard';
 import { generateDailyAnalytics, getSystemHealthReport } from '../../../services/admin.service';
 import { runWithFeedback } from '../../../utils/runWithFeedback';
 
@@ -63,6 +64,7 @@ function AnalyticsReportsPage() {
       </div>
 
       <AdminAnalyticsDashboard />
+      <MemoryDiagnosticsCard />
     </div>
   );
 }

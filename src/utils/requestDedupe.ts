@@ -1,3 +1,5 @@
+import { REQUEST_DEDUPE_LIMITS } from '../constants/memory';
+
 type CacheEntry<T> = {
   expiresAt: number;
   value: T;
@@ -5,7 +7,7 @@ type CacheEntry<T> = {
 
 const inFlightRequests = new Map<string, Promise<unknown>>();
 const resultCache = new Map<string, CacheEntry<unknown>>();
-const MAX_CACHE_ENTRIES = 300;
+const MAX_CACHE_ENTRIES = REQUEST_DEDUPE_LIMITS.maxResultCacheEntries;
 
 const cleanupExpiredCache = (now: number) => {
   for (const [key, entry] of resultCache.entries()) {
@@ -29,6 +31,9 @@ export const runDedupedRequest = async <T>(
     cleanupExpiredCache(now);
     const cached = resultCache.get(key) as CacheEntry<T> | undefined;
     if (cached && cached.expiresAt > now) {
+      // Refresh ordering so older inactive entries are evicted first.
+      resultCache.delete(key);
+      resultCache.set(key, cached);
       return cached.value;
     }
   }
@@ -69,3 +74,9 @@ export const clearDedupedRequestCache = (prefix?: string) => {
     }
   }
 };
+
+export const getDedupedRequestCacheStats = () => ({
+  inFlightCount: inFlightRequests.size,
+  resultCacheCount: resultCache.size,
+  maxResultCacheEntries: MAX_CACHE_ENTRIES,
+});

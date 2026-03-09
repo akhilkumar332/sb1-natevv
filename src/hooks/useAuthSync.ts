@@ -28,6 +28,9 @@ export const useAuthSync = () => {
 
   useEffect(() => {
     const checkAuthStatus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
       const now = Date.now();
       
       // Only perform check if enough time has passed since last check

@@ -23,6 +23,7 @@ import NetworkStatusBadge from './components/shared/NetworkStatusBadge';
 import { APP_ROUTE_PREFIXES_WITH_LEGACY, ROUTES } from './constants/routes';
 import { TOAST_THEME_TOKENS } from './constants/theme';
 import { FIVE_SECONDS_MS, ONE_MINUTE_MS, THREE_SECONDS_MS } from './constants/time';
+import { startOfflineMutationOutboxWorker, stopOfflineMutationOutboxWorker } from './services/offlineMutationOutbox.service';
 
 function App() {
   useAuthSync();
@@ -106,6 +107,29 @@ function App() {
   useEffect(() => {
     applyPwaBranding(location.pathname);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    if (!user?.uid) {
+      stopOfflineMutationOutboxWorker();
+      return undefined;
+    }
+
+    const syncWorkerWithVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        stopOfflineMutationOutboxWorker();
+      } else {
+        startOfflineMutationOutboxWorker();
+      }
+    };
+
+    syncWorkerWithVisibility();
+    document.addEventListener('visibilitychange', syncWorkerWithVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', syncWorkerWithVisibility);
+      stopOfflineMutationOutboxWorker();
+    };
+  }, [user?.uid]);
 
   return (
     <LoadingProvider>

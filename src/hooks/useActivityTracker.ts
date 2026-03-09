@@ -19,9 +19,10 @@ export const useActivityTracker = () => {
   }, []);
 
   useEffect(() => {
-    const events = ['mousemove', 'keydown', 'click', 'scroll'];
+    const events = ['pointerdown', 'keydown', 'click', 'visibilitychange'];
     
     const handleActivity = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       updateActivity();
     };
 

@@ -193,15 +193,6 @@ export default function BlogPage() {
       || effectiveAuthor !== 'all'
       || selectedSort !== 'newest'
   );
-  const activeFilterPills = useMemo(() => {
-    const pills: Array<{ kind: 'q' | 'category' | 'series' | 'author' | 'sort'; label: string }> = [];
-    if (selectedQuery) pills.push({ kind: 'q', label: `Search: ${selectedQuery}` });
-    if (effectiveCategory !== 'all') pills.push({ kind: 'category', label: `Topic: ${toHumanLabel(effectiveCategory)}` });
-    if (effectiveSeries !== 'all') pills.push({ kind: 'series', label: `Series: ${toHumanLabel(effectiveSeries)}` });
-    if (effectiveAuthor !== 'all') pills.push({ kind: 'author', label: `Author: ${effectiveAuthor}` });
-    if (selectedSort !== 'newest') pills.push({ kind: 'sort', label: 'Sort: Oldest first' });
-    return pills;
-  }, [selectedQuery, effectiveCategory, effectiveSeries, effectiveAuthor, selectedSort]);
   const applyParams = (next: { category?: string; series?: string; author?: string; sort?: 'newest' | 'oldest'; q?: string; page?: number }) => {
     const params = new URLSearchParams(searchParams);
     if (typeof next.category !== 'undefined') {
@@ -386,30 +377,6 @@ export default function BlogPage() {
               </div>
             </aside>
             <div className="space-y-4">
-              <div className="rounded-xl border border-red-100 bg-white px-3 py-2 shadow-sm">
-                <p className="text-sm font-semibold text-gray-800">{sortedPosts.length} article{sortedPosts.length === 1 ? '' : 's'} found</p>
-                <p className="text-xs text-gray-500">Filters update results instantly.</p>
-                {activeFilterPills.length > 0 ? (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {activeFilterPills.map((pill) => (
-                      <button
-                        key={`pill-${pill.kind}`}
-                        type="button"
-                        onClick={() => {
-                          if (pill.kind === 'q') applyParams({ q: '' });
-                          if (pill.kind === 'category') applyParams({ category: 'all' });
-                          if (pill.kind === 'series') applyParams({ series: 'all' });
-                          if (pill.kind === 'author') applyParams({ author: 'all' });
-                          if (pill.kind === 'sort') applyParams({ sort: 'newest' });
-                        }}
-                        className="rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-100"
-                      >
-                        {pill.label} ×
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
               {postsQuery.isLoading && posts.length === 0 && !loadingStalled ? (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {Array.from({ length: 6 }).map((_, index) => (
