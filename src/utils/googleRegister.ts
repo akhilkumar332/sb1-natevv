@@ -12,6 +12,23 @@ import { captureFirestoreOperationError } from './firestoreDiagnostics';
 type GoogleRegisterRole = 'donor' | 'ngo' | 'bloodbank';
 const pendingPortalRoleStorageKey = 'bh_pending_portal_role';
 
+const waitForFirestoreAuthUser = async (expectedUid: string, timeoutMs: number = 3000) => {
+  if (typeof (auth as any).authStateReady === 'function') {
+    try {
+      await (auth as any).authStateReady();
+    } catch {
+      // ignore auth readiness failures
+    }
+  }
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (auth.currentUser?.uid === expectedUid) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+};
+
 const resolveGoogleRegisterErrorMessage = (error: unknown): string => {
   const anyError = error as { code?: string; message?: string };
   const message = String(anyError?.message || '');
@@ -91,6 +108,8 @@ export const registerWithGoogleRole = async ({
         metadata: { kind: `${kind}.enable_network_before_register` },
       });
     }
+
+    await waitForFirestoreAuthUser(result.user.uid);
 
     // Critical path: create donor profile first so role access is immediately valid.
     try {

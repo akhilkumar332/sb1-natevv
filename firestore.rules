@@ -144,9 +144,9 @@ service cloud.firestore {
      * Allow a newly authenticated owner to finish initializing a partial user doc
      * exactly once before the role is established.
      */
-    function isOwnerBootstrapUserInitialization() {
+    function isOwnerBootstrapUserInitialization(userId) {
       return isAuthenticated()
-        && request.auth.uid == resource.id
+        && request.auth.uid == userId
         && !(resource.data.role is string)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'uid',
@@ -374,7 +374,7 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         (isOwner(userId) && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'verified', 'status', 'breakGlass']) ||
-          isOwnerBootstrapUserInitialization() ||
+          isOwnerBootstrapUserInitialization(userId) ||
           (
             request.resource.data.status == 'deleted' &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deletedAt', 'updatedAt'])

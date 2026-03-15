@@ -30,7 +30,17 @@ const unregisterServiceWorkers = async () => {
     return;
   }
   const registrations = await navigator.serviceWorker.getRegistrations();
-  await Promise.all(registrations.map((registration) => registration.unregister()));
+  await Promise.all(registrations.map(async (registration) => {
+    try {
+      await registration.unregister();
+    } catch (error: any) {
+      const message = String(error?.message || '').toLowerCase();
+      if (error?.name === 'AbortError' || message.includes('aborted')) {
+        return;
+      }
+      throw error;
+    }
+  }));
 };
 
 const clearCookies = () => {

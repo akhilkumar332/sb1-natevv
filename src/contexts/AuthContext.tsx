@@ -537,15 +537,27 @@ type UserFetchResult = {
   missing: boolean;
 };
 
-const getUserDocSnapshot = async (userRef: DocumentReference): Promise<DocumentSnapshot> => {
-  // Wait for Auth state to settle before issuing owner-scoped reads.
+const waitForFirestoreAuthUser = async (expectedUid?: string | null, timeoutMs: number = 3000): Promise<void> => {
   if (typeof (auth as any).authStateReady === 'function') {
     try {
       await (auth as any).authStateReady();
     } catch {
-      // ignore auth readiness failures; we'll still attempt the read below
+      // ignore auth readiness failures
     }
   }
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const currentUid = auth.currentUser?.uid || null;
+    if (!expectedUid || currentUid === expectedUid) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+};
+
+const getUserDocSnapshot = async (userRef: DocumentReference): Promise<DocumentSnapshot> => {
+  await waitForFirestoreAuthUser(userRef.id);
 
   let attempts = 0;
   let lastError: unknown = null;
@@ -570,13 +582,7 @@ const getUserDocSnapshot = async (userRef: DocumentReference): Promise<DocumentS
       }
 
       await new Promise((resolve) => setTimeout(resolve, 250 * attempts));
-      if (typeof (auth as any).authStateReady === 'function') {
-        try {
-          await (auth as any).authStateReady();
-        } catch {
-          // ignore and continue retry
-        }
-      }
+      await waitForFirestoreAuthUser(userRef.id, 1000);
     }
   }
 
