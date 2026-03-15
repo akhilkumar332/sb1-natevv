@@ -400,11 +400,15 @@ export function DonorOnboarding() {
         }
 
         if (user?.uid) {
-          await applyReferralTrackingForUser(user.uid);
-          await ensureReferralTrackingForExistingReferral({
-            ...user,
-            onboardingCompleted: true,
-          });
+          try {
+            await applyReferralTrackingForUser(user.uid);
+            await ensureReferralTrackingForExistingReferral({
+              ...user,
+              onboardingCompleted: true,
+            });
+          } catch (referralError) {
+            reportOnboardingError(referralError, 'donor.onboarding.referral_sync');
+          }
         }
 
         setShowConfetti(true);

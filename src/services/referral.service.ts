@@ -340,22 +340,33 @@ export const ensureReferralTrackingForExistingReferral = async (user: any): Prom
 
   const referralDocId = `${referrerUid}_${user.uid}`;
   const referralRef = doc(db, COLLECTIONS.REFERRAL_TRACKING, referralDocId);
-  const referralSnap = await getDoc(referralRef);
+  let referralSnap;
+  try {
+    referralSnap = await getDoc(referralRef);
+  } catch (error) {
+    reportReferralServiceError(error, 'referral.ensure_existing.read', { referralDocId, referrerUid, referredUid: user.uid });
+    return;
+  }
 
   if (!referralSnap.exists()) {
-    await setDoc(referralRef, stripUndefined({
-      referrerUid,
-      referredUid: user.uid,
-      referrerBhId: user.referredByBhId,
-      referrerRole,
-      referredRole: user?.role,
-      referredDisplayName: getReferredDisplayName(user),
-      referredBhId: user?.bhId || null,
-      referredAt: serverTimestamp(),
-      status: 'registered',
-      createdAt: serverTimestamp(),
-    }));
-    await sendReferralNotification(referrerUid, 'registered', user.uid, user, user.uid, referrerRole);
+    try {
+      await setDoc(referralRef, stripUndefined({
+        referrerUid,
+        referredUid: user.uid,
+        referrerBhId: user.referredByBhId,
+        referrerRole,
+        referredRole: user?.role,
+        referredDisplayName: getReferredDisplayName(user),
+        referredBhId: user?.bhId || null,
+        referredAt: serverTimestamp(),
+        status: 'registered',
+        createdAt: serverTimestamp(),
+      }));
+      await sendReferralNotification(referrerUid, 'registered', user.uid, user, user.uid, referrerRole);
+    } catch (error) {
+      reportReferralServiceError(error, 'referral.ensure_existing.create', { referralDocId, referrerUid, referredUid: user.uid });
+      return;
+    }
   }
 
   const referralData = referralSnap.exists() ? referralSnap.data() : null;
@@ -369,16 +380,25 @@ export const ensureReferralTrackingForExistingReferral = async (user: any): Prom
   });
 
   if (computed.status !== currentStatus) {
-    await setDoc(
-      referralRef,
-      {
+    try {
+      await setDoc(
+        referralRef,
+        {
+          status: computed.status,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      if (computed.status === 'onboarded' || computed.status === 'eligible') {
+        await sendReferralNotification(referrerUid, computed.status, user.uid, user, user.uid, referrerRole);
+      }
+    } catch (error) {
+      reportReferralServiceError(error, 'referral.ensure_existing.status_update', {
+        referralDocId,
+        referrerUid,
+        referredUid: user.uid,
         status: computed.status,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
-    if (computed.status === 'onboarded' || computed.status === 'eligible') {
-      await sendReferralNotification(referrerUid, computed.status, user.uid, user, user.uid, referrerRole);
+      });
     }
   }
 };

@@ -81,6 +81,9 @@ function registerValidSW(swUrl: string, config?: Config) {
       };
     })
     .catch((error) => {
+      if ((error as any)?.name === 'AbortError' || String((error as any)?.message || '').toLowerCase().includes('aborted')) {
+        return;
+      }
       void captureHandledError(error, {
         source: 'frontend',
         scope: 'unknown',
