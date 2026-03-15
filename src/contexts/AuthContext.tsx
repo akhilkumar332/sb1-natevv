@@ -63,6 +63,7 @@ import {
   readPendingPortalRole,
   readRegistrationIntent,
 } from '../utils/registrationIntent';
+import { patchUserDocumentViaRest } from '../utils/firestoreRestUserWrite';
 
 const trackImpersonationEvent = (eventName: string, params?: Record<string, any>) => {
   void import('../services/monitoring.service')
@@ -609,9 +610,11 @@ const ensureBootstrapUserDocument = async ({
 const runOwnerUserWriteWithRetry = async ({
   uid,
   write,
+  restFallbackPatch,
 }: {
   uid: string;
   write: () => Promise<void>;
+  restFallbackPatch?: Record<string, string | number | boolean | Date | null | undefined | any[] | Record<string, any>>;
 }) => {
   let lastError: unknown = null;
 
@@ -641,6 +644,17 @@ const runOwnerUserWriteWithRetry = async ({
       await waitForFirestoreAuthUser(uid, 2000);
       await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
     }
+  }
+
+  const lastCode = String((lastError as any)?.code || '').toLowerCase();
+  if (lastCode === 'permission-denied' && restFallbackPatch && auth.currentUser?.uid === uid) {
+    const freshToken = await auth.currentUser.getIdToken(true);
+    await patchUserDocumentViaRest({
+      idToken: freshToken,
+      userId: uid,
+      patch: restFallbackPatch,
+    });
+    return;
   }
 
   throw lastError instanceof Error ? lastError : new Error('Failed to persist owner user document');
@@ -2546,6 +2560,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isPrivileged = user.role === 'admin' || user.role === 'superadmin';
     const sanitizedData: Partial<User> = { ...data };
     const bootstrapRole = !isPrivileged ? (readPendingPortalRole() || readRegistrationIntent()) : null;
+    let profilePatchFieldKeys: string[] = [];
     if (!isPrivileged) {
       if (Object.prototype.hasOwnProperty.call(sanitizedData, 'role')) {
         delete sanitizedData.role;
@@ -2580,6 +2595,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (bootstrapRole && !user.createdAt && auth.currentUser) {
+        const bootstrapPatch = {
+          uid: auth.currentUser.uid,
+          email: auth.currentUser.email || user.email || null,
+          displayName: user.displayName || auth.currentUser.displayName || null,
+          photoURL: auth.currentUser.photoURL || user.photoURL || null,
+          phoneNumber: user.phoneNumber || auth.currentUser.phoneNumber || null,
+          ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
+          role: bootstrapRole,
+          onboardingCompleted: false,
+          createdAt: new Date(),
+          lastLoginAt: new Date(),
+          ...(user.referredByUid ? { referredByUid: user.referredByUid } : {}),
+          ...(user.referredByBhId ? { referredByBhId: user.referredByBhId } : {}),
+        };
         try {
           await runOwnerUserWriteWithRetry({
             uid: user.uid,
@@ -2589,6 +2618,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               currentUser: user,
               phoneNumberNormalized,
             }),
+            restFallbackPatch: bootstrapPatch,
           });
         } catch (bootstrapError) {
           await captureFirestoreOperationError(bootstrapError, {
@@ -2600,23 +2630,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             blocking: true,
             phase: 'onboarding_profile_bootstrap',
             portalRole: bootstrapRole,
+            metadata: {
+              firestoreFieldKeys: Object.keys(bootstrapPatch).sort(),
+              firestoreTransportFallbackEnabled: true,
+            },
           });
           throw bootstrapError;
         }
       }
+
+      const profilePatch = {
+        ...sanitizedData,
+        ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
+        onboardingCompleted: true,
+        ...(existingBhId ? {} : generatedBhId ? { bhId: generatedBhId } : {}),
+      };
+      profilePatchFieldKeys = Object.keys(profilePatch).sort();
 
       await runOwnerUserWriteWithRetry({
         uid: user.uid,
         write: () => updateUserProfilePatch({
           userId: user.uid,
           actorUid: user.uid,
-          patch: {
-            ...sanitizedData,
-            ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
-            onboardingCompleted: true,
-            ...(existingBhId ? {} : generatedBhId ? { bhId: generatedBhId } : {}),
-          },
+          patch: profilePatch,
         }).then(() => undefined),
+        restFallbackPatch: profilePatch as Record<string, any>,
       });
       if (isPrivileged && sanitizedData.role && sanitizedData.role !== user.role) {
         void logAuditEvent({
@@ -2682,6 +2720,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         blocking: true,
         phase: 'onboarding_profile_update',
         portalRole: user.role || null,
+        metadata: {
+          firestoreFieldKeys: profilePatchFieldKeys,
+          firestoreTransportFallbackEnabled: true,
+        },
       });
       reportAuthContextError(error, 'auth.profile_update');
       throw error; // Re-throw the error so the caller can handle it

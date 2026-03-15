@@ -316,6 +316,9 @@ export function DonorOnboarding() {
   };
 
   const handleSubmit = async () => {
+    if (isLoading) {
+      return;
+    }
     if (validateStep()) {
       setIsLoading(true);
       try {

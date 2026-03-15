@@ -104,122 +104,122 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.setDoc.contexts/AuthContext.tsx:593",
+    "id": "USERS.setDoc.contexts/AuthContext.tsx:594",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 593,
+    "line": 594,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:707",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:721",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 707,
+    "line": 721,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:748",
+    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:762",
     "method": "setDoc",
     "collectionKey": "PUBLIC_DONORS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 748,
+    "line": 762,
     "area": "PUBLIC_DONORS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:801",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:815",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 801,
+    "line": 815,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:1413",
+    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:1427",
     "method": "setDoc",
     "collectionKey": "PUBLIC_DONORS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 1413,
+    "line": 1427,
     "area": "PUBLIC_DONORS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:1904",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:1918",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 1904,
+    "line": 1918,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2029",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2043",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2029,
+    "line": 2043,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2108",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2122",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2108,
+    "line": 2122,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2131",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2145",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2131,
+    "line": 2145,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2226",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2240",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2226,
+    "line": 2240,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2424",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2438",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2424,
+    "line": 2438,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:2652",
+    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:2690",
     "method": "setDoc",
     "collectionKey": "PUBLIC_DONORS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2652,
+    "line": 2690,
     "area": "PUBLIC_DONORS setDoc",
     "mode": "queue_safe"
   },
@@ -294,12 +294,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.setDoc.hooks/useRegister.ts:152",
+    "id": "USERS.setDoc.hooks/useRegister.ts:184",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "hooks",
     "path": "hooks/useRegister.ts",
-    "line": 152,
+    "line": 184,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },
@@ -1084,12 +1084,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "DONATION_HISTORY.setDoc.pages/donor/DonorOnboarding.tsx:407",
+    "id": "DONATION_HISTORY.setDoc.pages/donor/DonorOnboarding.tsx:410",
     "method": "setDoc",
     "collectionKey": "DONATION_HISTORY",
     "module": "pages/donor",
     "path": "pages/donor/DonorOnboarding.tsx",
-    "line": 407,
+    "line": 410,
     "area": "DONATION_HISTORY setDoc",
     "mode": "queue_safe"
   },
@@ -2314,12 +2314,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "USERS.setDoc.utils/googleRegister.ts:62",
+    "id": "USERS.setDoc.utils/googleRegister.ts:63",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "utils",
     "path": "utils/googleRegister.ts",
-    "line": 62,
+    "line": 63,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },

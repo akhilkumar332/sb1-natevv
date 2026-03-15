@@ -14,6 +14,7 @@ import {
   markPendingPortalRole,
   markRegistrationIntent,
 } from './registrationIntent';
+import { patchUserDocumentViaRest } from './firestoreRestUserWrite';
 
 type GoogleRegisterRole = 'donor' | 'ngo' | 'bloodbank';
 let activeGoogleRegisterPromise: Promise<void> | null = null;
@@ -77,6 +78,29 @@ const createUserProfile = async (
       }
       attempt += 1;
       if (!shouldRetryBootstrapProfileCreate(error, uid) || attempt >= 3) {
+        const code = String((error as { code?: string })?.code || '').toLowerCase();
+        if (code === 'permission-denied' && auth.currentUser?.uid === uid) {
+          const freshToken = await auth.currentUser.getIdToken(true);
+          await patchUserDocumentViaRest({
+            idToken: freshToken,
+            userId: uid,
+            patch: {
+              uid,
+              email: typeof payload.email === 'string' || payload.email === null ? payload.email as string | null : null,
+              displayName: typeof payload.displayName === 'string' || payload.displayName === null
+                ? payload.displayName as string | null
+                : null,
+              photoURL: typeof payload.photoURL === 'string' || payload.photoURL === null
+                ? payload.photoURL as string | null
+                : null,
+              role,
+              onboardingCompleted: false,
+              createdAt: new Date(),
+              lastLoginAt: new Date(),
+            },
+          });
+          return;
+        }
         throw error;
       }
       try {
@@ -208,6 +232,10 @@ export const registerWithGoogleRole = async ({
           blocking: true,
           phase: 'google_register',
           portalRole: role,
+          metadata: {
+            firestoreFieldKeys: ['createdAt', 'displayName', 'email', 'lastLoginAt', 'onboardingCompleted', 'photoURL', 'role', 'uid'],
+            firestoreTransportFallbackEnabled: true,
+          },
         });
         if (!canDeferToOnboarding) {
           await diagnosticsPromise;

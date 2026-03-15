@@ -24,6 +24,7 @@ import {
   markPendingPortalRole,
   markRegistrationIntent,
 } from '../utils/registrationIntent';
+import { patchUserDocumentViaRest } from '../utils/firestoreRestUserWrite';
 
 interface RegisterFormData {
   identifier: string;
@@ -43,6 +44,24 @@ export const useRegister = () => {
   const navigate = useNavigate();
   const { loginWithPhone, authLoading } = useAuth();
 
+  const waitForFirestoreAuthUser = async (expectedUid: string, timeoutMs: number = 3000) => {
+    if (typeof (auth as any).authStateReady === 'function') {
+      try {
+        await (auth as any).authStateReady();
+      } catch {
+        // ignore readiness errors
+      }
+    }
+
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (auth.currentUser?.uid === expectedUid) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  };
+
   const handleIdentifierChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -60,6 +79,9 @@ export const useRegister = () => {
   };
 
   const handlePhoneNumberSubmit = async () => {
+    if (authLoading || otpLoading || googleLoading) {
+      return;
+    }
     const { normalized: normalizedPhone, error } = validateGeneralPhoneInput(formData.identifier);
     if (!requireValue(!error, error || authInputMessages.invalidIndiaPhone)) {
       return;
@@ -77,6 +99,9 @@ export const useRegister = () => {
   };
 
   const handleOTPSubmit = async () => {
+    if (otpLoading || googleLoading) {
+      return;
+    }
     if (!requireValue(Boolean(confirmationResult), authInputMessages.requestOtpFirst)) {
       return;
     }
@@ -102,6 +127,8 @@ export const useRegister = () => {
         void captureHandledError(networkEnableError, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.phone.enable_network' } });
       }
 
+      await waitForFirestoreAuthUser(userCredential.user.uid);
+
       // Check if user already registered by uid as a fallback
       const userRef = doc(db, COLLECTIONS.USERS, userCredential.user.uid);
       let userDoc;
@@ -122,9 +149,14 @@ export const useRegister = () => {
       }
 
       if (userDoc.exists()) {
+        const existingData = userDoc.data() as { role?: string; onboardingCompleted?: boolean };
         clearRegistrationIntent();
+        if (existingData?.role === 'donor' && existingData?.onboardingCompleted !== true) {
+          notify.success('Continue onboarding to finish registration.');
+          navigate(ROUTES.portal.donor.onboarding);
+          return;
+        }
         clearPendingPortalRole();
-        // User already exists - sign them out and redirect to login
         await signOut(auth);
         notifyMobileAlreadyRegistered();
         navigate(ROUTES.portal.donor.login);
@@ -166,6 +198,61 @@ export const useRegister = () => {
             : {}),
         }, { merge: true });
       } catch (profileCreateError) {
+        const code = String((profileCreateError as { code?: string })?.code || '').toLowerCase();
+        if (code === 'permission-denied' && auth.currentUser?.uid === userCredential.user.uid) {
+          try {
+            const currentAuthUser = auth.currentUser;
+            if (!currentAuthUser) {
+              throw profileCreateError;
+            }
+            const freshToken = await currentAuthUser.getIdToken(true);
+            await patchUserDocumentViaRest({
+              idToken: freshToken,
+              userId: userCredential.user.uid,
+              patch: {
+                uid: userCredential.user.uid,
+                phoneNumber: userCredential.user.phoneNumber,
+                phoneNumberNormalized: normalizedPhone,
+                role: 'donor',
+                onboardingCompleted: false,
+                createdAt: new Date(),
+                lastLoginAt: new Date(),
+                ...(referralContext
+                  ? {
+                      referredByUid: referralContext.referrerUid,
+                      referredByBhId: referralContext.referrerBhId,
+                      referralCapturedAt: new Date(),
+                    }
+                  : {}),
+              },
+            });
+          } catch (restFallbackError) {
+            await captureFirestoreOperationError(restFallbackError, {
+              scope: 'auth',
+              kind: 'auth.register.phone.user_profile_create',
+              operation: 'setDoc',
+              collection: COLLECTIONS.USERS,
+              docId: userCredential.user.uid,
+              blocking: true,
+              phase: 'phone_register',
+              portalRole: 'donor',
+              metadata: {
+                firestoreFieldKeys: [
+                  'createdAt',
+                  'lastLoginAt',
+                  'onboardingCompleted',
+                  'phoneNumber',
+                  'phoneNumberNormalized',
+                  'role',
+                  'uid',
+                  ...(referralContext ? ['referredByBhId', 'referredByUid', 'referralCapturedAt'] : []),
+                ].sort(),
+                firestoreTransportFallbackEnabled: true,
+              },
+            });
+            throw restFallbackError;
+          }
+        }
         await captureFirestoreOperationError(profileCreateError, {
           scope: 'auth',
           kind: 'auth.register.phone.user_profile_create',
@@ -175,6 +262,19 @@ export const useRegister = () => {
           blocking: true,
           phase: 'phone_register',
           portalRole: 'donor',
+          metadata: {
+            firestoreFieldKeys: [
+              'createdAt',
+              'lastLoginAt',
+              'onboardingCompleted',
+              'phoneNumber',
+              'phoneNumberNormalized',
+              'role',
+              'uid',
+              ...(referralContext ? ['referredByBhId', 'referredByUid', 'referralCapturedAt'] : []),
+            ].sort(),
+            firestoreTransportFallbackEnabled: true,
+          },
         });
         throw profileCreateError;
       }
@@ -209,6 +309,9 @@ export const useRegister = () => {
   };
 
   const handleResendOTP = async () => {
+    if (otpLoading || googleLoading) {
+      return;
+    }
     const { normalized, error } = validateGeneralPhoneInput(formData.identifier);
     if (!requireValue(!error, error || authInputMessages.invalidIndiaPhone)) {
       return;
@@ -225,6 +328,9 @@ export const useRegister = () => {
   };
 
   const handleGoogleRegister = async () => {
+    if (googleLoading || otpLoading || authLoading) {
+      return;
+    }
     try {
       setGoogleLoading(true);
       await registerWithGoogleRole({
