@@ -46,13 +46,6 @@ service cloud.firestore {
     }
 
     /**
-     * Check if user is superadmin
-     */
-    function isSuperAdmin() {
-      return hasRole('superadmin');
-    }
-
-    /**
      * Check if user is donor
      */
     function isDonor() {
@@ -116,77 +109,6 @@ service cloud.firestore {
      */
     function isVerified() {
       return isAuthenticated() && getUserData().verified == true;
-    }
-
-    /**
-     * Check if user account is active
-     */
-    function isActive() {
-      return isAuthenticated() && getUserData().status == 'active';
-    }
-
-    /**
-     * Restrict non-owner user-profile reads to active, non-break-glass accounts.
-     */
-    function isReadableDirectoryProfile() {
-      return (resource.data.status == 'active' || !resource.data.keys().hasAny(['status']))
-        && !(resource.data.breakGlass == true)
-        && (
-          (resource.data.role == 'donor' && resource.data.onboardingCompleted != false) ||
-          (
-            resource.data.role in ['ngo', 'bloodbank', 'hospital']
-            && resource.data.verified == true
-          )
-        );
-    }
-
-    /**
-     * Allow a newly authenticated owner to finish initializing a partial user doc
-     * exactly once before the role is established.
-     */
-    function isOwnerBootstrapUserInitialization(userId) {
-      return isAuthenticated()
-        && request.auth.uid == userId
-        && (
-          !(resource.data.role is string) ||
-          (
-            request.resource.data.role is string &&
-            request.resource.data.role == resource.data.role
-          )
-        )
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'uid',
-          'email',
-          'displayName',
-          'photoURL',
-          'phoneNumber',
-          'phoneNumberNormalized',
-          'role',
-          'status',
-          'onboardingCompleted',
-          'createdAt',
-          'lastLoginAt',
-          'updatedAt',
-          'referredByUid',
-          'referredByBhId',
-          'referralCapturedAt'
-        ])
-        && request.resource.data.role in ['donor', 'ngo', 'bloodbank', 'hospital', 'admin']
-        && (
-          !('status' in request.resource.data)
-          || (
-            (
-              !('status' in resource.data)
-              || !(resource.data.status is string)
-            ) &&
-            request.resource.data.status in ['active', 'pending_verification']
-          )
-          || (
-            resource.data.status == 'pending_verification' &&
-            request.resource.data.status == 'active'
-          )
-          || request.resource.data.status == resource.data.status
-        );
     }
 
     /**
@@ -370,37 +292,24 @@ service cloud.firestore {
     // ========================================================================
 
     match /users/{userId} {
-      // Owner/admin can read all; other authenticated users can read only active directory-safe profiles.
-      allow read: if isAuthenticated() && (
-        isOwner(userId) ||
-        isAdmin() ||
-        (
-          // Any authenticated session can read donor-backed user profiles
-          // when the donor is present in publicDonors.
-          exists(/databases/$(database)/documents/publicDonors/$(userId))
-        ) ||
-        isReadableDirectoryProfile()
-      );
+      // Anyone authenticated can read user data
+      allow read: if isAuthenticated();
 
       // Users can create their own document during registration
-      allow create: if isAuthenticated() && isOwner(userId) && !(request.resource.data.breakGlass == true);
+      allow create: if isAuthenticated() && isOwner(userId);
 
       // Users can update their own data, admins can update any
-      // Prevent users from changing their own role/verification/status
+      // Prevent users from changing their own role or verification status
       // Allow self-service soft delete (status = deleted) with limited fields
       allow update: if isAuthenticated() && (
         (isOwner(userId) && (
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'verified', 'status', 'breakGlass']) ||
-          isOwnerBootstrapUserInitialization(userId) ||
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'verified', 'status']) ||
           (
             request.resource.data.status == 'deleted' &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deletedAt', 'updatedAt'])
           )
         )) ||
-        (isAdmin() && (
-          isSuperAdmin() ||
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'breakGlass'])
-        ))
+        isAdmin()
       );
 
       // Only admins can delete users
@@ -1342,4 +1251,3 @@ service cloud.firestore {
     }
   }
 }
-  
