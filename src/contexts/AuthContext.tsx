@@ -55,7 +55,7 @@ import { authStorage } from '../utils/authStorage';
 import { readFcmTokenMeta, readStoredFcmToken, writeFcmTokenMeta, writeStoredFcmToken } from '../utils/fcmStorage';
 import { authMessages } from '../constants/messages';
 import { ROUTES } from '../constants/routes';
-import { captureFirestoreOperationError } from '../utils/firestoreDiagnostics';
+import { buildUserWriteDiagnosticMetadata, captureFirestoreOperationError } from '../utils/firestoreDiagnostics';
 import {
   clearPendingPortalRole,
   clearRegistrationIntent,
@@ -2642,6 +2642,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             restFallbackMode: 'create',
           });
         } catch (bootstrapError) {
+          const diagnosticMetadata = await buildUserWriteDiagnosticMetadata({
+            userId: user.uid,
+            payload: {
+              ...bootstrapPatch,
+              createdAt: '[clientDate]',
+              lastLoginAt: '[clientDate]',
+            },
+            payloadLabel: 'onboarding_profile_bootstrap',
+          });
           await captureFirestoreOperationError(bootstrapError, {
             scope: 'auth',
             kind: 'auth.profile_update.bootstrap',
@@ -2654,6 +2663,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             metadata: {
               firestoreFieldKeys: Object.keys(bootstrapPatch).sort(),
               firestoreTransportFallbackEnabled: true,
+              ...diagnosticMetadata,
             },
           });
           throw bootstrapError;
@@ -2735,6 +2745,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearRegistrationIntent();
       clearPendingPortalRole();
     } catch (error) {
+      const diagnosticMetadata = await buildUserWriteDiagnosticMetadata({
+        userId: user.uid,
+        payload: {
+          ...sanitizedData,
+          ...(sanitizedData.phoneNumber
+            ? { phoneNumberNormalized: normalizePhoneNumber(sanitizedData.phoneNumber) }
+            : {}),
+          onboardingCompleted: true,
+        },
+        payloadLabel: 'onboarding_profile_update',
+      });
       void captureFirestoreOperationError(error, {
         scope: 'auth',
         kind: 'auth.profile_update',
@@ -2747,6 +2768,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         metadata: {
           firestoreFieldKeys: profilePatchFieldKeys,
           firestoreTransportFallbackEnabled: true,
+          ...diagnosticMetadata,
         },
       });
       reportAuthContextError(error, 'auth.profile_update');

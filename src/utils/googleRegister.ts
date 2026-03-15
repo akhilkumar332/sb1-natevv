@@ -7,7 +7,7 @@ import { captureHandledError } from '../services/errorLog.service';
 import { authStorage } from './authStorage';
 import { authFlowMessages } from './authInputValidation';
 import { COLLECTIONS } from '../constants/firestore';
-import { captureFirestoreOperationError } from './firestoreDiagnostics';
+import { buildUserWriteDiagnosticMetadata, captureFirestoreOperationError } from './firestoreDiagnostics';
 import {
   clearPendingPortalRole,
   clearRegistrationIntent,
@@ -223,18 +223,35 @@ export const registerWithGoogleRole = async ({
 
       // Critical path: create donor profile first so role access is immediately valid.
       try {
-        await createUserProfile(userRef, result.user.uid, role, {
-        uid: result.user.uid,
-        email: result.user.email,
-        displayName: result.user.displayName,
-        photoURL: result.user.photoURL,
-        role,
+        const bootstrapPayload = {
+          uid: result.user.uid,
+          email: result.user.email,
+          displayName: result.user.displayName,
+          photoURL: result.user.photoURL,
+          role,
           onboardingCompleted: false,
           createdAt: serverTimestamp(),
           lastLoginAt: serverTimestamp(),
+        };
+        await createUserProfile(userRef, result.user.uid, role, {
+          ...bootstrapPayload,
         });
       } catch (profileCreateError) {
         const canDeferToOnboarding = shouldDeferProfileCreationToOnboarding(profileCreateError, result.user.uid);
+        const diagnosticMetadata = await buildUserWriteDiagnosticMetadata({
+          userId: result.user.uid,
+          payload: {
+            uid: result.user.uid,
+            email: result.user.email,
+            displayName: result.user.displayName,
+            photoURL: result.user.photoURL,
+            role,
+            onboardingCompleted: false,
+            createdAt: '[serverTimestamp]',
+            lastLoginAt: '[serverTimestamp]',
+          },
+          payloadLabel: 'google_register_user_profile_create',
+        });
         const diagnosticsPromise = captureFirestoreOperationError(profileCreateError, {
           scope,
           kind: `${kind}.user_profile_create`,
@@ -247,6 +264,7 @@ export const registerWithGoogleRole = async ({
           metadata: {
             firestoreFieldKeys: ['createdAt', 'displayName', 'email', 'lastLoginAt', 'onboardingCompleted', 'photoURL', 'role', 'uid'],
             firestoreTransportFallbackEnabled: true,
+            ...diagnosticMetadata,
           },
         });
         if (!canDeferToOnboarding) {

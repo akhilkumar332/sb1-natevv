@@ -214,22 +214,22 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.setDoc.contexts/AuthContext.tsx:2673",
+    "id": "USERS.setDoc.contexts/AuthContext.tsx:2683",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2673,
+    "line": 2683,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:2714",
+    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:2724",
     "method": "setDoc",
     "collectionKey": "PUBLIC_DONORS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2714,
+    "line": 2724,
     "area": "PUBLIC_DONORS setDoc",
     "mode": "queue_safe"
   },
