@@ -58,6 +58,8 @@ import { ROUTES } from '../constants/routes';
 import { updateUserProfilePatch } from '../services/offlineMutationOutbox.service';
 import { captureFirestoreOperationError } from '../utils/firestoreDiagnostics';
 import {
+  clearPendingPortalRole,
+  clearRegistrationIntent,
   readPendingPortalRole,
   readRegistrationIntent,
 } from '../utils/registrationIntent';
@@ -575,6 +577,34 @@ const buildBootstrapFallbackUser = (
   status: pendingRole ? 'active' : undefined,
   onboardingCompleted: pendingRole ? false : undefined,
 } as User);
+
+const ensureBootstrapUserDocument = async ({
+  firebaseUser,
+  role,
+  currentUser,
+  phoneNumberNormalized,
+}: {
+  firebaseUser: FirebaseUser;
+  role: User['role'];
+  currentUser: User;
+  phoneNumberNormalized?: string;
+}) => {
+  const userRef = doc(db, COLLECTIONS.USERS, firebaseUser.uid);
+  await setDoc(userRef, {
+    uid: firebaseUser.uid,
+    email: firebaseUser.email || currentUser.email || null,
+    displayName: currentUser.displayName || firebaseUser.displayName || null,
+    photoURL: firebaseUser.photoURL || currentUser.photoURL || null,
+    phoneNumber: currentUser.phoneNumber || firebaseUser.phoneNumber || null,
+    ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
+    role,
+    onboardingCompleted: false,
+    createdAt: serverTimestamp(),
+    lastLoginAt: serverTimestamp(),
+    ...(currentUser.referredByUid ? { referredByUid: currentUser.referredByUid } : {}),
+    ...(currentUser.referredByBhId ? { referredByBhId: currentUser.referredByBhId } : {}),
+  }, { merge: true });
+};
 
 const updateUserInFirestore = async (
   firebaseUser: FirebaseUser,
@@ -2509,20 +2539,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      if (bootstrapRole && !user.createdAt && auth.currentUser) {
+        try {
+          await ensureBootstrapUserDocument({
+            firebaseUser: auth.currentUser,
+            role: bootstrapRole,
+            currentUser: user,
+            phoneNumberNormalized,
+          });
+        } catch (bootstrapError) {
+          await captureFirestoreOperationError(bootstrapError, {
+            scope: 'auth',
+            kind: 'auth.profile_update.bootstrap',
+            operation: 'setDoc',
+            collection: COLLECTIONS.USERS,
+            docId: user.uid,
+            blocking: true,
+            phase: 'onboarding_profile_bootstrap',
+            portalRole: bootstrapRole,
+          });
+          throw bootstrapError;
+        }
+      }
+
       await updateUserProfilePatch({
         userId: user.uid,
         actorUid: user.uid,
         patch: {
           ...sanitizedData,
-          ...(
-            bootstrapRole && !user.createdAt
-              ? {
-                  role: bootstrapRole,
-                  createdAt: serverTimestamp(),
-                  lastLoginAt: serverTimestamp(),
-                }
-              : {}
-          ),
           ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
           onboardingCompleted: true, // Set this to true upon successful completion
           ...(existingBhId ? {} : generatedBhId ? { bhId: generatedBhId } : {}),
@@ -2541,15 +2585,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         });
       }
+      const nextRole = sanitizedData.role ?? user.role ?? bootstrapRole ?? undefined;
       const nextUser = {
         ...user,
         ...sanitizedData,
+        ...(nextRole ? { role: nextRole } : {}),
         ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
         onboardingCompleted: true,
         bhId: user.bhId || generatedBhId || undefined
       } as User;
 
-      const nextRole = sanitizedData.role ?? user.role;
       const nextStatus = sanitizedData.status ?? user.status;
       const nextOnboarding = sanitizedData.onboardingCompleted ?? true;
       const canPublishPublicDonor = nextRole === 'donor'
@@ -2574,10 +2619,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(prev => ({
         ...prev,
         ...sanitizedData,
+        ...(nextRole ? { role: nextRole } : {}),
         ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
         onboardingCompleted: true, // Ensure this is updated in the state
         bhId: prev?.bhId || generatedBhId || undefined
       } as User));
+      clearRegistrationIntent();
+      clearPendingPortalRole();
     } catch (error) {
       void captureFirestoreOperationError(error, {
         scope: 'auth',
