@@ -175,7 +175,10 @@ service cloud.firestore {
         && (
           !('status' in request.resource.data)
           || (
-            !('status' in resource.data) &&
+            (
+              !('status' in resource.data)
+              || !(resource.data.status is string)
+            ) &&
             request.resource.data.status in ['active', 'pending_verification']
           )
           || (

@@ -154,7 +154,6 @@ export const useRegister = () => {
           phoneNumber: userCredential.user.phoneNumber,
           phoneNumberNormalized: normalizedPhone,
           role: 'donor',
-          status: 'active',
           onboardingCompleted: false,
           createdAt: serverTimestamp(),
           lastLoginAt: serverTimestamp(),

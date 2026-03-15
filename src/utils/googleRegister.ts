@@ -175,16 +175,15 @@ export const registerWithGoogleRole = async ({
 
       // Critical path: create donor profile first so role access is immediately valid.
       try {
-        await createUserProfile(userRef, result.user.uid, role, {
-          uid: result.user.uid,
-          email: result.user.email,
-          displayName: result.user.displayName,
-          photoURL: result.user.photoURL,
-          role,
-          status: 'active',
-          onboardingCompleted: false,
-          createdAt: serverTimestamp(),
-          lastLoginAt: serverTimestamp(),
+      await createUserProfile(userRef, result.user.uid, role, {
+        uid: result.user.uid,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        photoURL: result.user.photoURL,
+        role,
+        onboardingCompleted: false,
+        createdAt: serverTimestamp(),
+        lastLoginAt: serverTimestamp(),
         });
       } catch (profileCreateError) {
         await captureFirestoreOperationError(profileCreateError, {
