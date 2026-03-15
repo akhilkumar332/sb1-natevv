@@ -98,6 +98,7 @@ describe('registerWithGoogleRole', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     navigate.mockReset();
+    window.sessionStorage.clear();
     mockAuth.currentUser = null;
     mockGetAdditionalUserInfo.mockReturnValue({ isNewUser: true });
     mockEnableNetwork.mockResolvedValue(undefined);
@@ -119,6 +120,8 @@ describe('registerWithGoogleRole', () => {
     expect(mockNotifySuccess).toHaveBeenCalledWith('Registration successful!');
     expect(navigate).toHaveBeenCalledWith(ROUTES.portal.donor.onboarding);
     expect(mockSignOut).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem('bh_registration_intent')).toBeNull();
+    expect(window.sessionStorage.getItem('bh_pending_portal_role')).not.toBeNull();
   });
 
   it('signs out and redirects to login when user already exists', async () => {
@@ -132,6 +135,8 @@ describe('registerWithGoogleRole', () => {
     expect(mockNotifyError).toHaveBeenCalledWith('email-registered');
     expect(navigate).toHaveBeenCalledWith(ROUTES.portal.donor.login);
     expect(mockSetDoc).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem('bh_registration_intent')).toBeNull();
+    expect(window.sessionStorage.getItem('bh_pending_portal_role')).toBeNull();
   });
 
   it('signs out on critical profile creation failure', async () => {
@@ -147,6 +152,8 @@ describe('registerWithGoogleRole', () => {
     expect(mockSignOut).toHaveBeenCalled();
     expect(mockNotifyError).toHaveBeenCalledWith('Missing or insufficient permissions');
     expect(navigate).not.toHaveBeenCalledWith('/donor/onboarding');
+    expect(window.sessionStorage.getItem('bh_registration_intent')).toBeNull();
+    expect(window.sessionStorage.getItem('bh_pending_portal_role')).toBeNull();
   });
 
   it('continues registration when enableNetwork fails', async () => {
@@ -171,5 +178,21 @@ describe('registerWithGoogleRole', () => {
     await registerWithGoogleRole(baseArgs);
 
     expect(mockNotifyError).toHaveBeenCalledWith('Internet connection lost during Google signup. Reconnect and try again.');
+  });
+
+  it('retries bootstrap profile creation when auth has not propagated to Firestore yet', async () => {
+    mockSignInWithPopup.mockResolvedValue(popupResult);
+    mockAuth.currentUser = { uid: 'uid-1' };
+    mockSetDoc
+      .mockRejectedValueOnce(Object.assign(new Error('Missing or insufficient permissions'), { code: 'permission-denied' }))
+      .mockRejectedValueOnce(Object.assign(new Error('Missing or insufficient permissions'), { code: 'permission-denied' }))
+      .mockResolvedValueOnce(undefined);
+    mockApplyReferralTrackingForUser.mockResolvedValue(null);
+
+    await registerWithGoogleRole(baseArgs);
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(3);
+    expect(mockNotifySuccess).toHaveBeenCalledWith('Registration successful!');
+    expect(navigate).toHaveBeenCalledWith(ROUTES.portal.donor.onboarding);
   });
 });

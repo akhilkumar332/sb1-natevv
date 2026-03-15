@@ -5,30 +5,7 @@ import Loading from './Loading';
 import { notify } from 'services/notify.service';
 import { authMessages } from '../constants/messages';
 import { LEGACY_ROUTE_PREFIXES, PORTAL_PATH_PREFIXES, ROUTES } from '../constants/routes';
-
-const pendingPortalRoleStorageKey = 'bh_pending_portal_role';
-const pendingPortalRoleTtlMs = 30_000;
-
-const readPendingPortalRole = (): 'donor' | 'ngo' | 'bloodbank' | 'admin' | null => {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.sessionStorage.getItem(pendingPortalRoleStorageKey);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { role?: string; createdAt?: number };
-    const role = parsed?.role;
-    const createdAt = Number(parsed?.createdAt || 0);
-    if (!role || !createdAt || Date.now() - createdAt > pendingPortalRoleTtlMs) {
-      window.sessionStorage.removeItem(pendingPortalRoleStorageKey);
-      return null;
-    }
-    if (role === 'donor' || role === 'ngo' || role === 'bloodbank' || role === 'admin') {
-      return role;
-    }
-  } catch {
-    // ignore storage errors
-  }
-  return null;
-};
+import { clearPendingPortalRole, readPendingPortalRole } from '../utils/registrationIntent';
 
 const ProtectedRoute = () => {
   const { user, authLoading, loading, portalRole, effectiveRole, isSuperAdmin, isImpersonating, profileResolved } = useAuth();
@@ -78,11 +55,7 @@ const ProtectedRoute = () => {
 
   useEffect(() => {
     if (!activeRole || typeof window === 'undefined') return;
-    try {
-      window.sessionStorage.removeItem(pendingPortalRoleStorageKey);
-    } catch {
-      // ignore storage errors
-    }
+    clearPendingPortalRole();
   }, [activeRole]);
 
   // Allow rendering protected shells when a user is already available.

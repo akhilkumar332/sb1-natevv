@@ -57,6 +57,10 @@ import { authMessages } from '../constants/messages';
 import { ROUTES } from '../constants/routes';
 import { updateUserProfilePatch } from '../services/offlineMutationOutbox.service';
 import { captureFirestoreOperationError } from '../utils/firestoreDiagnostics';
+import {
+  readPendingPortalRole,
+  readRegistrationIntent,
+} from '../utils/registrationIntent';
 
 const trackImpersonationEvent = (eventName: string, params?: Record<string, any>) => {
   void import('../services/monitoring.service')
@@ -66,37 +70,6 @@ const trackImpersonationEvent = (eventName: string, params?: Record<string, any>
     .catch(() => {
       // ignore analytics failures
     });
-};
-
-const pendingPortalRoleStorageKey = 'bh_pending_portal_role';
-const pendingPortalRoleTtlMs = 30_000;
-
-const readPendingPortalRole = (): User['role'] | null => {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.sessionStorage.getItem(pendingPortalRoleStorageKey);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { role?: string; createdAt?: number };
-    const role = parsed?.role;
-    const createdAt = Number(parsed?.createdAt || 0);
-    if (!role || !createdAt || Date.now() - createdAt > pendingPortalRoleTtlMs) {
-      window.sessionStorage.removeItem(pendingPortalRoleStorageKey);
-      return null;
-    }
-    if (
-      role === 'donor'
-      || role === 'ngo'
-      || role === 'bloodbank'
-      || role === 'admin'
-      || role === 'hospital'
-      || role === 'superadmin'
-    ) {
-      return role;
-    }
-  } catch {
-    // ignore storage errors
-  }
-  return null;
 };
 
 // Define window recaptcha type
@@ -1421,6 +1394,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const currentUser = userRef.current;
           const cachedUser = readCachedUser();
           const pendingPortalRole = readPendingPortalRole();
+          const registrationIntentRole = readRegistrationIntent();
+          const bootstrapPendingRole = pendingPortalRole || registrationIntentRole;
+          const isRegistrationRoute =
+            typeof window !== 'undefined'
+            && (window.location.pathname.includes('/register') || window.location.pathname.includes('/onboarding'));
           if (!currentUser || currentUser.uid !== firebaseUser.uid) {
             setProfileResolved(false);
           }
@@ -1449,10 +1427,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             void updateSessionMetadata(firebaseUser, cachedUser);
             void updateUserInFirestore(firebaseUser)
               .then((result) => {
-                const isRegistrationRoute =
-                  typeof window !== 'undefined' &&
-                  (window.location.pathname.includes('/register') ||
-                    window.location.pathname.includes('/onboarding'));
                 if (result.user) {
                   setUser(result.user);
                   return;
@@ -1460,7 +1434,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (result.missing) {
                   reportAuthContextError(new Error('User document missing'), 'auth.user_doc.missing_cached', { uid: firebaseUser.uid });
                   if (isRegistrationRoute) {
-                    setUser(buildBootstrapFallbackUser(firebaseUser, pendingPortalRole));
+                    setUser(buildBootstrapFallbackUser(firebaseUser, bootstrapPendingRole));
                   }
                 }
               })
@@ -1491,29 +1465,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const creationTime = new Date(firebaseUser.metadata.creationTime!).getTime();
           const currentTime = Date.now();
           const isNewUser = (currentTime - creationTime) < 30000; // 30 seconds grace period
-          const isRegistrationRoute =
-            typeof window !== 'undefined'
-            && (window.location.pathname.includes('/register') || window.location.pathname.includes('/onboarding'));
 
-          if (isNewUser && isRegistrationRoute && pendingPortalRole) {
-            setUser(buildBootstrapFallbackUser(firebaseUser, pendingPortalRole));
+          if (isRegistrationRoute && bootstrapPendingRole && (isNewUser || registrationIntentRole)) {
+            setUser(buildBootstrapFallbackUser(firebaseUser, bootstrapPendingRole));
             setProfileResolved(true);
             setLoading(false);
 
             if (profileRetryTimeoutRef.current !== null) {
               window.clearTimeout(profileRetryTimeoutRef.current);
             }
-            profileRetryTimeoutRef.current = window.setTimeout(() => {
-              updateUserInFirestore(firebaseUser)
-                .then((retryResult) => {
-                  if (retryResult.user) {
-                    setUser(retryResult.user);
+            const refreshRegistrationProfile = (attempt: number) => {
+              profileRetryTimeoutRef.current = window.setTimeout(() => {
+                if (readRegistrationIntent()) {
+                  if (attempt < 12) {
+                    refreshRegistrationProfile(attempt + 1);
                   }
-                })
-                .catch((retryError) => {
-                  logProfileIssue('registration-route-profile-retry-failed', retryError, { uid: firebaseUser.uid });
-                });
-            }, 1800);
+                  return;
+                }
+                updateUserInFirestore(firebaseUser)
+                  .then((retryResult) => {
+                    if (retryResult.user) {
+                      setUser(retryResult.user);
+                    }
+                  })
+                  .catch((retryError) => {
+                    logProfileIssue('registration-route-profile-retry-failed', retryError, { uid: firebaseUser.uid });
+                  });
+              }, attempt === 0 ? 1800 : 1000);
+            };
+            refreshRegistrationProfile(0);
             return;
           }
 
@@ -1592,7 +1572,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (fallbackUser) {
               setUser(fallbackUser);
             } else {
-              setUser(buildBootstrapFallbackUser(firebaseUser, pendingPortalRole));
+              setUser(buildBootstrapFallbackUser(firebaseUser, bootstrapPendingRole));
             }
           }
           setProfileResolved(true);

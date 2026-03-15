@@ -18,13 +18,17 @@ import { notifyMobileAlreadyRegistered, requireValue } from '../utils/validation
 import { COLLECTIONS } from '../constants/firestore';
 import { ROUTES } from '../constants/routes';
 import { captureFirestoreOperationError } from '../utils/firestoreDiagnostics';
+import {
+  clearPendingPortalRole,
+  clearRegistrationIntent,
+  markPendingPortalRole,
+  markRegistrationIntent,
+} from '../utils/registrationIntent';
 
 interface RegisterFormData {
   identifier: string;
   otp: string;
 }
-
-const pendingPortalRoleStorageKey = 'bh_pending_portal_role';
 
 export const useRegister = () => {
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -84,6 +88,8 @@ export const useRegister = () => {
     const sanitizedOtp = sanitizeOtp(formData.otp);
     try {
       setOtpLoading(true);
+      markRegistrationIntent('donor');
+      markPendingPortalRole('donor');
       const userCredential = await confirmationResult.confirm(sanitizedOtp);
 
       clearRecaptchaVerifier();
@@ -116,6 +122,8 @@ export const useRegister = () => {
       }
 
       if (userDoc.exists()) {
+        clearRegistrationIntent();
+        clearPendingPortalRole();
         // User already exists - sign them out and redirect to login
         await signOut(auth);
         notifyMobileAlreadyRegistered();
@@ -130,6 +138,8 @@ export const useRegister = () => {
       });
 
       if (otherMatch) {
+        clearRegistrationIntent();
+        clearPendingPortalRole();
         await signOut(auth);
         notifyMobileAlreadyRegistered();
         navigate(ROUTES.portal.donor.login);
@@ -178,18 +188,13 @@ export const useRegister = () => {
       }
       authStorage.setAuthToken(token);
 
-      try {
-        window.sessionStorage.setItem(pendingPortalRoleStorageKey, JSON.stringify({
-          role: 'donor',
-          createdAt: Date.now(),
-        }));
-      } catch {
-        // ignore storage errors
-      }
+      clearRegistrationIntent();
 
       notify.success('Registration successful!');
       navigate(ROUTES.portal.donor.onboarding);
     } catch (error: any) {
+      clearRegistrationIntent();
+      clearPendingPortalRole();
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.otp.verify' } });
 
       clearRecaptchaVerifier();

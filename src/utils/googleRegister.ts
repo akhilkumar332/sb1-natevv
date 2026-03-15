@@ -8,9 +8,14 @@ import { authStorage } from './authStorage';
 import { authFlowMessages } from './authInputValidation';
 import { COLLECTIONS } from '../constants/firestore';
 import { captureFirestoreOperationError } from './firestoreDiagnostics';
+import {
+  clearPendingPortalRole,
+  clearRegistrationIntent,
+  markPendingPortalRole,
+  markRegistrationIntent,
+} from './registrationIntent';
 
 type GoogleRegisterRole = 'donor' | 'ngo' | 'bloodbank';
-const pendingPortalRoleStorageKey = 'bh_pending_portal_role';
 
 const waitForFirestoreAuthUser = async (expectedUid: string, timeoutMs: number = 3000) => {
   if (typeof (auth as any).authStateReady === 'function') {
@@ -26,6 +31,36 @@ const waitForFirestoreAuthUser = async (expectedUid: string, timeoutMs: number =
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+};
+
+const shouldRetryBootstrapProfileCreate = (error: unknown, expectedUid: string) => {
+  const anyError = error as { code?: string; message?: string };
+  const code = String(anyError?.code || '').toLowerCase();
+  const message = String(anyError?.message || '');
+  return code === 'permission-denied' && auth.currentUser?.uid === expectedUid
+    && !message.toLowerCase().includes('missing or insufficient permissions from stale session');
+};
+
+const createUserProfile = async (
+  userRef: ReturnType<typeof doc>,
+  uid: string,
+  payload: Record<string, unknown>,
+) => {
+  let attempt = 0;
+
+  while (attempt < 3) {
+    try {
+      await setDoc(userRef, payload, { merge: true });
+      return;
+    } catch (error) {
+      attempt += 1;
+      if (!shouldRetryBootstrapProfileCreate(error, uid) || attempt >= 3) {
+        throw error;
+      }
+      await waitForFirestoreAuthUser(uid, 1200);
+      await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+    }
   }
 };
 
@@ -71,6 +106,9 @@ export const registerWithGoogleRole = async ({
 }) => {
   let signedInUid: string | null = null;
   try {
+    markRegistrationIntent(role);
+    markPendingPortalRole(role);
+
     const result = await signInWithPopup(auth, googleProvider).catch((error) => {
       if (error.code === 'auth/popup-closed-by-user') {
         throw new Error('Sign-in popup was closed before completing the sign-in process.');
@@ -85,6 +123,8 @@ export const registerWithGoogleRole = async ({
     });
 
     if (!result) {
+      clearRegistrationIntent();
+      clearPendingPortalRole();
       return;
     }
     signedInUid = result.user.uid;
@@ -93,6 +133,8 @@ export const registerWithGoogleRole = async ({
     const additionalInfo = getAdditionalUserInfo(result);
     const isNewGoogleUser = additionalInfo?.isNewUser === true;
     if (!isNewGoogleUser) {
+      clearRegistrationIntent();
+      clearPendingPortalRole();
       await signOut(auth);
       notify.error(authFlowMessages.emailRegistered);
       navigate(loginPath);
@@ -113,7 +155,7 @@ export const registerWithGoogleRole = async ({
 
     // Critical path: create donor profile first so role access is immediately valid.
     try {
-      await setDoc(userRef, {
+      await createUserProfile(userRef, result.user.uid, {
         uid: result.user.uid,
         email: result.user.email,
         displayName: result.user.displayName,
@@ -123,7 +165,7 @@ export const registerWithGoogleRole = async ({
         onboardingCompleted: false,
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
-      }, { merge: true });
+      });
     } catch (profileCreateError) {
       await captureFirestoreOperationError(profileCreateError, {
         scope,
@@ -162,18 +204,12 @@ export const registerWithGoogleRole = async ({
       }
     }
 
-    try {
-      window.sessionStorage.setItem(pendingPortalRoleStorageKey, JSON.stringify({
-        role,
-        createdAt: Date.now(),
-      }));
-    } catch {
-      // ignore storage errors
-    }
+    clearRegistrationIntent();
 
     notify.success('Registration successful!');
     navigate(onboardingPath);
   } catch (error) {
+    clearRegistrationIntent();
     if (signedInUid && auth.currentUser?.uid === signedInUid) {
       try {
         await signOut(auth);
@@ -185,6 +221,7 @@ export const registerWithGoogleRole = async ({
         });
       }
     }
+    clearPendingPortalRole();
     void captureHandledError(error, { source: 'frontend', scope, metadata: { kind } });
     notify.error(resolveGoogleRegisterErrorMessage(error));
   }
