@@ -204,12 +204,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:2551",
+    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:2561",
     "method": "setDoc",
     "collectionKey": "PUBLIC_DONORS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2551,
+    "line": 2561,
     "area": "PUBLIC_DONORS setDoc",
     "mode": "queue_safe"
   },
@@ -2304,12 +2304,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "USERS.setDoc.utils/googleRegister.ts:56",
+    "id": "USERS.setDoc.utils/googleRegister.ts:62",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "utils",
     "path": "utils/googleRegister.ts",
-    "line": 56,
+    "line": 62,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },

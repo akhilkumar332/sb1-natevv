@@ -43,6 +43,12 @@ const shouldRetryBootstrapProfileCreate = (error: unknown, expectedUid: string) 
     && !message.toLowerCase().includes('missing or insufficient permissions from stale session');
 };
 
+const shouldDeferProfileCreationToOnboarding = (error: unknown, expectedUid: string) => {
+  const anyError = error as { code?: string };
+  return String(anyError?.code || '').toLowerCase() === 'permission-denied'
+    && auth.currentUser?.uid === expectedUid;
+};
+
 const createUserProfile = async (
   userRef: ReturnType<typeof doc>,
   uid: string,
@@ -125,6 +131,7 @@ export const registerWithGoogleRole = async ({
 
   activeGoogleRegisterPromise = (async () => {
     let signedInUid: string | null = null;
+    let deferredToOnboarding = false;
     try {
       markRegistrationIntent(role);
       markPendingPortalRole(role);
@@ -175,18 +182,19 @@ export const registerWithGoogleRole = async ({
 
       // Critical path: create donor profile first so role access is immediately valid.
       try {
-      await createUserProfile(userRef, result.user.uid, role, {
+        await createUserProfile(userRef, result.user.uid, role, {
         uid: result.user.uid,
         email: result.user.email,
         displayName: result.user.displayName,
         photoURL: result.user.photoURL,
         role,
-        onboardingCompleted: false,
-        createdAt: serverTimestamp(),
-        lastLoginAt: serverTimestamp(),
+          onboardingCompleted: false,
+          createdAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
         });
       } catch (profileCreateError) {
-        await captureFirestoreOperationError(profileCreateError, {
+        const canDeferToOnboarding = shouldDeferProfileCreationToOnboarding(profileCreateError, result.user.uid);
+        const diagnosticsPromise = captureFirestoreOperationError(profileCreateError, {
           scope,
           kind: `${kind}.user_profile_create`,
           operation: 'setDoc',
@@ -196,18 +204,25 @@ export const registerWithGoogleRole = async ({
           phase: 'google_register',
           portalRole: role,
         });
-        throw profileCreateError;
+        if (!canDeferToOnboarding) {
+          await diagnosticsPromise;
+          throw profileCreateError;
+        }
+        void diagnosticsPromise;
+        deferredToOnboarding = true;
       }
 
-      // Non-critical: referral enrichment must not block signup completion.
-      try {
-        await applyReferralTrackingForUser(result.user.uid);
-      } catch (referralError) {
-        void captureHandledError(referralError, {
-          source: 'frontend',
-          scope,
-          metadata: { kind: `${kind}.referral_tracking_non_blocking` },
-        });
+      if (!deferredToOnboarding) {
+        // Non-critical: referral enrichment must not block signup completion.
+        try {
+          await applyReferralTrackingForUser(result.user.uid);
+        } catch (referralError) {
+          void captureHandledError(referralError, {
+            source: 'frontend',
+            scope,
+            metadata: { kind: `${kind}.referral_tracking_non_blocking` },
+          });
+        }
       }
 
       if (persistToken) {
@@ -225,11 +240,16 @@ export const registerWithGoogleRole = async ({
 
       clearRegistrationIntent();
 
-      notify.success('Registration successful!');
+      notify.success(deferredToOnboarding ? 'Continue onboarding to finish registration.' : 'Registration successful!');
       navigate(onboardingPath);
     } catch (error) {
       clearRegistrationIntent();
-      if (signedInUid && auth.currentUser?.uid === signedInUid) {
+      if (signedInUid && shouldDeferProfileCreationToOnboarding(error, signedInUid)) {
+        notify.success('Continue onboarding to finish registration.');
+        navigate(onboardingPath);
+        return;
+      }
+      if (!deferredToOnboarding && signedInUid && auth.currentUser?.uid === signedInUid) {
         try {
           await signOut(auth);
         } catch (signOutError) {
@@ -240,9 +260,13 @@ export const registerWithGoogleRole = async ({
           });
         }
       }
-      clearPendingPortalRole();
+      if (!deferredToOnboarding) {
+        clearPendingPortalRole();
+      }
       void captureHandledError(error, { source: 'frontend', scope, metadata: { kind } });
-      notify.error(resolveGoogleRegisterErrorMessage(error));
+      if (!deferredToOnboarding) {
+        notify.error(resolveGoogleRegisterErrorMessage(error));
+      }
     }
   })();
 

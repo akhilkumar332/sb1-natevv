@@ -145,8 +145,8 @@ describe('registerWithGoogleRole', () => {
     expect(window.sessionStorage.getItem('bh_pending_portal_role')).toBeNull();
   });
 
-  it('signs out on critical profile creation failure', async () => {
-    const fatalError = new Error('Missing or insufficient permissions');
+  it('signs out on non-recoverable profile creation failure', async () => {
+    const fatalError = new Error('write failed');
 
     mockSignInWithPopup.mockResolvedValue(popupResult);
     mockSetDoc.mockRejectedValue(fatalError);
@@ -156,7 +156,7 @@ describe('registerWithGoogleRole', () => {
     await registerWithGoogleRole(baseArgs);
 
     expect(mockSignOut).toHaveBeenCalled();
-    expect(mockNotifyError).toHaveBeenCalledWith('Missing or insufficient permissions');
+    expect(mockNotifyError).toHaveBeenCalledWith('write failed');
     expect(navigate).not.toHaveBeenCalledWith('/donor/onboarding');
     expect(window.sessionStorage.getItem('bh_registration_intent')).toBeNull();
     expect(window.sessionStorage.getItem('bh_pending_portal_role')).toBeNull();
@@ -219,4 +219,5 @@ describe('registerWithGoogleRole', () => {
     expect(mockNotifySuccess).toHaveBeenCalledWith('Registration successful!');
     expect(mockSignOut).not.toHaveBeenCalled();
   });
+
 });

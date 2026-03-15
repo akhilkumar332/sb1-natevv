@@ -2475,6 +2475,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const isPrivileged = user.role === 'admin' || user.role === 'superadmin';
     const sanitizedData: Partial<User> = { ...data };
+    const bootstrapRole = !isPrivileged ? (readPendingPortalRole() || readRegistrationIntent()) : null;
     if (!isPrivileged) {
       if (Object.prototype.hasOwnProperty.call(sanitizedData, 'role')) {
         delete sanitizedData.role;
@@ -2513,6 +2514,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         actorUid: user.uid,
         patch: {
           ...sanitizedData,
+          ...(
+            bootstrapRole && !user.createdAt
+              ? {
+                  role: bootstrapRole,
+                  createdAt: serverTimestamp(),
+                  lastLoginAt: serverTimestamp(),
+                }
+              : {}
+          ),
           ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
           onboardingCompleted: true, // Set this to true upon successful completion
           ...(existingBhId ? {} : generatedBhId ? { bhId: generatedBhId } : {}),
