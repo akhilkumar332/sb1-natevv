@@ -2,7 +2,7 @@ import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, db, googleProvider } from '../firebase';
 import { notify } from 'services/notify.service';
-import { applyReferralTrackingForUser, resolveReferralContext } from '../services/referral.service';
+import { applyReferralTrackingForUser } from '../services/referral.service';
 import { captureHandledError } from '../services/errorLog.service';
 import { authStorage } from './authStorage';
 import { authFlowMessages } from './authInputValidation';
@@ -27,6 +27,7 @@ export const registerWithGoogleRole = async ({
   navigate: (to: string) => void;
   persistToken?: boolean;
 }) => {
+  let signedInUid: string | null = null;
   try {
     const result = await signInWithPopup(auth, googleProvider).catch((error) => {
       if (error.code === 'auth/popup-closed-by-user') {
@@ -44,6 +45,7 @@ export const registerWithGoogleRole = async ({
     if (!result) {
       return;
     }
+    signedInUid = result.user.uid;
 
     const userRef = doc(db, COLLECTIONS.USERS, result.user.uid);
     const userDoc = await getDoc(userRef);
@@ -54,7 +56,7 @@ export const registerWithGoogleRole = async ({
       return;
     }
 
-    const referralContext = await resolveReferralContext(result.user.uid);
+    // Critical path: create donor profile first so role access is immediately valid.
     await setDoc(userRef, {
       uid: result.user.uid,
       email: result.user.email,
@@ -64,25 +66,46 @@ export const registerWithGoogleRole = async ({
       onboardingCompleted: false,
       createdAt: serverTimestamp(),
       lastLoginAt: serverTimestamp(),
-      ...(referralContext
-        ? {
-            referredByUid: referralContext.referrerUid,
-            referredByBhId: referralContext.referrerBhId,
-            referralCapturedAt: serverTimestamp(),
-          }
-        : {}),
     });
 
-    await applyReferralTrackingForUser(result.user.uid);
+    // Non-critical: referral enrichment must not block signup completion.
+    try {
+      await applyReferralTrackingForUser(result.user.uid);
+    } catch (referralError) {
+      void captureHandledError(referralError, {
+        source: 'frontend',
+        scope,
+        metadata: { kind: `${kind}.referral_tracking_non_blocking` },
+      });
+    }
 
     if (persistToken) {
-      const token = await result.user.getIdToken();
-      authStorage.setAuthToken(token);
+      try {
+        const token = await result.user.getIdToken();
+        authStorage.setAuthToken(token);
+      } catch (tokenError) {
+        void captureHandledError(tokenError, {
+          source: 'frontend',
+          scope,
+          metadata: { kind: `${kind}.persist_token_non_blocking` },
+        });
+      }
     }
 
     notify.success('Registration successful!');
     navigate(onboardingPath);
   } catch (error) {
+    if (signedInUid && auth.currentUser?.uid === signedInUid) {
+      try {
+        await signOut(auth);
+      } catch (signOutError) {
+        void captureHandledError(signOutError, {
+          source: 'frontend',
+          scope,
+          metadata: { kind: `${kind}.signout_after_failed_register` },
+        });
+      }
+    }
     void captureHandledError(error, { source: 'frontend', scope, metadata: { kind } });
     if (error instanceof Error) {
       notify.error(error.message);

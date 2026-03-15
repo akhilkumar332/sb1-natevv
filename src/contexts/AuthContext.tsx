@@ -1364,6 +1364,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 break;
               }
               if (result.missing) {
+                if (isNewUser) {
+                  retries--;
+                  if (retries > 0) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    continue;
+                  }
+                }
                 missingUserDoc = true;
                 break;
               }

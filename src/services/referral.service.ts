@@ -53,14 +53,18 @@ const buildReferralNotificationId = (
 
 const resolveReferrerByBhId = async (bhId?: string | null): Promise<ResolveResult | null> => {
   if (!bhId) return null;
-  const referrerSnapshot = await getDocs(query(
-    collection(db, COLLECTIONS.USERS),
-    where('bhId', '==', bhId),
-    limit(1)
-  ));
-  if (referrerSnapshot.empty) {
+  let referrerSnapshot;
+  try {
+    referrerSnapshot = await getDocs(query(
+      collection(db, COLLECTIONS.USERS),
+      where('bhId', '==', bhId),
+      limit(1)
+    ));
+  } catch (error) {
+    reportReferralServiceError(error, 'referral.resolve_by_bhid.query', { bhId });
     return null;
   }
+  if (referrerSnapshot.empty) return null;
   const referrerDoc = referrerSnapshot.docs[0];
   return {
     uid: referrerDoc.id,
@@ -114,7 +118,13 @@ export const resolveReferralContext = async (newUserUid: string): Promise<Referr
       reportReferralServiceError(error, 'referral.resolve_by_uid', { newUserUid });
     }
   } else if (referralBhId) {
-    const bhIdLookup = await resolveReferrerByBhId(referralBhId);
+    let bhIdLookup: ResolveResult | null = null;
+    try {
+      bhIdLookup = await resolveReferrerByBhId(referralBhId);
+    } catch (error) {
+      reportReferralServiceError(error, 'referral.resolve_by_bhid', { newUserUid });
+      bhIdLookup = null;
+    }
     if (!bhIdLookup) {
       clearReferralTracking();
       return null;
@@ -161,7 +171,11 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
         },
         { merge: true }
       );
-      await sendReferralNotification(referrerUid, 'registered', newUserUid, referredData, newUserUid, referrerRole);
+      try {
+        await sendReferralNotification(referrerUid, 'registered', newUserUid, referredData, newUserUid, referrerRole);
+      } catch (notificationError) {
+        reportReferralServiceError(notificationError, 'referral.notification.registered', { referrerUid, newUserUid });
+      }
       clearReferralTracking();
       return { referrerUid, referrerBhId };
     }
@@ -200,7 +214,11 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
     const referralWritten = referralResult.status === 'fulfilled';
     const userWritten = userResult.status === 'fulfilled';
     if (referralWritten) {
-      await sendReferralNotification(referrerUid, 'registered', newUserUid, referredData, newUserUid, referrerRole);
+      try {
+        await sendReferralNotification(referrerUid, 'registered', newUserUid, referredData, newUserUid, referrerRole);
+      } catch (notificationError) {
+        reportReferralServiceError(notificationError, 'referral.notification.registered', { referrerUid, newUserUid });
+      }
     }
     if (referralWritten || userWritten) {
       clearReferralTracking();
