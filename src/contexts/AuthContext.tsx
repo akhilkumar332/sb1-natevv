@@ -1250,6 +1250,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       pushInitRef.current = null;
       return;
     }
+    if (readRegistrationIntent() || user.onboardingCompleted !== true) {
+      pushInitRef.current = null;
+      return;
+    }
     const pushRole = user.role === 'superadmin' ? portalRoleState : user.role;
     if (!pushRole || !['donor', 'ngo', 'bloodbank'].includes(pushRole)) {
       return;
