@@ -110,7 +110,7 @@ export const useNgoRegister = () => {
               referralCapturedAt: serverTimestamp(),
             }
           : {}),
-      });
+      }, { merge: true });
 
       await applyReferralTrackingForUser(userCredential.user.uid);
 

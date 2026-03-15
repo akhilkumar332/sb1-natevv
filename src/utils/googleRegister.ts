@@ -123,7 +123,7 @@ export const registerWithGoogleRole = async ({
         onboardingCompleted: false,
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
-      });
+      }, { merge: true });
     } catch (profileCreateError) {
       await captureFirestoreOperationError(profileCreateError, {
         scope,

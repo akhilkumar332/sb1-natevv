@@ -155,7 +155,7 @@ export const useRegister = () => {
                 referralCapturedAt: serverTimestamp(),
               }
             : {}),
-        });
+        }, { merge: true });
       } catch (profileCreateError) {
         await captureFirestoreOperationError(profileCreateError, {
           scope: 'auth',
