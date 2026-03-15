@@ -1,4 +1,4 @@
-import { doc, enableNetwork, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, enableNetwork, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getAdditionalUserInfo, signInWithPopup, signOut } from 'firebase/auth';
 import { auth, db, googleProvider } from '../firebase';
 import { notify } from 'services/notify.service';
@@ -16,6 +16,7 @@ import {
 } from './registrationIntent';
 
 type GoogleRegisterRole = 'donor' | 'ngo' | 'bloodbank';
+let activeGoogleRegisterPromise: Promise<void> | null = null;
 
 const waitForFirestoreAuthUser = async (expectedUid: string, timeoutMs: number = 3000) => {
   if (typeof (auth as any).authStateReady === 'function') {
@@ -45,6 +46,7 @@ const shouldRetryBootstrapProfileCreate = (error: unknown, expectedUid: string) 
 const createUserProfile = async (
   userRef: ReturnType<typeof doc>,
   uid: string,
+  role: GoogleRegisterRole,
   payload: Record<string, unknown>,
 ) => {
   let attempt = 0;
@@ -54,6 +56,19 @@ const createUserProfile = async (
       await setDoc(userRef, payload, { merge: true });
       return;
     } catch (error) {
+      if ((error as { code?: string })?.code === 'permission-denied') {
+        try {
+          const existingDoc = await getDoc(userRef);
+          if (existingDoc.exists()) {
+            const existingData = existingDoc.data() as { role?: string; onboardingCompleted?: boolean };
+            if (existingData?.role === role) {
+              return;
+            }
+          }
+        } catch {
+          // ignore fallback read errors and continue with normal retry/throw path
+        }
+      }
       attempt += 1;
       if (!shouldRetryBootstrapProfileCreate(error, uid) || attempt >= 3) {
         throw error;
@@ -104,125 +119,137 @@ export const registerWithGoogleRole = async ({
   navigate: (to: string) => void;
   persistToken?: boolean;
 }) => {
-  let signedInUid: string | null = null;
-  try {
-    markRegistrationIntent(role);
-    markPendingPortalRole(role);
+  if (activeGoogleRegisterPromise) {
+    return activeGoogleRegisterPromise;
+  }
 
-    const result = await signInWithPopup(auth, googleProvider).catch((error) => {
-      if (error.code === 'auth/popup-closed-by-user') {
-        throw new Error('Sign-in popup was closed before completing the sign-in process.');
-      }
-      if (error.code === 'auth/popup-blocked') {
-        throw new Error('Sign-in popup was blocked by the browser. Please allow popups for this site.');
-      }
-      if (error.code === 'auth/cancelled-popup-request') {
-        return null;
-      }
-      throw error;
-    });
-
-    if (!result) {
-      clearRegistrationIntent();
-      clearPendingPortalRole();
-      return;
-    }
-    signedInUid = result.user.uid;
-
-    const userRef = doc(db, COLLECTIONS.USERS, result.user.uid);
-    const additionalInfo = getAdditionalUserInfo(result);
-    const isNewGoogleUser = additionalInfo?.isNewUser === true;
-    if (!isNewGoogleUser) {
-      clearRegistrationIntent();
-      clearPendingPortalRole();
-      await signOut(auth);
-      notify.error(authFlowMessages.emailRegistered);
-      navigate(loginPath);
-      return;
-    }
-
+  activeGoogleRegisterPromise = (async () => {
+    let signedInUid: string | null = null;
     try {
-      await enableNetwork(db);
-    } catch (networkEnableError) {
-      void captureHandledError(networkEnableError, {
-        source: 'frontend',
-        scope,
-        metadata: { kind: `${kind}.enable_network_before_register` },
-      });
-    }
+      markRegistrationIntent(role);
+      markPendingPortalRole(role);
 
-    await waitForFirestoreAuthUser(result.user.uid);
-
-    // Critical path: create donor profile first so role access is immediately valid.
-    try {
-      await createUserProfile(userRef, result.user.uid, {
-        uid: result.user.uid,
-        email: result.user.email,
-        displayName: result.user.displayName,
-        photoURL: result.user.photoURL,
-        role,
-        status: 'active',
-        onboardingCompleted: false,
-        createdAt: serverTimestamp(),
-        lastLoginAt: serverTimestamp(),
+      const result = await signInWithPopup(auth, googleProvider).catch((error) => {
+        if (error.code === 'auth/popup-closed-by-user') {
+          throw new Error('Sign-in popup was closed before completing the sign-in process.');
+        }
+        if (error.code === 'auth/popup-blocked') {
+          throw new Error('Sign-in popup was blocked by the browser. Please allow popups for this site.');
+        }
+        if (error.code === 'auth/cancelled-popup-request') {
+          return null;
+        }
+        throw error;
       });
-    } catch (profileCreateError) {
-      await captureFirestoreOperationError(profileCreateError, {
-        scope,
-        kind: `${kind}.user_profile_create`,
-        operation: 'setDoc',
-        collection: COLLECTIONS.USERS,
-        docId: result.user.uid,
-        blocking: true,
-        phase: 'google_register',
-        portalRole: role,
-      });
-      throw profileCreateError;
-    }
 
-    // Non-critical: referral enrichment must not block signup completion.
-    try {
-      await applyReferralTrackingForUser(result.user.uid);
-    } catch (referralError) {
-      void captureHandledError(referralError, {
-        source: 'frontend',
-        scope,
-        metadata: { kind: `${kind}.referral_tracking_non_blocking` },
-      });
-    }
-
-    if (persistToken) {
-      try {
-        const token = await result.user.getIdToken();
-        authStorage.setAuthToken(token);
-      } catch (tokenError) {
-        void captureHandledError(tokenError, {
-          source: 'frontend',
-          scope,
-          metadata: { kind: `${kind}.persist_token_non_blocking` },
-        });
+      if (!result) {
+        clearRegistrationIntent();
+        clearPendingPortalRole();
+        return;
       }
-    }
+      signedInUid = result.user.uid;
 
-    clearRegistrationIntent();
-
-    notify.success('Registration successful!');
-    navigate(onboardingPath);
-  } catch (error) {
-    clearRegistrationIntent();
-    if (signedInUid && auth.currentUser?.uid === signedInUid) {
-      try {
+      const userRef = doc(db, COLLECTIONS.USERS, result.user.uid);
+      const additionalInfo = getAdditionalUserInfo(result);
+      const isNewGoogleUser = additionalInfo?.isNewUser === true;
+      if (!isNewGoogleUser) {
+        clearRegistrationIntent();
+        clearPendingPortalRole();
         await signOut(auth);
-      } catch (signOutError) {
-        void captureHandledError(signOutError, {
+        notify.error(authFlowMessages.emailRegistered);
+        navigate(loginPath);
+        return;
+      }
+
+      try {
+        await enableNetwork(db);
+      } catch (networkEnableError) {
+        void captureHandledError(networkEnableError, {
           source: 'frontend',
           scope,
-          metadata: { kind: `${kind}.signout_after_failed_register` },
+          metadata: { kind: `${kind}.enable_network_before_register` },
         });
       }
+
+      await waitForFirestoreAuthUser(result.user.uid);
+
+      // Critical path: create donor profile first so role access is immediately valid.
+      try {
+        await createUserProfile(userRef, result.user.uid, role, {
+          uid: result.user.uid,
+          email: result.user.email,
+          displayName: result.user.displayName,
+          photoURL: result.user.photoURL,
+          role,
+          status: 'active',
+          onboardingCompleted: false,
+          createdAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
+        });
+      } catch (profileCreateError) {
+        await captureFirestoreOperationError(profileCreateError, {
+          scope,
+          kind: `${kind}.user_profile_create`,
+          operation: 'setDoc',
+          collection: COLLECTIONS.USERS,
+          docId: result.user.uid,
+          blocking: true,
+          phase: 'google_register',
+          portalRole: role,
+        });
+        throw profileCreateError;
+      }
+
+      // Non-critical: referral enrichment must not block signup completion.
+      try {
+        await applyReferralTrackingForUser(result.user.uid);
+      } catch (referralError) {
+        void captureHandledError(referralError, {
+          source: 'frontend',
+          scope,
+          metadata: { kind: `${kind}.referral_tracking_non_blocking` },
+        });
+      }
+
+      if (persistToken) {
+        try {
+          const token = await result.user.getIdToken();
+          authStorage.setAuthToken(token);
+        } catch (tokenError) {
+          void captureHandledError(tokenError, {
+            source: 'frontend',
+            scope,
+            metadata: { kind: `${kind}.persist_token_non_blocking` },
+          });
+        }
+      }
+
+      clearRegistrationIntent();
+
+      notify.success('Registration successful!');
+      navigate(onboardingPath);
+    } catch (error) {
+      clearRegistrationIntent();
+      if (signedInUid && auth.currentUser?.uid === signedInUid) {
+        try {
+          await signOut(auth);
+        } catch (signOutError) {
+          void captureHandledError(signOutError, {
+            source: 'frontend',
+            scope,
+            metadata: { kind: `${kind}.signout_after_failed_register` },
+          });
+        }
+      }
+      clearPendingPortalRole();
+      void captureHandledError(error, { source: 'frontend', scope, metadata: { kind } });
+      notify.error(resolveGoogleRegisterErrorMessage(error));
     }
-    clearPendingPortalRole();
-    void captureHandledError(error, { source: 'frontend', scope, metadata: { kind } });
-    notify.error(resolveGoogleRegisterErrorMessage(error));
+  })();
+
+  try {
+    await activeGoogleRegisterPromise;
+  } finally {
+    activeGoogleRegisterPromise = null;
   }
 };

@@ -6,6 +6,7 @@ const mockSignOut = vi.hoisted(() => vi.fn());
 const mockGetAdditionalUserInfo = vi.hoisted(() => vi.fn());
 const mockDoc = vi.hoisted(() => vi.fn());
 const mockEnableNetwork = vi.hoisted(() => vi.fn());
+const mockGetDoc = vi.hoisted(() => vi.fn());
 const mockSetDoc = vi.hoisted(() => vi.fn());
 const mockServerTimestamp = vi.hoisted(() => vi.fn(() => 'ts'));
 const mockApplyReferralTrackingForUser = vi.hoisted(() => vi.fn());
@@ -26,6 +27,7 @@ vi.mock('firebase/auth', () => ({
 vi.mock('firebase/firestore', () => ({
   doc: mockDoc,
   enableNetwork: mockEnableNetwork,
+  getDoc: mockGetDoc,
   setDoc: mockSetDoc,
   serverTimestamp: mockServerTimestamp,
 }));
@@ -102,6 +104,10 @@ describe('registerWithGoogleRole', () => {
     mockAuth.currentUser = null;
     mockGetAdditionalUserInfo.mockReturnValue({ isNewUser: true });
     mockEnableNetwork.mockResolvedValue(undefined);
+    mockGetDoc.mockResolvedValue({
+      exists: () => false,
+      data: () => undefined,
+    });
     mockDoc.mockImplementation((_db: unknown, collectionName: string, uid: string) => ({
       id: `${collectionName}/${uid}`,
     }));
@@ -194,5 +200,23 @@ describe('registerWithGoogleRole', () => {
     expect(mockSetDoc).toHaveBeenCalledTimes(3);
     expect(mockNotifySuccess).toHaveBeenCalledWith('Registration successful!');
     expect(navigate).toHaveBeenCalledWith(ROUTES.portal.donor.onboarding);
+  });
+
+  it('treats a duplicate bootstrap write as success when the donor profile already exists', async () => {
+    mockSignInWithPopup.mockResolvedValue(popupResult);
+    mockAuth.currentUser = { uid: 'uid-1' };
+    mockSetDoc.mockRejectedValueOnce(Object.assign(new Error('Missing or insufficient permissions'), { code: 'permission-denied' }));
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ role: 'donor', onboardingCompleted: false }),
+    });
+    mockApplyReferralTrackingForUser.mockResolvedValue(null);
+
+    await registerWithGoogleRole(baseArgs);
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(1);
+    expect(mockGetDoc).toHaveBeenCalledTimes(1);
+    expect(mockNotifySuccess).toHaveBeenCalledWith('Registration successful!');
+    expect(mockSignOut).not.toHaveBeenCalled();
   });
 });
