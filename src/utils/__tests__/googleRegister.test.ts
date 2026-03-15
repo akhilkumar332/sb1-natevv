@@ -3,8 +3,8 @@ import { ROUTES } from '../../constants/routes';
 
 const mockSignInWithPopup = vi.hoisted(() => vi.fn());
 const mockSignOut = vi.hoisted(() => vi.fn());
+const mockGetAdditionalUserInfo = vi.hoisted(() => vi.fn());
 const mockDoc = vi.hoisted(() => vi.fn());
-const mockGetDoc = vi.hoisted(() => vi.fn());
 const mockSetDoc = vi.hoisted(() => vi.fn());
 const mockServerTimestamp = vi.hoisted(() => vi.fn(() => 'ts'));
 const mockApplyReferralTrackingForUser = vi.hoisted(() => vi.fn());
@@ -17,13 +17,13 @@ const mockAuth = vi.hoisted(() => ({
 }));
 
 vi.mock('firebase/auth', () => ({
+  getAdditionalUserInfo: mockGetAdditionalUserInfo,
   signInWithPopup: mockSignInWithPopup,
   signOut: mockSignOut,
 }));
 
 vi.mock('firebase/firestore', () => ({
   doc: mockDoc,
-  getDoc: mockGetDoc,
   setDoc: mockSetDoc,
   serverTimestamp: mockServerTimestamp,
 }));
@@ -97,6 +97,7 @@ describe('registerWithGoogleRole', () => {
     vi.clearAllMocks();
     navigate.mockReset();
     mockAuth.currentUser = null;
+    mockGetAdditionalUserInfo.mockReturnValue({ isNewUser: true });
     mockDoc.mockImplementation((_db: unknown, collectionName: string, uid: string) => ({
       id: `${collectionName}/${uid}`,
     }));
@@ -104,7 +105,6 @@ describe('registerWithGoogleRole', () => {
 
   it('keeps registration successful when referral tracking fails', async () => {
     mockSignInWithPopup.mockResolvedValue(popupResult);
-    mockGetDoc.mockResolvedValue({ exists: () => false });
     mockSetDoc.mockResolvedValue(undefined);
     mockApplyReferralTrackingForUser.mockRejectedValue(new Error('permission-denied'));
 
@@ -120,7 +120,7 @@ describe('registerWithGoogleRole', () => {
 
   it('signs out and redirects to login when user already exists', async () => {
     mockSignInWithPopup.mockResolvedValue(popupResult);
-    mockGetDoc.mockResolvedValue({ exists: () => true });
+    mockGetAdditionalUserInfo.mockReturnValue({ isNewUser: false });
     mockSignOut.mockResolvedValue(undefined);
 
     await registerWithGoogleRole(baseArgs);
@@ -135,7 +135,6 @@ describe('registerWithGoogleRole', () => {
     const fatalError = new Error('Missing or insufficient permissions');
 
     mockSignInWithPopup.mockResolvedValue(popupResult);
-    mockGetDoc.mockResolvedValue({ exists: () => false });
     mockSetDoc.mockRejectedValue(fatalError);
     mockSignOut.mockResolvedValue(undefined);
     mockAuth.currentUser = { uid: 'uid-1' };

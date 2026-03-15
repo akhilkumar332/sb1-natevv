@@ -436,6 +436,7 @@ service cloud.firestore {
 
     match /ReferralTracking/{referralId} {
       allow read: if isAuthenticated() && (
+        !exists(/databases/$(database)/documents/ReferralTracking/$(referralId)) ||
         resource.data.referrerUid == request.auth.uid ||
         resource.data.referredUid == request.auth.uid ||
         isAdmin()

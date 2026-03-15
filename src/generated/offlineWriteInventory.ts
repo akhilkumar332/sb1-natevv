@@ -2304,12 +2304,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "USERS.setDoc.utils/googleRegister.ts:60",
+    "id": "USERS.setDoc.utils/googleRegister.ts:61",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "utils",
     "path": "utils/googleRegister.ts",
-    "line": 60,
+    "line": 61,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },

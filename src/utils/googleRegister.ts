@@ -1,5 +1,5 @@
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { signInWithPopup, signOut } from 'firebase/auth';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { getAdditionalUserInfo, signInWithPopup, signOut } from 'firebase/auth';
 import { auth, db, googleProvider } from '../firebase';
 import { notify } from 'services/notify.service';
 import { applyReferralTrackingForUser } from '../services/referral.service';
@@ -48,8 +48,9 @@ export const registerWithGoogleRole = async ({
     signedInUid = result.user.uid;
 
     const userRef = doc(db, COLLECTIONS.USERS, result.user.uid);
-    const userDoc = await getDoc(userRef);
-    if (userDoc.exists()) {
+    const additionalInfo = getAdditionalUserInfo(result);
+    const isNewGoogleUser = additionalInfo?.isNewUser === true;
+    if (!isNewGoogleUser) {
       await signOut(auth);
       notify.error(authFlowMessages.emailRegistered);
       navigate(loginPath);
