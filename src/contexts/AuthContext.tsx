@@ -55,7 +55,6 @@ import { authStorage } from '../utils/authStorage';
 import { readFcmTokenMeta, readStoredFcmToken, writeFcmTokenMeta, writeStoredFcmToken } from '../utils/fcmStorage';
 import { authMessages } from '../constants/messages';
 import { ROUTES } from '../constants/routes';
-import { updateUserProfilePatch } from '../services/offlineMutationOutbox.service';
 import { captureFirestoreOperationError } from '../utils/firestoreDiagnostics';
 import {
   clearPendingPortalRole,
@@ -63,7 +62,7 @@ import {
   readPendingPortalRole,
   readRegistrationIntent,
 } from '../utils/registrationIntent';
-import { patchUserDocumentViaRest } from '../utils/firestoreRestUserWrite';
+import { createUserDocumentViaRest, patchUserDocumentViaRest } from '../utils/firestoreRestUserWrite';
 
 const trackImpersonationEvent = (eventName: string, params?: Record<string, any>) => {
   void import('../services/monitoring.service')
@@ -611,10 +610,12 @@ const runOwnerUserWriteWithRetry = async ({
   uid,
   write,
   restFallbackPatch,
+  restFallbackMode = 'patch',
 }: {
   uid: string;
   write: () => Promise<void>;
   restFallbackPatch?: Record<string, string | number | boolean | Date | null | undefined | any[] | Record<string, any>>;
+  restFallbackMode?: 'create' | 'patch';
 }) => {
   let lastError: unknown = null;
 
@@ -649,11 +650,30 @@ const runOwnerUserWriteWithRetry = async ({
   const lastCode = String((lastError as any)?.code || '').toLowerCase();
   if (lastCode === 'permission-denied' && restFallbackPatch && auth.currentUser?.uid === uid) {
     const freshToken = await auth.currentUser.getIdToken(true);
-    await patchUserDocumentViaRest({
-      idToken: freshToken,
-      userId: uid,
-      patch: restFallbackPatch,
-    });
+    if (restFallbackMode === 'create') {
+      try {
+        await createUserDocumentViaRest({
+          idToken: freshToken,
+          userId: uid,
+          document: restFallbackPatch,
+        });
+      } catch (restCreateError: any) {
+        if (String(restCreateError?.code || '').toLowerCase() !== 'already-exists') {
+          throw restCreateError;
+        }
+        await patchUserDocumentViaRest({
+          idToken: freshToken,
+          userId: uid,
+          patch: restFallbackPatch,
+        });
+      }
+    } else {
+      await patchUserDocumentViaRest({
+        idToken: freshToken,
+        userId: uid,
+        patch: restFallbackPatch,
+      });
+    }
     return;
   }
 
@@ -2619,6 +2639,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               phoneNumberNormalized,
             }),
             restFallbackPatch: bootstrapPatch,
+            restFallbackMode: 'create',
           });
         } catch (bootstrapError) {
           await captureFirestoreOperationError(bootstrapError, {
@@ -2649,11 +2670,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       await runOwnerUserWriteWithRetry({
         uid: user.uid,
-        write: () => updateUserProfilePatch({
-          userId: user.uid,
-          actorUid: user.uid,
-          patch: profilePatch,
-        }).then(() => undefined),
+        write: () => setDoc(
+          doc(db, COLLECTIONS.USERS, user.uid),
+          {
+            ...profilePatch,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true },
+        ),
         restFallbackPatch: profilePatch as Record<string, any>,
       });
       if (isPrivileged && sanitizedData.role && sanitizedData.role !== user.role) {

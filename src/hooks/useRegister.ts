@@ -24,7 +24,7 @@ import {
   markPendingPortalRole,
   markRegistrationIntent,
 } from '../utils/registrationIntent';
-import { patchUserDocumentViaRest } from '../utils/firestoreRestUserWrite';
+import { createUserDocumentViaRest, patchUserDocumentViaRest } from '../utils/firestoreRestUserWrite';
 
 interface RegisterFormData {
   identifier: string;
@@ -206,26 +206,38 @@ export const useRegister = () => {
               throw profileCreateError;
             }
             const freshToken = await currentAuthUser.getIdToken(true);
-            await patchUserDocumentViaRest({
-              idToken: freshToken,
-              userId: userCredential.user.uid,
-              patch: {
-                uid: userCredential.user.uid,
-                phoneNumber: userCredential.user.phoneNumber,
-                phoneNumberNormalized: normalizedPhone,
-                role: 'donor',
-                onboardingCompleted: false,
-                createdAt: new Date(),
-                lastLoginAt: new Date(),
-                ...(referralContext
-                  ? {
-                      referredByUid: referralContext.referrerUid,
-                      referredByBhId: referralContext.referrerBhId,
-                      referralCapturedAt: new Date(),
-                    }
-                  : {}),
-              },
-            });
+            const restDocument = {
+              uid: userCredential.user.uid,
+              phoneNumber: userCredential.user.phoneNumber,
+              phoneNumberNormalized: normalizedPhone,
+              role: 'donor' as const,
+              onboardingCompleted: false,
+              createdAt: new Date(),
+              lastLoginAt: new Date(),
+              ...(referralContext
+                ? {
+                    referredByUid: referralContext.referrerUid,
+                    referredByBhId: referralContext.referrerBhId,
+                    referralCapturedAt: new Date(),
+                  }
+                : {}),
+            };
+            try {
+              await createUserDocumentViaRest({
+                idToken: freshToken,
+                userId: userCredential.user.uid,
+                document: restDocument,
+              });
+            } catch (restCreateError: any) {
+              if (String(restCreateError?.code || '').toLowerCase() !== 'already-exists') {
+                throw restCreateError;
+              }
+              await patchUserDocumentViaRest({
+                idToken: freshToken,
+                userId: userCredential.user.uid,
+                patch: restDocument,
+              });
+            }
           } catch (restFallbackError) {
             await captureFirestoreOperationError(restFallbackError, {
               scope: 'auth',

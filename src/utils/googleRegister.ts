@@ -14,7 +14,7 @@ import {
   markPendingPortalRole,
   markRegistrationIntent,
 } from './registrationIntent';
-import { patchUserDocumentViaRest } from './firestoreRestUserWrite';
+import { createUserDocumentViaRest, patchUserDocumentViaRest } from './firestoreRestUserWrite';
 
 type GoogleRegisterRole = 'donor' | 'ngo' | 'bloodbank';
 let activeGoogleRegisterPromise: Promise<void> | null = null;
@@ -81,24 +81,36 @@ const createUserProfile = async (
         const code = String((error as { code?: string })?.code || '').toLowerCase();
         if (code === 'permission-denied' && auth.currentUser?.uid === uid) {
           const freshToken = await auth.currentUser.getIdToken(true);
-          await patchUserDocumentViaRest({
-            idToken: freshToken,
-            userId: uid,
-            patch: {
-              uid,
-              email: typeof payload.email === 'string' || payload.email === null ? payload.email as string | null : null,
-              displayName: typeof payload.displayName === 'string' || payload.displayName === null
-                ? payload.displayName as string | null
-                : null,
-              photoURL: typeof payload.photoURL === 'string' || payload.photoURL === null
-                ? payload.photoURL as string | null
-                : null,
-              role,
-              onboardingCompleted: false,
-              createdAt: new Date(),
-              lastLoginAt: new Date(),
-            },
-          });
+          const restDocument = {
+            uid,
+            email: typeof payload.email === 'string' || payload.email === null ? payload.email as string | null : null,
+            displayName: typeof payload.displayName === 'string' || payload.displayName === null
+              ? payload.displayName as string | null
+              : null,
+            photoURL: typeof payload.photoURL === 'string' || payload.photoURL === null
+              ? payload.photoURL as string | null
+              : null,
+            role,
+            onboardingCompleted: false,
+            createdAt: new Date(),
+            lastLoginAt: new Date(),
+          };
+          try {
+            await createUserDocumentViaRest({
+              idToken: freshToken,
+              userId: uid,
+              document: restDocument,
+            });
+          } catch (restCreateError: any) {
+            if (String(restCreateError?.code || '').toLowerCase() !== 'already-exists') {
+              throw restCreateError;
+            }
+            await patchUserDocumentViaRest({
+              idToken: freshToken,
+              userId: uid,
+              patch: restDocument,
+            });
+          }
           return;
         }
         throw error;
