@@ -79,6 +79,11 @@ const createUserProfile = async (
       if (!shouldRetryBootstrapProfileCreate(error, uid) || attempt >= 3) {
         throw error;
       }
+      try {
+        await auth.currentUser?.getIdToken(true);
+      } catch {
+        // ignore token refresh failures and let the next Firestore attempt decide
+      }
       await waitForFirestoreAuthUser(uid, 1200);
       await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
     }

@@ -54,9 +54,10 @@ const ProtectedRoute = () => {
   })();
 
   useEffect(() => {
-    if (!activeRole || typeof window === 'undefined') return;
+    if (!activeRole || typeof window === 'undefined' || !user) return;
+    if (!user.createdAt && user.onboardingCompleted !== true) return;
     clearPendingPortalRole();
-  }, [activeRole]);
+  }, [activeRole, user]);
 
   // Allow rendering protected shells when a user is already available.
   // This avoids post-login blocking while profile refresh continues in the background.

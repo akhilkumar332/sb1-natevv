@@ -606,6 +606,46 @@ const ensureBootstrapUserDocument = async ({
   }, { merge: true });
 };
 
+const runOwnerUserWriteWithRetry = async ({
+  uid,
+  write,
+}: {
+  uid: string;
+  write: () => Promise<void>;
+}) => {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await waitForFirestoreAuthUser(uid, 1500);
+      await write();
+      return;
+    } catch (error: any) {
+      lastError = error;
+      const code = String(error?.code || '').toLowerCase();
+      const currentUid = auth.currentUser?.uid || null;
+      const shouldRetry =
+        code === 'permission-denied'
+        && currentUid === uid;
+
+      if (!shouldRetry || attempt >= 2) {
+        throw error;
+      }
+
+      try {
+        await auth.currentUser?.getIdToken(true);
+      } catch {
+        // ignore token refresh failures and retry once Firestore auth catches up
+      }
+
+      await waitForFirestoreAuthUser(uid, 2000);
+      await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Failed to persist owner user document');
+};
+
 const updateUserInFirestore = async (
   firebaseUser: FirebaseUser,
   additionalData?: Partial<User>
@@ -2541,11 +2581,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (bootstrapRole && !user.createdAt && auth.currentUser) {
         try {
-          await ensureBootstrapUserDocument({
-            firebaseUser: auth.currentUser,
-            role: bootstrapRole,
-            currentUser: user,
-            phoneNumberNormalized,
+          await runOwnerUserWriteWithRetry({
+            uid: user.uid,
+            write: () => ensureBootstrapUserDocument({
+              firebaseUser: auth.currentUser!,
+              role: bootstrapRole,
+              currentUser: user,
+              phoneNumberNormalized,
+            }),
           });
         } catch (bootstrapError) {
           await captureFirestoreOperationError(bootstrapError, {
@@ -2562,15 +2605,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      await updateUserProfilePatch({
-        userId: user.uid,
-        actorUid: user.uid,
-        patch: {
-          ...sanitizedData,
-          ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
-          onboardingCompleted: true, // Set this to true upon successful completion
-          ...(existingBhId ? {} : generatedBhId ? { bhId: generatedBhId } : {}),
-        },
+      await runOwnerUserWriteWithRetry({
+        uid: user.uid,
+        write: () => updateUserProfilePatch({
+          userId: user.uid,
+          actorUid: user.uid,
+          patch: {
+            ...sanitizedData,
+            ...(phoneNumberNormalized ? { phoneNumberNormalized } : {}),
+            onboardingCompleted: true,
+            ...(existingBhId ? {} : generatedBhId ? { bhId: generatedBhId } : {}),
+          },
+        }).then(() => undefined),
       });
       if (isPrivileged && sanitizedData.role && sanitizedData.role !== user.role) {
         void logAuditEvent({

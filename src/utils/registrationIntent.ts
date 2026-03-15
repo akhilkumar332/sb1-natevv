@@ -2,7 +2,7 @@ type PortalRole = 'donor' | 'ngo' | 'bloodbank' | 'hospital' | 'admin' | 'supera
 
 const pendingPortalRoleStorageKey = 'bh_pending_portal_role';
 const registrationIntentStorageKey = 'bh_registration_intent';
-const pendingPortalRoleTtlMs = 30_000;
+const pendingPortalRoleTtlMs = 4 * 60 * 60 * 1000;
 const registrationIntentTtlMs = 45_000;
 
 const parseRolePayload = (raw: string | null, ttlMs: number, storageKey: string): PortalRole | null => {
