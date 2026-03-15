@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNgoRegister } from '../../hooks/useNgoRegister';
 import LogoMark from '../../components/LogoMark';
 import { ROUTES } from '../../constants/routes';
+import { readRegistrationIntent } from '../../utils/registrationIntent';
 
 export function NgoRegister() {
   const navigate = useNavigate();
@@ -18,6 +19,9 @@ export function NgoRegister() {
 
   useEffect(() => {
     if (!user || !profileResolved || hasNavigated.current) {
+      return;
+    }
+    if (readRegistrationIntent()) {
       return;
     }
     if (user.role !== 'ngo') {

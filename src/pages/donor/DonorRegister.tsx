@@ -9,6 +9,7 @@ import { useRegister } from '../../hooks/useRegister';
 import 'react-phone-number-input/style.css';
 import LogoMark from '../../components/LogoMark';
 import { ROUTES } from '../../constants/routes';
+import { readRegistrationIntent } from '../../utils/registrationIntent';
 
 export function DonorRegister() {
   const navigate = useNavigate();
@@ -31,6 +32,9 @@ export function DonorRegister() {
 
   useEffect(() => {
     if (!user || !profileResolved || hasNavigated.current) {
+      return;
+    }
+    if (readRegistrationIntent()) {
       return;
     }
     if (user.role !== 'donor') {

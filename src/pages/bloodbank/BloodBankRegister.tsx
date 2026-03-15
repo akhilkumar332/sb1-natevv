@@ -6,6 +6,7 @@ import { useBloodBankRegister } from '../../hooks/useBloodBankRegister';
 import { useAuth } from '../../contexts/AuthContext';
 import LogoMark from '../../components/LogoMark';
 import { ROUTES } from '../../constants/routes';
+import { readRegistrationIntent } from '../../utils/registrationIntent';
 
 export function BloodBankRegister() {
   const navigate = useNavigate();
@@ -16,6 +17,9 @@ export function BloodBankRegister() {
   } = useBloodBankRegister();
 
   useEffect(() => {
+    if (readRegistrationIntent()) {
+      return;
+    }
     if (user && user.role === 'bloodbank') {
       navigate(ROUTES.portal.bloodbank.dashboard.root);
     }
