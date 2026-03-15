@@ -1491,6 +1491,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const creationTime = new Date(firebaseUser.metadata.creationTime!).getTime();
           const currentTime = Date.now();
           const isNewUser = (currentTime - creationTime) < 30000; // 30 seconds grace period
+          const isRegistrationRoute =
+            typeof window !== 'undefined'
+            && (window.location.pathname.includes('/register') || window.location.pathname.includes('/onboarding'));
+
+          if (isNewUser && isRegistrationRoute && pendingPortalRole) {
+            setUser(buildBootstrapFallbackUser(firebaseUser, pendingPortalRole));
+            setProfileResolved(true);
+            setLoading(false);
+
+            if (profileRetryTimeoutRef.current !== null) {
+              window.clearTimeout(profileRetryTimeoutRef.current);
+            }
+            profileRetryTimeoutRef.current = window.setTimeout(() => {
+              updateUserInFirestore(firebaseUser)
+                .then((retryResult) => {
+                  if (retryResult.user) {
+                    setUser(retryResult.user);
+                  }
+                })
+                .catch((retryError) => {
+                  logProfileIssue('registration-route-profile-retry-failed', retryError, { uid: firebaseUser.uid });
+                });
+            }, 1800);
+            return;
+          }
 
           // Add retry logic with delay for new users
           let userData: User | null = null;

@@ -147,7 +147,13 @@ service cloud.firestore {
     function isOwnerBootstrapUserInitialization(userId) {
       return isAuthenticated()
         && request.auth.uid == userId
-        && !(resource.data.role is string)
+        && (
+          !(resource.data.role is string) ||
+          (
+            request.resource.data.role is string &&
+            request.resource.data.role == resource.data.role
+          )
+        )
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'uid',
           'email',
@@ -168,7 +174,15 @@ service cloud.firestore {
         && request.resource.data.role in ['donor', 'ngo', 'bloodbank', 'hospital', 'admin']
         && (
           !('status' in request.resource.data)
-          || request.resource.data.status in ['active', 'pending_verification']
+          || (
+            !('status' in resource.data) &&
+            request.resource.data.status in ['active', 'pending_verification']
+          )
+          || (
+            resource.data.status == 'pending_verification' &&
+            request.resource.data.status == 'active'
+          )
+          || request.resource.data.status == resource.data.status
         );
     }
 
