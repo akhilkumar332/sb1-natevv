@@ -11,6 +11,7 @@ import { REFERRAL_RULES, computeReferralStatus, normalizeReferralDate } from '..
 import { captureHandledError } from './errorLog.service';
 import { COLLECTIONS } from '../constants/firestore';
 import { ROUTES } from '../constants/routes';
+import { captureFirestoreOperationError } from '../utils/firestoreDiagnostics';
 
 type ReferralApplyResult = {
   referrerUid: string;
@@ -61,6 +62,15 @@ const resolveReferrerByBhId = async (bhId?: string | null): Promise<ResolveResul
       limit(1)
     ));
   } catch (error) {
+    void captureFirestoreOperationError(error, {
+      scope: 'donor',
+      kind: 'referral.resolve_by_bhid.query',
+      operation: 'query',
+      collection: COLLECTIONS.USERS,
+      docId: null,
+      blocking: false,
+      phase: 'referral_resolution',
+    });
     reportReferralServiceError(error, 'referral.resolve_by_bhid.query', { bhId });
     return null;
   }
@@ -115,6 +125,15 @@ export const resolveReferralContext = async (newUserUid: string): Promise<Referr
         }
       }
     } catch (error) {
+      void captureFirestoreOperationError(error, {
+        scope: 'donor',
+        kind: 'referral.resolve_by_uid',
+        operation: 'getDoc',
+        collection: COLLECTIONS.USERS,
+        docId: referrerUid,
+        blocking: false,
+        phase: 'referral_resolution',
+      });
       reportReferralServiceError(error, 'referral.resolve_by_uid', { newUserUid });
     }
   } else if (referralBhId) {
@@ -155,9 +174,37 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
 
     const referralDocId = `${referrerUid}_${newUserUid}`;
     const referralRef = doc(db, COLLECTIONS.REFERRAL_TRACKING, referralDocId);
-    const referralExisting = await getDoc(referralRef);
+    let referralExisting;
+    try {
+      referralExisting = await getDoc(referralRef);
+    } catch (referralReadError) {
+      await captureFirestoreOperationError(referralReadError, {
+        scope: 'donor',
+        kind: 'referral.apply.read_tracking',
+        operation: 'getDoc',
+        collection: COLLECTIONS.REFERRAL_TRACKING,
+        docId: referralDocId,
+        blocking: false,
+        phase: 'referral_apply',
+      });
+      throw referralReadError;
+    }
     const userRef = doc(db, COLLECTIONS.USERS, newUserUid);
-    const referredSnap = await getDoc(userRef);
+    let referredSnap;
+    try {
+      referredSnap = await getDoc(userRef);
+    } catch (referredReadError) {
+      await captureFirestoreOperationError(referredReadError, {
+        scope: 'donor',
+        kind: 'referral.apply.read_user',
+        operation: 'getDoc',
+        collection: COLLECTIONS.USERS,
+        docId: newUserUid,
+        blocking: false,
+        phase: 'referral_apply',
+      });
+      throw referredReadError;
+    }
     const referredData = referredSnap.exists() ? referredSnap.data() : undefined;
     const referredRole = referredData?.role;
 
@@ -205,9 +252,27 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
     ]);
 
     if (referralResult.status === 'rejected') {
+      void captureFirestoreOperationError(referralResult.reason, {
+        scope: 'donor',
+        kind: 'referral.tracking_doc.write',
+        operation: 'setDoc',
+        collection: COLLECTIONS.REFERRAL_TRACKING,
+        docId: referralDocId,
+        blocking: false,
+        phase: 'referral_apply',
+      });
       reportReferralServiceError(referralResult.reason, 'referral.tracking_doc.write', { referralDocId });
     }
     if (userResult.status === 'rejected') {
+      void captureFirestoreOperationError(userResult.reason, {
+        scope: 'donor',
+        kind: 'referral.referred_by.update',
+        operation: 'setDoc',
+        collection: COLLECTIONS.USERS,
+        docId: newUserUid,
+        blocking: false,
+        phase: 'referral_apply',
+      });
       reportReferralServiceError(userResult.reason, 'referral.referred_by.update', { newUserUid });
     }
 
@@ -225,6 +290,15 @@ export const applyReferralTrackingForUser = async (newUserUid: string): Promise<
       return { referrerUid, referrerBhId };
     }
   } catch (error) {
+    void captureFirestoreOperationError(error, {
+      scope: 'donor',
+      kind: 'referral.apply',
+      operation: 'setDoc',
+      collection: COLLECTIONS.REFERRAL_TRACKING,
+      docId: null,
+      blocking: false,
+      phase: 'referral_apply',
+    });
     reportReferralServiceError(error, 'referral.apply', { newUserUid });
   }
 
@@ -319,6 +393,15 @@ const sendReferralNotification = async (
     return true;
   } catch (error: any) {
     if (error?.code !== 'permission-denied') {
+      void captureFirestoreOperationError(error, {
+        scope: 'donor',
+        kind: 'referral.notification.create',
+        operation: 'setDoc',
+        collection: COLLECTIONS.NOTIFICATIONS,
+        docId: buildReferralNotificationId(referrerUid, referredUid, status),
+        blocking: false,
+        phase: 'referral_notification',
+      });
       reportReferralServiceError(error, 'referral.notification.create', { referrerUid, referredUid, status });
     }
   }
@@ -335,6 +418,15 @@ export const ensureReferralTrackingForExistingReferral = async (user: any): Prom
       referrerRole = referrerDoc.data()?.role;
     }
   } catch (error) {
+    void captureFirestoreOperationError(error, {
+      scope: 'donor',
+      kind: 'referral.resolve_referrer_role',
+      operation: 'getDoc',
+      collection: COLLECTIONS.USERS,
+      docId: referrerUid,
+      blocking: false,
+      phase: 'referral_ensure_existing',
+    });
     reportReferralServiceError(error, 'referral.resolve_referrer_role', { referrerUid });
   }
 
@@ -344,6 +436,15 @@ export const ensureReferralTrackingForExistingReferral = async (user: any): Prom
   try {
     referralSnap = await getDoc(referralRef);
   } catch (error) {
+    void captureFirestoreOperationError(error, {
+      scope: 'donor',
+      kind: 'referral.ensure_existing.read',
+      operation: 'getDoc',
+      collection: COLLECTIONS.REFERRAL_TRACKING,
+      docId: referralDocId,
+      blocking: false,
+      phase: 'referral_ensure_existing',
+    });
     reportReferralServiceError(error, 'referral.ensure_existing.read', { referralDocId, referrerUid, referredUid: user.uid });
     return;
   }
@@ -364,6 +465,15 @@ export const ensureReferralTrackingForExistingReferral = async (user: any): Prom
       }));
       await sendReferralNotification(referrerUid, 'registered', user.uid, user, user.uid, referrerRole);
     } catch (error) {
+      void captureFirestoreOperationError(error, {
+        scope: 'donor',
+        kind: 'referral.ensure_existing.create',
+        operation: 'setDoc',
+        collection: COLLECTIONS.REFERRAL_TRACKING,
+        docId: referralDocId,
+        blocking: false,
+        phase: 'referral_ensure_existing',
+      });
       reportReferralServiceError(error, 'referral.ensure_existing.create', { referralDocId, referrerUid, referredUid: user.uid });
       return;
     }
@@ -393,6 +503,15 @@ export const ensureReferralTrackingForExistingReferral = async (user: any): Prom
         await sendReferralNotification(referrerUid, computed.status, user.uid, user, user.uid, referrerRole);
       }
     } catch (error) {
+      void captureFirestoreOperationError(error, {
+        scope: 'donor',
+        kind: 'referral.ensure_existing.status_update',
+        operation: 'setDoc',
+        collection: COLLECTIONS.REFERRAL_TRACKING,
+        docId: referralDocId,
+        blocking: false,
+        phase: 'referral_ensure_existing',
+      });
       reportReferralServiceError(error, 'referral.ensure_existing.status_update', {
         referralDocId,
         referrerUid,

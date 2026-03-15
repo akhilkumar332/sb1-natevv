@@ -141,6 +141,38 @@ service cloud.firestore {
     }
 
     /**
+     * Allow a newly authenticated owner to finish initializing a partial user doc
+     * exactly once before the role is established.
+     */
+    function isOwnerBootstrapUserInitialization() {
+      return isAuthenticated()
+        && request.auth.uid == resource.id
+        && !(resource.data.role is string)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'uid',
+          'email',
+          'displayName',
+          'photoURL',
+          'phoneNumber',
+          'phoneNumberNormalized',
+          'role',
+          'status',
+          'onboardingCompleted',
+          'createdAt',
+          'lastLoginAt',
+          'updatedAt',
+          'referredByUid',
+          'referredByBhId',
+          'referralCapturedAt'
+        ])
+        && request.resource.data.role in ['donor', 'ngo', 'bloodbank', 'hospital', 'admin']
+        && (
+          !('status' in request.resource.data)
+          || request.resource.data.status in ['active', 'pending_verification']
+        );
+    }
+
+    /**
      * Allow a caller to append only themselves to a list field.
      */
     function isSelfAppendOnly(listField) {
@@ -342,6 +374,7 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         (isOwner(userId) && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'verified', 'status', 'breakGlass']) ||
+          isOwnerBootstrapUserInitialization() ||
           (
             request.resource.data.status == 'deleted' &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deletedAt', 'updatedAt'])

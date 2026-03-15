@@ -56,6 +56,7 @@ import { readFcmTokenMeta, readStoredFcmToken, writeFcmTokenMeta, writeStoredFcm
 import { authMessages } from '../constants/messages';
 import { ROUTES } from '../constants/routes';
 import { updateUserProfilePatch } from '../services/offlineMutationOutbox.service';
+import { captureFirestoreOperationError } from '../utils/firestoreDiagnostics';
 
 const trackImpersonationEvent = (eventName: string, params?: Record<string, any>) => {
   void import('../services/monitoring.service')
@@ -537,8 +538,49 @@ type UserFetchResult = {
 };
 
 const getUserDocSnapshot = async (userRef: DocumentReference): Promise<DocumentSnapshot> => {
-  // Prefer standard getDoc so Firestore can use cache when network channels are unstable.
-  return await getDoc(userRef);
+  // Wait for Auth state to settle before issuing owner-scoped reads.
+  if (typeof (auth as any).authStateReady === 'function') {
+    try {
+      await (auth as any).authStateReady();
+    } catch {
+      // ignore auth readiness failures; we'll still attempt the read below
+    }
+  }
+
+  let attempts = 0;
+  let lastError: unknown = null;
+
+  while (attempts < 3) {
+    try {
+      return await getDoc(userRef);
+    } catch (error: any) {
+      lastError = error;
+      const message = String(error?.message || '');
+      const isTargetCollision = error?.code === 'already-exists' || message.includes('Target ID already exists');
+      const currentUid = auth.currentUser?.uid || null;
+      const authNotReadyForOwnerRead = error?.code === 'permission-denied' && (!currentUid || currentUid !== userRef.id);
+
+      if (!isTargetCollision && !authNotReadyForOwnerRead) {
+        throw error;
+      }
+
+      attempts += 1;
+      if (attempts >= 3) {
+        throw error;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 250 * attempts));
+      if (typeof (auth as any).authStateReady === 'function') {
+        try {
+          await (auth as any).authStateReady();
+        } catch {
+          // ignore and continue retry
+        }
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Failed to read user document');
 };
 
 const buildBootstrapFallbackUser = (
@@ -559,9 +601,24 @@ const updateUserInFirestore = async (
   firebaseUser: FirebaseUser,
   additionalData?: Partial<User>
 ): Promise<UserFetchResult> => {
+  const userRef: DocumentReference = doc(db, COLLECTIONS.USERS, firebaseUser.uid);
   try {
-    const userRef: DocumentReference = doc(db, COLLECTIONS.USERS, firebaseUser.uid);
-    const userDoc: DocumentSnapshot = await getUserDocSnapshot(userRef);
+    let userDoc: DocumentSnapshot;
+    try {
+      userDoc = await getUserDocSnapshot(userRef);
+    } catch (userReadError) {
+      await captureFirestoreOperationError(userReadError, {
+        scope: 'auth',
+        kind: 'auth.user_doc.read',
+        operation: 'getDoc',
+        collection: COLLECTIONS.USERS,
+        docId: firebaseUser.uid,
+        blocking: true,
+        phase: 'auth_bootstrap',
+        portalRole: additionalData?.role || null,
+      });
+      throw userReadError;
+    }
 
     // If user document doesn't exist, return null
     if (!userDoc.exists()) {
@@ -600,6 +657,16 @@ const updateUserInFirestore = async (
       }
       await updateDoc(userRef, updatePayload);
     } catch (updateError) {
+      void captureFirestoreOperationError(updateError, {
+        scope: 'auth',
+        kind: 'auth.user_doc.last_login_update',
+        operation: 'updateDoc',
+        collection: COLLECTIONS.USERS,
+        docId: firebaseUser.uid,
+        blocking: false,
+        phase: 'auth_bootstrap',
+        portalRole: existingUserData?.role || null,
+      });
       reportAuthContextError(updateError, 'auth.user_doc.last_login_update');
       // Continue even if update fails - not critical
     }
@@ -638,6 +705,16 @@ const updateUserInFirestore = async (
           { merge: true }
         );
       } catch (publicError) {
+        void captureFirestoreOperationError(publicError, {
+          scope: 'auth',
+          kind: 'auth.public_donor.sync',
+          operation: 'setDoc',
+          collection: COLLECTIONS.PUBLIC_DONORS,
+          docId: firebaseUser.uid,
+          blocking: false,
+          phase: 'auth_bootstrap',
+          portalRole: resolvedUser.role || null,
+        });
         reportAuthContextError(publicError, 'auth.public_donor.sync');
       }
     }
@@ -674,6 +751,16 @@ const updateSessionMetadata = async (firebaseUser: FirebaseUser, knownUser?: Use
     }
     await updateDoc(userRef, updatePayload);
   } catch (error) {
+    void captureFirestoreOperationError(error, {
+      scope: 'auth',
+      kind: 'auth.session_metadata.update',
+      operation: 'updateDoc',
+      collection: COLLECTIONS.USERS,
+      docId: firebaseUser.uid,
+      blocking: false,
+      phase: 'session_metadata',
+      portalRole: knownUser?.role || null,
+    });
     reportAuthContextError(error, 'auth.session_metadata.update');
   }
 };
@@ -1278,6 +1365,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       { merge: true }
     ).catch((error) => {
+      void captureFirestoreOperationError(error, {
+        scope: 'auth',
+        kind: 'auth.public_donor.sync_effect',
+        operation: 'setDoc',
+        collection: COLLECTIONS.PUBLIC_DONORS,
+        docId: user.uid,
+        blocking: false,
+        phase: 'auth_sync_effect',
+        portalRole: user.role || null,
+      });
       reportAuthContextError(error, 'auth.public_donor.sync_effect');
     });
   }, [
@@ -2457,6 +2554,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bhId: prev?.bhId || generatedBhId || undefined
       } as User));
     } catch (error) {
+      void captureFirestoreOperationError(error, {
+        scope: 'auth',
+        kind: 'auth.profile_update',
+        operation: 'setDoc',
+        collection: COLLECTIONS.USERS,
+        docId: user.uid,
+        blocking: true,
+        phase: 'onboarding_profile_update',
+        portalRole: user.role || null,
+      });
       reportAuthContextError(error, 'auth.profile_update');
       throw error; // Re-throw the error so the caller can handle it
     }

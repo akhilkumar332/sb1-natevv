@@ -42,6 +42,7 @@ import {
 import { isValidCoordinatePair } from '../../utils/locationSelection';
 import { buildGeocodeLocationPatch, buildSuggestionLocationUpdate } from '../../utils/locationController';
 import { resolveOnboardingSubmitErrorMessage } from '../../utils/onboardingFeedback';
+import { captureFirestoreOperationError } from '../../utils/firestoreDiagnostics';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -353,7 +354,22 @@ export function DonorOnboarding() {
             const parsedDate = new Date(formData.lastDonation);
             if (!Number.isNaN(parsedDate.getTime())) {
               const historyRef = doc(db, COLLECTIONS.DONATION_HISTORY, user.uid);
-              const historySnapshot = await getDoc(historyRef);
+              let historySnapshot;
+              try {
+                historySnapshot = await getDoc(historyRef);
+              } catch (historyReadError) {
+                await captureFirestoreOperationError(historyReadError, {
+                  scope: 'donor',
+                  kind: 'donor.onboarding.history_read',
+                  operation: 'getDoc',
+                  collection: COLLECTIONS.DONATION_HISTORY,
+                  docId: user.uid,
+                  blocking: false,
+                  phase: 'donor_onboarding',
+                  portalRole: 'donor',
+                });
+                throw historyReadError;
+              }
               const existingDonations = historySnapshot.exists() && Array.isArray(historySnapshot.data().donations)
                 ? historySnapshot.data().donations
                 : [];
@@ -387,16 +403,30 @@ export function DonorOnboarding() {
                   return dateB - dateA;
                 })
                 .slice(0, 20);
-              await setDoc(
-                historyRef,
-                {
-                  userId: user.uid,
-                  lastDonationDate: Timestamp.fromDate(parsedDate),
-                  donations: sortedDonations,
-                  updatedAt: serverTimestamp(),
-                },
-                { merge: true }
-              );
+              try {
+                await setDoc(
+                  historyRef,
+                  {
+                    userId: user.uid,
+                    lastDonationDate: Timestamp.fromDate(parsedDate),
+                    donations: sortedDonations,
+                    updatedAt: serverTimestamp(),
+                  },
+                  { merge: true }
+                );
+              } catch (historyWriteError) {
+                await captureFirestoreOperationError(historyWriteError, {
+                  scope: 'donor',
+                  kind: 'donor.onboarding.history_write',
+                  operation: 'setDoc',
+                  collection: COLLECTIONS.DONATION_HISTORY,
+                  docId: user.uid,
+                  blocking: false,
+                  phase: 'donor_onboarding',
+                  portalRole: 'donor',
+                });
+                throw historyWriteError;
+              }
             }
           } catch (historyError) {
             reportOnboardingError(historyError, 'donor.onboarding.history_sync');

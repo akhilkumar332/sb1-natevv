@@ -7,6 +7,7 @@ import { captureHandledError } from '../services/errorLog.service';
 import { authStorage } from './authStorage';
 import { authFlowMessages } from './authInputValidation';
 import { COLLECTIONS } from '../constants/firestore';
+import { captureFirestoreOperationError } from './firestoreDiagnostics';
 
 type GoogleRegisterRole = 'donor' | 'ngo' | 'bloodbank';
 const pendingPortalRoleStorageKey = 'bh_pending_portal_role';
@@ -92,17 +93,31 @@ export const registerWithGoogleRole = async ({
     }
 
     // Critical path: create donor profile first so role access is immediately valid.
-    await setDoc(userRef, {
-      uid: result.user.uid,
-      email: result.user.email,
-      displayName: result.user.displayName,
-      photoURL: result.user.photoURL,
-      role,
-      status: 'active',
-      onboardingCompleted: false,
-      createdAt: serverTimestamp(),
-      lastLoginAt: serverTimestamp(),
-    });
+    try {
+      await setDoc(userRef, {
+        uid: result.user.uid,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        photoURL: result.user.photoURL,
+        role,
+        status: 'active',
+        onboardingCompleted: false,
+        createdAt: serverTimestamp(),
+        lastLoginAt: serverTimestamp(),
+      });
+    } catch (profileCreateError) {
+      await captureFirestoreOperationError(profileCreateError, {
+        scope,
+        kind: `${kind}.user_profile_create`,
+        operation: 'setDoc',
+        collection: COLLECTIONS.USERS,
+        docId: result.user.uid,
+        blocking: true,
+        phase: 'google_register',
+        portalRole: role,
+      });
+      throw profileCreateError;
+    }
 
     // Non-critical: referral enrichment must not block signup completion.
     try {

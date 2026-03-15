@@ -27,6 +27,25 @@ type ErrorLogRow = {
   createdAt?: Date;
 };
 
+const getMetadataString = (metadata: Record<string, unknown> | null): string => {
+  if (!metadata) return '';
+  try {
+    return JSON.stringify(metadata).toLowerCase();
+  } catch {
+    return '';
+  }
+};
+
+const getFirestoreMeta = (metadata: Record<string, unknown> | null) => ({
+  operation: typeof metadata?.firestoreOperation === 'string' ? metadata.firestoreOperation : null,
+  collection: typeof metadata?.firestoreCollection === 'string' ? metadata.firestoreCollection : null,
+  docId: typeof metadata?.firestoreDocId === 'string' ? metadata.firestoreDocId : null,
+  phase: typeof metadata?.firestorePhase === 'string' ? metadata.firestorePhase : null,
+  blocking: metadata?.firestoreBlocking === true,
+  permissionDenied: metadata?.firestorePermissionDenied === true,
+  kind: typeof metadata?.kind === 'string' ? metadata.kind : null,
+});
+
 const toDate = (value: unknown): Date | undefined => {
   return toDateValue(value);
 };
@@ -37,6 +56,7 @@ function ErrorLogsPage() {
   const [scopeFilter, setScopeFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [levelFilter, setLevelFilter] = useState('all');
+  const [operationFilter, setOperationFilter] = useState('all');
   const [impersonationFilter, setImpersonationFilter] = useState<'all' | 'yes' | 'no'>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -71,7 +91,7 @@ function ErrorLogsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, scopeFilter, sourceFilter, levelFilter, impersonationFilter, pageSize]);
+  }, [searchTerm, scopeFilter, sourceFilter, levelFilter, operationFilter, impersonationFilter, pageSize]);
 
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -79,6 +99,8 @@ function ErrorLogsPage() {
       if (scopeFilter !== 'all' && row.scope !== scopeFilter) return false;
       if (sourceFilter !== 'all' && row.source !== sourceFilter) return false;
       if (levelFilter !== 'all' && row.level !== levelFilter) return false;
+      const firestoreMeta = getFirestoreMeta(row.metadata);
+      if (operationFilter !== 'all' && firestoreMeta.operation !== operationFilter) return false;
       if (impersonationFilter === 'yes' && !row.isImpersonating) return false;
       if (impersonationFilter === 'no' && row.isImpersonating) return false;
       if (!term) return true;
@@ -93,11 +115,12 @@ function ErrorLogsPage() {
         row.userRole,
         row.fingerprint,
         row.sessionId,
+        getMetadataString(row.metadata),
       ].filter(Boolean).join(' ').toLowerCase();
 
       return haystack.includes(term);
     });
-  }, [rows, searchTerm, scopeFilter, sourceFilter, levelFilter, impersonationFilter]);
+  }, [rows, searchTerm, scopeFilter, sourceFilter, levelFilter, operationFilter, impersonationFilter]);
 
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -165,6 +188,18 @@ function ErrorLogsPage() {
             <option value="warning">warning</option>
           </select>
           <select
+            value={operationFilter}
+            onChange={(event) => setOperationFilter(event.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="all">All Firestore ops</option>
+            <option value="getDoc">getDoc</option>
+            <option value="setDoc">setDoc</option>
+            <option value="updateDoc">updateDoc</option>
+            <option value="query">query</option>
+            <option value="listen">listen</option>
+          </select>
+          <select
             value={impersonationFilter}
             onChange={(event) => setImpersonationFilter(event.target.value as 'all' | 'yes' | 'no')}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -179,6 +214,7 @@ function ErrorLogsPage() {
               setScopeFilter('all');
               setSourceFilter('all');
               setLevelFilter('all');
+              setOperationFilter('all');
               setImpersonationFilter('all');
             }}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
@@ -198,12 +234,24 @@ function ErrorLogsPage() {
           <div className="space-y-3 lg:hidden">
             {paged.map((row) => (
               <article key={`mobile-${row.id}`} className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
+                {(() => {
+                  const firestoreMeta = getFirestoreMeta(row.metadata);
+                  return (
+                    <>
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-semibold text-gray-900 line-clamp-2">{row.message}</p>
                   <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${row.level === 'warning' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-700'}`}>
                     {row.level}
                   </span>
                 </div>
+                {(firestoreMeta.operation || firestoreMeta.collection) && (
+                  <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                    {firestoreMeta.operation && <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">{firestoreMeta.operation}</span>}
+                    {firestoreMeta.collection && <span className="rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-700">{firestoreMeta.collection}</span>}
+                    {firestoreMeta.permissionDenied && <span className="rounded-full bg-red-50 px-2 py-1 font-semibold text-red-700">permission-denied</span>}
+                    {firestoreMeta.blocking && <span className="rounded-full bg-amber-50 px-2 py-1 font-semibold text-amber-700">blocking</span>}
+                  </div>
+                )}
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-600">
                   <p>Scope: <span className="font-semibold text-gray-800">{row.scope}</span></p>
                   <p>Source: <span className="font-semibold text-gray-800">{row.source}</span></p>
@@ -211,6 +259,9 @@ function ErrorLogsPage() {
                   <p>User: <span className="font-semibold text-gray-800">{row.userUid || '-'}</span></p>
                   <p>Time: <span className="font-semibold text-gray-800">{row.createdAt ? row.createdAt.toLocaleString() : 'N/A'}</span></p>
                 </div>
+                    </>
+                  );
+                })()}
               </article>
             ))}
           </div>
@@ -232,12 +283,21 @@ function ErrorLogsPage() {
                 <tbody className="divide-y divide-gray-100">
                   {paged.map((row) => {
                     const isExpanded = expandedId === row.id;
+                    const firestoreMeta = getFirestoreMeta(row.metadata);
                     return (
                       <Fragment key={row.id}>
                         <tr className="hover:bg-red-50/40">
                           <td className="px-4 py-3 text-gray-700 max-w-lg">
                             <p className="line-clamp-2 font-medium">{row.message}</p>
                             {row.code && <p className="text-xs text-red-600 mt-1">code: {row.code}</p>}
+                            {(firestoreMeta.operation || firestoreMeta.collection) && (
+                              <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                                {firestoreMeta.operation && <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">{firestoreMeta.operation}</span>}
+                                {firestoreMeta.collection && <span className="rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-700">{firestoreMeta.collection}</span>}
+                                {firestoreMeta.permissionDenied && <span className="rounded-full bg-red-50 px-2 py-1 font-semibold text-red-700">permission-denied</span>}
+                                {firestoreMeta.blocking && <span className="rounded-full bg-amber-50 px-2 py-1 font-semibold text-amber-700">blocking</span>}
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-gray-700">{row.scope}</td>
                           <td className="px-4 py-3 text-gray-700">{row.source}</td>
@@ -265,6 +325,20 @@ function ErrorLogsPage() {
                                 <p><span className="font-semibold">Fingerprint:</span> {row.fingerprint || '-'}</p>
                                 <p><span className="font-semibold">Session ID:</span> {row.sessionId || '-'}</p>
                               </div>
+                              {(firestoreMeta.operation || firestoreMeta.collection || firestoreMeta.phase || firestoreMeta.docId || firestoreMeta.kind) && (
+                                <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-950">
+                                  <p className="font-semibold">Firestore Trace</p>
+                                  <div className="mt-2 grid gap-2 md:grid-cols-2">
+                                    <p><span className="font-semibold">Operation:</span> {firestoreMeta.operation || '-'}</p>
+                                    <p><span className="font-semibold">Collection:</span> {firestoreMeta.collection || '-'}</p>
+                                    <p><span className="font-semibold">Document:</span> {firestoreMeta.docId || '-'}</p>
+                                    <p><span className="font-semibold">Phase:</span> {firestoreMeta.phase || '-'}</p>
+                                    <p><span className="font-semibold">Blocking:</span> {firestoreMeta.blocking ? 'yes' : 'no'}</p>
+                                    <p><span className="font-semibold">Permission Denied:</span> {firestoreMeta.permissionDenied ? 'yes' : 'no'}</p>
+                                    <p className="md:col-span-2"><span className="font-semibold">Kind:</span> {firestoreMeta.kind || '-'}</p>
+                                  </div>
+                                </div>
+                              )}
                               {row.metadata && (
                                 <div className="mt-3">
                                   <p className="text-xs font-semibold text-gray-800">Metadata</p>

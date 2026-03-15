@@ -17,6 +17,7 @@ import { registerWithGoogleRole } from '../utils/googleRegister';
 import { notifyMobileAlreadyRegistered, requireValue } from '../utils/validationFeedback';
 import { COLLECTIONS } from '../constants/firestore';
 import { ROUTES } from '../constants/routes';
+import { captureFirestoreOperationError } from '../utils/firestoreDiagnostics';
 
 interface RegisterFormData {
   identifier: string;
@@ -97,7 +98,22 @@ export const useRegister = () => {
 
       // Check if user already registered by uid as a fallback
       const userRef = doc(db, COLLECTIONS.USERS, userCredential.user.uid);
-      const userDoc = await getDoc(userRef);
+      let userDoc;
+      try {
+        userDoc = await getDoc(userRef);
+      } catch (userReadError) {
+        await captureFirestoreOperationError(userReadError, {
+          scope: 'auth',
+          kind: 'auth.register.phone.user_doc_read',
+          operation: 'getDoc',
+          collection: COLLECTIONS.USERS,
+          docId: userCredential.user.uid,
+          blocking: true,
+          phase: 'phone_register',
+          portalRole: 'donor',
+        });
+        throw userReadError;
+      }
 
       if (userDoc.exists()) {
         // User already exists - sign them out and redirect to login
@@ -122,23 +138,37 @@ export const useRegister = () => {
 
       // Create new user document with Donor role
       const referralContext = await resolveReferralContext(userCredential.user.uid);
-      await setDoc(userRef, {
-        uid: userCredential.user.uid,
-        phoneNumber: userCredential.user.phoneNumber,
-        phoneNumberNormalized: normalizedPhone,
-        role: 'donor',
-        status: 'active',
-        onboardingCompleted: false,
-        createdAt: serverTimestamp(),
-        lastLoginAt: serverTimestamp(),
-        ...(referralContext
-          ? {
-              referredByUid: referralContext.referrerUid,
-              referredByBhId: referralContext.referrerBhId,
-              referralCapturedAt: serverTimestamp(),
-            }
-          : {}),
-      });
+      try {
+        await setDoc(userRef, {
+          uid: userCredential.user.uid,
+          phoneNumber: userCredential.user.phoneNumber,
+          phoneNumberNormalized: normalizedPhone,
+          role: 'donor',
+          status: 'active',
+          onboardingCompleted: false,
+          createdAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
+          ...(referralContext
+            ? {
+                referredByUid: referralContext.referrerUid,
+                referredByBhId: referralContext.referrerBhId,
+                referralCapturedAt: serverTimestamp(),
+              }
+            : {}),
+        });
+      } catch (profileCreateError) {
+        await captureFirestoreOperationError(profileCreateError, {
+          scope: 'auth',
+          kind: 'auth.register.phone.user_profile_create',
+          operation: 'setDoc',
+          collection: COLLECTIONS.USERS,
+          docId: userCredential.user.uid,
+          blocking: true,
+          phase: 'phone_register',
+          portalRole: 'donor',
+        });
+        throw profileCreateError;
+      }
 
       await applyReferralTrackingForUser(userCredential.user.uid);
 
