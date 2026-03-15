@@ -1,4 +1,4 @@
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, enableNetwork, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getAdditionalUserInfo, signInWithPopup, signOut } from 'firebase/auth';
 import { auth, db, googleProvider } from '../firebase';
 import { notify } from 'services/notify.service';
@@ -9,6 +9,30 @@ import { authFlowMessages } from './authInputValidation';
 import { COLLECTIONS } from '../constants/firestore';
 
 type GoogleRegisterRole = 'donor' | 'ngo' | 'bloodbank';
+const pendingPortalRoleStorageKey = 'bh_pending_portal_role';
+
+const resolveGoogleRegisterErrorMessage = (error: unknown): string => {
+  const anyError = error as { code?: string; message?: string };
+  const message = String(anyError?.message || '');
+  const normalizedMessage = message.toLowerCase();
+  const code = String(anyError?.code || '').toLowerCase();
+
+  if (
+    (typeof navigator !== 'undefined' && !navigator.onLine)
+    || code === 'unavailable'
+    || code === 'failed-precondition'
+    || code === 'deadline-exceeded'
+    || normalizedMessage.includes('internet_disconnected')
+    || normalizedMessage.includes('client is offline')
+    || normalizedMessage.includes('offline')
+    || normalizedMessage.includes('network')
+    || normalizedMessage.includes('failed to fetch')
+  ) {
+    return 'Internet connection lost during Google signup. Reconnect and try again.';
+  }
+
+  return message || authFlowMessages.registrationFailed;
+};
 
 export const registerWithGoogleRole = async ({
   role,
@@ -57,6 +81,16 @@ export const registerWithGoogleRole = async ({
       return;
     }
 
+    try {
+      await enableNetwork(db);
+    } catch (networkEnableError) {
+      void captureHandledError(networkEnableError, {
+        source: 'frontend',
+        scope,
+        metadata: { kind: `${kind}.enable_network_before_register` },
+      });
+    }
+
     // Critical path: create donor profile first so role access is immediately valid.
     await setDoc(userRef, {
       uid: result.user.uid,
@@ -64,6 +98,7 @@ export const registerWithGoogleRole = async ({
       displayName: result.user.displayName,
       photoURL: result.user.photoURL,
       role,
+      status: 'active',
       onboardingCompleted: false,
       createdAt: serverTimestamp(),
       lastLoginAt: serverTimestamp(),
@@ -93,6 +128,15 @@ export const registerWithGoogleRole = async ({
       }
     }
 
+    try {
+      window.sessionStorage.setItem(pendingPortalRoleStorageKey, JSON.stringify({
+        role,
+        createdAt: Date.now(),
+      }));
+    } catch {
+      // ignore storage errors
+    }
+
     notify.success('Registration successful!');
     navigate(onboardingPath);
   } catch (error) {
@@ -108,10 +152,6 @@ export const registerWithGoogleRole = async ({
       }
     }
     void captureHandledError(error, { source: 'frontend', scope, metadata: { kind } });
-    if (error instanceof Error) {
-      notify.error(error.message);
-    } else {
-      notify.error(authFlowMessages.registrationFailed);
-    }
+    notify.error(resolveGoogleRegisterErrorMessage(error));
   }
 };

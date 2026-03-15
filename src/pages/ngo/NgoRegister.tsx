@@ -9,7 +9,7 @@ import { ROUTES } from '../../constants/routes';
 
 export function NgoRegister() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profileResolved } = useAuth();
   const hasNavigated = useRef(false);
   const {
     googleLoading,
@@ -17,15 +17,19 @@ export function NgoRegister() {
   } = useNgoRegister();
 
   useEffect(() => {
-    if (user && !hasNavigated.current) {
-      hasNavigated.current = true;
-      if (!user.onboardingCompleted) {
-        navigate(ROUTES.portal.ngo.onboarding);
-      } else if (user.role === 'ngo') {
-        navigate(ROUTES.portal.ngo.dashboard.root);
-      }
+    if (!user || !profileResolved || hasNavigated.current) {
+      return;
     }
-  }, [user, navigate]);
+    if (user.role !== 'ngo') {
+      return;
+    }
+    hasNavigated.current = true;
+    if (!user.onboardingCompleted) {
+      navigate(ROUTES.portal.ngo.onboarding);
+      return;
+    }
+    navigate(ROUTES.portal.ngo.dashboard.root);
+  }, [navigate, profileResolved, user]);
 
   return (
     <div className="min-h-screen flex">

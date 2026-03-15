@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { notify } from 'services/notify.service';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, enableNetwork, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { authStorage } from '../utils/authStorage';
@@ -22,6 +22,8 @@ interface RegisterFormData {
   identifier: string;
   otp: string;
 }
+
+const pendingPortalRoleStorageKey = 'bh_pending_portal_role';
 
 export const useRegister = () => {
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -87,6 +89,12 @@ export const useRegister = () => {
 
       const { normalized: normalizedPhone } = validateGeneralPhoneInput(formData.identifier);
 
+      try {
+        await enableNetwork(db);
+      } catch (networkEnableError) {
+        void captureHandledError(networkEnableError, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.phone.enable_network' } });
+      }
+
       // Check if user already registered by uid as a fallback
       const userRef = doc(db, COLLECTIONS.USERS, userCredential.user.uid);
       const userDoc = await getDoc(userRef);
@@ -119,6 +127,7 @@ export const useRegister = () => {
         phoneNumber: userCredential.user.phoneNumber,
         phoneNumberNormalized: normalizedPhone,
         role: 'donor',
+        status: 'active',
         onboardingCompleted: false,
         createdAt: serverTimestamp(),
         lastLoginAt: serverTimestamp(),
@@ -138,6 +147,15 @@ export const useRegister = () => {
         throw new Error('No token received');
       }
       authStorage.setAuthToken(token);
+
+      try {
+        window.sessionStorage.setItem(pendingPortalRoleStorageKey, JSON.stringify({
+          role: 'donor',
+          createdAt: Date.now(),
+        }));
+      } catch {
+        // ignore storage errors
+      }
 
       notify.success('Registration successful!');
       navigate(ROUTES.portal.donor.onboarding);

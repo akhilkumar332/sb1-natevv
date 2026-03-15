@@ -67,6 +67,37 @@ const trackImpersonationEvent = (eventName: string, params?: Record<string, any>
     });
 };
 
+const pendingPortalRoleStorageKey = 'bh_pending_portal_role';
+const pendingPortalRoleTtlMs = 30_000;
+
+const readPendingPortalRole = (): User['role'] | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(pendingPortalRoleStorageKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { role?: string; createdAt?: number };
+    const role = parsed?.role;
+    const createdAt = Number(parsed?.createdAt || 0);
+    if (!role || !createdAt || Date.now() - createdAt > pendingPortalRoleTtlMs) {
+      window.sessionStorage.removeItem(pendingPortalRoleStorageKey);
+      return null;
+    }
+    if (
+      role === 'donor'
+      || role === 'ngo'
+      || role === 'bloodbank'
+      || role === 'admin'
+      || role === 'hospital'
+      || role === 'superadmin'
+    ) {
+      return role;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return null;
+};
+
 // Define window recaptcha type
 declare global {
   interface Window {
@@ -509,6 +540,20 @@ const getUserDocSnapshot = async (userRef: DocumentReference): Promise<DocumentS
   // Prefer standard getDoc so Firestore can use cache when network channels are unstable.
   return await getDoc(userRef);
 };
+
+const buildBootstrapFallbackUser = (
+  firebaseUser: FirebaseUser,
+  pendingRole?: User['role'] | null,
+): User => ({
+  uid: firebaseUser.uid,
+  email: firebaseUser.email,
+  displayName: firebaseUser.displayName,
+  photoURL: firebaseUser.photoURL,
+  phoneNumber: firebaseUser.phoneNumber,
+  role: pendingRole || undefined,
+  status: pendingRole ? 'active' : undefined,
+  onboardingCompleted: pendingRole ? false : undefined,
+} as User);
 
 const updateUserInFirestore = async (
   firebaseUser: FirebaseUser,
@@ -1272,6 +1317,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const recentLogin = recentLoginRef.current;
           const currentUser = userRef.current;
           const cachedUser = readCachedUser();
+          const pendingPortalRole = readPendingPortalRole();
           if (!currentUser || currentUser.uid !== firebaseUser.uid) {
             setProfileResolved(false);
           }
@@ -1311,13 +1357,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (result.missing) {
                   reportAuthContextError(new Error('User document missing'), 'auth.user_doc.missing_cached', { uid: firebaseUser.uid });
                   if (isRegistrationRoute) {
-                    setUser({
-                      uid: firebaseUser.uid,
-                      email: firebaseUser.email,
-                      displayName: firebaseUser.displayName,
-                      photoURL: firebaseUser.photoURL,
-                      phoneNumber: firebaseUser.phoneNumber,
-                    } as User);
+                    setUser(buildBootstrapFallbackUser(firebaseUser, pendingPortalRole));
                   }
                 }
               })
@@ -1424,13 +1464,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (fallbackUser) {
               setUser(fallbackUser);
             } else {
-              setUser({
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                displayName: firebaseUser.displayName,
-                photoURL: firebaseUser.photoURL,
-                phoneNumber: firebaseUser.phoneNumber,
-              } as User);
+              setUser(buildBootstrapFallbackUser(firebaseUser, pendingPortalRole));
             }
           }
           setProfileResolved(true);

@@ -5,6 +5,7 @@ const mockSignInWithPopup = vi.hoisted(() => vi.fn());
 const mockSignOut = vi.hoisted(() => vi.fn());
 const mockGetAdditionalUserInfo = vi.hoisted(() => vi.fn());
 const mockDoc = vi.hoisted(() => vi.fn());
+const mockEnableNetwork = vi.hoisted(() => vi.fn());
 const mockSetDoc = vi.hoisted(() => vi.fn());
 const mockServerTimestamp = vi.hoisted(() => vi.fn(() => 'ts'));
 const mockApplyReferralTrackingForUser = vi.hoisted(() => vi.fn());
@@ -24,6 +25,7 @@ vi.mock('firebase/auth', () => ({
 
 vi.mock('firebase/firestore', () => ({
   doc: mockDoc,
+  enableNetwork: mockEnableNetwork,
   setDoc: mockSetDoc,
   serverTimestamp: mockServerTimestamp,
 }));
@@ -98,6 +100,7 @@ describe('registerWithGoogleRole', () => {
     navigate.mockReset();
     mockAuth.currentUser = null;
     mockGetAdditionalUserInfo.mockReturnValue({ isNewUser: true });
+    mockEnableNetwork.mockResolvedValue(undefined);
     mockDoc.mockImplementation((_db: unknown, collectionName: string, uid: string) => ({
       id: `${collectionName}/${uid}`,
     }));
@@ -144,5 +147,29 @@ describe('registerWithGoogleRole', () => {
     expect(mockSignOut).toHaveBeenCalled();
     expect(mockNotifyError).toHaveBeenCalledWith('Missing or insufficient permissions');
     expect(navigate).not.toHaveBeenCalledWith('/donor/onboarding');
+  });
+
+  it('continues registration when enableNetwork fails', async () => {
+    mockSignInWithPopup.mockResolvedValue(popupResult);
+    mockEnableNetwork.mockRejectedValue(new Error('network toggle failed'));
+    mockSetDoc.mockResolvedValue(undefined);
+    mockApplyReferralTrackingForUser.mockResolvedValue(null);
+
+    await registerWithGoogleRole(baseArgs);
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(1);
+    expect(mockNotifySuccess).toHaveBeenCalledWith('Registration successful!');
+    expect(navigate).toHaveBeenCalledWith(ROUTES.portal.donor.onboarding);
+  });
+
+  it('shows offline-specific error message for network failures', async () => {
+    mockSignInWithPopup.mockResolvedValue(popupResult);
+    mockSetDoc.mockRejectedValue(Object.assign(new Error('client is offline'), { code: 'unavailable' }));
+    mockSignOut.mockResolvedValue(undefined);
+    mockAuth.currentUser = { uid: 'uid-1' };
+
+    await registerWithGoogleRole(baseArgs);
+
+    expect(mockNotifyError).toHaveBeenCalledWith('Internet connection lost during Google signup. Reconnect and try again.');
   });
 });

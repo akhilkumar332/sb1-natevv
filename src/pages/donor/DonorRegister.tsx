@@ -12,7 +12,7 @@ import { ROUTES } from '../../constants/routes';
 
 export function DonorRegister() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profileResolved } = useAuth();
   const hasNavigated = useRef(false);
   const {
     formData,
@@ -30,15 +30,19 @@ export function DonorRegister() {
   } = useRegister();
 
   useEffect(() => {
-    if (user && !hasNavigated.current) {
-      hasNavigated.current = true;
-      if (!user.onboardingCompleted) {
-        navigate(ROUTES.portal.donor.onboarding);
-      } else if (user.role === 'donor') {
-        navigate(ROUTES.portal.donor.dashboard.root);
-      }
+    if (!user || !profileResolved || hasNavigated.current) {
+      return;
     }
-  }, [user, navigate]);
+    if (user.role !== 'donor') {
+      return;
+    }
+    hasNavigated.current = true;
+    if (!user.onboardingCompleted) {
+      navigate(ROUTES.portal.donor.onboarding);
+      return;
+    }
+    navigate(ROUTES.portal.donor.dashboard.root);
+  }, [navigate, profileResolved, user]);
 
   const renderInitialForm = () => (
     <div className="space-y-6">
