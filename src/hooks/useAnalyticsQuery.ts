@@ -20,6 +20,8 @@ import {
   getBloodTypeDistribution,
   getGeographicDistribution,
   getTopDonors,
+  getNgoPlatformAnalytics,
+  getBloodBankPlatformAnalytics,
   type DateRange,
   type DonorStats,
   type BloodBankStats,
@@ -29,6 +31,8 @@ import {
   type TrendData,
   type BloodTypeDistribution,
   type GeographicDistribution,
+  type NgoPlatformAnalytics,
+  type BloodBankPlatformAnalytics,
 } from '../services/analytics.service';
 
 // ============================================================================
@@ -249,6 +253,38 @@ export const useTopDonors = (
     queryKey: ['topDonors', limit],
     queryFn: () => getTopDonors(limit),
     // Cache top donors for 10 minutes
+    staleTime: TEN_MINUTES_MS,
+    ...options,
+  });
+};
+
+/**
+ * Hook to get platform-level NGO analytics with caching
+ */
+export const useNgoPlatformAnalytics = (
+  dateRange: DateRange,
+  options?: Omit<UseQueryOptions<NgoPlatformAnalytics>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: ['ngoPlatformAnalytics', dateRange],
+    queryFn: () => getNgoPlatformAnalytics(dateRange),
+    enabled: !!dateRange.startDate && !!dateRange.endDate,
+    staleTime: TEN_MINUTES_MS,
+    ...options,
+  });
+};
+
+/**
+ * Hook to get platform-level blood bank analytics with caching
+ */
+export const useBloodBankPlatformAnalytics = (
+  dateRange: DateRange,
+  options?: Omit<UseQueryOptions<BloodBankPlatformAnalytics>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: ['bloodBankPlatformAnalytics', dateRange],
+    queryFn: () => getBloodBankPlatformAnalytics(dateRange),
+    enabled: !!dateRange.startDate && !!dateRange.endDate,
     staleTime: TEN_MINUTES_MS,
     ...options,
   });

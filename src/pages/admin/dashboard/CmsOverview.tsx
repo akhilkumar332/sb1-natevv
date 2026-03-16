@@ -24,12 +24,12 @@ import { getCmsDiagnosticsSummary, recordCmsOperationFailure, resetCmsDiagnostic
 
 function MetricCard({ label, value, to, icon }: { label: string; value: number; to: string; icon: ReactNode }) {
   return (
-    <Link to={to} className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm hover:bg-red-50/40">
+    <Link to={to} className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm hover:bg-red-50/40 dark:border-red-900/30 dark:bg-slate-900 dark:hover:bg-red-950/20">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-red-700">{label}</p>
-        <span className="text-red-600">{icon}</span>
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-red-700 dark:text-red-300">{label}</p>
+        <span className="text-red-600 dark:text-red-300">{icon}</span>
       </div>
-      <p className="mt-2 text-2xl font-bold text-gray-900">{value}</p>
+      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-slate-100">{value}</p>
     </Link>
   );
 }
@@ -187,9 +187,9 @@ export default function CmsOverviewPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
-        <h2 className="text-2xl font-bold text-gray-900">CMS Overview</h2>
-        <p className="text-sm text-gray-600">Manage website content with clear priorities and next actions.</p>
+      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">CMS Overview</h2>
+        <p className="text-sm text-gray-600 dark:text-slate-300">Manage website content with clear priorities and next actions.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
@@ -225,71 +225,71 @@ export default function CmsOverviewPage() {
         />
       </div>
 
-      <div className="rounded-2xl border border-red-100 bg-white p-4 text-sm text-gray-600 shadow-sm">
-        <p>Published pages: <span className="font-semibold text-gray-900">{publishedPages.length}</span></p>
-        <p>Published posts: <span className="font-semibold text-gray-900">{publishedPosts.length}</span></p>
+      <div className="rounded-2xl border border-red-100 bg-white p-4 text-sm text-gray-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+        <p>Published pages: <span className="font-semibold text-gray-900 dark:text-slate-100">{publishedPages.length}</span></p>
+        <p>Published posts: <span className="font-semibold text-gray-900 dark:text-slate-100">{publishedPosts.length}</span></p>
         <div className="mt-3">
           <button
             type="button"
             onClick={() => void applyScheduledTransitions()}
             disabled={applyingSchedule}
-            className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+            className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/40"
           >
             {applyingSchedule ? 'Applying...' : 'Apply Scheduled Transitions'}
           </button>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm">
+      <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm dark:border-blue-900/40 dark:bg-blue-950/20">
         <div className="mb-2">
-          <h3 className="text-base font-bold text-blue-900">SEO Health Snapshot</h3>
-          <p className="text-xs text-blue-800">Human-friendly summary of what to fix first.</p>
+          <h3 className="text-base font-bold text-blue-900 dark:text-blue-200">SEO Health Snapshot</h3>
+          <p className="text-xs text-blue-800 dark:text-blue-300">Human-friendly summary of what to fix first.</p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Pages missing search title: <span className="font-semibold text-gray-900">{pagesMissingSearchTitle}</span>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-blue-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Pages missing search title: <span className="font-semibold text-gray-900 dark:text-slate-100">{pagesMissingSearchTitle}</span>
           </div>
-          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Pages missing search description: <span className="font-semibold text-gray-900">{pagesMissingSearchDescription}</span>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-blue-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Pages missing search description: <span className="font-semibold text-gray-900 dark:text-slate-100">{pagesMissingSearchDescription}</span>
           </div>
-          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Posts missing search title: <span className="font-semibold text-gray-900">{postsMissingSearchTitle}</span>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-blue-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Posts missing search title: <span className="font-semibold text-gray-900 dark:text-slate-100">{postsMissingSearchTitle}</span>
           </div>
-          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Posts missing search description: <span className="font-semibold text-gray-900">{postsMissingSearchDescription}</span>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-blue-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Posts missing search description: <span className="font-semibold text-gray-900 dark:text-slate-100">{postsMissingSearchDescription}</span>
           </div>
-          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Posts missing social image: <span className="font-semibold text-gray-900">{postsMissingSocialImage}</span>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-blue-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Posts missing social image: <span className="font-semibold text-gray-900 dark:text-slate-100">{postsMissingSocialImage}</span>
           </div>
-          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Published pages/posts with noindex: <span className="font-semibold text-gray-900">{noindexPublishedPages + noindexPublishedPosts}</span>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-blue-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Published pages/posts with noindex: <span className="font-semibold text-gray-900 dark:text-slate-100">{noindexPublishedPages + noindexPublishedPosts}</span>
           </div>
-          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Stale published posts (180+ days): <span className="font-semibold text-gray-900">{stalePublishedPosts}</span>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-blue-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Stale published posts (180+ days): <span className="font-semibold text-gray-900 dark:text-slate-100">{stalePublishedPosts}</span>
           </div>
-          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Stale published pages (180+ days): <span className="font-semibold text-gray-900">{stalePublishedPages}</span>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-blue-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Stale published pages (180+ days): <span className="font-semibold text-gray-900 dark:text-slate-100">{stalePublishedPages}</span>
           </div>
-          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Scheduled items queued: <span className="font-semibold text-gray-900">{scheduledItems}</span>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-blue-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Scheduled items queued: <span className="font-semibold text-gray-900 dark:text-slate-100">{scheduledItems}</span>
           </div>
-          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Overdue scheduled items: <span className="font-semibold text-gray-900">{overdueScheduledItems}</span>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-blue-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Overdue scheduled items: <span className="font-semibold text-gray-900 dark:text-slate-100">{overdueScheduledItems}</span>
           </div>
-          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Orphan post candidates: <span className="font-semibold text-gray-900">{orphanPosts}</span>
+          <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-blue-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Orphan post candidates: <span className="font-semibold text-gray-900 dark:text-slate-100">{orphanPosts}</span>
           </div>
         </div>
-        <div className="mt-3 rounded-lg border border-blue-200 bg-white p-3 text-xs text-gray-700">
-          <p className="font-semibold text-blue-900">Recommended Actions</p>
+        <div className="mt-3 rounded-lg border border-blue-200 bg-white p-3 text-xs text-gray-700 dark:border-blue-900/40 dark:bg-slate-900 dark:text-slate-300">
+          <p className="font-semibold text-blue-900 dark:text-blue-200">Recommended Actions</p>
           <p>1) Add missing search descriptions, 2) add social images for live posts, 3) refresh stale content and review hidden-from-search pages.</p>
         </div>
         {seoPriorityQueue.length ? (
-          <div className="mt-3 rounded-lg border border-blue-200 bg-white p-3 text-xs text-gray-700">
-            <p className="font-semibold text-blue-900">Top SEO Fixes</p>
+          <div className="mt-3 rounded-lg border border-blue-200 bg-white p-3 text-xs text-gray-700 dark:border-blue-900/40 dark:bg-slate-900 dark:text-slate-300">
+            <p className="font-semibold text-blue-900 dark:text-blue-200">Top SEO Fixes</p>
             <div className="mt-2 space-y-1">
               {seoPriorityQueue.map((item) => (
-                <Link key={item.key} to={item.href} className="block rounded border border-gray-200 px-2 py-1 hover:bg-gray-50">
+                <Link key={item.key} to={item.href} className="block rounded border border-gray-200 px-2 py-1 hover:bg-gray-50 dark:border-slate-700 dark:hover:bg-slate-800">
                   {item.label}
                 </Link>
               ))}
@@ -298,37 +298,37 @@ export default function CmsOverviewPage() {
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-3">
-          <h3 className="text-base font-bold text-gray-900">Manage Existing Frontend Pages</h3>
-          <p className="text-xs text-gray-600">Quick open editor for Home, Find Donors, Request Blood, About, and Contact content.</p>
+          <h3 className="text-base font-bold text-gray-900 dark:text-slate-100">Manage Existing Frontend Pages</h3>
+          <p className="text-xs text-gray-600 dark:text-slate-300">Quick open editor for Home, Find Donors, Request Blood, About, and Contact content.</p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {CMS_FRONTEND_PAGE_PRESETS.map((preset) => (
             <Link
               key={preset.key}
               to={ROUTES.portal.admin.dashboard.cmsPageEditor.replace(':slug', preset.slug)}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-800 hover:border-red-300 hover:bg-red-50"
+              className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-800 hover:border-red-300 hover:bg-red-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-red-950/20"
             >
               <div>{preset.label}</div>
-              <div className="text-xs font-normal text-gray-500">{preset.path}</div>
+              <div className="text-xs font-normal text-gray-500 dark:text-slate-400">{preset.path}</div>
             </Link>
           ))}
           <Link
             to={ROUTES.portal.admin.dashboard.cmsBlogPosts}
-            className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-800 hover:border-red-300 hover:bg-red-50"
+            className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-800 hover:border-red-300 hover:bg-red-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-red-950/20"
           >
             <div>Frontend Blog</div>
-            <div className="text-xs font-normal text-gray-500">{ROUTES.blog}</div>
+            <div className="text-xs font-normal text-gray-500 dark:text-slate-400">{ROUTES.blog}</div>
           </Link>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 shadow-sm">
+      <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/20">
         <div className="mb-2 flex items-center justify-between gap-2">
           <div>
-            <h3 className="text-base font-bold text-amber-900">CMS Ops Diagnostics</h3>
-            <p className="text-xs text-amber-800">Recent save/schedule failures captured from CMS runtime.</p>
+            <h3 className="text-base font-bold text-amber-900 dark:text-amber-200">CMS Ops Diagnostics</h3>
+            <p className="text-xs text-amber-800 dark:text-amber-300">Recent save/schedule failures captured from CMS runtime.</p>
           </div>
           <button
             type="button"
@@ -337,23 +337,23 @@ export default function CmsOverviewPage() {
               setDiagnosticsTick((tick) => tick + 1);
               notify.success('CMS diagnostics reset.');
             }}
-            className="rounded-md border border-amber-300 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+            className="rounded-md border border-amber-300 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-950/40"
           >
             Reset Diagnostics
           </button>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Total failures: <span className="font-semibold text-gray-900">{cmsDiagnostics.totalFailures}</span>
+          <div className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-amber-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Total failures: <span className="font-semibold text-gray-900 dark:text-slate-100">{cmsDiagnostics.totalFailures}</span>
           </div>
-          <div className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Last 24h: <span className="font-semibold text-gray-900">{cmsDiagnostics.recent24hFailures}</span>
+          <div className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-amber-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Last 24h: <span className="font-semibold text-gray-900 dark:text-slate-100">{cmsDiagnostics.recent24hFailures}</span>
           </div>
-          <div className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Save failures: <span className="font-semibold text-gray-900">{cmsDiagnostics.byKind.page_save + cmsDiagnostics.byKind.post_save}</span>
+          <div className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-amber-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Save failures: <span className="font-semibold text-gray-900 dark:text-slate-100">{cmsDiagnostics.byKind.page_save + cmsDiagnostics.byKind.post_save}</span>
           </div>
-          <div className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-gray-700">
-            Schedule failures: <span className="font-semibold text-gray-900">{cmsDiagnostics.byKind.schedule_transition}</span>
+          <div className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-amber-900/40 dark:bg-slate-900 dark:text-slate-300">
+            Schedule failures: <span className="font-semibold text-gray-900 dark:text-slate-100">{cmsDiagnostics.byKind.schedule_transition}</span>
           </div>
         </div>
       </div>

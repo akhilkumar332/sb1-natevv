@@ -1283,19 +1283,19 @@ function FindDonors() {
 
             {/* Results Header */}
             {hasSearchQuery && (
-              <div className="flex flex-col items-start justify-between gap-3 mb-6 sm:flex-row sm:items-center">
-                <p className="text-gray-600">
+              <div className="mb-6 flex flex-col items-start justify-between gap-3 lg:flex-row lg:items-center">
+                <p className="min-w-0 text-gray-600">
                   Showing <span className="font-bold text-red-600">{pageDonors.length}</span> of{' '}
                   <span className="font-bold text-red-600">{visibleDonors.length}</span> donors
                 </p>
-                <div className="flex items-center gap-3">
-                  <p className="text-sm text-gray-500">
+                <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+                  <p className="text-sm text-gray-500 sm:text-right">
                     Page {safePage} of {visibleTotalPages}
                   </p>
                   <button
                     type="button"
                     onClick={openRequestStudio}
-                    className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-gradient-to-r from-red-600 to-red-700 px-4 py-2 text-xs font-semibold text-white shadow-md ring-2 ring-red-100 transition-all hover:from-red-700 hover:to-red-800 hover:shadow-lg"
+                    className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-2 self-start rounded-full border border-red-200 bg-gradient-to-r from-red-600 to-red-700 px-4 py-2 text-xs font-semibold text-white shadow-md ring-2 ring-red-100 transition-all hover:from-red-700 hover:to-red-800 hover:shadow-lg sm:self-auto"
                   >
                     Request Studio
                     <ChevronRight className="h-4 w-4" />

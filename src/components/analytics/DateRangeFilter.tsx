@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { Calendar } from 'lucide-react';
+import { Calendar, Clock3 } from 'lucide-react';
 import { THREE_HUNDRED_MS } from '../../constants/time';
 import { ANALYTICS_LIMITS, ANALYTICS_RANGE_MS } from '../../constants/analytics';
 
@@ -35,6 +35,8 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
     { label: 'Last Year', value: 'year' },
     { label: 'Custom', value: 'custom' },
   ];
+
+  const selectedLabel = presetRanges.find((range) => range.value === selectedRange)?.label || 'Custom';
 
   const calculateDateRange = (range: DateRangeType): { start: Date; end: Date } => {
     const end = new Date();
@@ -93,65 +95,77 @@ export const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-4">
-      <div className="flex items-center gap-2 mb-4">
-        <Calendar className="w-5 h-5 text-gray-600" />
-        <h3 className="text-sm font-medium text-gray-900">Date Range</h3>
+    <div className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-3 shadow-sm dark:border-slate-800 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.98)_0%,rgba(15,23,42,0.92)_100%)]">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="rounded-lg bg-red-100 p-1.5 text-red-600 dark:bg-red-950/60 dark:text-red-300">
+            <Calendar className="h-3.5 w-3.5" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Date Range</h3>
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                <Clock3 className="h-3 w-3" />
+                {selectedLabel}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {presetRanges.map((range) => (
+            <button
+              key={range.value}
+              type="button"
+              onClick={() => handleRangeSelect(range.value)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                selectedRange === range.value
+                  ? 'border-red-600 bg-red-600 text-white shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800'
+              }`}
+            >
+              {range.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Preset Ranges */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {presetRanges.map((range) => (
-          <button
-            key={range.value}
-            onClick={() => handleRangeSelect(range.value)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              selectedRange === range.value
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            {range.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Custom Range Inputs */}
       {selectedRange === 'custom' && (
-        <div className="space-y-3 pt-3 border-t border-gray-200">
+        <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3 dark:border-slate-800 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
               Start Date
             </label>
             <input
               type="date"
               value={customStart}
               onChange={(e) => setCustomStart(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-red-950/50"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
               End Date
             </label>
             <input
               type="date"
               value={customEnd}
               onChange={(e) => setCustomEnd(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-red-950/50"
             />
           </div>
 
           <button
+            type="button"
             onClick={handleCustomApply}
             disabled={!customStart || !customEnd}
-            className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+            className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-red-600 dark:hover:bg-red-500 dark:disabled:bg-slate-700"
           >
-            Apply Custom Range
+            Apply Range
           </button>
           {customError ? (
-            <p className="text-xs text-rose-600" style={{ transitionDuration: `${THREE_HUNDRED_MS}ms` }}>
+            <p className="text-xs text-rose-600 dark:text-rose-400 lg:col-span-3" style={{ transitionDuration: `${THREE_HUNDRED_MS}ms` }}>
               {customError}
             </p>
           ) : null}

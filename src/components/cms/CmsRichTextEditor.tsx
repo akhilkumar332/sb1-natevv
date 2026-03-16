@@ -8,7 +8,7 @@ type Props = {
   disabled?: boolean;
 };
 
-const buttonClass = 'rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50';
+const buttonClass = 'rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800';
 
 export default function CmsRichTextEditor({ value, onChange, placeholder, disabled = false }: Props) {
   const editorRef = useRef<HTMLDivElement | null>(null);
@@ -67,8 +67,8 @@ export default function CmsRichTextEditor({ value, onChange, placeholder, disabl
   };
 
   return (
-    <div className="rounded-xl border border-gray-300">
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 bg-gray-50 p-2">
+    <div className="rounded-xl border border-gray-300 dark:border-slate-700 dark:bg-slate-900">
+      <div className="flex flex-wrap gap-1 border-b border-gray-200 bg-gray-50 p-2 dark:border-slate-700 dark:bg-slate-950/70">
         <button type="button" className={buttonClass} disabled={disabled} onClick={() => exec('bold')}>Bold</button>
         <button type="button" className={buttonClass} disabled={disabled} onClick={() => exec('italic')}>Italic</button>
         <button type="button" className={buttonClass} disabled={disabled} onClick={() => exec('underline')}>Underline</button>
@@ -107,7 +107,7 @@ export default function CmsRichTextEditor({ value, onChange, placeholder, disabl
           }
         }}
         data-placeholder={placeholder || 'Start writing...'}
-        className="min-h-[220px] p-3 text-sm leading-6 text-gray-800 outline-none empty:before:pointer-events-none empty:before:text-gray-400 empty:before:content-[attr(data-placeholder)] [&_a]:text-blue-700 [&_a]:underline"
+        className="min-h-[220px] p-3 text-sm leading-6 text-gray-800 outline-none empty:before:pointer-events-none empty:before:text-gray-400 empty:before:content-[attr(data-placeholder)] dark:text-slate-100 dark:empty:before:text-slate-500 [&_a]:text-blue-700 [&_a]:underline dark:[&_a]:text-blue-300"
       />
     </div>
   );

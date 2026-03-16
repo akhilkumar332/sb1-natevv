@@ -17,10 +17,10 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { COLLECTIONS } from '../constants/firestore';
-import { User, Donation, BloodRequest, Campaign } from '../types/database.types';
+import { User, Donation, BloodRequest, Campaign, BloodInventory } from '../types/database.types';
 import { extractQueryData } from '../utils/firestore.utils';
 import { countCollection } from '../utils/firestoreCount';
-import { runDedupedRequest } from '../utils/requestDedupe';
+import { clearDedupedRequestCache, runDedupedRequest } from '../utils/requestDedupe';
 import { DatabaseError } from '../utils/errorHandler';
 import { BLOOD_TYPE_CHART_COLORS, CHART_PALETTE } from '../constants/theme';
 import {
@@ -113,6 +113,62 @@ export interface GeographicDistribution {
   hospitals: number;
   donorCount: number;
   hospitalCount: number;
+}
+
+export interface NgoPlatformAnalytics {
+  totalVolunteers: number;
+  activeVolunteers: number;
+  totalPartnerships: number;
+  activePartnerships: number;
+  donorReach: number;
+  donorConfirmed: number;
+  confirmationRate: number;
+  campaignTypeDistribution: Array<{ label: string; value: number }>;
+  topNgos: Array<{
+    ngoId: string;
+    ngoName: string;
+    campaigns: number;
+    donorReach: number;
+    confirmedDonors: number;
+  }>;
+}
+
+export interface BloodBankPlatformAnalytics {
+  totalBloodBanks: number;
+  verifiedBloodBanks: number;
+  requestsCreated: number;
+  completedDonationsReceived: number;
+  totalUnitsReceived: number;
+  inventoryUnits: number;
+  criticalInventoryRecords: number;
+  lowInventoryRecords: number;
+  inventoryStatusDistribution: Array<{ label: string; value: number }>;
+  topBloodBanks: Array<{
+    bloodBankId: string;
+    bloodBankName: string;
+    requestsCreated: number;
+    unitsReceived: number;
+  }>;
+}
+
+export interface AnalyticsHealthReport {
+  status: 'healthy' | 'degraded';
+  checkedAt: Date;
+  range: {
+    startDate: Date;
+    endDate: Date;
+  };
+  datasets: {
+    platformStats: number;
+    rangeSource: PlatformRangeStats['source'];
+    growthPoints: number;
+    bloodTypes: number;
+    geoLocations: number;
+    ngoLeaders: number;
+    bloodBankLeaders: number;
+    topDonors: number;
+  };
+  issues: string[];
 }
 
 const resolveRole = (role?: 'donor' | 'bloodbank' | 'hospital' | 'ngo') => {
@@ -795,19 +851,224 @@ export const getTopDonors = async (limitCount: number = 10): Promise<Array<User 
           limit(chunk.length)
         )))
       );
-      const users = userSnapshots.flatMap((snapshot) => (
-        extractQueryData<User>(snapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation'])
-      ));
+      const usersById = new Map<string, User>();
+      userSnapshots.forEach((snapshot) => {
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data() as User;
+          usersById.set(docSnap.id, {
+            ...data,
+            uid: data.uid || docSnap.id,
+          });
+        });
+      });
 
       return topDonorIds
-        .map(id => {
-          const user = users.find(u => u.uid === id);
+        .map((id) => {
+          const user = usersById.get(id);
           return user ? { ...user, donationCount: donorCounts[id] } : null;
         })
         .filter(Boolean) as Array<User & { donationCount: number }>;
     }, FIVE_MINUTES_MS);
   } catch (error) {
     throw new DatabaseError('Failed to get top donors');
+  }
+};
+
+/**
+ * Get platform-wide NGO analytics for the selected range
+ */
+export const getNgoPlatformAnalytics = async (
+  dateRange: DateRange
+): Promise<NgoPlatformAnalytics> => {
+  try {
+    const cacheKey = `analytics:ngoPlatform:${dateRange.startDate.toISOString()}:${dateRange.endDate.toISOString()}`;
+    return runDedupedRequest(cacheKey, async () => {
+      const fromMs = dateRange.startDate.getTime();
+      const toMs = dateRange.endDate.getTime();
+
+      const [campaignsSnapshot, volunteersSnapshot, partnershipsSnapshot] = await Promise.all([
+        getDocs(collection(db, COLLECTIONS.CAMPAIGNS)),
+        getDocs(collection(db, COLLECTIONS.VOLUNTEERS)),
+        getDocs(collection(db, COLLECTIONS.PARTNERSHIPS)),
+      ]);
+
+      const campaigns = extractQueryData<Campaign>(campaignsSnapshot, ['createdAt', 'startDate', 'endDate']);
+      const volunteers = extractQueryData<any>(volunteersSnapshot, ['createdAt', 'joinedAt', 'lastActiveAt']);
+      const partnerships = extractQueryData<any>(partnershipsSnapshot, ['createdAt', 'startDate', 'endDate']);
+
+      const rangeCampaigns = campaigns.filter((campaign) => {
+        const createdAt = campaign.createdAt instanceof Date ? campaign.createdAt : campaign.createdAt?.toDate?.();
+        if (!createdAt) return false;
+        const createdAtMs = createdAt.getTime();
+        return createdAtMs >= fromMs && createdAtMs <= toMs;
+      });
+
+      const byType: Record<string, number> = {};
+      const byNgo: Record<string, { ngoId: string; ngoName: string; campaigns: number; donorReach: number; confirmedDonors: number }> = {};
+      let donorReach = 0;
+      let donorConfirmed = 0;
+
+      rangeCampaigns.forEach((campaign) => {
+        const typeLabel = campaign.type === 'blood-drive'
+          ? 'Blood Drives'
+          : campaign.type === 'awareness'
+            ? 'Awareness'
+            : campaign.type === 'fundraising'
+              ? 'Fundraising'
+              : 'Volunteer';
+        byType[typeLabel] = (byType[typeLabel] || 0) + 1;
+
+        const registeredCount = Array.isArray(campaign.registeredDonors) ? campaign.registeredDonors.length : 0;
+        const confirmedCount = Array.isArray(campaign.confirmedDonors) ? campaign.confirmedDonors.length : 0;
+        donorReach += registeredCount;
+        donorConfirmed += confirmedCount;
+
+        if (!byNgo[campaign.ngoId]) {
+          byNgo[campaign.ngoId] = {
+            ngoId: campaign.ngoId,
+            ngoName: campaign.ngoName || campaign.ngoId,
+            campaigns: 0,
+            donorReach: 0,
+            confirmedDonors: 0,
+          };
+        }
+
+        byNgo[campaign.ngoId].campaigns += 1;
+        byNgo[campaign.ngoId].donorReach += registeredCount;
+        byNgo[campaign.ngoId].confirmedDonors += confirmedCount;
+      });
+
+      const campaignTypeDistribution = Object.entries(byType)
+        .map(([label, value]) => ({ label, value }))
+        .sort((a, b) => b.value - a.value);
+
+      const topNgos = Object.values(byNgo)
+        .sort((a, b) => {
+          if (b.campaigns !== a.campaigns) return b.campaigns - a.campaigns;
+          return b.donorReach - a.donorReach;
+        })
+        .slice(0, 6);
+
+      const totalVolunteers = volunteers.length;
+      const activeVolunteers = volunteers.filter((volunteer) => volunteer.status === 'active').length;
+      const totalPartnerships = partnerships.length;
+      const activePartnerships = partnerships.filter((partnership) => partnership.status === 'active').length;
+
+      return {
+        totalVolunteers,
+        activeVolunteers,
+        totalPartnerships,
+        activePartnerships,
+        donorReach,
+        donorConfirmed,
+        confirmationRate: donorReach > 0 ? Math.round((donorConfirmed / donorReach) * 1000) / 10 : 0,
+        campaignTypeDistribution,
+        topNgos,
+      };
+    }, TEN_MINUTES_MS);
+  } catch (error) {
+    throw new DatabaseError('Failed to get NGO platform analytics');
+  }
+};
+
+/**
+ * Get platform-wide blood bank analytics for the selected range
+ */
+export const getBloodBankPlatformAnalytics = async (
+  dateRange: DateRange
+): Promise<BloodBankPlatformAnalytics> => {
+  try {
+    const cacheKey = `analytics:bloodBankPlatform:${dateRange.startDate.toISOString()}:${dateRange.endDate.toISOString()}`;
+    return runDedupedRequest(cacheKey, async () => {
+      const fromMs = dateRange.startDate.getTime();
+      const toMs = dateRange.endDate.getTime();
+
+      const [usersSnapshot, requestsSnapshot, donationsSnapshot, inventorySnapshot] = await Promise.all([
+        getDocs(collection(db, COLLECTIONS.USERS)),
+        getDocs(collection(db, COLLECTIONS.BLOOD_REQUESTS)),
+        getDocs(query(collection(db, COLLECTIONS.DONATIONS), where('status', '==', 'completed'))),
+        getDocs(collection(db, COLLECTIONS.BLOOD_INVENTORY)),
+      ]);
+
+      const users = extractQueryData<User>(usersSnapshot, ['createdAt', 'lastLoginAt', 'dateOfBirth', 'lastDonation']);
+      const requests = extractQueryData<BloodRequest>(requestsSnapshot, ['requestedAt', 'neededBy', 'fulfilledAt']);
+      const donations = extractQueryData<Donation>(donationsSnapshot, ['donationDate']);
+      const inventory = extractQueryData<BloodInventory>(inventorySnapshot, ['updatedAt', 'lastRestocked']);
+
+      const bloodBanks = users.filter((user) => user.role === 'bloodbank' || user.role === 'hospital');
+      const bloodBankLookup = bloodBanks.reduce<Record<string, User>>((acc, user) => {
+        acc[user.uid] = user;
+        return acc;
+      }, {});
+
+      const rangeRequests = requests.filter((request) => {
+        const requestedAt = request.requestedAt instanceof Date ? request.requestedAt : request.requestedAt?.toDate?.();
+        if (!requestedAt) return false;
+        const requestedAtMs = requestedAt.getTime();
+        return requestedAtMs >= fromMs && requestedAtMs <= toMs;
+      });
+
+      const rangeDonations = donations.filter((donation) => {
+        const donationDate = donation.donationDate instanceof Date ? donation.donationDate : donation.donationDate?.toDate?.();
+        if (!donationDate) return false;
+        const donationDateMs = donationDate.getTime();
+        return donationDateMs >= fromMs && donationDateMs <= toMs;
+      });
+
+      const requestCounts: Record<string, number> = {};
+      rangeRequests.forEach((request) => {
+        requestCounts[request.requesterId] = (requestCounts[request.requesterId] || 0) + 1;
+      });
+
+      const donationUnitsByHospital: Record<string, number> = {};
+      rangeDonations.forEach((donation) => {
+        donationUnitsByHospital[donation.hospitalId] = (donationUnitsByHospital[donation.hospitalId] || 0) + Number(donation.units || 0);
+      });
+
+      const inventoryStatusDistributionMap: Record<string, number> = {};
+      let inventoryUnits = 0;
+      let criticalInventoryRecords = 0;
+      let lowInventoryRecords = 0;
+      inventory.forEach((record) => {
+        inventoryUnits += Number(record.units || 0);
+        inventoryStatusDistributionMap[record.status] = (inventoryStatusDistributionMap[record.status] || 0) + 1;
+        if (record.status === 'critical') criticalInventoryRecords += 1;
+        if (record.status === 'low') lowInventoryRecords += 1;
+      });
+
+      const topBloodBanks = Object.keys({ ...requestCounts, ...donationUnitsByHospital })
+        .map((bloodBankId) => {
+          const user = bloodBankLookup[bloodBankId];
+          return {
+            bloodBankId,
+            bloodBankName: user?.bloodBankName || user?.hospitalName || user?.displayName || user?.email || bloodBankId,
+            requestsCreated: requestCounts[bloodBankId] || 0,
+            unitsReceived: donationUnitsByHospital[bloodBankId] || 0,
+          };
+        })
+        .sort((a, b) => {
+          if (b.requestsCreated !== a.requestsCreated) return b.requestsCreated - a.requestsCreated;
+          return b.unitsReceived - a.unitsReceived;
+        })
+        .slice(0, 6);
+
+      return {
+        totalBloodBanks: bloodBanks.length,
+        verifiedBloodBanks: bloodBanks.filter((user) => user.verified === true).length,
+        requestsCreated: rangeRequests.length,
+        completedDonationsReceived: rangeDonations.length,
+        totalUnitsReceived: rangeDonations.reduce((sum, donation) => sum + Number(donation.units || 0), 0),
+        inventoryUnits,
+        criticalInventoryRecords,
+        lowInventoryRecords,
+        inventoryStatusDistribution: Object.entries(inventoryStatusDistributionMap)
+          .map(([label, value]) => ({ label, value }))
+          .sort((a, b) => b.value - a.value),
+        topBloodBanks,
+      };
+    }, TEN_MINUTES_MS);
+  } catch (error) {
+    throw new DatabaseError('Failed to get blood bank platform analytics');
   }
 };
 
@@ -925,4 +1186,54 @@ const groupByMonth = (data: any[], dateField: string): TrendData[] => {
   return Object.entries(monthGroups)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, value]) => ({ date, label: date, value }));
+};
+
+export const getAnalyticsHealthReport = async (
+  dateRange: DateRange
+): Promise<AnalyticsHealthReport> => {
+  try {
+    clearDedupedRequestCache('analytics:');
+
+    const [platformStats, rangeStats, growthTrend, bloodTypes, geo, ngo, bloodBank, topDonors] = await Promise.all([
+      getPlatformStats(),
+      getPlatformRangeStats(dateRange),
+      getUserGrowthTrend(dateRange),
+      getBloodTypeDistribution(dateRange),
+      getGeographicDistribution(dateRange),
+      getNgoPlatformAnalytics(dateRange),
+      getBloodBankPlatformAnalytics(dateRange),
+      getTopDonors(8),
+    ]);
+
+    const issues: string[] = [];
+    if (platformStats.totalUsers <= 0) issues.push('Platform stats returned zero users.');
+    if (growthTrend.length === 0) issues.push('Growth trend returned no points for the selected range.');
+    if (geo.length === 0) issues.push('Geographic distribution returned no locations.');
+    if (bloodTypes.length === 0) issues.push('Blood-type distribution returned no donor mix data.');
+    if (ngo.topNgos.length === 0) issues.push('NGO analytics returned no ranked NGOs for the selected range.');
+    if (bloodBank.topBloodBanks.length === 0) issues.push('Blood bank analytics returned no ranked blood banks for the selected range.');
+    if (topDonors.length === 0) issues.push('Top donor leaderboard returned no donors.');
+
+    return {
+      status: issues.length > 0 ? 'degraded' : 'healthy',
+      checkedAt: new Date(),
+      range: {
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate,
+      },
+      datasets: {
+        platformStats: platformStats.totalUsers,
+        rangeSource: rangeStats.source,
+        growthPoints: growthTrend.length,
+        bloodTypes: bloodTypes.length,
+        geoLocations: geo.length,
+        ngoLeaders: ngo.topNgos.length,
+        bloodBankLeaders: bloodBank.topBloodBanks.length,
+        topDonors: topDonors.length,
+      },
+      issues,
+    };
+  } catch (error) {
+    throw new DatabaseError('Failed to get analytics health report');
+  }
 };

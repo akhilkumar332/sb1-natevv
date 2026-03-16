@@ -218,16 +218,16 @@ function Home() {
             <div className="pointer-events-none absolute right-2 top-2 z-20 rounded-full border border-red-100 bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-red-600 shadow-sm lg:hidden">
               Swipe →
             </div>
-            <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory sm:gap-6 md:gap-7 lg:grid lg:grid-cols-3 lg:overflow-visible lg:pb-0">
+            <div className="flex gap-3 overflow-x-auto pb-2 pl-1 pr-10 snap-x snap-mandatory sm:gap-6 md:gap-7 lg:grid lg:grid-cols-3 lg:overflow-visible lg:pb-0 lg:pr-0">
               {(content.featureCards || []).map((item, index) => (
-                <div key={item.title} className="group relative min-h-[250px] min-w-[260px] flex-shrink-0 snap-start overflow-hidden rounded-2xl border border-white/50 bg-white/90 p-8 shadow-lg backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:min-w-[300px] md:min-w-[340px] lg:min-w-0 lg:flex-shrink">
-                  <div className="absolute -top-10 -right-10 h-28 w-28 rounded-full bg-gradient-to-r from-red-500 to-pink-500 opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-20" />
+                <div key={item.title} className="group relative min-h-[220px] w-[82vw] max-w-[250px] flex-shrink-0 snap-start overflow-hidden rounded-2xl border border-white/50 bg-white/90 p-5 shadow-lg backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-xl sm:min-h-[240px] sm:min-w-[300px] sm:max-w-none sm:p-8 md:min-w-[340px] lg:min-h-[250px] lg:min-w-0 lg:w-auto lg:max-w-none lg:flex-shrink">
+                  <div className="absolute -top-10 -right-10 h-24 w-24 rounded-full bg-gradient-to-r from-red-500 to-pink-500 opacity-10 blur-2xl transition-opacity duration-300 group-hover:opacity-20 sm:h-28 sm:w-28" />
                   <div className="relative z-10">
-                    <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-r from-red-600 to-red-700 shadow-lg">
-                      {[<Zap className="w-6 h-6 text-white" />, <Shield className="w-6 h-6 text-white" />, <TrendingUp className="w-6 h-6 text-white" />][index] || <Zap className="w-6 h-6 text-white" />}
+                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-r from-red-600 to-red-700 shadow-lg sm:mb-5 sm:h-14 sm:w-14">
+                      {[<Zap className="h-5 w-5 text-white sm:h-6 sm:w-6" />, <Shield className="h-5 w-5 text-white sm:h-6 sm:w-6" />, <TrendingUp className="h-5 w-5 text-white sm:h-6 sm:w-6" />][index] || <Zap className="h-5 w-5 text-white sm:h-6 sm:w-6" />}
                     </div>
-                    <h3 className="text-xl font-bold text-gray-900">{item.title}</h3>
-                    <p className="mt-3 text-base leading-relaxed text-gray-600">{item.description}</p>
+                    <h3 className="text-lg font-bold leading-snug text-gray-900 sm:text-xl">{item.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-gray-600 sm:mt-3 sm:text-base sm:leading-relaxed">{item.description}</p>
                   </div>
                 </div>
               ))}

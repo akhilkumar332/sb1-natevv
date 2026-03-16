@@ -7,6 +7,7 @@ import { COLLECTIONS } from '../../../constants/firestore';
 import {
   CMS_FEATURE_FLAGS,
   CMS_FRONTEND_PAGE_PRESETS,
+  CMS_DEFAULTS,
   CMS_EDITOR,
   CMS_LIMITS,
   CMS_PAGE_KIND,
@@ -227,7 +228,8 @@ export default function CmsPageEditorPage() {
   const previewSlug = toCmsSlug(slug || title) || 'untitled-page';
   const draftScopeKey = isNewPage ? `new_${toCmsSlug(slugParam || 'new') || 'new'}` : (normalizedParamSlug || previewSlug);
   const previewPath = activePresetPath || (previewSlug === 'home' ? '/' : `/${previewSlug}`);
-  const previewUrl = `https://bloodhubindia.com${previewPath}`;
+  const previewBaseUrl = (settingsQuery.data?.canonicalBaseUrl || CMS_DEFAULTS.canonicalBaseUrl).replace(/\/+$/, '');
+  const previewUrl = `${previewBaseUrl}${previewPath}`;
   const seoAudit = runSeoAudit({
     title,
     seoTitle,
@@ -504,25 +506,25 @@ export default function CmsPageEditorPage() {
   const renderJsonField = (label: string, value: JsonLike, path: JsonPath): JSX.Element => {
     if (Array.isArray(value)) {
       return (
-        <div className="space-y-2 rounded-xl border border-gray-200 p-3">
+        <div className="space-y-2 rounded-xl border border-gray-200 p-3 dark:border-slate-700 dark:bg-slate-900/40">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">{label}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{label}</p>
             <button
               type="button"
               onClick={() => addDraftArrayItem(path, value[0] ?? '')}
-              className="rounded-md border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-50"
+              className="rounded-md border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/40"
             >
               Add item
             </button>
           </div>
           {value.map((item, index) => (
-            <div key={`${label}-${index}`} className="rounded-lg border border-gray-100 p-2">
+            <div key={`${label}-${index}`} className="rounded-lg border border-gray-100 p-2 dark:border-slate-800 dark:bg-slate-950/50">
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-[11px] font-semibold text-gray-500">Item {index + 1}</p>
+                <p className="text-[11px] font-semibold text-gray-500 dark:text-slate-400">Item {index + 1}</p>
                 <button
                   type="button"
                   onClick={() => removeDraftArrayItem(path, index)}
-                  className="rounded-md border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-50"
+                  className="rounded-md border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/40"
                 >
                   Remove
                 </button>
@@ -530,15 +532,15 @@ export default function CmsPageEditorPage() {
               {renderJsonField(`${label}-${index}`, item, [...path, index])}
             </div>
           ))}
-          {value.length === 0 && <p className="text-xs text-gray-500">No items yet.</p>}
+          {value.length === 0 && <p className="text-xs text-gray-500 dark:text-slate-400">No items yet.</p>}
         </div>
       );
     }
 
     if (isPlainObject(value)) {
       return (
-        <div className="space-y-2 rounded-xl border border-gray-200 p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">{label}</p>
+        <div className="space-y-2 rounded-xl border border-gray-200 p-3 dark:border-slate-700 dark:bg-slate-900/40">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{label}</p>
           <div className="grid gap-3 md:grid-cols-2">
             {Object.entries(value).map(([childKey, childValue]) => (
               <div key={`${label}-${childKey}`} className="md:col-span-2">
@@ -552,7 +554,7 @@ export default function CmsPageEditorPage() {
 
     if (typeof value === 'boolean') {
       return (
-        <label className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700">
+        <label className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
           <input
             type="checkbox"
             checked={value}
@@ -566,12 +568,12 @@ export default function CmsPageEditorPage() {
     if (typeof value === 'number') {
       return (
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">{label}</span>
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{label}</span>
           <input
             type="number"
             value={value}
             onChange={(event) => updateDraftAtPath(path, Number(event.target.value || 0))}
-            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
         </label>
       );
@@ -581,19 +583,19 @@ export default function CmsPageEditorPage() {
     const multiline = normalizedValue.length > 80 || normalizedValue.includes('\n');
     return (
       <label className="block">
-        <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">{label}</span>
+        <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{label}</span>
         {multiline ? (
           <textarea
             value={normalizedValue}
             onChange={(event) => updateDraftAtPath(path, event.target.value)}
             rows={3}
-            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
         ) : (
           <input
             value={normalizedValue}
             onChange={(event) => updateDraftAtPath(path, event.target.value)}
-            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
         )}
       </label>
@@ -832,17 +834,17 @@ export default function CmsPageEditorPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">CMS Page Editor</h2>
-            <p className="text-sm text-gray-600">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">CMS Page Editor</h2>
+            <p className="text-sm text-gray-600 dark:text-slate-300">
               {activePreset ? `Editing ${activePreset.label}` : 'Edit page content in a dedicated editor view.'}
             </p>
           </div>
           <Link
             to={ROUTES.portal.admin.dashboard.cmsPages}
-            className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             Back to Pages
           </Link>
@@ -851,7 +853,7 @@ export default function CmsPageEditorPage() {
               to={`${activePresetPath}?edit=1`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+              className="inline-flex items-center rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/40"
             >
               Open Live Visual Editor
             </Link>
@@ -859,9 +861,9 @@ export default function CmsPageEditorPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         {restoreDraftPayload ? (
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
             <p>Recovered a local unsaved draft for this page.</p>
             <div className="flex gap-2">
               <button
@@ -916,7 +918,7 @@ export default function CmsPageEditorPage() {
                   setIsDirty(true);
                   notify.success('Recovered local draft loaded.');
                 }}
-                className="rounded-md border border-amber-300 px-2 py-1 font-semibold hover:bg-amber-100"
+                className="rounded-md border border-amber-300 px-2 py-1 font-semibold hover:bg-amber-100 dark:border-amber-900/40 dark:hover:bg-amber-950/40"
               >
                 Restore Draft
               </button>
@@ -928,7 +930,7 @@ export default function CmsPageEditorPage() {
                     window.localStorage.removeItem(draftStorageKey(draftScopeKey));
                   }
                 }}
-                className="rounded-md border border-gray-300 bg-white px-2 py-1 font-semibold text-gray-700 hover:bg-gray-50"
+                className="rounded-md border border-gray-300 bg-white px-2 py-1 font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Discard
               </button>
@@ -936,10 +938,10 @@ export default function CmsPageEditorPage() {
           </div>
         ) : null}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-gray-900">Page Editor</p>
+          <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Page Editor</p>
         </div>
-        <div className="mb-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
-          <p className="text-sm font-semibold text-gray-900">Publish Readiness</p>
+        <div className="mb-3 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-950/70">
+          <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Publish Readiness</p>
           <div className="mt-2 grid gap-1 sm:grid-cols-2">
             {publishChecks.critical.map((check) => (
               <div key={check.id} className={`rounded px-2 py-1 text-xs ${check.passed ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
@@ -957,7 +959,7 @@ export default function CmsPageEditorPage() {
         <div className="grid gap-3 md:grid-cols-2">
           {isNewPage ? (
             <label className="block md:col-span-2">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Duplicate From Existing Page (Optional)</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Duplicate From Existing Page (Optional)</span>
               <select
                 value=""
                 onChange={(event) => {
@@ -982,7 +984,7 @@ export default function CmsPageEditorPage() {
                   setIsDirty(true);
                   notify.success('Page content duplicated. Update title/slug before saving.');
                 }}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               >
                 <option value="">Select an existing page</option>
                 {rows.map((entry) => (
@@ -995,35 +997,35 @@ export default function CmsPageEditorPage() {
             value={title}
             onChange={(event) => { setTitle(event.target.value); setIsDirty(true); }}
             placeholder="Page title"
-            className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
           <input
             value={slug}
             onChange={(event) => { setSlug(toCmsSlug(event.target.value)); setIsDirty(true); }}
             placeholder="page-slug"
-            className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
-          <select value={kind} onChange={(event) => { setKind(event.target.value as (typeof kindOptions)[number]); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm">
+          <select value={kind} onChange={(event) => { setKind(event.target.value as (typeof kindOptions)[number]); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
             {kindOptions.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
           </select>
-          <select value={status} onChange={(event) => { setStatus(event.target.value as (typeof statusOptions)[number]); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm">
+          <select value={status} onChange={(event) => { setStatus(event.target.value as (typeof statusOptions)[number]); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
             {statusOptions.map((entry) => <option key={entry} value={entry}>{toHumanCmsStatus(entry)}</option>)}
           </select>
-          <input value={workflowAssignee} onChange={(event) => { setWorkflowAssignee(event.target.value); setIsDirty(true); }} placeholder="Workflow assignee (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-          <select value={reviewStatus} onChange={(event) => { setReviewStatus(event.target.value as (typeof CMS_REVIEW_STATUS)[keyof typeof CMS_REVIEW_STATUS]); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm">
+          <input value={workflowAssignee} onChange={(event) => { setWorkflowAssignee(event.target.value); setIsDirty(true); }} placeholder="Workflow assignee (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+          <select value={reviewStatus} onChange={(event) => { setReviewStatus(event.target.value as (typeof CMS_REVIEW_STATUS)[keyof typeof CMS_REVIEW_STATUS]); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
             {Object.values(CMS_REVIEW_STATUS).map((entry) => <option key={entry} value={entry}>{entry}</option>)}
           </select>
-          <input type="datetime-local" value={scheduledPublishAt} onChange={(event) => { setScheduledPublishAt(event.target.value); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-          <input type="datetime-local" value={scheduledUnpublishAt} onChange={(event) => { setScheduledUnpublishAt(event.target.value); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-          <input value={excerpt} onChange={(event) => { setExcerpt(event.target.value); setIsDirty(true); }} placeholder="Summary (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2" />
-          <textarea value={reviewNotes} onChange={(event) => { setReviewNotes(event.target.value); setIsDirty(true); }} placeholder="Review notes (optional)" rows={2} className="rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2" />
+          <input type="datetime-local" value={scheduledPublishAt} onChange={(event) => { setScheduledPublishAt(event.target.value); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+          <input type="datetime-local" value={scheduledUnpublishAt} onChange={(event) => { setScheduledUnpublishAt(event.target.value); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+          <input value={excerpt} onChange={(event) => { setExcerpt(event.target.value); setIsDirty(true); }} placeholder="Summary (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+          <textarea value={reviewNotes} onChange={(event) => { setReviewNotes(event.target.value); setIsDirty(true); }} placeholder="Review notes (optional)" rows={2} className="rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
               <div className="space-y-1">
-                <input value={seoTitle} onChange={(event) => { setSeoTitle(event.target.value); setIsDirty(true); }} placeholder="Search title (optional)" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-                <span className="block text-[11px] text-gray-500">Recommended {CMS_SEO_GUIDELINES.titleMin}-{CMS_SEO_GUIDELINES.titleMax} characters. ({seoTitleLen}/{CMS_LIMITS.seoTitle})</span>
+                <input value={seoTitle} onChange={(event) => { setSeoTitle(event.target.value); setIsDirty(true); }} placeholder="Search title (optional)" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <span className="block text-[11px] text-gray-500 dark:text-slate-400">Recommended {CMS_SEO_GUIDELINES.titleMin}-{CMS_SEO_GUIDELINES.titleMax} characters. ({seoTitleLen}/{CMS_LIMITS.seoTitle})</span>
               </div>
               <div className="space-y-1">
-                <input value={seoDescription} onChange={(event) => { setSeoDescription(event.target.value); setIsDirty(true); }} placeholder="Search description (optional)" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-                <span className="block text-[11px] text-gray-500">Recommended {CMS_SEO_GUIDELINES.descriptionMin}-{CMS_SEO_GUIDELINES.descriptionMax} characters. ({seoDescriptionLen}/{CMS_LIMITS.seoDescription})</span>
+                <input value={seoDescription} onChange={(event) => { setSeoDescription(event.target.value); setIsDirty(true); }} placeholder="Search description (optional)" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <span className="block text-[11px] text-gray-500 dark:text-slate-400">Recommended {CMS_SEO_GUIDELINES.descriptionMin}-{CMS_SEO_GUIDELINES.descriptionMax} characters. ({seoDescriptionLen}/{CMS_LIMITS.seoDescription})</span>
               </div>
               <div className="md:col-span-2">
                 <SeoSnippetPreview title={previewTitle} description={previewDescription} url={previewUrl} />
@@ -1035,7 +1037,7 @@ export default function CmsPageEditorPage() {
                     setSeoTitle((prev) => prev.trim() || title.trim().slice(0, CMS_LIMITS.seoTitle));
                     setIsDirty(true);
                   }}
-                  className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                  className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   Use Page Title
                 </button>
@@ -1045,7 +1047,7 @@ export default function CmsPageEditorPage() {
                     setSeoDescription((prev) => prev.trim() || excerpt.trim().slice(0, CMS_LIMITS.seoDescription));
                     setIsDirty(true);
                   }}
-                  className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                  className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   Use Summary
                 </button>
@@ -1055,13 +1057,13 @@ export default function CmsPageEditorPage() {
                     setTwitterImageUrl((prev) => prev.trim() || ogImageUrl.trim());
                     setIsDirty(true);
                   }}
-                  className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                  className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   Copy Social Image to Twitter
                 </button>
               </div>
               {seoAudit.topFixes.length ? (
-                <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                <div className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
                   <p className="font-semibold">Top fixes to improve SEO:</p>
                   <ul className="mt-1 list-disc pl-5">
                     {seoAudit.topFixes.map((fix) => <li key={fix}>{fix}</li>)}
@@ -1073,7 +1075,7 @@ export default function CmsPageEditorPage() {
               <button
                 type="button"
                 onClick={() => setShowAdvancedSeo((prev) => !prev)}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 {showAdvancedSeo ? 'Hide Advanced SEO' : 'Show Advanced SEO (Optional)'}
               </button>
@@ -1081,20 +1083,20 @@ export default function CmsPageEditorPage() {
           ) : null}
           {(!CMS_FEATURE_FLAGS.simplifiedEditorMode || showAdvancedSeo) ? (
             <>
-              <input value={seoCanonicalUrl} onChange={(event) => { setSeoCanonicalUrl(event.target.value); setIsDirty(true); }} placeholder="Canonical URL (optional, full URL)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2" />
+              <input value={seoCanonicalUrl} onChange={(event) => { setSeoCanonicalUrl(event.target.value); setIsDirty(true); }} placeholder="Canonical URL (optional, full URL)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
               {canonicalConflictCount > 0 ? (
-                <p className="text-xs text-amber-700 md:col-span-2">Canonical conflict: {canonicalConflictCount} other CMS item(s) use this canonical URL.</p>
+                <p className="text-xs text-amber-700 md:col-span-2 dark:text-amber-300">Canonical conflict: {canonicalConflictCount} other CMS item(s) use this canonical URL.</p>
               ) : null}
-              <input value={ogTitle} onChange={(event) => { setOgTitle(event.target.value); setIsDirty(true); }} placeholder="Social title (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-              <input value={ogDescription} onChange={(event) => { setOgDescription(event.target.value); setIsDirty(true); }} placeholder="Social description (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-              <input value={ogImageUrl} onChange={(event) => { setOgImageUrl(event.target.value); setIsDirty(true); }} placeholder="Social preview image URL (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-              <input value={twitterImageUrl} onChange={(event) => { setTwitterImageUrl(event.target.value); setIsDirty(true); }} placeholder="Twitter image URL (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-              <div className="flex items-center gap-4 rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2">
+              <input value={ogTitle} onChange={(event) => { setOgTitle(event.target.value); setIsDirty(true); }} placeholder="Social title (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <input value={ogDescription} onChange={(event) => { setOgDescription(event.target.value); setIsDirty(true); }} placeholder="Social description (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <input value={ogImageUrl} onChange={(event) => { setOgImageUrl(event.target.value); setIsDirty(true); }} placeholder="Social preview image URL (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <input value={twitterImageUrl} onChange={(event) => { setTwitterImageUrl(event.target.value); setIsDirty(true); }} placeholder="Twitter image URL (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <div className="flex items-center gap-4 rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
                 <label className="inline-flex items-center gap-2"><input type="checkbox" checked={seoNoIndex} onChange={(event) => { setSeoNoIndex(event.target.checked); setIsDirty(true); }} />Disable indexing</label>
                 <label className="inline-flex items-center gap-2"><input type="checkbox" checked={seoNoFollow} onChange={(event) => { setSeoNoFollow(event.target.checked); setIsDirty(true); }} />Disable link following</label>
               </div>
               {status !== CMS_STATUS.published ? (
-                <p className="text-xs text-amber-700 md:col-span-2">Draft and scheduled content is automatically kept noindex/nofollow for safety.</p>
+                <p className="text-xs text-amber-700 md:col-span-2 dark:text-amber-300">Draft and scheduled content is automatically kept noindex/nofollow for safety.</p>
               ) : null}
             </>
           ) : null}
@@ -1113,7 +1115,7 @@ export default function CmsPageEditorPage() {
                           className={`whitespace-nowrap rounded-lg border px-3 py-1.5 text-xs font-semibold ${
                             isActive
                               ? 'border-red-600 bg-red-600 text-white'
-                              : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                              : 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
                           }`}
                         >
                           {toSectionLabel(sectionKey)}
@@ -1123,7 +1125,7 @@ export default function CmsPageEditorPage() {
                     <button
                       type="button"
                       onClick={addTopLevelSection}
-                      className="whitespace-nowrap rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                      className="whitespace-nowrap rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/40"
                     >
                       + Add Section
                     </button>
@@ -1131,25 +1133,25 @@ export default function CmsPageEditorPage() {
                   {activeSection && isPlainObject(contentDraft) && activeSection in contentDraft ? (
                     <div>
                       <div className="mb-2 flex flex-wrap gap-2">
-                        <button type="button" onClick={() => moveTopLevelSection(activeSection, 'up')} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">Move Up</button>
-                        <button type="button" onClick={() => moveTopLevelSection(activeSection, 'down')} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">Move Down</button>
-                        <button type="button" onClick={() => duplicateTopLevelSection(activeSection)} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">Duplicate Section</button>
+                        <button type="button" onClick={() => moveTopLevelSection(activeSection, 'up')} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Move Up</button>
+                        <button type="button" onClick={() => moveTopLevelSection(activeSection, 'down')} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Move Down</button>
+                        <button type="button" onClick={() => duplicateTopLevelSection(activeSection)} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Duplicate Section</button>
                       </div>
                       {renderJsonField(activeSection, contentDraft[activeSection] as JsonLike, [activeSection])}
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-300">
                       Select a section to edit.
                     </div>
                   )}
                 </>
               ) : (
-                <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-600">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-600 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-300">
                   <p>No content loaded yet.</p>
                   <button
                     type="button"
                     onClick={loadDefaultContent}
-                    className="mt-2 rounded-md border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                    className="mt-2 rounded-md border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/40"
                   >
                     {activePreset ? 'Load Default Content' : 'Load Starter Content'}
                   </button>
@@ -1158,14 +1160,14 @@ export default function CmsPageEditorPage() {
             </div>
         </div>
 
-        <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Saved Versions (Local)</p>
+        <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-950/70">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Saved Versions (Local)</p>
           {revisionHistory.length ? (
             <div className="mt-2 space-y-2">
               {revisionHistory.map((entry, index) => (
-                <div key={`${entry.savedAt}-${index}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
-                  <div className="text-xs text-gray-600">
-                    <p className="font-semibold text-gray-900">{entry.title}</p>
+                <div key={`${entry.savedAt}-${index}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                  <div className="text-xs text-gray-600 dark:text-slate-300">
+                    <p className="font-semibold text-gray-900 dark:text-slate-100">{entry.title}</p>
                     <p>{new Date(entry.savedAt).toLocaleString()} · {toHumanCmsStatus(entry.status)}</p>
                   </div>
                   <button
@@ -1178,7 +1180,7 @@ export default function CmsPageEditorPage() {
                       setContentJson(JSON.stringify(parsed, null, 2));
                       setIsDirty(true);
                     }}
-                    className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                    className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     Restore
                   </button>
@@ -1186,7 +1188,7 @@ export default function CmsPageEditorPage() {
               ))}
             </div>
           ) : (
-            <p className="mt-2 text-xs text-gray-500">No revisions saved yet.</p>
+            <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">No revisions saved yet.</p>
           )}
         </div>
 
@@ -1200,7 +1202,7 @@ export default function CmsPageEditorPage() {
           <button
             type="button"
             onClick={() => navigate(ROUTES.portal.admin.dashboard.cmsPages)}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-slate-700 dark:text-slate-200"
           >
             Cancel
           </button>

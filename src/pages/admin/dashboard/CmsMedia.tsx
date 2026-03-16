@@ -136,32 +136,32 @@ export default function CmsMediaPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">CMS Media</h2>
-            <p className="text-sm text-gray-600">Manage media records used across pages and posts.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">CMS Media</h2>
+            <p className="text-sm text-gray-600 dark:text-slate-300">Manage media records used across pages and posts.</p>
           </div>
           <AdminRefreshButton onClick={() => refetchQuery(mediaQuery)} isRefreshing={mediaQuery.isFetching} label="Refresh media" />
         </div>
       </div>
 
-      <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm grid gap-3 md:grid-cols-2">
-        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Media name" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-        <input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-        <input value={altText} onChange={(event) => setAltText(event.target.value)} placeholder="Alt text" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-        <select value={status} onChange={(event) => setStatus(event.target.value as (typeof statusOptions)[number])} className="rounded-xl border border-gray-300 px-3 py-2 text-sm">
+      <div className="grid gap-3 rounded-2xl border border-red-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-2">
+        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Media name" className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+        <input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+        <input value={altText} onChange={(event) => setAltText(event.target.value)} placeholder="Alt text" className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+        <select value={status} onChange={(event) => setStatus(event.target.value as (typeof statusOptions)[number])} className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
           {statusOptions.map((entry) => <option key={entry} value={entry}>{toHumanCmsStatus(entry)}</option>)}
         </select>
-        <button type="button" onClick={() => void saveMedia()} disabled={saving} className="rounded-lg border border-red-600 bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 md:col-span-2">
+        <button type="button" onClick={() => void saveMedia()} disabled={saving} className="rounded-lg border border-red-600 bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 dark:border-red-500 dark:bg-red-500 dark:hover:bg-red-400 md:col-span-2">
           {saving ? 'Saving...' : 'Save Media'}
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-red-50 text-left text-xs uppercase tracking-[0.12em] text-red-800">
+            <thead className="bg-red-50 text-left text-xs uppercase tracking-[0.12em] text-red-800 dark:bg-red-950/30 dark:text-red-300">
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">URL</th>
@@ -170,15 +170,15 @@ export default function CmsMediaPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
               {rows.map((entry) => (
-                <tr key={entry.id}>
-                  <td className="px-4 py-3 font-semibold text-gray-900">{entry.name}</td>
-                  <td className="px-4 py-3 text-gray-700 max-w-[340px] truncate">{entry.url}</td>
-                  <td className="px-4 py-3 text-gray-700">{toHumanCmsStatus(entry.status)}</td>
-                  <td className="px-4 py-3 text-gray-700">{usageByUrl.get(normalizeMediaUrlKey(entry.url)) || 0}</td>
+                <tr key={entry.id} className="hover:bg-red-50/40 dark:hover:bg-slate-800/70">
+                  <td className="px-4 py-3 font-semibold text-gray-900 dark:text-slate-100">{entry.name}</td>
+                  <td className="max-w-[340px] truncate px-4 py-3 text-gray-700 dark:text-slate-300">{entry.url}</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{toHumanCmsStatus(entry.status)}</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{usageByUrl.get(normalizeMediaUrlKey(entry.url)) || 0}</td>
                   <td className="px-4 py-3 text-right">
-                    <button type="button" onClick={() => void removeMedia(entry.id)} className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">Delete</button>
+                    <button type="button" onClick={() => void removeMedia(entry.id)} className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/40">Delete</button>
                   </td>
                 </tr>
               ))}

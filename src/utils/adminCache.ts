@@ -69,3 +69,19 @@ export const writeAdminCache = <T>(key: string, data: T): void => {
   }
 };
 
+
+export const clearAdminCache = (predicate?: (key: string) => boolean): void => {
+  if (!isBrowser()) return;
+  try {
+    const keysToDelete: string[] = [];
+    for (let index = 0; index < window.sessionStorage.length; index += 1) {
+      const storageKey = window.sessionStorage.key(index);
+      if (!storageKey || !storageKey.startsWith(ADMIN_CACHE_PREFIX)) continue;
+      const rawKey = storageKey.slice(ADMIN_CACHE_PREFIX.length);
+      if (!predicate || predicate(rawKey)) keysToDelete.push(storageKey);
+    }
+    keysToDelete.forEach((storageKey) => window.sessionStorage.removeItem(storageKey));
+  } catch (error) {
+    // Ignore cache clear failures to keep admin flows resilient.
+  }
+};

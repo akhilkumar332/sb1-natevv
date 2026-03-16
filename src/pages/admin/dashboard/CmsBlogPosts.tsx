@@ -290,16 +290,16 @@ export default function CmsBlogPostsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">CMS Blog Posts</h2>
-            <p className="text-sm text-gray-600">Manage articles with a clear publish workflow.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">CMS Blog Posts</h2>
+            <p className="text-sm text-gray-600 dark:text-slate-300">Manage articles with a clear publish workflow.</p>
           </div>
           <div className="flex items-center gap-2">
             <Link
               to={ROUTES.portal.admin.dashboard.cmsBlogPostEditor.replace(':slug', 'new')}
-              className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+              className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/40"
             >
               New Post
             </Link>
@@ -308,13 +308,13 @@ export default function CmsBlogPostsPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => { setActiveQueue('all'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'all' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>All ({rows.length})</button>
-          <button type="button" onClick={() => { setActiveQueue('needs-review'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'needs-review' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>Needs Review ({queueCounts.needsReview})</button>
-          <button type="button" onClick={() => { setActiveQueue('ready-publish'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'ready-publish' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>Ready To Publish ({queueCounts.readyPublish})</button>
-          <button type="button" onClick={() => { setActiveQueue('scheduled'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'scheduled' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>Scheduled ({queueCounts.scheduled})</button>
-          <button type="button" onClick={() => { setActiveQueue('seo-fix'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'seo-fix' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>SEO Needs Fix ({queueCounts.seoFix})</button>
+          <button type="button" onClick={() => { setActiveQueue('all'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'all' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>All ({rows.length})</button>
+          <button type="button" onClick={() => { setActiveQueue('needs-review'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'needs-review' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>Needs Review ({queueCounts.needsReview})</button>
+          <button type="button" onClick={() => { setActiveQueue('ready-publish'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'ready-publish' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>Ready To Publish ({queueCounts.readyPublish})</button>
+          <button type="button" onClick={() => { setActiveQueue('scheduled'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'scheduled' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>Scheduled ({queueCounts.scheduled})</button>
+          <button type="button" onClick={() => { setActiveQueue('seo-fix'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'seo-fix' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>SEO Needs Fix ({queueCounts.seoFix})</button>
         </div>
         <div className="grid gap-2 md:grid-cols-6">
           <input
@@ -324,7 +324,7 @@ export default function CmsBlogPostsPage() {
               setPage(1);
             }}
             placeholder="Search title, slug, category"
-            className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
           <select
             value={statusFilter}
@@ -332,7 +332,7 @@ export default function CmsBlogPostsPage() {
               setStatusFilter(event.target.value as typeof statusFilter);
               setPage(1);
             }}
-            className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           >
             <option value="all">All statuses</option>
             {Object.values(CMS_STATUS).map((status) => (
@@ -345,7 +345,7 @@ export default function CmsBlogPostsPage() {
               setCategoryFilter(event.target.value);
               setPage(1);
             }}
-            className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           >
             <option value="all">All categories</option>
             {categories.map((category) => (
@@ -358,7 +358,7 @@ export default function CmsBlogPostsPage() {
               setTagFilter(event.target.value);
               setPage(1);
             }}
-            className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           >
             <option value="all">All tags</option>
             {tags.map((tag) => (
@@ -371,7 +371,7 @@ export default function CmsBlogPostsPage() {
               setSeriesFilter(event.target.value);
               setPage(1);
             }}
-            className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           >
             <option value="all">All series</option>
             {series.map((seriesSlug) => (
@@ -389,7 +389,7 @@ export default function CmsBlogPostsPage() {
               setActiveQueue('all');
               setPage(1);
             }}
-            className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             Reset Filters
           </button>
@@ -416,7 +416,7 @@ export default function CmsBlogPostsPage() {
             type="button"
             onClick={() => void updateSelectedStatus(CMS_STATUS.archived)}
             disabled={bulkMutating || selectedCount === 0}
-            className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-50"
+            className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
           >
             Hide Selected
           </button>
@@ -428,19 +428,19 @@ export default function CmsBlogPostsPage() {
           >
             Delete Selected
           </button>
-          <span className="text-xs text-gray-500">Filtered: {filteredRows.length}</span>
+          <span className="text-xs text-gray-500 dark:text-slate-400">Filtered: {filteredRows.length}</span>
           {selectedCount > 0 ? (
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-500 dark:text-slate-400">
               Selected impact: {selectedPublishedCount} published, {selectedDraftCount} drafts, {selectedScheduledCount} scheduled
             </span>
           ) : null}
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-red-50 text-left text-xs uppercase tracking-[0.12em] text-red-800">
+            <thead className="bg-red-50 text-left text-xs uppercase tracking-[0.12em] text-red-800 dark:bg-red-950/30 dark:text-red-300">
               <tr>
                 <th className="px-4 py-3">
                   <input
@@ -458,7 +458,7 @@ export default function CmsBlogPostsPage() {
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
               {pagedRows.map((entry) => (
                 <tr key={entry.id}>
                   <td className="px-4 py-3">
@@ -469,15 +469,15 @@ export default function CmsBlogPostsPage() {
                       aria-label={`Select ${entry.title}`}
                     />
                   </td>
-                  <td className="px-4 py-3 font-semibold text-gray-900">{entry.title}</td>
-                  <td className="px-4 py-3 text-gray-700">{entry.slug}</td>
-                  <td className="px-4 py-3 text-gray-700">{entry.categorySlug ? toHumanLabel(entry.categorySlug) : '-'}</td>
-                  <td className="px-4 py-3 text-gray-700">{toHumanCmsStatus(entry.status)}</td>
-                  <td className="px-4 py-3 text-gray-700">{toDateValue(entry.publishedAt)?.toLocaleString() || '-'}</td>
+                  <td className="px-4 py-3 font-semibold text-gray-900 dark:text-slate-100">{entry.title}</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{entry.slug}</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{entry.categorySlug ? toHumanLabel(entry.categorySlug) : '-'}</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{toHumanCmsStatus(entry.status)}</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{toDateValue(entry.publishedAt)?.toLocaleString() || '-'}</td>
                   <td className="px-4 py-3 text-right">
                     <Link
                       to={ROUTES.portal.admin.dashboard.cmsBlogPostEditor.replace(':slug', entry.slug || 'new')}
-                      className="mr-2 rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                      className="mr-2 rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                     >
                       Edit
                     </Link>
@@ -494,7 +494,7 @@ export default function CmsBlogPostsPage() {
               ))}
               {pagedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500">No posts found for selected filters.</td>
+                  <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-slate-400">No posts found for selected filters.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -502,14 +502,14 @@ export default function CmsBlogPostsPage() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-2xl border border-red-100 bg-white px-4 py-3 text-sm shadow-sm">
-        <p className="text-gray-600">Page {currentPage} of {totalPages}</p>
+      <div className="flex items-center justify-between rounded-2xl border border-red-100 bg-white px-4 py-3 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <p className="text-gray-600 dark:text-slate-300">Page {currentPage} of {totalPages}</p>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => setPage((prev) => Math.max(1, prev - 1))}
             disabled={currentPage <= 1}
-            className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
+            className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
           >
             Prev
           </button>
@@ -517,7 +517,7 @@ export default function CmsBlogPostsPage() {
             type="button"
             onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
             disabled={currentPage >= totalPages}
-            className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
+            className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
           >
             Next
           </button>

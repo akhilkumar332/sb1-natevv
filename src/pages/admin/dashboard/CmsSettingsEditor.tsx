@@ -183,46 +183,46 @@ export default function CmsSettingsEditorPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">CMS Settings</h2>
-            <p className="text-sm text-gray-600">Simple controls for site identity, support details, and blog behavior.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">CMS Settings</h2>
+            <p className="text-sm text-gray-600 dark:text-slate-300">Simple controls for site identity, support details, and blog behavior.</p>
           </div>
           <Link
             to={ROUTES.portal.admin.dashboard.cmsSettings}
-            className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             Back to Settings
           </Link>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="grid gap-3 md:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Site Name</span>
-            <input value={siteTitle} onChange={(event) => { setSiteTitle(event.target.value); setIsDirty(true); }} placeholder="BloodHub India" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Site Name</span>
+            <input value={siteTitle} onChange={(event) => { setSiteTitle(event.target.value); setIsDirty(true); }} placeholder="BloodHub India" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
             <span className={`mt-1 block text-[11px] ${lengthClass(titleLen, CMS_LIMITS.title, 110)}`}>{titleLen}/{CMS_LIMITS.title}</span>
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Tagline</span>
-            <input value={siteTagline} onChange={(event) => { setSiteTagline(event.target.value); setIsDirty(true); }} placeholder="Donate blood, save lives." className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Tagline</span>
+            <input value={siteTagline} onChange={(event) => { setSiteTagline(event.target.value); setIsDirty(true); }} placeholder="Donate blood, save lives." className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Search Result Title</span>
-            <input value={defaultSeoTitle} onChange={(event) => { setDefaultSeoTitle(event.target.value); setIsDirty(true); }} placeholder="Shown in Google results" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Search Result Title</span>
+            <input value={defaultSeoTitle} onChange={(event) => { setDefaultSeoTitle(event.target.value); setIsDirty(true); }} placeholder="Shown in Google results" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
             <span className={`mt-1 block text-[11px] ${lengthClass(seoTitleLen, CMS_LIMITS.seoTitle, 55)}`}>{seoTitleLen}/{CMS_LIMITS.seoTitle}</span>
-            <span className="mt-1 block text-[11px] text-gray-500">Recommended {CMS_SEO_GUIDELINES.titleMin}-{CMS_SEO_GUIDELINES.titleMax} characters.</span>
+            <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">Recommended {CMS_SEO_GUIDELINES.titleMin}-{CMS_SEO_GUIDELINES.titleMax} characters.</span>
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Search Result Description</span>
-            <input value={defaultSeoDescription} onChange={(event) => { setDefaultSeoDescription(event.target.value); setIsDirty(true); }} placeholder="Short summary shown in search" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Search Result Description</span>
+            <input value={defaultSeoDescription} onChange={(event) => { setDefaultSeoDescription(event.target.value); setIsDirty(true); }} placeholder="Short summary shown in search" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
             <span className={`mt-1 block text-[11px] ${lengthClass(seoDescLen, CMS_LIMITS.seoDescription, 145)}`}>{seoDescLen}/{CMS_LIMITS.seoDescription}</span>
-            <span className="mt-1 block text-[11px] text-gray-500">Recommended {CMS_SEO_GUIDELINES.descriptionMin}-{CMS_SEO_GUIDELINES.descriptionMax} characters.</span>
+            <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">Recommended {CMS_SEO_GUIDELINES.descriptionMin}-{CMS_SEO_GUIDELINES.descriptionMax} characters.</span>
           </label>
           <div className="md:col-span-2">
             <SeoSnippetPreview
@@ -233,39 +233,39 @@ export default function CmsSettingsEditorPage() {
           </div>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Blog Posts Per Page</span>
-            <input type="number" value={blogPostsPerPage} min={3} max={24} onChange={(event) => { setBlogPostsPerPage(Number(event.target.value || CMS_DEFAULTS.blogPostsPerPage)); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Blog Posts Per Page</span>
+            <input type="number" value={blogPostsPerPage} min={3} max={24} onChange={(event) => { setBlogPostsPerPage(Number(event.target.value || CMS_DEFAULTS.blogPostsPerPage)); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
           </label>
 
-          <div className="flex items-center gap-4 rounded-xl border border-gray-300 px-3 py-2 text-sm">
+          <div className="flex items-center gap-4 rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-800 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showFeaturedOnBlog} onChange={(event) => { setShowFeaturedOnBlog(event.target.checked); setIsDirty(true); }} />Show featured posts</label>
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={showBlogInFooter} onChange={(event) => { setShowBlogInFooter(event.target.checked); setIsDirty(true); }} />Show blog in footer</label>
             <label className="inline-flex items-center gap-2"><input type="checkbox" checked={requireApprovalBeforePublish} onChange={(event) => { setRequireApprovalBeforePublish(event.target.checked); setIsDirty(true); }} />Require review approval before publish</label>
           </div>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Support Email</span>
-            <input value={supportEmail} onChange={(event) => { setSupportEmail(event.target.value); setIsDirty(true); }} placeholder="support@domain.com" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Support Email</span>
+            <input value={supportEmail} onChange={(event) => { setSupportEmail(event.target.value); setIsDirty(true); }} placeholder="support@domain.com" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Support Phone</span>
-            <input value={supportPhone} onChange={(event) => { setSupportPhone(event.target.value); setIsDirty(true); }} placeholder="+91 ..." className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Support Phone</span>
+            <input value={supportPhone} onChange={(event) => { setSupportPhone(event.target.value); setIsDirty(true); }} placeholder="+91 ..." className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
           </label>
 
           <label className="block md:col-span-2">
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Office City</span>
-            <input value={officeCity} onChange={(event) => { setOfficeCity(event.target.value); setIsDirty(true); }} placeholder="Mumbai, Maharashtra" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Office City</span>
+            <input value={officeCity} onChange={(event) => { setOfficeCity(event.target.value); setIsDirty(true); }} placeholder="Mumbai, Maharashtra" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
           </label>
 
-          <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Social Links</p>
+          <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-800 dark:bg-slate-950/60">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Social Links</p>
             <div className="grid gap-2 md:grid-cols-2">
-              <input value={socialLinks.facebook} onChange={(event) => { setSocialLinks((prev) => ({ ...prev, facebook: event.target.value })); setIsDirty(true); }} placeholder="Facebook URL" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-              <input value={socialLinks.instagram} onChange={(event) => { setSocialLinks((prev) => ({ ...prev, instagram: event.target.value })); setIsDirty(true); }} placeholder="Instagram URL" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-              <input value={socialLinks.x} onChange={(event) => { setSocialLinks((prev) => ({ ...prev, x: event.target.value })); setIsDirty(true); }} placeholder="X URL" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-              <input value={socialLinks.linkedin} onChange={(event) => { setSocialLinks((prev) => ({ ...prev, linkedin: event.target.value })); setIsDirty(true); }} placeholder="LinkedIn URL" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-              <input value={socialLinks.youtube} onChange={(event) => { setSocialLinks((prev) => ({ ...prev, youtube: event.target.value })); setIsDirty(true); }} placeholder="YouTube URL" className="rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2" />
+              <input value={socialLinks.facebook} onChange={(event) => { setSocialLinks((prev) => ({ ...prev, facebook: event.target.value })); setIsDirty(true); }} placeholder="Facebook URL" className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+              <input value={socialLinks.instagram} onChange={(event) => { setSocialLinks((prev) => ({ ...prev, instagram: event.target.value })); setIsDirty(true); }} placeholder="Instagram URL" className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+              <input value={socialLinks.x} onChange={(event) => { setSocialLinks((prev) => ({ ...prev, x: event.target.value })); setIsDirty(true); }} placeholder="X URL" className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+              <input value={socialLinks.linkedin} onChange={(event) => { setSocialLinks((prev) => ({ ...prev, linkedin: event.target.value })); setIsDirty(true); }} placeholder="LinkedIn URL" className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+              <input value={socialLinks.youtube} onChange={(event) => { setSocialLinks((prev) => ({ ...prev, youtube: event.target.value })); setIsDirty(true); }} placeholder="YouTube URL" className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 md:col-span-2" />
             </div>
           </div>
 
@@ -274,7 +274,7 @@ export default function CmsSettingsEditorPage() {
               <button
                 type="button"
                 onClick={() => setShowAdvancedSeo((prev) => !prev)}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 {showAdvancedSeo ? 'Hide Advanced SEO' : 'Show Advanced SEO (Optional)'}
               </button>
@@ -282,13 +282,13 @@ export default function CmsSettingsEditorPage() {
           ) : null}
 
           {(!CMS_FEATURE_FLAGS.simplifiedEditorMode || showAdvancedSeo) ? (
-            <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Advanced SEO</p>
+            <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-800 dark:bg-slate-950/60">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Advanced SEO</p>
               <div className="grid gap-2 md:grid-cols-2">
-                <input value={canonicalBaseUrl} onChange={(event) => { setCanonicalBaseUrl(event.target.value); setIsDirty(true); }} placeholder="Preferred Domain (https://example.com)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-                <input value={defaultOgImageUrl} onChange={(event) => { setDefaultOgImageUrl(event.target.value); setIsDirty(true); }} placeholder="Default Social Share Image URL" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-                <input value={twitterHandle} onChange={(event) => { setTwitterHandle(event.target.value); setIsDirty(true); }} placeholder="Twitter handle (without @)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-                <select value={robotsPolicy} onChange={(event) => { setRobotsPolicy(event.target.value as 'index_follow' | 'noindex_nofollow'); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm">
+                <input value={canonicalBaseUrl} onChange={(event) => { setCanonicalBaseUrl(event.target.value); setIsDirty(true); }} placeholder="Preferred Domain (https://example.com)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+                <input value={defaultOgImageUrl} onChange={(event) => { setDefaultOgImageUrl(event.target.value); setIsDirty(true); }} placeholder="Default Social Share Image URL" className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+                <input value={twitterHandle} onChange={(event) => { setTwitterHandle(event.target.value); setIsDirty(true); }} placeholder="Twitter handle (without @)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+                <select value={robotsPolicy} onChange={(event) => { setRobotsPolicy(event.target.value as 'index_follow' | 'noindex_nofollow'); setIsDirty(true); }} className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                   <option value="index_follow">Allow search indexing</option>
                   <option value="noindex_nofollow">Do not index site</option>
                 </select>
@@ -298,13 +298,13 @@ export default function CmsSettingsEditorPage() {
         </div>
 
         <div className="mt-3 flex gap-2">
-          <button type="button" onClick={() => void saveSettings()} disabled={saving} className="rounded-lg border border-red-600 bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+          <button type="button" onClick={() => void saveSettings()} disabled={saving} className="rounded-lg border border-red-600 bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 dark:border-red-500 dark:bg-red-500 dark:hover:bg-red-400">
             {saving ? 'Saving...' : 'Save Settings'}
           </button>
           <button
             type="button"
             onClick={() => navigate(ROUTES.portal.admin.dashboard.cmsSettings)}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             Cancel
           </button>

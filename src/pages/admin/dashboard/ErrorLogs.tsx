@@ -131,11 +131,11 @@ function ErrorLogsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Error Logs</h2>
-            <p className="text-sm text-gray-600">Monitor frontend and backend errors across all portal flows.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Error Logs</h2>
+            <p className="text-sm text-gray-600 dark:text-slate-300">Monitor frontend and backend errors across all portal flows.</p>
           </div>
           <AdminRefreshButton
             onClick={() => refetchQuery(query)}
@@ -149,15 +149,15 @@ function ErrorLogsPage() {
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
         searchPlaceholder="Search message, code, route, uid, fingerprint"
-        rightContent={<span className="text-xs font-semibold text-gray-500">{filtered.length} logs</span>}
+        rightContent={<span className="text-xs font-semibold text-gray-500 dark:text-slate-400">{filtered.length} logs</span>}
       />
 
-      <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="grid gap-3 md:grid-cols-4 lg:grid-cols-5">
           <select
             value={scopeFilter}
             onChange={(event) => setScopeFilter(event.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           >
             <option value="all">All scopes</option>
             <option value="auth">auth</option>
@@ -170,7 +170,7 @@ function ErrorLogsPage() {
           <select
             value={sourceFilter}
             onChange={(event) => setSourceFilter(event.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           >
             <option value="all">All sources</option>
             <option value="frontend">frontend</option>
@@ -181,7 +181,7 @@ function ErrorLogsPage() {
           <select
             value={levelFilter}
             onChange={(event) => setLevelFilter(event.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           >
             <option value="all">All levels</option>
             <option value="error">error</option>
@@ -190,7 +190,7 @@ function ErrorLogsPage() {
           <select
             value={operationFilter}
             onChange={(event) => setOperationFilter(event.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           >
             <option value="all">All Firestore ops</option>
             <option value="getDoc">getDoc</option>
@@ -202,7 +202,7 @@ function ErrorLogsPage() {
           <select
             value={impersonationFilter}
             onChange={(event) => setImpersonationFilter(event.target.value as 'all' | 'yes' | 'no')}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           >
             <option value="all">Impersonation: any</option>
             <option value="yes">Impersonation: yes</option>
@@ -217,7 +217,7 @@ function ErrorLogsPage() {
               setOperationFilter('all');
               setImpersonationFilter('all');
             }}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             Reset filters
           </button>
@@ -233,31 +233,31 @@ function ErrorLogsPage() {
         <>
           <div className="space-y-3 lg:hidden">
             {paged.map((row) => (
-              <article key={`mobile-${row.id}`} className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
+              <article key={`mobile-${row.id}`} className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 {(() => {
                   const firestoreMeta = getFirestoreMeta(row.metadata);
                   return (
                     <>
                 <div className="flex items-start justify-between gap-2">
-                  <p className="font-semibold text-gray-900 line-clamp-2">{row.message}</p>
-                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${row.level === 'warning' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-700'}`}>
+                  <p className="line-clamp-2 font-semibold text-gray-900 dark:text-slate-100">{row.message}</p>
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${row.level === 'warning' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200' : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300'}`}>
                     {row.level}
                   </span>
                 </div>
                 {(firestoreMeta.operation || firestoreMeta.collection) && (
                   <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                    {firestoreMeta.operation && <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">{firestoreMeta.operation}</span>}
-                    {firestoreMeta.collection && <span className="rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-700">{firestoreMeta.collection}</span>}
-                    {firestoreMeta.permissionDenied && <span className="rounded-full bg-red-50 px-2 py-1 font-semibold text-red-700">permission-denied</span>}
-                    {firestoreMeta.blocking && <span className="rounded-full bg-amber-50 px-2 py-1 font-semibold text-amber-700">blocking</span>}
+                    {firestoreMeta.operation && <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{firestoreMeta.operation}</span>}
+                    {firestoreMeta.collection && <span className="rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">{firestoreMeta.collection}</span>}
+                    {firestoreMeta.permissionDenied && <span className="rounded-full bg-red-50 px-2 py-1 font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">permission-denied</span>}
+                    {firestoreMeta.blocking && <span className="rounded-full bg-amber-50 px-2 py-1 font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">blocking</span>}
                   </div>
                 )}
-                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-600">
-                  <p>Scope: <span className="font-semibold text-gray-800">{row.scope}</span></p>
-                  <p>Source: <span className="font-semibold text-gray-800">{row.source}</span></p>
-                  <p className="col-span-2">Route: <span className="font-semibold text-gray-800">{row.route || '-'}</span></p>
-                  <p>User: <span className="font-semibold text-gray-800">{row.userUid || '-'}</span></p>
-                  <p>Time: <span className="font-semibold text-gray-800">{row.createdAt ? row.createdAt.toLocaleString() : 'N/A'}</span></p>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-slate-400">
+                  <p>Scope: <span className="font-semibold text-gray-800 dark:text-slate-200">{row.scope}</span></p>
+                  <p>Source: <span className="font-semibold text-gray-800 dark:text-slate-200">{row.source}</span></p>
+                  <p className="col-span-2">Route: <span className="font-semibold text-gray-800 dark:text-slate-200">{row.route || '-'}</span></p>
+                  <p>User: <span className="font-semibold text-gray-800 dark:text-slate-200">{row.userUid || '-'}</span></p>
+                  <p>Time: <span className="font-semibold text-gray-800 dark:text-slate-200">{row.createdAt ? row.createdAt.toLocaleString() : 'N/A'}</span></p>
                 </div>
                     </>
                   );
@@ -266,10 +266,10 @@ function ErrorLogsPage() {
             ))}
           </div>
 
-          <div className="hidden overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm lg:block">
+          <div className="hidden overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:block">
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-red-50 text-left text-xs uppercase tracking-[0.12em] text-red-800">
+                <thead className="bg-red-50 text-left text-xs uppercase tracking-[0.12em] text-red-800 dark:bg-red-950/30 dark:text-red-300">
                   <tr>
                     <th className="px-4 py-3">Message</th>
                     <th className="px-4 py-3">Scope</th>
@@ -280,44 +280,44 @@ function ErrorLogsPage() {
                     <th className="px-4 py-3">Details</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                   {paged.map((row) => {
                     const isExpanded = expandedId === row.id;
                     const firestoreMeta = getFirestoreMeta(row.metadata);
                     return (
                       <Fragment key={row.id}>
-                        <tr className="hover:bg-red-50/40">
-                          <td className="px-4 py-3 text-gray-700 max-w-lg">
-                            <p className="line-clamp-2 font-medium">{row.message}</p>
-                            {row.code && <p className="text-xs text-red-600 mt-1">code: {row.code}</p>}
+                        <tr className="hover:bg-red-50/40 dark:hover:bg-slate-800/70">
+                          <td className="max-w-lg px-4 py-3 text-gray-700 dark:text-slate-300">
+                            <p className="line-clamp-2 font-medium text-gray-700 dark:text-slate-200">{row.message}</p>
+                            {row.code && <p className="mt-1 text-xs text-red-600 dark:text-red-300">code: {row.code}</p>}
                             {(firestoreMeta.operation || firestoreMeta.collection) && (
                               <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                                {firestoreMeta.operation && <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">{firestoreMeta.operation}</span>}
-                                {firestoreMeta.collection && <span className="rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-700">{firestoreMeta.collection}</span>}
-                                {firestoreMeta.permissionDenied && <span className="rounded-full bg-red-50 px-2 py-1 font-semibold text-red-700">permission-denied</span>}
-                                {firestoreMeta.blocking && <span className="rounded-full bg-amber-50 px-2 py-1 font-semibold text-amber-700">blocking</span>}
+                                {firestoreMeta.operation && <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{firestoreMeta.operation}</span>}
+                                {firestoreMeta.collection && <span className="rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">{firestoreMeta.collection}</span>}
+                                {firestoreMeta.permissionDenied && <span className="rounded-full bg-red-50 px-2 py-1 font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">permission-denied</span>}
+                                {firestoreMeta.blocking && <span className="rounded-full bg-amber-50 px-2 py-1 font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">blocking</span>}
                               </div>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-gray-700">{row.scope}</td>
-                          <td className="px-4 py-3 text-gray-700">{row.source}</td>
-                          <td className="px-4 py-3 text-gray-700">{row.level}</td>
-                          <td className="px-4 py-3 text-gray-700">{row.userUid || '-'}</td>
-                          <td className="px-4 py-3 text-gray-600">{row.createdAt ? row.createdAt.toLocaleString() : 'N/A'}</td>
+                          <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{row.scope}</td>
+                          <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{row.source}</td>
+                          <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{row.level}</td>
+                          <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{row.userUid || '-'}</td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-slate-400">{row.createdAt ? row.createdAt.toLocaleString() : 'N/A'}</td>
                           <td className="px-4 py-3">
                             <button
                               type="button"
                               onClick={() => setExpandedId(isExpanded ? null : row.id)}
-                              className="rounded-lg border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                              className="rounded-lg border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                             >
                               {isExpanded ? 'Hide' : 'View'}
                             </button>
                           </td>
                         </tr>
                         {isExpanded && (
-                          <tr className="bg-gray-50/70">
+                          <tr className="bg-gray-50/70 dark:bg-slate-950/70">
                             <td colSpan={7} className="px-4 py-4">
-                              <div className="grid gap-3 text-xs text-gray-700 md:grid-cols-2">
+                              <div className="grid gap-3 text-xs text-gray-700 dark:text-slate-300 md:grid-cols-2">
                                 <p><span className="font-semibold">Route:</span> {row.route || '-'}</p>
                                 <p><span className="font-semibold">User Role:</span> {row.userRole || '-'}</p>
                                 <p><span className="font-semibold">Impersonating:</span> {row.isImpersonating ? 'yes' : 'no'}</p>
@@ -326,7 +326,7 @@ function ErrorLogsPage() {
                                 <p><span className="font-semibold">Session ID:</span> {row.sessionId || '-'}</p>
                               </div>
                               {(firestoreMeta.operation || firestoreMeta.collection || firestoreMeta.phase || firestoreMeta.docId || firestoreMeta.kind) && (
-                                <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-950">
+                                <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-950 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-100">
                                   <p className="font-semibold">Firestore Trace</p>
                                   <div className="mt-2 grid gap-2 md:grid-cols-2">
                                     <p><span className="font-semibold">Operation:</span> {firestoreMeta.operation || '-'}</p>
@@ -341,14 +341,14 @@ function ErrorLogsPage() {
                               )}
                               {row.metadata && (
                                 <div className="mt-3">
-                                  <p className="text-xs font-semibold text-gray-800">Metadata</p>
-                                  <pre className="mt-1 max-h-56 overflow-auto rounded-lg bg-white p-3 text-[11px] text-gray-700 border border-gray-200">{JSON.stringify(row.metadata, null, 2)}</pre>
+                                  <p className="text-xs font-semibold text-gray-800 dark:text-slate-200">Metadata</p>
+                                  <pre className="mt-1 max-h-56 overflow-auto rounded-lg border border-gray-200 bg-white p-3 text-[11px] text-gray-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">{JSON.stringify(row.metadata, null, 2)}</pre>
                                 </div>
                               )}
                               {row.stack && (
                                 <div className="mt-3">
-                                  <p className="text-xs font-semibold text-gray-800">Stack</p>
-                                  <pre className="mt-1 max-h-56 overflow-auto rounded-lg bg-white p-3 text-[11px] text-gray-700 border border-gray-200 whitespace-pre-wrap">{row.stack}</pre>
+                                  <p className="text-xs font-semibold text-gray-800 dark:text-slate-200">Stack</p>
+                                  <pre className="mt-1 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-[11px] text-gray-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">{row.stack}</pre>
                                 </div>
                               )}
                             </td>
@@ -374,12 +374,12 @@ function ErrorLogsPage() {
         onPageSizeChange={setPageSize}
       />
 
-      <div className="rounded-xl border border-red-100 bg-white px-4 py-3 text-sm text-gray-700 shadow-sm">
-        <p className="flex items-center gap-2 font-semibold text-red-700"><Shield className="h-4 w-4" />Operational note</p>
+      <div className="rounded-xl border border-red-100 bg-white px-4 py-3 text-sm text-gray-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+        <p className="flex items-center gap-2 font-semibold text-red-700 dark:text-red-300"><Shield className="h-4 w-4" />Operational note</p>
         <p className="mt-1">Logs include sanitized payloads. Stack traces are intentionally truncated in production for safety.</p>
       </div>
 
-      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200">
         <p className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" />Retention</p>
         <p className="mt-1">Error logs older than 90 days are deleted by scheduled cleanup.</p>
       </div>

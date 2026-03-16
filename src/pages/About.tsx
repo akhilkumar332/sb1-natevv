@@ -360,31 +360,39 @@ function About() {
             <p className="text-xl text-gray-600">Dedicated professionals supporting donors and recipients</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {teamMembers.map((member, index) => (
-              <div key={index} className="group relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-500"></div>
-                <div className="relative bg-white/90 backdrop-blur-xl p-8 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 border border-white/50 text-center overflow-hidden">
-                  {/* Decorative orb */}
-                  <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-r from-red-500 to-pink-500 rounded-full blur-3xl opacity-10 group-hover:opacity-20 transition-opacity duration-500"></div>
+          <div className="relative mx-auto max-w-5xl">
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-gray-50 to-transparent md:hidden" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-gray-50 to-transparent md:hidden" />
+            <div className="pointer-events-none absolute right-2 top-2 z-20 rounded-full border border-red-100 bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-red-600 shadow-sm md:hidden">
+              Swipe →
+            </div>
 
-                  <div className="relative z-10">
-                    {/* Avatar with glow effect */}
-                    <div className="relative inline-block mb-6">
-                      <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-red-800 rounded-full blur-lg opacity-40 group-hover:opacity-60 transition-opacity duration-500"></div>
-                      <div className="relative w-24 h-24 bg-gradient-to-br from-red-600 via-red-700 to-red-800 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-2xl transform group-hover:scale-110 group-hover:rotate-12 transition-all duration-500"
-                           style={{ boxShadow: '0 20px 40px rgba(220, 38, 38, 0.3)' }}>
-                        {member.name[0]}
+            <div className="flex gap-3 overflow-x-auto pb-2 pl-1 pr-10 snap-x snap-mandatory sm:gap-6 md:grid md:grid-cols-3 md:gap-8 md:overflow-visible md:pb-0 md:pr-0">
+              {teamMembers.map((member, index) => (
+                <div key={index} className="group relative h-full w-[82vw] max-w-[250px] flex-shrink-0 snap-start md:w-auto md:max-w-none md:flex-shrink">
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-red-500 to-pink-500 blur-xl opacity-20 transition-opacity duration-500 group-hover:opacity-30"></div>
+                  <div className="relative flex h-full min-h-[260px] flex-col overflow-hidden rounded-2xl border border-white/50 bg-white/90 p-5 text-center shadow-xl backdrop-blur-xl transition-all duration-500 hover:shadow-2xl sm:min-h-[300px] sm:p-8">
+                    <div className="absolute -top-10 -right-10 h-24 w-24 rounded-full bg-gradient-to-r from-red-500 to-pink-500 blur-3xl opacity-10 transition-opacity duration-500 group-hover:opacity-20 sm:h-32 sm:w-32"></div>
+
+                    <div className="relative z-10 flex h-full flex-col items-center">
+                      <div className="relative mb-4 inline-block sm:mb-6">
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-red-600 to-red-800 blur-lg opacity-40 transition-opacity duration-500 group-hover:opacity-60"></div>
+                        <div
+                          className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-red-600 via-red-700 to-red-800 text-2xl font-bold text-white shadow-2xl transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 sm:h-24 sm:w-24 sm:text-3xl"
+                          style={{ boxShadow: '0 20px 40px rgba(220, 38, 38, 0.3)' }}
+                        >
+                          {member.name[0]}
+                        </div>
                       </div>
-                    </div>
 
-                    <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-red-600 transition-colors duration-300">{member.name}</h3>
-                    <p className="text-red-600 font-semibold mb-3">{member.role}</p>
-                    <p className="text-gray-700 text-sm">{member.expertise}</p>
+                      <h3 className="text-lg font-bold text-gray-900 transition-colors duration-300 group-hover:text-red-600 sm:text-xl">{member.name}</h3>
+                      <p className="mb-2 mt-2 text-sm font-semibold text-red-600 sm:mb-3 sm:text-base">{member.role}</p>
+                      <p className="mt-auto text-sm leading-6 text-gray-700">{member.expertise}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>

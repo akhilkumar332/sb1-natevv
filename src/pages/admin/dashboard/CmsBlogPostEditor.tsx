@@ -7,6 +7,7 @@ import { COLLECTIONS } from '../../../constants/firestore';
 import {
   CMS_FEATURE_FLAGS,
   CMS_FRONTEND_PAGE_PRESETS,
+  CMS_DEFAULTS,
   CMS_EDITOR,
   CMS_LIMITS,
   CMS_REVIEW_STATUS,
@@ -261,7 +262,8 @@ export default function CmsBlogPostEditorPage() {
   ).slice(0, CMS_LIMITS.seoDescription);
   const previewSlug = toCmsSlug(slug || title) || 'untitled-post';
   const draftScopeKey = isNewPost ? `new_${toCmsSlug(slugParam || 'new') || 'new'}` : (normalizedParamSlug || previewSlug);
-  const previewUrl = `https://bloodhubindia.com/blog/${previewSlug}`;
+  const previewBaseUrl = (settingsQuery.data?.canonicalBaseUrl || CMS_DEFAULTS.canonicalBaseUrl).replace(/\/+$/, '');
+  const previewUrl = `${previewBaseUrl}/blog/${previewSlug}`;
   const normalizedTags = useMemo(
     () => tagsInput
       .split(',')
@@ -761,23 +763,23 @@ export default function CmsBlogPostEditorPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Blog Post Editor</h2>
-            <p className="text-sm text-gray-600">Human-friendly editor with optional advanced SEO controls.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Blog Post Editor</h2>
+            <p className="text-sm text-gray-600 dark:text-slate-300">Human-friendly editor with optional advanced SEO controls.</p>
           </div>
           <Link
             to={ROUTES.portal.admin.dashboard.cmsBlogPosts}
-            className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             Back to Blog Posts
           </Link>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+      <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/70">
           <div className="flex flex-wrap items-center gap-2">
             {([
               { id: 'content', label: '1. Content', ready: guideState.contentReady },
@@ -793,20 +795,20 @@ export default function CmsBlogPostEditorPage() {
                   activeTab === step.id
                     ? 'border-red-600 bg-red-600 text-white'
                     : step.ready
-                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                      : 'border-gray-300 text-gray-700'
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200'
+                      : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'
                 }`}
               >
                 {step.label}
               </button>
             ))}
           </div>
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-gray-600 dark:text-slate-400">
             {autosaveSecondsAgo === null ? 'Autosave waiting for edits' : `Last saved ${autosaveSecondsAgo}s ago`}
           </p>
         </div>
         {restoreDraftPayload ? (
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
             <p>Recovered a local unsaved draft for this post.</p>
             <div className="flex gap-2">
               <button
@@ -850,7 +852,7 @@ export default function CmsBlogPostEditorPage() {
                   setIsDirty(true);
                   notify.success('Recovered local draft loaded.');
                 }}
-                className="rounded-md border border-amber-300 px-2 py-1 font-semibold hover:bg-amber-100"
+                className="rounded-md border border-amber-300 px-2 py-1 font-semibold hover:bg-amber-100 dark:border-amber-900/40 dark:hover:bg-amber-950/40"
               >
                 Restore Draft
               </button>
@@ -862,27 +864,27 @@ export default function CmsBlogPostEditorPage() {
                     window.localStorage.removeItem(draftStorageKey(draftScopeKey));
                   }
                 }}
-                className="rounded-md border border-gray-300 bg-white px-2 py-1 font-semibold text-gray-700 hover:bg-gray-50"
+                className="rounded-md border border-gray-300 bg-white px-2 py-1 font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Discard
               </button>
             </div>
           </div>
         ) : null}
-        <div className="mb-3 flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
+        <div className="mb-3 flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-slate-700 dark:bg-slate-950/70">
           {(['content', 'media', 'seo', 'settings'] as EditorTab[]).map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold capitalize ${activeTab === tab ? 'bg-white text-red-700 shadow-sm' : 'text-gray-600'}`}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold capitalize ${activeTab === tab ? 'bg-white text-red-700 shadow-sm dark:bg-slate-900 dark:text-red-300' : 'text-gray-600 dark:text-slate-300'}`}
             >
               {tab}
             </button>
           ))}
         </div>
         {publishBlockers.length > 0 ? (
-          <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
             <p className="font-semibold">Ready to publish checklist</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {publishBlockers.slice(0, 4).map((blocker) => (
@@ -890,7 +892,7 @@ export default function CmsBlogPostEditorPage() {
                   key={blocker}
                   type="button"
                   onClick={() => setActiveTab(blockerTabMap.get(blocker) || 'content')}
-                  className="rounded-md border border-amber-300 bg-white px-2 py-1 text-left font-semibold text-amber-800 hover:bg-amber-100"
+                  className="rounded-md border border-amber-300 bg-white px-2 py-1 text-left font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-900/40 dark:bg-slate-900 dark:text-amber-200 dark:hover:bg-amber-950/40"
                 >
                   Fix: {blocker}
                 </button>
@@ -898,7 +900,7 @@ export default function CmsBlogPostEditorPage() {
             </div>
           </div>
         ) : (
-          <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">
+          <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-200">
             Publish checklist is complete. This post is ready to go live.
           </div>
         )}
@@ -906,13 +908,13 @@ export default function CmsBlogPostEditorPage() {
         {activeTab === 'content' ? (
           <div className="grid gap-3 md:grid-cols-2">
             {CMS_FEATURE_FLAGS.blogEditorV2 ? (
-              <div className="md:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+              <div className="md:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-200">
                 Editor v2 enhancements enabled: richer formatting controls, quick insert blocks, and keyboard shortcuts (`Ctrl/Cmd+B`, `I`, `U`).
               </div>
             ) : null}
             {isNewPost ? (
               <label className="block md:col-span-2">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Duplicate From Existing Post (Optional)</span>
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Duplicate From Existing Post (Optional)</span>
                 <select
                   value=""
                   onChange={(event) => {
@@ -937,7 +939,7 @@ export default function CmsBlogPostEditorPage() {
                     setIsDirty(true);
                     notify.success('Post content duplicated. Update title/slug before saving.');
                   }}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 >
                   <option value="">Select an existing post</option>
                   {rows.map((entry) => (
@@ -947,23 +949,23 @@ export default function CmsBlogPostEditorPage() {
               </label>
             ) : null}
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Post Title</span>
-              <input value={title} onChange={(event) => { setTitle(event.target.value); setIsDirty(true); if (!slug) setSlug(toCmsSlug(event.target.value)); }} placeholder="Write a clear title" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-              <span className={`mt-1 block text-[11px] ${titleLen > CMS_LIMITS.title ? 'text-red-700' : 'text-gray-500'}`}>{titleLen}/{CMS_LIMITS.title}</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Post Title</span>
+              <input value={title} onChange={(event) => { setTitle(event.target.value); setIsDirty(true); if (!slug) setSlug(toCmsSlug(event.target.value)); }} placeholder="Write a clear title" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <span className={`mt-1 block text-[11px] ${titleLen > CMS_LIMITS.title ? 'text-red-700 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'}`}>{titleLen}/{CMS_LIMITS.title}</span>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Post Slug</span>
-              <input value={slug} onChange={(event) => { setSlug(toCmsSlug(event.target.value)); setIsDirty(true); }} placeholder="post-slug" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Post Slug</span>
+              <input value={slug} onChange={(event) => { setSlug(toCmsSlug(event.target.value)); setIsDirty(true); }} placeholder="post-slug" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="block md:col-span-2">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Summary</span>
-              <textarea value={excerpt} onChange={(event) => { setExcerpt(event.target.value); setIsDirty(true); }} rows={3} placeholder="Short summary shown in blog list and search" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-              <span className={`mt-1 block text-[11px] ${excerptLen > CMS_LIMITS.excerpt ? 'text-red-700' : 'text-gray-500'}`}>{excerptLen}/{CMS_LIMITS.excerpt}</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Summary</span>
+              <textarea value={excerpt} onChange={(event) => { setExcerpt(event.target.value); setIsDirty(true); }} rows={3} placeholder="Short summary shown in blog list and search" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <span className={`mt-1 block text-[11px] ${excerptLen > CMS_LIMITS.excerpt ? 'text-red-700 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'}`}>{excerptLen}/{CMS_LIMITS.excerpt}</span>
             </label>
             <label className="block md:col-span-2">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Article Content</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Article Content</span>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[11px] text-gray-500">
+                <p className="text-[11px] text-gray-500 dark:text-slate-400">
                   Write for humans first. Keep paragraphs short and include actionable guidance.
                 </p>
               </div>
@@ -977,25 +979,25 @@ export default function CmsBlogPostEditorPage() {
               />
             </label>
             <label className="block md:col-span-2">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Tags</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Tags</span>
               <input
                 value={tagsInput}
                 onChange={(event) => { setTagsInput(event.target.value); setIsDirty(true); }}
                 placeholder="blood donation, eligibility, donor tips"
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
-              <span className="mt-1 block text-[11px] text-gray-500">Comma separated. Up to {CMS_LIMITS.tagsPerPost} tags.</span>
+              <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">Comma separated. Up to {CMS_LIMITS.tagsPerPost} tags.</span>
               {normalizedTags.length ? (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {normalizedTags.map((tag) => (
-                    <span key={tag} className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">#{tag}</span>
+                    <span key={tag} className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">#{tag}</span>
                   ))}
                 </div>
               ) : null}
             </label>
             {linkSuggestions.length ? (
-              <div className="md:col-span-2 rounded-xl border border-blue-100 bg-blue-50 p-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-blue-700">Internal Link Suggestions</p>
+              <div className="md:col-span-2 rounded-xl border border-blue-100 bg-blue-50 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-blue-700 dark:text-blue-300">Internal Link Suggestions</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {linkSuggestions.map((entry) => (
                     <button
@@ -1005,7 +1007,7 @@ export default function CmsBlogPostEditorPage() {
                         setContentJson((prev) => appendInternalLinkToCmsRichContent(prev, entry.label, entry.path));
                         setIsDirty(true);
                       }}
-                      className="rounded-md border border-blue-200 bg-white px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                      className="rounded-md border border-blue-200 bg-white px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900/40 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/40"
                     >
                       Insert {entry.source}: {entry.label}
                     </button>
@@ -1013,7 +1015,7 @@ export default function CmsBlogPostEditorPage() {
                 </div>
               </div>
             ) : null}
-            <div className="md:col-span-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-900">
+            <div className="md:col-span-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-200">
               <p className="font-semibold">Readability</p>
               <p className="mt-1">Words: {readability.words} · Sentences: {readability.sentences} · Approx read time: {readability.readingMinutes} min · Difficulty: {readability.level} ({readability.score})</p>
             </div>
@@ -1023,10 +1025,10 @@ export default function CmsBlogPostEditorPage() {
         {activeTab === 'media' ? (
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block md:col-span-2">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Cover Image URL</span>
-              <input value={coverImageUrl} onChange={(event) => { setCoverImageUrl(event.target.value); setIsDirty(true); }} placeholder="https://..." className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Cover Image URL</span>
+              <input value={coverImageUrl} onChange={(event) => { setCoverImageUrl(event.target.value); setIsDirty(true); }} placeholder="https://..." className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
-            <label className="inline-flex items-center gap-2 rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700">
+            <label className="inline-flex items-center gap-2 rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
               <input type="checkbox" checked={featured} onChange={(event) => { setFeatured(event.target.checked); setIsDirty(true); }} />
               Mark as featured post
             </label>
@@ -1035,8 +1037,8 @@ export default function CmsBlogPostEditorPage() {
 
         {activeTab === 'seo' ? (
           <div className="space-y-3">
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
-              <p className="text-sm font-semibold text-gray-900">Publish Readiness</p>
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-950/70">
+              <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Publish Readiness</p>
               <div className="mt-2 grid gap-1 sm:grid-cols-2">
                 {publishChecks.critical.map((check) => (
                   <div key={check.id} className={`rounded px-2 py-1 text-xs ${check.passed ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
@@ -1049,21 +1051,21 @@ export default function CmsBlogPostEditorPage() {
                   </div>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-gray-600">SEO quality score: {seoAudit.score}/100</p>
+              <p className="mt-2 text-xs text-gray-600 dark:text-slate-400">SEO quality score: {seoAudit.score}/100</p>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
               <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Search Title</span>
-                <input value={seoTitle} onChange={(event) => { setSeoTitle(event.target.value); setIsDirty(true); }} placeholder="Defaults to post title" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-                <span className={`mt-1 block text-[11px] ${seoTitleLen > CMS_LIMITS.seoTitle ? 'text-red-700' : 'text-gray-500'}`}>{seoTitleLen}/{CMS_LIMITS.seoTitle}</span>
-                <span className="mt-1 block text-[11px] text-gray-500">Recommended {CMS_SEO_GUIDELINES.titleMin}-{CMS_SEO_GUIDELINES.titleMax} characters.</span>
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Search Title</span>
+                <input value={seoTitle} onChange={(event) => { setSeoTitle(event.target.value); setIsDirty(true); }} placeholder="Defaults to post title" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <span className={`mt-1 block text-[11px] ${seoTitleLen > CMS_LIMITS.seoTitle ? 'text-red-700 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'}`}>{seoTitleLen}/{CMS_LIMITS.seoTitle}</span>
+                <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">Recommended {CMS_SEO_GUIDELINES.titleMin}-{CMS_SEO_GUIDELINES.titleMax} characters.</span>
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Search Description</span>
-                <input value={seoDescription} onChange={(event) => { setSeoDescription(event.target.value); setIsDirty(true); }} placeholder="Defaults to summary" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-                <span className={`mt-1 block text-[11px] ${seoDescLen > CMS_LIMITS.seoDescription ? 'text-red-700' : 'text-gray-500'}`}>{seoDescLen}/{CMS_LIMITS.seoDescription}</span>
-                <span className="mt-1 block text-[11px] text-gray-500">Recommended {CMS_SEO_GUIDELINES.descriptionMin}-{CMS_SEO_GUIDELINES.descriptionMax} characters.</span>
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Search Description</span>
+                <input value={seoDescription} onChange={(event) => { setSeoDescription(event.target.value); setIsDirty(true); }} placeholder="Defaults to summary" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <span className={`mt-1 block text-[11px] ${seoDescLen > CMS_LIMITS.seoDescription ? 'text-red-700 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'}`}>{seoDescLen}/{CMS_LIMITS.seoDescription}</span>
+                <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">Recommended {CMS_SEO_GUIDELINES.descriptionMin}-{CMS_SEO_GUIDELINES.descriptionMax} characters.</span>
               </label>
             </div>
             <SeoSnippetPreview title={previewTitle} description={previewDescription} url={previewUrl} />
@@ -1074,7 +1076,7 @@ export default function CmsBlogPostEditorPage() {
                   setSeoTitle((prev) => prev.trim() || title.trim().slice(0, CMS_LIMITS.seoTitle));
                   setIsDirty(true);
                 }}
-                className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Use Post Title
               </button>
@@ -1084,7 +1086,7 @@ export default function CmsBlogPostEditorPage() {
                   setSeoDescription((prev) => prev.trim() || excerpt.trim().slice(0, CMS_LIMITS.seoDescription));
                   setIsDirty(true);
                 }}
-                className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Use Summary
               </button>
@@ -1095,13 +1097,13 @@ export default function CmsBlogPostEditorPage() {
                   setTwitterImageUrl((prev) => prev.trim() || coverImageUrl.trim());
                   setIsDirty(true);
                 }}
-                className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Use Cover Image for Social
               </button>
             </div>
             {seoAudit.topFixes.length ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
                 <p className="font-semibold">Top fixes to improve SEO:</p>
                 <ul className="mt-1 list-disc pl-5">
                   {seoAudit.topFixes.map((fix) => <li key={fix}>{fix}</li>)}
@@ -1113,30 +1115,30 @@ export default function CmsBlogPostEditorPage() {
               <button
                 type="button"
                 onClick={() => setShowAdvancedSeo((prev) => !prev)}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 {showAdvancedSeo ? 'Hide Advanced SEO' : 'Show Advanced SEO (Optional)'}
               </button>
             ) : null}
 
             {(!CMS_FEATURE_FLAGS.simplifiedEditorMode || showAdvancedSeo) ? (
-              <div className="grid gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 md:grid-cols-2">
-                <input value={seoCanonicalUrl} onChange={(event) => { setSeoCanonicalUrl(event.target.value); setIsDirty(true); }} placeholder="Canonical URL (optional, full URL)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2" />
+              <div className="grid gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-950/70 md:grid-cols-2">
+                <input value={seoCanonicalUrl} onChange={(event) => { setSeoCanonicalUrl(event.target.value); setIsDirty(true); }} placeholder="Canonical URL (optional, full URL)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
                 {canonicalConflictCount > 0 ? (
-                  <p className="text-xs text-amber-700 md:col-span-2">
+                  <p className="text-xs text-amber-700 dark:text-amber-300 md:col-span-2">
                     Canonical conflict: {canonicalConflictCount} other CMS item(s) use this canonical URL.
                   </p>
                 ) : null}
-                <input value={ogTitle} onChange={(event) => { setOgTitle(event.target.value); setIsDirty(true); }} placeholder="Social title (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-                <input value={ogDescription} onChange={(event) => { setOgDescription(event.target.value); setIsDirty(true); }} placeholder="Social description (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-                <input value={ogImageUrl} onChange={(event) => { setOgImageUrl(event.target.value); setIsDirty(true); }} placeholder="Social preview image URL (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-                <input value={twitterImageUrl} onChange={(event) => { setTwitterImageUrl(event.target.value); setIsDirty(true); }} placeholder="Twitter image URL (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-                <div className="flex items-center gap-4 rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2">
+                <input value={ogTitle} onChange={(event) => { setOgTitle(event.target.value); setIsDirty(true); }} placeholder="Social title (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <input value={ogDescription} onChange={(event) => { setOgDescription(event.target.value); setIsDirty(true); }} placeholder="Social description (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <input value={ogImageUrl} onChange={(event) => { setOgImageUrl(event.target.value); setIsDirty(true); }} placeholder="Social preview image URL (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <input value={twitterImageUrl} onChange={(event) => { setTwitterImageUrl(event.target.value); setIsDirty(true); }} placeholder="Twitter image URL (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <div className="flex items-center gap-4 rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
                   <label className="inline-flex items-center gap-2"><input type="checkbox" checked={seoNoIndex} onChange={(event) => { setSeoNoIndex(event.target.checked); setIsDirty(true); }} />Disable indexing</label>
                   <label className="inline-flex items-center gap-2"><input type="checkbox" checked={seoNoFollow} onChange={(event) => { setSeoNoFollow(event.target.checked); setIsDirty(true); }} />Disable link following</label>
                 </div>
                 {status !== CMS_STATUS.published ? (
-                  <p className="text-xs text-amber-700 md:col-span-2">Draft and scheduled content is automatically kept noindex/nofollow for safety.</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-300 md:col-span-2">Draft and scheduled content is automatically kept noindex/nofollow for safety.</p>
                 ) : null}
               </div>
             ) : null}
@@ -1146,65 +1148,65 @@ export default function CmsBlogPostEditorPage() {
         {activeTab === 'settings' ? (
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Category</span>
-              <select value={categorySlug} onChange={(event) => { setCategorySlug(event.target.value); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm">
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Category</span>
+              <select value={categorySlug} onChange={(event) => { setCategorySlug(event.target.value); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                 <option value="">No category</option>
                 {categoryOptions.map((entry) => <option key={entry.id} value={entry.slug}>{entry.name}</option>)}
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Series Slug</span>
-              <input value={seriesSlug} onChange={(event) => { setSeriesSlug(toCmsSlug(event.target.value)); setIsDirty(true); }} placeholder="optional-series" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Series Slug</span>
+              <input value={seriesSlug} onChange={(event) => { setSeriesSlug(toCmsSlug(event.target.value)); setIsDirty(true); }} placeholder="optional-series" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Related Post Slugs</span>
-              <input value={relatedPostSlugsInput} onChange={(event) => { setRelatedPostSlugsInput(event.target.value); setIsDirty(true); }} placeholder="slug-one, slug-two" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
-              <span className="mt-1 block text-[11px] text-gray-500">Comma separated, max {CMS_LIMITS.relatedPostsPerEntry}.</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Related Post Slugs</span>
+              <input value={relatedPostSlugsInput} onChange={(event) => { setRelatedPostSlugsInput(event.target.value); setIsDirty(true); }} placeholder="slug-one, slug-two" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">Comma separated, max {CMS_LIMITS.relatedPostsPerEntry}.</span>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Author Name</span>
-              <input value={authorName} onChange={(event) => { setAuthorName(event.target.value); setIsDirty(true); }} placeholder="Author display name" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Author Name</span>
+              <input value={authorName} onChange={(event) => { setAuthorName(event.target.value); setIsDirty(true); }} placeholder="Author display name" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Status</span>
-              <select value={status} onChange={(event) => { setStatus(event.target.value as (typeof statusOptions)[number]); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm">
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Status</span>
+              <select value={status} onChange={(event) => { setStatus(event.target.value as (typeof statusOptions)[number]); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                 {statusOptions.map((entry) => <option key={entry} value={entry}>{toHumanCmsStatus(entry)}</option>)}
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Featured Until</span>
-              <input type="datetime-local" value={featuredUntil} onChange={(event) => { setFeaturedUntil(event.target.value); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Featured Until</span>
+              <input type="datetime-local" value={featuredUntil} onChange={(event) => { setFeaturedUntil(event.target.value); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Workflow Assignee</span>
-              <input value={workflowAssignee} onChange={(event) => { setWorkflowAssignee(event.target.value); setIsDirty(true); }} placeholder="Reviewer name or UID" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Workflow Assignee</span>
+              <input value={workflowAssignee} onChange={(event) => { setWorkflowAssignee(event.target.value); setIsDirty(true); }} placeholder="Reviewer name or UID" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Review Status</span>
-              <select value={reviewStatus} onChange={(event) => { setReviewStatus(event.target.value as (typeof CMS_REVIEW_STATUS)[keyof typeof CMS_REVIEW_STATUS]); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm">
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Review Status</span>
+              <select value={reviewStatus} onChange={(event) => { setReviewStatus(event.target.value as (typeof CMS_REVIEW_STATUS)[keyof typeof CMS_REVIEW_STATUS]); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                 {Object.values(CMS_REVIEW_STATUS).map((entry) => <option key={entry} value={entry}>{entry}</option>)}
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Scheduled Publish</span>
-              <input type="datetime-local" value={scheduledPublishAt} onChange={(event) => { setScheduledPublishAt(event.target.value); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Scheduled Publish</span>
+              <input type="datetime-local" value={scheduledPublishAt} onChange={(event) => { setScheduledPublishAt(event.target.value); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Scheduled Unpublish</span>
-              <input type="datetime-local" value={scheduledUnpublishAt} onChange={(event) => { setScheduledUnpublishAt(event.target.value); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Scheduled Unpublish</span>
+              <input type="datetime-local" value={scheduledUnpublishAt} onChange={(event) => { setScheduledUnpublishAt(event.target.value); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="block md:col-span-2">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Review Notes</span>
-              <textarea value={reviewNotes} onChange={(event) => { setReviewNotes(event.target.value); setIsDirty(true); }} rows={3} placeholder="Context for reviewers and publishers" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Review Notes</span>
+              <textarea value={reviewNotes} onChange={(event) => { setReviewNotes(event.target.value); setIsDirty(true); }} rows={3} placeholder="Context for reviewers and publishers" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
-            <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600">Saved Versions (Local)</p>
+            <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-950/70">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Saved Versions (Local)</p>
               {revisionHistory.length ? (
                 <div className="mt-2 space-y-2">
                   {revisionHistory.map((entry, index) => (
-                    <div key={`${entry.savedAt}-${index}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
-                      <div className="text-xs text-gray-600">
-                        <p className="font-semibold text-gray-900">{entry.title}</p>
+                    <div key={`${entry.savedAt}-${index}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                      <div className="text-xs text-gray-600 dark:text-slate-300">
+                        <p className="font-semibold text-gray-900 dark:text-slate-100">{entry.title}</p>
                         <p>{new Date(entry.savedAt).toLocaleString()} · {toHumanCmsStatus(entry.status)}</p>
                         <p>
                           Content size: {extractCmsPlainText(entry.contentJson).trim().length} chars
@@ -1221,7 +1223,7 @@ export default function CmsBlogPostEditorPage() {
                           setContentJson(toModernBlogContentJson(entry.contentJson));
                           setIsDirty(true);
                         }}
-                        className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                        className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                       >
                         Restore
                       </button>
@@ -1229,17 +1231,17 @@ export default function CmsBlogPostEditorPage() {
                   ))}
                 </div>
               ) : (
-                <p className="mt-2 text-xs text-gray-500">No revisions saved yet.</p>
+                <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">No revisions saved yet.</p>
               )}
             </div>
-            <div className="md:col-span-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-indigo-700">Saved Versions (Server)</p>
+            <div className="md:col-span-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-indigo-700 dark:text-indigo-300">Saved Versions (Server)</p>
               {serverRevisionHistory.length ? (
                 <div className="mt-2 space-y-2">
                   {serverRevisionHistory.map((entry) => (
-                    <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2">
-                      <div className="text-xs text-gray-600">
-                        <p className="font-semibold text-gray-900">{entry.title}</p>
+                    <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 dark:border-indigo-900/40 dark:bg-slate-900">
+                      <div className="text-xs text-gray-600 dark:text-slate-300">
+                        <p className="font-semibold text-gray-900 dark:text-slate-100">{entry.title}</p>
                         <p>{new Date(entry.savedAt).toLocaleString()} · {toHumanCmsStatus(entry.status)} · v{entry.version} · {entry.savedBy}</p>
                         <p>
                           Content size: {extractCmsPlainText(entry.contentJson).trim().length} chars
@@ -1257,7 +1259,7 @@ export default function CmsBlogPostEditorPage() {
                           setStatus(entry.status as (typeof statusOptions)[number]);
                           setIsDirty(true);
                         }}
-                        className="rounded-md border border-indigo-300 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                        className="rounded-md border border-indigo-300 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 dark:border-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
                       >
                         Restore
                       </button>
@@ -1265,7 +1267,7 @@ export default function CmsBlogPostEditorPage() {
                   ))}
                 </div>
               ) : (
-                <p className="mt-2 text-xs text-indigo-700/80">No server revisions yet for this post.</p>
+                <p className="mt-2 text-xs text-indigo-700/80 dark:text-indigo-300/80">No server revisions yet for this post.</p>
               )}
             </div>
           </div>
@@ -1281,13 +1283,13 @@ export default function CmsBlogPostEditorPage() {
           <button
             type="button"
             onClick={() => navigate(ROUTES.portal.admin.dashboard.cmsBlogPosts)}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-slate-700 dark:text-slate-200"
           >
             Cancel
           </button>
         </div>
         {publishBlockers.length > 0 ? (
-          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
             <p className="font-semibold">Publish blockers</p>
             <ul className="mt-1 list-disc pl-5">
               {publishBlockers.slice(0, 6).map((blocker) => (
