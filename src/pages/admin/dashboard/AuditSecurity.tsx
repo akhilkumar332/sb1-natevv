@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, UserCog } from 'lucide-react';
+import { collection, getDocs, limit, orderBy, query, startAfter, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import { toDateValue } from '../../../utils/dateValue';
 import { useAuth } from '../../../contexts/AuthContext';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
-import { useAdminAuditLogs } from '../../../hooks/admin/useAdminQueries';
-import { refetchQuery } from '../../../utils/queryRefetch';
 import { ROUTES } from '../../../constants/routes';
+import { db } from '../../../firebase';
+import { COLLECTIONS } from '../../../constants/firestore';
 
 type AuditRow = {
   id: string;
@@ -26,21 +27,60 @@ function AuditSecurityPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const auditQuery = useAdminAuditLogs(1000);
-  const loading = auditQuery.isLoading;
-  const error = auditQuery.error instanceof Error ? auditQuery.error.message : null;
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+
+  const fetchAuditLogsPage = async (options?: {
+    reset?: boolean;
+    cursor?: QueryDocumentSnapshot<DocumentData> | null;
+  }) => {
+    const snapshot = await getDocs(query(
+      collection(db, COLLECTIONS.AUDIT_LOGS),
+      orderBy('createdAt', 'desc'),
+      ...(options?.cursor ? [startAfter(options.cursor)] : []),
+      limit(101),
+    ));
+    const docs = snapshot.docs;
+    const nextRows = docs.slice(0, 100).map((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+      return {
+        id: docSnap.id,
+        actorUid: typeof data.actorUid === 'string' ? data.actorUid : '-',
+        actorRole: typeof data.actorRole === 'string' ? data.actorRole : undefined,
+        action: typeof data.action === 'string' ? data.action : 'unknown',
+        targetUid: typeof data.targetUid === 'string' ? data.targetUid : undefined,
+        createdAt: toDateValue(data.createdAt),
+      } as AuditRow;
+    }).filter((entry) => Boolean(entry.id));
+
+    setEvents((current) => options?.reset ? nextRows : [...current, ...nextRows]);
+    setHasMore(docs.length > 100);
+    setLastDoc(docs.length > 100 ? docs[99] : docs[docs.length - 1] || null);
+  };
 
   useEffect(() => {
-    const rows = (auditQuery.data || []).map((entry) => ({
-      id: entry.id || '',
-      actorUid: entry.actorUid || '-',
-      actorRole: entry.actorRole,
-      action: entry.action || 'unknown',
-      targetUid: entry.targetUid,
-      createdAt: toDateValue(entry.createdAt),
-    })) as AuditRow[];
-    setEvents(rows.filter((entry) => Boolean(entry.id)));
-  }, [auditQuery.data]);
+    let isActive = true;
+    setLoading(true);
+    setError(null);
+    fetchAuditLogsPage({ reset: true })
+      .catch((nextError) => {
+        if (!isActive) return;
+        setError(nextError instanceof Error ? nextError.message : 'Failed to fetch audit logs.');
+        setEvents([]);
+        setHasMore(false);
+        setLastDoc(null);
+      })
+      .finally(() => {
+        if (isActive) setLoading(false);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     setPage(1);
@@ -71,8 +111,18 @@ function AuditSecurityPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <AdminRefreshButton
-              onClick={() => refetchQuery(auditQuery)}
-              isRefreshing={auditQuery.isFetching}
+              onClick={async () => {
+                setRefreshing(true);
+                setError(null);
+                try {
+                  await fetchAuditLogsPage({ reset: true });
+                } catch (nextError) {
+                  setError(nextError instanceof Error ? nextError.message : 'Failed to refresh audit logs.');
+                } finally {
+                  setRefreshing(false);
+                }
+              }}
+              isRefreshing={refreshing}
               label="Refresh audit logs"
             />
             <Link
@@ -96,11 +146,19 @@ function AuditSecurityPage() {
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
         searchPlaceholder="Search actor uid, role, action, target uid"
-        rightContent={<span className="text-xs font-semibold text-gray-500 dark:text-slate-400">{filtered.length} events</span>}
+        rightContent={<span className="text-xs font-semibold text-gray-500 dark:text-slate-400">{filtered.length} loaded events</span>}
       />
 
-      <AdminRefreshingBanner show={loading} message="Refreshing audit logs..." />
-      <AdminErrorCard message={error} onRetry={() => refetchQuery(auditQuery)} />
+      <AdminRefreshingBanner show={loading || refreshing || loadingMore} message="Refreshing audit logs..." />
+      <AdminErrorCard message={error} onRetry={() => {
+        setLoading(true);
+        setError(null);
+        void fetchAuditLogsPage({ reset: true })
+          .catch((nextError) => {
+            setError(nextError instanceof Error ? nextError.message : 'Failed to fetch audit logs.');
+          })
+          .finally(() => setLoading(false));
+      }} />
 
       {paged.length === 0 ? (
         <AdminEmptyStateCard message="No audit events found." />
@@ -154,10 +212,32 @@ function AuditSecurityPage() {
         pageSize={pageSize}
         itemCount={paged.length}
         hasNextPage={hasNextPage}
-        loading={loading}
+        loading={loading || refreshing || loadingMore}
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
       />
+
+      <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 shadow-sm dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-200">
+        <p className="font-semibold">Visibility window</p>
+        <p className="mt-1">Search and pagination operate on the loaded audit window. Load older events to extend the visible range.</p>
+        <button
+          type="button"
+          onClick={() => {
+            if (!hasMore || !lastDoc) return;
+            setLoadingMore(true);
+            setError(null);
+            void fetchAuditLogsPage({ cursor: lastDoc })
+              .catch((nextError) => {
+                setError(nextError instanceof Error ? nextError.message : 'Failed to load older audit logs.');
+              })
+              .finally(() => setLoadingMore(false));
+          }}
+          disabled={!hasMore || loadingMore}
+          className="mt-3 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300"
+        >
+          {loadingMore ? 'Loading older events...' : hasMore ? 'Load older events' : 'All currently reachable events loaded'}
+        </button>
+      </div>
 
       <div className="rounded-xl border border-red-100 bg-white px-4 py-3 text-sm text-gray-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
         <p className="flex items-center gap-2 font-semibold text-red-700 dark:text-red-300"><Shield className="h-4 w-4" />Security control</p>

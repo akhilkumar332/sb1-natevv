@@ -12,7 +12,6 @@ export const authStorage = {
       localStorage.removeItem('lastLoginTime');
       localStorage.removeItem('lastActiveTime');
       localStorage.removeItem('user');
-      sessionStorage.clear();
     },
   
     updateLastActiveTime: () => {

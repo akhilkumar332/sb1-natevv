@@ -276,6 +276,40 @@ const userCacheKey = 'bh_user_cache';
 const userCacheAtKey = 'bh_user_cache_at';
 const userCacheTtlMs = ONE_DAY_MS;
 const IMPERSONATION_TTL_MS = THIRTY_MINUTES_MS;
+const authOwnedSessionStorageKeys = [
+  pendingPhoneLinkKey,
+  portalRoleStorageKey,
+  impersonationStorageKey,
+  'bh_pending_portal_role',
+  'bh_registration_intent',
+] as const;
+
+const decodeJwtSubject = (token: string | null): string | null => {
+  if (!token) return null;
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+  try {
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const decoded = JSON.parse(atob(padded)) as { sub?: unknown; user_id?: unknown };
+    if (typeof decoded?.sub === 'string' && decoded.sub) return decoded.sub;
+    if (typeof decoded?.user_id === 'string' && decoded.user_id) return decoded.user_id;
+  } catch {
+    // ignore invalid token payloads
+  }
+  return null;
+};
+
+const clearAuthOwnedSessionStorage = () => {
+  if (typeof window === 'undefined') return;
+  authOwnedSessionStorageKeys.forEach((key) => {
+    try {
+      window.sessionStorage.removeItem(key);
+    } catch {
+      // ignore storage cleanup errors
+    }
+  });
+};
 
 const reportAuthContextError = (
   error: unknown,
@@ -418,7 +452,14 @@ const readCachedUser = (): User | null => {
     }
     const raw = localStorage.getItem(userCacheKey);
     if (!raw) return null;
-    return hydrateCachedUser(JSON.parse(raw));
+    const hydrated = hydrateCachedUser(JSON.parse(raw));
+    const tokenSubject = decodeJwtSubject(authToken);
+    if (tokenSubject && hydrated?.uid && hydrated.uid !== tokenSubject) {
+      localStorage.removeItem(userCacheKey);
+      localStorage.removeItem(userCacheAtKey);
+      return null;
+    }
+    return hydrated;
   } catch {
     return null;
   }
@@ -860,7 +901,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
   const [impersonationTransition, setImpersonationTransition] = useState<'starting' | 'stopping' | null>(null);
   const [profileResolved, setProfileResolved] = useState(!initialCachedUser);
-  const logoutChannel = new BroadcastChannel('auth_logout');
+  const logoutChannelRef = useRef<BroadcastChannel | null>(null);
   const referralApplyAttemptedRef = useRef(false);
   const recentLoginRef = useRef<{ uid: string; at: number; user?: User } | null>(null);
   const userRef = useRef<User | null>(initialCachedUser);
@@ -1501,6 +1542,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const recentLogin = recentLoginRef.current;
           const currentUser = userRef.current;
           const cachedUser = readCachedUser();
+          const matchingCachedUser = cachedUser?.uid === firebaseUser.uid ? cachedUser : null;
           const pendingPortalRole = readPendingPortalRole();
           const registrationIntentRole = readRegistrationIntent();
           const bootstrapPendingRole = pendingPortalRole || registrationIntentRole;
@@ -1513,11 +1555,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           if (recentLogin && recentLogin.uid === firebaseUser.uid && now - recentLogin.at < 15000) {
             if (!currentUser || currentUser.uid !== firebaseUser.uid) {
-              setUser(recentLogin.user || cachedUser || currentUser || null);
+              setUser(recentLogin.user || matchingCachedUser || currentUser || null);
             }
             setProfileResolved(true);
             setLoading(false);
-            void updateSessionMetadata(firebaseUser, recentLogin.user || cachedUser || currentUser || undefined);
+            void updateSessionMetadata(firebaseUser, recentLogin.user || matchingCachedUser || currentUser || undefined);
             return;
           }
 
@@ -1528,11 +1570,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
           }
 
-          if (cachedUser && cachedUser.uid === firebaseUser.uid) {
-            setUser(cachedUser);
+          if (matchingCachedUser) {
+            setUser(matchingCachedUser);
             setProfileResolved(false);
             setLoading(false);
-            void updateSessionMetadata(firebaseUser, cachedUser);
+            void updateSessionMetadata(firebaseUser, matchingCachedUser);
             void updateUserInFirestore(firebaseUser)
               .then((result) => {
                 if (result.user) {
@@ -1710,18 +1752,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Listen for logout events from other tabs
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
     const handleLogoutEvent = (event: MessageEvent) => {
       if (event.data === 'logout') {
         handleLogout();
       }
     };
 
-    logoutChannel.addEventListener('message', handleLogoutEvent);
+    const channel = new BroadcastChannel('auth_logout');
+    logoutChannelRef.current = channel;
+    channel.addEventListener('message', handleLogoutEvent);
 
     // Cleanup listener on unmount
     return () => {
-      logoutChannel.removeEventListener('message', handleLogoutEvent);
-      logoutChannel.close();
+      channel.removeEventListener('message', handleLogoutEvent);
+      channel.close();
+      if (logoutChannelRef.current === channel) {
+        logoutChannelRef.current = null;
+      }
     };
   }, []);
 
@@ -2505,7 +2553,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       localStorage.removeItem('authToken');
-      sessionStorage.clear();
+      clearAuthOwnedSessionStorage();
       // Clear any other auth-related storage
       localStorage.removeItem('user');
       localStorage.removeItem('lastLoginTime');
@@ -2554,7 +2602,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // Broadcast logout event to other tabs
-      logoutChannel.postMessage('logout');
+      logoutChannelRef.current?.postMessage('logout');
     } catch (error) {
       reportAuthContextError(error, 'auth.logout.broadcast');
     }

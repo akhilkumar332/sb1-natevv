@@ -10,13 +10,13 @@ import {
   doc,
   setDoc,
   updateDoc,
-  getDoc,
   query,
   where,
   getDocs,
   Timestamp,
   deleteField,
   serverTimestamp,
+  FieldValue,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { COLLECTIONS } from '../constants/firestore';
@@ -43,6 +43,22 @@ const reportNotificationServiceError = (error: unknown, kind: string, metadata?:
       ...(metadata || {}),
     },
   });
+};
+
+const legacyFcmDeviceKeyPrefix = 'bh_fcm_device_key:';
+
+const getLegacyFcmDeviceKey = (userId: string) => {
+  if (typeof window === 'undefined' || !userId) return `legacy_${userId}`;
+  const storageKey = `${legacyFcmDeviceKeyPrefix}${userId}`;
+  try {
+    const existing = window.localStorage.getItem(storageKey);
+    if (existing) return existing;
+    const nextKey = `legacy_${userId}`;
+    window.localStorage.setItem(storageKey, nextKey);
+    return nextKey;
+  } catch {
+    return `legacy_${userId}`;
+  }
 };
 
 /**
@@ -168,7 +184,7 @@ export const saveFCMToken = async (userId: string, token: string): Promise<void>
       const matchingDeviceId = Object.keys(currentDetails).find(
         (deviceId) => String(currentDetails[deviceId]?.token || '').trim() === normalizedToken,
       );
-      const fallbackDeviceId = matchingDeviceId || `anon_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      const fallbackDeviceId = matchingDeviceId || getLegacyFcmDeviceKey(userId);
 
       tx.set(userRef, {
         lastTokenUpdate: serverTimestamp(),
@@ -224,19 +240,26 @@ export const removeFCMToken = async (
 ): Promise<void> => {
   try {
     const userRef = doc(db, COLLECTIONS.USERS, userId);
-    const snapshot = await getDoc(userRef);
-    const data = snapshot.exists() ? (snapshot.data() as any) : {};
-    const currentDeviceDetails = { ...(data.fcmDeviceDetails || {}) };
+    await runOnlineTransaction(async (tx) => {
+      const snapshot = await tx.get(userRef);
+      const data = snapshot.exists() ? (snapshot.data() as any) : {};
+      const currentDeviceDetails = { ...(data.fcmDeviceDetails || {}) } as Record<string, { token?: string }>;
+      const normalizedToken = String(token || '').trim();
+      if (!normalizedToken) return;
 
-    Object.keys(currentDeviceDetails).forEach((deviceId) => {
-      if (currentDeviceDetails[deviceId]?.token === token) {
-        delete currentDeviceDetails[deviceId];
-      }
-    });
-    await updateDoc(userRef, {
-      fcmDeviceDetails: currentDeviceDetails,
-      lastTokenUpdate: serverTimestamp(),
-    });
+      const matchingDeviceIds = Object.keys(currentDeviceDetails).filter(
+        (deviceId) => String(currentDeviceDetails[deviceId]?.token || '').trim() === normalizedToken,
+      );
+      if (matchingDeviceIds.length === 0) return;
+
+      const patch = matchingDeviceIds.reduce<Record<string, FieldValue | ReturnType<typeof serverTimestamp>>>((acc, deviceId) => {
+        acc[`fcmDeviceDetails.${deviceId}`] = deleteField();
+        return acc;
+      }, {
+        lastTokenUpdate: serverTimestamp(),
+      });
+      tx.update(userRef, patch);
+    }, 'You are offline. Reconnect to remove notification token.');
   } catch (error) {
     throw new DatabaseError('Failed to remove FCM token');
   }

@@ -1,4 +1,4 @@
-import { Timestamp, collection, doc, getDoc, getDocs, limit, orderBy, query, startAfter, where, type QueryConstraint } from 'firebase/firestore';
+import { Timestamp, collection, doc, getDoc, getDocs, limit, orderBy, query, where, type QueryConstraint } from 'firebase/firestore';
 import { db } from '../firebase';
 import { COLLECTIONS } from '../constants/firestore';
 import { CMS_DEFAULTS, CMS_LIMITS, CMS_PAGE_KIND, CMS_QUERY_LIMITS, CMS_SETTINGS_DOC_ID, CMS_STATUS, getCmsMenuDocId, getCmsPostDocId, type CmsMenuLocation } from '../constants/cms';
@@ -112,6 +112,15 @@ const decodeBlogCursor = (cursor: CmsPublishedBlogPageCursor): { ts: number; id:
   return { ts, id };
 };
 
+const sortPublishedPostsForCursor = (items: CmsBlogPost[]): CmsBlogPost[] => (
+  [...items].sort((a, b) => {
+    const aTs = toDateValue(a.publishedAt)?.getTime() ?? 0;
+    const bTs = toDateValue(b.publishedAt)?.getTime() ?? 0;
+    if (aTs !== bTs) return bTs - aTs;
+    return (b.id || '').localeCompare(a.id || '');
+  })
+);
+
 const mapCmsPage = (id: string, data: Record<string, any>): CmsPage => ({
   id,
   slug: typeof data.slug === 'string' ? data.slug : '',
@@ -182,7 +191,9 @@ export const getPublicCmsSettings = async (): Promise<CmsSettings> => {
     siteTagline: typeof data.siteTagline === 'string' ? data.siteTagline : CMS_DEFAULTS.siteTagline,
     defaultSeoTitle: typeof data.defaultSeoTitle === 'string' ? data.defaultSeoTitle : CMS_DEFAULTS.defaultSeoTitle,
     defaultSeoDescription: typeof data.defaultSeoDescription === 'string' ? data.defaultSeoDescription : CMS_DEFAULTS.defaultSeoDescription,
-    canonicalBaseUrl: typeof data.canonicalBaseUrl === 'string' ? data.canonicalBaseUrl : CMS_DEFAULTS.canonicalBaseUrl,
+    canonicalBaseUrl: typeof data.canonicalBaseUrl === 'string' && data.canonicalBaseUrl.trim()
+      ? data.canonicalBaseUrl.trim().replace(/\/+$/, '')
+      : CMS_DEFAULTS.canonicalBaseUrl,
     defaultOgImageUrl: typeof data.defaultOgImageUrl === 'string' ? data.defaultOgImageUrl : CMS_DEFAULTS.defaultOgImageUrl,
     twitterHandle: typeof data.twitterHandle === 'string' ? data.twitterHandle : CMS_DEFAULTS.twitterHandle,
     robotsPolicy: data.robotsPolicy === 'noindex_nofollow' ? 'noindex_nofollow' : CMS_DEFAULTS.robotsPolicy,
@@ -292,24 +303,53 @@ export const getPublishedBlogPostsPage = async (options?: {
   const pageSize = Math.max(3, Math.min(24, Number(options?.pageSize || 9)));
   const decoded = decodeBlogCursor(options?.cursor || null);
   const now = Timestamp.now();
-  const buildQuery = (collectionName: string) => {
-    const base = [
-      where('status', '==', CMS_STATUS.published),
-      where('publishedAt', '<=', now),
-      orderBy('publishedAt', 'desc'),
-    ] as QueryConstraint[];
-    if (decoded) {
-      base.push(startAfter(Timestamp.fromMillis(decoded.ts)));
-    }
-    base.push(limit(pageSize + 1));
-    return query(collection(db, collectionName), ...base);
-  };
-
-  const readRows = async (collectionName: string): Promise<CmsBlogPost[]> => {
-    const snapshot = await withTimeout(getDocs(buildQuery(collectionName)));
+  const readBucketRows = async (
+    collectionName: string,
+    queryConstraints: QueryConstraint[],
+    limitCount: number,
+  ): Promise<CmsBlogPost[]> => {
+    const snapshot = await withTimeout(getDocs(query(
+      collection(db, collectionName),
+      ...queryConstraints,
+      limit(limitCount)
+    )));
     return snapshot.docs
       .map((docSnap) => mapCmsBlogPost(docSnap.id, docSnap.data() as Record<string, any>))
       .filter(toPublishedWindow);
+  };
+
+  const readRows = async (collectionName: string): Promise<CmsBlogPost[]> => {
+    if (!decoded) {
+      return readBucketRows(collectionName, [
+        where('status', '==', CMS_STATUS.published),
+        where('publishedAt', '<=', now),
+        orderBy('publishedAt', 'desc'),
+      ], pageSize + 1);
+    }
+
+    const cursorTimestamp = Timestamp.fromMillis(decoded.ts);
+    const exactTimestampRows = sortPublishedPostsForCursor(await readBucketRows(collectionName, [
+      where('status', '==', CMS_STATUS.published),
+      where('publishedAt', '==', cursorTimestamp),
+      orderBy('publishedAt', 'desc'),
+    ], Math.max(pageSize * 4, 48)));
+
+    const exactCursorIndex = exactTimestampRows.findIndex((entry) => entry.id === decoded.id);
+    const trailingSameTimestampRows = exactCursorIndex >= 0
+      ? exactTimestampRows.slice(exactCursorIndex + 1, exactCursorIndex + 1 + pageSize)
+      : [];
+
+    if (trailingSameTimestampRows.length >= pageSize) {
+      return trailingSameTimestampRows;
+    }
+
+    const olderRows = await readBucketRows(collectionName, [
+      where('status', '==', CMS_STATUS.published),
+      where('publishedAt', '<', cursorTimestamp),
+      orderBy('publishedAt', 'desc'),
+    ], pageSize - trailingSameTimestampRows.length + 1);
+
+    return [...trailingSameTimestampRows, ...olderRows];
   };
 
   try {

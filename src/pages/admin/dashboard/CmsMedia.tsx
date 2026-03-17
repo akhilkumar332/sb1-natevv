@@ -12,7 +12,12 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { refetchQuery } from '../../../utils/queryRefetch';
-import { extractMediaUrlReferences, normalizeMediaUrlKey } from '../../../utils/cmsMediaUsage';
+import {
+  cmsMediaUrlExists,
+  extractMediaUrlReferences,
+  findCmsMediaUsageCount,
+  normalizeMediaUrlKey,
+} from '../../../utils/cmsMediaUsage';
 
 const statusOptions = Object.values(CMS_STATUS);
 
@@ -89,6 +94,10 @@ export default function CmsMediaPage() {
       notify.error('A media entry with this URL already exists.');
       return;
     }
+    if (await cmsMediaUrlExists(normalizedUrl)) {
+      notify.error('A media entry with this URL already exists.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -119,7 +128,11 @@ export default function CmsMediaPage() {
     if (!id) return;
     const target = rows.find((entry) => entry.id === id);
     if (!target) return;
-    const usageCount = usageByUrl.get(normalizeMediaUrlKey(target.url)) || 0;
+    const exactUsageCount = await findCmsMediaUsageCount(target.url);
+    const usageCount = Math.max(
+      exactUsageCount,
+      usageByUrl.get(normalizeMediaUrlKey(target.url)) || 0,
+    );
     if (usageCount > 0) {
       notify.error(`This media is used ${usageCount} time(s) in pages/posts. Remove references before deleting.`);
       return;
@@ -159,6 +172,9 @@ export default function CmsMediaPage() {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="border-b border-red-100 px-4 py-3 text-xs text-gray-600 dark:border-slate-800 dark:text-slate-400">
+          Usage counts shown below are from the current admin dataset. Save/delete validation performs a full scan before allowing changes.
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-red-50 text-left text-xs uppercase tracking-[0.12em] text-red-800 dark:bg-red-950/30 dark:text-red-300">

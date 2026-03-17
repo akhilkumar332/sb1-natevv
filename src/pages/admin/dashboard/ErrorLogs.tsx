@@ -1,12 +1,13 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Shield } from 'lucide-react';
+import { collection, getDocs, limit, orderBy, query, startAfter, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
-import { useAdminErrorLogs } from '../../../hooks/admin/useAdminQueries';
-import { refetchQuery } from '../../../utils/queryRefetch';
 import { toDateValue } from '../../../utils/dateValue';
+import { db } from '../../../firebase';
+import { COLLECTIONS } from '../../../constants/firestore';
 
 type ErrorLogRow = {
   id: string;
@@ -61,33 +62,72 @@ function ErrorLogsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const query = useAdminErrorLogs(1000);
-  const loading = query.isLoading;
-  const error = query.error instanceof Error ? query.error.message : null;
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+
+  const fetchErrorLogsPage = async (options?: {
+    reset?: boolean;
+    cursor?: QueryDocumentSnapshot<DocumentData> | null;
+  }) => {
+    const snapshot = await getDocs(query(
+      collection(db, COLLECTIONS.ERROR_LOGS),
+      orderBy('createdAt', 'desc'),
+      ...(options?.cursor ? [startAfter(options.cursor)] : []),
+      limit(101),
+    ));
+    const docs = snapshot.docs;
+    const nextRows = docs.slice(0, 100).map((docSnap) => {
+      const entry = docSnap.data() as Record<string, unknown>;
+      return {
+        id: docSnap.id,
+        source: String(entry.source || 'unknown'),
+        scope: String(entry.scope || 'unknown'),
+        level: String(entry.level || 'error'),
+        message: String(entry.message || 'Unknown error'),
+        code: entry.code ? String(entry.code) : null,
+        route: entry.route ? String(entry.route) : null,
+        stack: entry.stack ? String(entry.stack) : null,
+        userUid: entry.userUid ? String(entry.userUid) : null,
+        userRole: entry.userRole ? String(entry.userRole) : null,
+        isImpersonating: Boolean(entry.isImpersonating),
+        impersonationActorUid: entry.impersonationActorUid ? String(entry.impersonationActorUid) : null,
+        fingerprint: entry.fingerprint ? String(entry.fingerprint) : null,
+        sessionId: entry.sessionId ? String(entry.sessionId) : null,
+        metadata: entry.metadata && typeof entry.metadata === 'object'
+          ? (entry.metadata as Record<string, unknown>)
+          : null,
+        createdAt: toDate(entry.createdAt),
+      } as ErrorLogRow;
+    }).filter((row) => Boolean(row.id));
+
+    setRows((current) => options?.reset ? nextRows : [...current, ...nextRows]);
+    setHasMore(docs.length > 100);
+    setLastDoc(docs.length > 100 ? docs[99] : docs[docs.length - 1] || null);
+  };
 
   useEffect(() => {
-    const nextRows = (query.data || []).map((entry) => ({
-      id: entry.id || '',
-      source: String(entry.source || 'unknown'),
-      scope: String(entry.scope || 'unknown'),
-      level: String(entry.level || 'error'),
-      message: String(entry.message || 'Unknown error'),
-      code: entry.code ? String(entry.code) : null,
-      route: entry.route ? String(entry.route) : null,
-      stack: entry.stack ? String(entry.stack) : null,
-      userUid: entry.userUid ? String(entry.userUid) : null,
-      userRole: entry.userRole ? String(entry.userRole) : null,
-      isImpersonating: Boolean(entry.isImpersonating),
-      impersonationActorUid: entry.impersonationActorUid ? String(entry.impersonationActorUid) : null,
-      fingerprint: entry.fingerprint ? String(entry.fingerprint) : null,
-      sessionId: entry.sessionId ? String(entry.sessionId) : null,
-      metadata: entry.metadata && typeof entry.metadata === 'object'
-        ? (entry.metadata as Record<string, unknown>)
-        : null,
-      createdAt: toDate(entry.createdAt),
-    })) as ErrorLogRow[];
-    setRows(nextRows.filter((row) => Boolean(row.id)));
-  }, [query.data]);
+    let isActive = true;
+    setLoading(true);
+    setError(null);
+    fetchErrorLogsPage({ reset: true })
+      .catch((nextError) => {
+        if (!isActive) return;
+        setError(nextError instanceof Error ? nextError.message : 'Failed to fetch error logs.');
+        setRows([]);
+        setHasMore(false);
+        setLastDoc(null);
+      })
+      .finally(() => {
+        if (isActive) setLoading(false);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     setPage(1);
@@ -138,8 +178,18 @@ function ErrorLogsPage() {
             <p className="text-sm text-gray-600 dark:text-slate-300">Monitor frontend and backend errors across all portal flows.</p>
           </div>
           <AdminRefreshButton
-            onClick={() => refetchQuery(query)}
-            isRefreshing={query.isFetching}
+            onClick={async () => {
+              setRefreshing(true);
+              setError(null);
+              try {
+                await fetchErrorLogsPage({ reset: true });
+              } catch (nextError) {
+                setError(nextError instanceof Error ? nextError.message : 'Failed to refresh error logs.');
+              } finally {
+                setRefreshing(false);
+              }
+            }}
+            isRefreshing={refreshing}
             label="Refresh error logs"
           />
         </div>
@@ -149,7 +199,7 @@ function ErrorLogsPage() {
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
         searchPlaceholder="Search message, code, route, uid, fingerprint"
-        rightContent={<span className="text-xs font-semibold text-gray-500 dark:text-slate-400">{filtered.length} logs</span>}
+        rightContent={<span className="text-xs font-semibold text-gray-500 dark:text-slate-400">{filtered.length} loaded logs</span>}
       />
 
       <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -224,8 +274,16 @@ function ErrorLogsPage() {
         </div>
       </div>
 
-      <AdminRefreshingBanner show={loading} message="Refreshing error logs..." />
-      <AdminErrorCard message={error} onRetry={() => refetchQuery(query)} />
+      <AdminRefreshingBanner show={loading || refreshing || loadingMore} message="Refreshing error logs..." />
+      <AdminErrorCard message={error} onRetry={() => {
+        setLoading(true);
+        setError(null);
+        void fetchErrorLogsPage({ reset: true })
+          .catch((nextError) => {
+            setError(nextError instanceof Error ? nextError.message : 'Failed to fetch error logs.');
+          })
+          .finally(() => setLoading(false));
+      }} />
 
       {paged.length === 0 ? (
         <AdminEmptyStateCard message="No error logs found." />
@@ -369,10 +427,32 @@ function ErrorLogsPage() {
         pageSize={pageSize}
         itemCount={paged.length}
         hasNextPage={hasNextPage}
-        loading={loading}
+        loading={loading || refreshing || loadingMore}
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
       />
+
+      <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 shadow-sm dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-200">
+        <p className="font-semibold">Visibility window</p>
+        <p className="mt-1">Search and filters operate on the loaded error-log window. Load older logs to extend the visible range.</p>
+        <button
+          type="button"
+          onClick={() => {
+            if (!hasMore || !lastDoc) return;
+            setLoadingMore(true);
+            setError(null);
+            void fetchErrorLogsPage({ cursor: lastDoc })
+              .catch((nextError) => {
+                setError(nextError instanceof Error ? nextError.message : 'Failed to load older error logs.');
+              })
+              .finally(() => setLoadingMore(false));
+          }}
+          disabled={!hasMore || loadingMore}
+          className="mt-3 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300"
+        >
+          {loadingMore ? 'Loading older logs...' : hasMore ? 'Load older logs' : 'All currently reachable logs loaded'}
+        </button>
+      </div>
 
       <div className="rounded-xl border border-red-100 bg-white px-4 py-3 text-sm text-gray-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
         <p className="flex items-center gap-2 font-semibold text-red-700 dark:text-red-300"><Shield className="h-4 w-4" />Operational note</p>

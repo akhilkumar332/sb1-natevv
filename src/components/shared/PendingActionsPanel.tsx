@@ -64,6 +64,11 @@ export const PendingActionsPanel = () => {
 
       {expanded && (
         <div className="mt-3 space-y-2 border-t border-amber-200 pt-3">
+          {pendingItems.length === 0 && (
+            <div className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-[11px] text-amber-800">
+              Queued actions exist in local storage, but detailed ownership is unavailable in the current auth state.
+            </div>
+          )}
           {pendingItems.map((item) => {
             const label = OFFLINE_MUTATION_LABELS[item.type] || item.type;
             return (

@@ -213,6 +213,7 @@ export type OfflineMutationTelemetry = {
   flushedSucceeded: number;
   flushedFailed: number;
   pendingCount: number;
+  orphanedCount: number;
   pendingByType: Partial<Record<MutationType, number>>;
   deadLetterCount: number;
   policyViolationCount: number;
@@ -272,6 +273,7 @@ const emptyTelemetry = (): OfflineMutationTelemetry => ({
   flushedSucceeded: 0,
   flushedFailed: 0,
   pendingCount: 0,
+  orphanedCount: 0,
   pendingByType: {},
   deadLetterCount: 0,
   policyViolationCount: 0,
@@ -301,6 +303,11 @@ const getCurrentUserUid = (): string | null => {
     return null;
   }
 };
+const getScopedStorageKey = (baseKey: string, uid?: string | null): string => (
+  uid ? `${baseKey}:${uid}` : `${baseKey}:signed_out`
+);
+const getTelemetryStorageKey = (uid?: string | null) => getScopedStorageKey(TELEMETRY_STORAGE_KEY, uid ?? getCurrentUserUid());
+const getDeadLetterStorageKey = (uid?: string | null) => getScopedStorageKey(DEAD_LETTER_STORAGE_KEY, uid ?? getCurrentUserUid());
 const subscribeAuthState = (listener: () => void): (() => void) => {
   try {
     if (auth && typeof auth.onAuthStateChanged === 'function') {
@@ -393,11 +400,11 @@ const shallowEqualRecord = (
   return true;
 };
 
-const loadTelemetry = (): OfflineMutationTelemetry => {
+const loadTelemetry = (uid?: string | null): OfflineMutationTelemetry => {
   const w = safeWindow();
   if (!w) return emptyTelemetry();
   try {
-    const raw = w.localStorage.getItem(TELEMETRY_STORAGE_KEY);
+    const raw = w.localStorage.getItem(getTelemetryStorageKey(uid));
     if (!raw) return emptyTelemetry();
     const parsed = JSON.parse(raw) as Partial<OfflineMutationTelemetry>;
     const safeEvents = Array.isArray(parsed.recentEvents)
@@ -439,6 +446,7 @@ const loadTelemetry = (): OfflineMutationTelemetry => {
       flushedSucceeded: toSafeCounter(parsed.flushedSucceeded),
       flushedFailed: toSafeCounter(parsed.flushedFailed),
       pendingCount: toSafeCounter(parsed.pendingCount),
+      orphanedCount: toSafeCounter((parsed as any).orphanedCount),
       pendingByType: parsedPendingByType,
       deadLetterCount: toSafeCounter(parsed.deadLetterCount),
       policyViolationCount: toSafeCounter((parsed as any).policyViolationCount),
@@ -493,11 +501,11 @@ const loadTelemetry = (): OfflineMutationTelemetry => {
 
 let telemetryState: OfflineMutationTelemetry = loadTelemetry();
 
-const loadDeadLetters = (): OfflineMutationDeadLetterEntry[] => {
+const loadDeadLetters = (uid?: string | null): OfflineMutationDeadLetterEntry[] => {
   const w = safeWindow();
   if (!w) return [];
   try {
-    const raw = w.localStorage.getItem(DEAD_LETTER_STORAGE_KEY);
+    const raw = w.localStorage.getItem(getDeadLetterStorageKey(uid));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -533,6 +541,15 @@ telemetryState = {
   deadLetterCount: deadLetterState.length,
 };
 
+const reloadScopedRuntimeState = () => {
+  telemetryState = loadTelemetry();
+  deadLetterState = loadDeadLetters();
+  telemetryState = {
+    ...telemetryState,
+    deadLetterCount: deadLetterState.length,
+  };
+};
+
 let compactingStorage = false;
 
 const compactLocalOfflineStorage = () => {
@@ -556,11 +573,11 @@ const saveTelemetry = () => {
   const w = safeWindow();
   if (!w) return;
   try {
-    w.localStorage.setItem(TELEMETRY_STORAGE_KEY, JSON.stringify(telemetryState));
+    w.localStorage.setItem(getTelemetryStorageKey(), JSON.stringify(telemetryState));
   } catch {
     compactLocalOfflineStorage();
     try {
-      w.localStorage.setItem(TELEMETRY_STORAGE_KEY, JSON.stringify(telemetryState));
+      w.localStorage.setItem(getTelemetryStorageKey(), JSON.stringify(telemetryState));
     } catch {
       // ignore
     }
@@ -736,11 +753,11 @@ const saveDeadLetters = () => {
   const w = safeWindow();
   if (!w) return;
   try {
-    w.localStorage.setItem(DEAD_LETTER_STORAGE_KEY, JSON.stringify(deadLetterState));
+    w.localStorage.setItem(getDeadLetterStorageKey(), JSON.stringify(deadLetterState));
   } catch {
     compactLocalOfflineStorage();
     try {
-      w.localStorage.setItem(DEAD_LETTER_STORAGE_KEY, JSON.stringify(deadLetterState));
+      w.localStorage.setItem(getDeadLetterStorageKey(), JSON.stringify(deadLetterState));
     } catch {
       // ignore
     }
@@ -767,6 +784,7 @@ const patchTelemetry = (patch: Partial<OfflineMutationTelemetry>) => {
   nextState.flushedSucceeded = toSafeCounter(nextState.flushedSucceeded);
   nextState.flushedFailed = toSafeCounter(nextState.flushedFailed);
   nextState.pendingCount = toSafeCounter(nextState.pendingCount);
+  nextState.orphanedCount = toSafeCounter(nextState.orphanedCount);
   nextState.deadLetterCount = toSafeCounter(nextState.deadLetterCount);
   nextState.policyViolationCount = toSafeCounter(nextState.policyViolationCount);
   nextState.storageCompactions = toSafeCounter(nextState.storageCompactions);
@@ -784,6 +802,7 @@ const patchTelemetry = (patch: Partial<OfflineMutationTelemetry>) => {
     && nextState.flushedSucceeded === telemetryState.flushedSucceeded
     && nextState.flushedFailed === telemetryState.flushedFailed
     && nextState.pendingCount === telemetryState.pendingCount
+    && nextState.orphanedCount === telemetryState.orphanedCount
     && shallowEqualRecord(nextState.pendingByType || {}, telemetryState.pendingByType || {})
     && nextState.deadLetterCount === telemetryState.deadLetterCount
     && nextState.policyViolationCount === telemetryState.policyViolationCount
@@ -1003,9 +1022,19 @@ const publishPendingState = async () => {
   }
   const actorUid = getCurrentUserUid();
   if (!actorUid) {
-    pendingCountListeners.forEach((listener) => listener(0));
-    pendingStateListeners.forEach((listener) => listener({ count: 0, items: [] }));
-    patchTelemetry({ pendingCount: 0, pendingByType: {} });
+    try {
+      const allQueued = await withStore('readonly', async (store) => {
+        const all = await requestToPromise<MutationRecord[]>(store.getAll());
+        return Array.isArray(all) ? all.length : 0;
+      });
+      pendingCountListeners.forEach((listener) => listener(allQueued));
+      pendingStateListeners.forEach((listener) => listener({ count: allQueued, items: [] }));
+      patchTelemetry({ pendingCount: 0, orphanedCount: allQueued, pendingByType: {} });
+    } catch {
+      pendingCountListeners.forEach((listener) => listener(0));
+      pendingStateListeners.forEach((listener) => listener({ count: 0, items: [] }));
+      patchTelemetry({ pendingCount: 0, orphanedCount: 0, pendingByType: {} });
+    }
     return;
   }
 
@@ -1039,11 +1068,11 @@ const publishPendingState = async () => {
     });
     pendingCountListeners.forEach((listener) => listener(summary.count));
     pendingStateListeners.forEach((listener) => listener(summary));
-    patchTelemetry({ pendingCount: summary.count, pendingByType: summary.byType || {} });
+    patchTelemetry({ pendingCount: summary.count, orphanedCount: 0, pendingByType: summary.byType || {} });
   } catch {
     pendingCountListeners.forEach((listener) => listener(0));
     pendingStateListeners.forEach((listener) => listener({ count: 0, items: [] }));
-    patchTelemetry({ pendingCount: 0, pendingByType: {} });
+    patchTelemetry({ pendingCount: 0, orphanedCount: 0, pendingByType: {} });
   }
 };
 
@@ -1501,6 +1530,9 @@ export const startOfflineMutationOutboxWorker = (): void => {
 
   window.addEventListener('online', handleOnlineFlush);
   authUnsubscribe = subscribeAuthState(() => {
+    reloadScopedRuntimeState();
+    publishTelemetry();
+    deadLetterListeners.forEach((listener) => listener([...deadLetterState]));
     void publishPendingState();
     scheduleOfflineSyncHealthRecordPersist();
     safeFlush();
