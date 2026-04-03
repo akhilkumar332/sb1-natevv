@@ -4,12 +4,14 @@ import {
 } from '../generated/offlineWriteInventory';
 
 export type OfflineWriteMode = 'queue_safe' | 'online_only' | 'persistence_backed';
+export type OfflineWriteTrust = 'verified' | 'heuristic' | 'unknown';
 
 export type OfflineWriteCoverageEntry = {
   id: string;
   module: string;
   area: string;
   mode: OfflineWriteMode;
+  trust: OfflineWriteTrust;
   notes?: string;
   path?: string;
   line?: number;
@@ -32,6 +34,15 @@ const ONLINE_ONLY_COLLECTION_HINTS = new Set([
   'BLOOD_INVENTORY',
   'AUDIT_LOGS',
 ]);
+
+const resolveTrust = (row: GeneratedOfflineWriteInventoryRow): OfflineWriteTrust => {
+  if (row.collectionKey === 'UNKNOWN') return 'unknown';
+  if (row.mode === 'queue_safe' || row.mode === 'online_only') return 'verified';
+  if (SENSITIVE_PATH_HINTS.some((hint) => row.path.endsWith(hint))) return 'heuristic';
+  if (ONLINE_ONLY_COLLECTION_HINTS.has(row.collectionKey)) return 'heuristic';
+  if (row.method === 'addDoc' || row.method === 'setDoc' || row.method === 'updateDoc') return 'heuristic';
+  return 'heuristic';
+};
 
 const resolveMode = (row: GeneratedOfflineWriteInventoryRow): OfflineWriteMode => {
   if (row.mode === 'online_only') return 'online_only';
@@ -63,6 +74,7 @@ export const OFFLINE_WRITE_COVERAGE_CATALOG: OfflineWriteCoverageEntry[] = GENER
   module: row.module,
   area: row.area,
   mode: resolveMode(row),
+  trust: resolveTrust(row),
   path: row.path,
   line: row.line,
   collectionKey: row.collectionKey,
@@ -76,6 +88,9 @@ export const getOfflineWriteCoverageSummary = () => {
   const onlineOnly = OFFLINE_WRITE_COVERAGE_CATALOG.filter((entry) => entry.mode === 'online_only').length;
   const persistenceBacked = OFFLINE_WRITE_COVERAGE_CATALOG.filter((entry) => entry.mode === 'persistence_backed').length;
   const unknownCollection = OFFLINE_WRITE_COVERAGE_CATALOG.filter((entry) => entry.collectionKey === 'UNKNOWN').length;
+  const verified = OFFLINE_WRITE_COVERAGE_CATALOG.filter((entry) => entry.trust === 'verified').length;
+  const heuristic = OFFLINE_WRITE_COVERAGE_CATALOG.filter((entry) => entry.trust === 'heuristic').length;
+  const unknown = OFFLINE_WRITE_COVERAGE_CATALOG.filter((entry) => entry.trust === 'unknown').length;
   const queueCoveragePercent = total > 0 ? (queueSafe / total) * 100 : 0;
   const catalogedCoveragePercent = total > 0 ? (detectedTotal / total) * 100 : 0;
 
@@ -87,6 +102,9 @@ export const getOfflineWriteCoverageSummary = () => {
     onlineOnly,
     persistenceBacked,
     unknownCollection,
+    verified,
+    heuristic,
+    unknown,
     queueCoveragePercent,
     catalogedCoveragePercent,
   };
@@ -97,6 +115,9 @@ export const getOfflineWriteExpansionTargets = (limit: number = 8) => {
     .filter((entry) => entry.mode !== 'queue_safe')
     .filter((entry) => !entry.id.startsWith('UNKNOWN.'))
     .sort((a, b) => {
+      const trustOrder = { unknown: 0, heuristic: 1, verified: 2 } as const;
+      const trustDelta = trustOrder[a.trust] - trustOrder[b.trust];
+      if (trustDelta !== 0) return trustDelta;
       const aUnknown = a.collectionKey === 'UNKNOWN' ? 0 : 1;
       const bUnknown = b.collectionKey === 'UNKNOWN' ? 0 : 1;
       if (aUnknown !== bUnknown) return aUnknown - bUnknown;

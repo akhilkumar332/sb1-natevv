@@ -47,3 +47,7 @@ secrets/
 docs/
 
 GEMINI.md
+
+.gemini/
+gha-creds-*.json
+.github/*

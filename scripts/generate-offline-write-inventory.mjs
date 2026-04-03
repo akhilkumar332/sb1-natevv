@@ -38,6 +38,61 @@ const ONLINE_ONLY_PATH_MARKERS = [
   '/services/audit.service.ts',
 ];
 
+const resolveManualCollectionKey = ({ relativePath, method, line, lineText }) => {
+  if (relativePath === 'services/adminUserDetail.service.ts') {
+    if (
+      (line >= 717 && line <= 717)
+      || (line >= 734 && line <= 740)
+      || lineText.includes('resolveUserDoc(')
+      || lineText.includes('userRef')
+    ) {
+      return 'USERS';
+    }
+  }
+
+  if (relativePath === 'services/donorRequest.service.ts') {
+    if ((line >= 149 && line <= 156) || lineText.includes('markRequestExpired')) {
+      return 'DONOR_REQUESTS';
+    }
+  }
+
+  if (relativePath === 'services/offlineMutationOutbox.service.ts') {
+    if (lineText.includes('options.collection') || lineText.includes('firestoreDocPatch')) {
+      return 'DYNAMIC_COLLECTION';
+    }
+  }
+
+  if (relativePath === 'utils/firestore.utils.ts') {
+    if (method === 'writeBatch') return 'GENERIC_BATCH_HELPER';
+    if (method.startsWith('batch.')) return 'GENERIC_BATCH_OPERATION';
+  }
+
+  if (relativePath === 'utils/onlineOnlyTransaction.ts') {
+    if (method === 'runTransaction') return 'GENERIC_TRANSACTION_HELPER';
+  }
+
+  return null;
+};
+
+const applyManualCollectionKeyOverrides = (rows) => {
+  return rows.map((row) => {
+    if (row.collectionKey !== 'UNKNOWN') return row;
+    const collectionKey = resolveManualCollectionKey({
+      relativePath: row.path,
+      method: row.method,
+      line: row.line,
+      lineText: '',
+    });
+    if (!collectionKey) return row;
+    return {
+      ...row,
+      id: `${collectionKey}.${row.method}.${row.path.replace(/[^\w/.-]/g, '_')}:${row.line}`,
+      collectionKey,
+      area: `${collectionKey} ${row.method}`,
+    };
+  });
+};
+
 const readAllSourceFiles = async (dir) => {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const files = [];
@@ -221,6 +276,15 @@ const scanFile = async (filePath) => {
         }
       }
 
+      if (collectionKey === 'UNKNOWN') {
+        collectionKey = resolveManualCollectionKey({
+          relativePath,
+          method,
+          line,
+          lineText: neighbor,
+        }) || collectionKey;
+      }
+
       const mode = detectMode({
         method,
         collectionKey,
@@ -250,7 +314,9 @@ const main = async () => {
     rows.push(...await scanFile(file));
   }
 
-  rows.sort((a, b) => {
+  const normalizedRows = applyManualCollectionKeyOverrides(rows);
+
+  normalizedRows.sort((a, b) => {
     if (a.path === b.path) return a.line - b.line;
     return a.path < b.path ? -1 : 1;
   });
@@ -267,11 +333,11 @@ const main = async () => {
     `  area: string;\n` +
     `  mode: 'queue_safe' | 'online_only' | 'persistence_backed';\n` +
     `};\n\n` +
-    `export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRow[] = ${JSON.stringify(rows, null, 2)};\n`;
+    `export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRow[] = ${JSON.stringify(normalizedRows, null, 2)};\n`;
 
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
   await fs.writeFile(OUTPUT_FILE, output, 'utf8');
-  console.log(`Generated offline write inventory: ${rows.length} callsites -> ${path.relative(process.cwd(), OUTPUT_FILE)}`);
+  console.log(`Generated offline write inventory: ${normalizedRows.length} callsites -> ${path.relative(process.cwd(), OUTPUT_FILE)}`);
 };
 
 main().catch((error) => {

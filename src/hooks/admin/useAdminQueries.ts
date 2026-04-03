@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { collection, doc, getDoc, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { adminQueryKeys, type AdminKpiRange, type AdminUserRoleFilter } from '../../constants/adminQueryKeys';
 import { CMS_DEFAULTS, CMS_LIMITS, CMS_QUERY_LIMITS } from '../../constants/cms';
@@ -51,6 +51,7 @@ import type {
   VerificationRequest
 } from '../../types/database.types';
 import { toDateValue } from '../../utils/dateValue';
+import type { OfflineSyncHealthActor, OfflineSyncHealthDeadLetterSample, OfflineSyncHealthRecord } from '../../utils/offlineSyncHealth';
 
 type PlatformStatsResponse = Awaited<ReturnType<typeof getPlatformStats>>;
 type AdminEntity = Record<string, any> & { id?: string };
@@ -98,6 +99,7 @@ export type AdminNpsActiveUserProfile = {
   role: NpsRole;
   lastLoginAt: Date | null;
 };
+export type AdminOfflineSyncHealthRecord = OfflineSyncHealthRecord;
 
 const useCachedAdminQuery = <T,>(
   queryKey: readonly unknown[],
@@ -583,6 +585,96 @@ const fetchErrorLogs = async (limitCount: number): Promise<AdminEntity[]> => {
   });
 };
 
+const mapOfflineSyncHealthActor = (data: Record<string, any>): OfflineSyncHealthActor => ({
+  uid: typeof data.uid === 'string' ? data.uid : '',
+  displayName: typeof data.displayName === 'string'
+    ? data.displayName
+    : typeof data.name === 'string'
+      ? data.name
+      : typeof data.organizationName === 'string'
+        ? data.organizationName
+        : typeof data.hospitalName === 'string'
+          ? data.hospitalName
+          : typeof data.bloodBankName === 'string'
+            ? data.bloodBankName
+            : 'Unknown user',
+  role: typeof data.role === 'string' ? data.role : null,
+  status: typeof data.status === 'string' ? data.status : null,
+});
+
+const fetchOfflineSyncHealthActors = async (uids: string[]): Promise<Map<string, OfflineSyncHealthActor>> => {
+  const normalized = Array.from(new Set(uids.filter((uid) => typeof uid === 'string' && uid.trim().length > 0)));
+  const actors = new Map<string, OfflineSyncHealthActor>();
+  const chunkSize = 10;
+
+  for (let index = 0; index < normalized.length; index += chunkSize) {
+    const chunk = normalized.slice(index, index + chunkSize);
+    if (!chunk.length) continue;
+    const snapshot = await getDocs(query(collection(db, COLLECTIONS.USERS), where('uid', 'in', chunk)));
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as Record<string, any>;
+      const actor = mapOfflineSyncHealthActor(data);
+      if (actor.uid) {
+        actors.set(actor.uid, actor);
+      }
+    });
+  }
+
+  return actors;
+};
+
+const fetchOfflineSyncHealthRecords = async (
+  windowMs: number,
+  limitCount: number,
+): Promise<AdminOfflineSyncHealthRecord[]> => {
+  const cutoff = Date.now() - Math.max(0, windowMs);
+  const snapshot = await getDocs(query(
+    collection(db, COLLECTIONS.OFFLINE_SYNC_HEALTH_RECORDS),
+    where('bucketStart', '>=', cutoff),
+    orderBy('bucketStart', 'desc'),
+    limit(limitCount),
+  ));
+
+  const rawRecords = snapshot.docs.map((docSnap) => {
+    const data = docSnap.data() as Record<string, any>;
+    const deadLetterSamples = Array.isArray(data.deadLetterSamples) ? data.deadLetterSamples : [];
+    return {
+      id: docSnap.id,
+      uid: typeof data.uid === 'string' ? data.uid : '',
+      actor: null,
+      bucketStart: typeof data.bucketStart === 'number' ? data.bucketStart : 0,
+      updatedAt: toDateValue(data.updatedAt) || null,
+      lastEnqueueAt: toDateValue(data.lastEnqueueAt) || null,
+      lastFlushAt: toDateValue(data.lastFlushAt) || null,
+      lastFailureAt: toDateValue(data.lastFailureAt) || null,
+      lastFailureMessage: typeof data.lastFailureMessage === 'string' ? data.lastFailureMessage : null,
+      pendingCount: typeof data.pendingCount === 'number' ? data.pendingCount : 0,
+      pendingByType: typeof data.pendingByType === 'object' && data.pendingByType !== null ? data.pendingByType as Record<string, number> : {},
+      deadLetterCount: typeof data.deadLetterCount === 'number' ? data.deadLetterCount : 0,
+      deadLetterSamples: deadLetterSamples.map((sample): OfflineSyncHealthDeadLetterSample => ({
+        type: typeof sample?.type === 'string' ? sample.type : 'unknown',
+        feature: typeof sample?.feature === 'string' ? sample.feature : null,
+        reason: typeof sample?.reason === 'string' ? sample.reason : 'unknown',
+        failureClass: typeof sample?.failureClass === 'string' ? sample.failureClass : 'unknown',
+        failureCode: typeof sample?.failureCode === 'string' ? sample.failureCode : null,
+        attempts: typeof sample?.attempts === 'number' ? sample.attempts : 0,
+        failedAt: toDateValue(sample?.failedAt) || null,
+      })),
+      enqueued: typeof data.enqueued === 'number' ? data.enqueued : 0,
+      flushRuns: typeof data.flushRuns === 'number' ? data.flushRuns : 0,
+      flushedProcessed: typeof data.flushedProcessed === 'number' ? data.flushedProcessed : 0,
+      flushedSucceeded: typeof data.flushedSucceeded === 'number' ? data.flushedSucceeded : 0,
+      flushedFailed: typeof data.flushedFailed === 'number' ? data.flushedFailed : 0,
+    } satisfies AdminOfflineSyncHealthRecord;
+  }).filter((record) => record.uid);
+
+  const actors = await fetchOfflineSyncHealthActors(rawRecords.map((record) => record.uid));
+  return rawRecords.map((record) => ({
+    ...record,
+    actor: actors.get(record.uid) || null,
+  }));
+};
+
 export const useAdminUsers = (role: AdminUserRoleFilter = 'all', limitCount: number = 800) =>
   useCachedAdminQuery<User[]>(
     adminQueryKeys.users(role, limitCount),
@@ -954,6 +1046,20 @@ export const useAdminErrorLogs = (limitCount: number = 1000) =>
       staleTime: ADMIN_QUERY_TIMINGS.notifications.staleTime,
       gcTime: ADMIN_QUERY_TIMINGS.notifications.gcTime,
       refetchInterval: ADMIN_QUERY_TIMINGS.notifications.refetchInterval,
+      refetchIntervalInBackground: false,
+    },
+  );
+
+export const useAdminOfflineSyncHealth = (windowMs: number, limitCount: number = 500) =>
+  useCachedAdminQuery<AdminOfflineSyncHealthRecord[]>(
+    adminQueryKeys.offlineSyncHealth(windowMs, limitCount),
+    ADMIN_QUERY_TIMINGS.offlineSyncHealth.ttl,
+    ['updatedAt', 'lastEnqueueAt', 'lastFlushAt', 'lastFailureAt', 'failedAt'],
+    () => fetchOfflineSyncHealthRecords(windowMs, limitCount),
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.offlineSyncHealth.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.offlineSyncHealth.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.offlineSyncHealth.refetchInterval,
       refetchIntervalInBackground: false,
     },
   );

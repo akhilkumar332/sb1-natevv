@@ -69,4 +69,7 @@ export const adminQueryKeys = {
     limit: number = 1000,
     filters?: { source?: string; scope?: string; level?: string; impersonating?: string }
   ) => ['admin', 'errorLogs', { limit, ...(filters || {}) }] as const,
+  offlineSyncHealthRoot: ['admin', 'offlineSyncHealth'] as const,
+  offlineSyncHealth: (windowMs: number, limit: number = 500) =>
+    ['admin', 'offlineSyncHealth', { windowMs, limit }] as const,
 };

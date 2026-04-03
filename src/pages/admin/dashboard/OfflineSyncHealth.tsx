@@ -2,12 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, DatabaseZap, RefreshCw, WifiOff } from 'lucide-react';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import AdminPagination from '../../../components/admin/AdminPagination';
+import { AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
 import { useOfflineMutationTelemetry } from '../../../hooks/useOfflineMutationTelemetry';
 import { useOfflineMutationDeadLetters } from '../../../hooks/useOfflineMutationDeadLetters';
 import { usePendingOfflineMutations } from '../../../hooks/usePendingOfflineMutations';
+import { useAdminOfflineSyncHealth } from '../../../hooks/admin/useAdminQueries';
 import { useNetworkStatus } from '../../../contexts/NetworkStatusContext';
 import {
   OFFLINE_ANALYTICS_WINDOWS,
+  OFFLINE_HEALTH_RECORDS_CONFIG,
   OFFLINE_FEATURE_OPERATOR_LABELS,
   OFFLINE_HEALTH_THRESHOLDS,
   OFFLINE_MUTATION_LABELS,
@@ -19,9 +22,11 @@ import {
 } from '../../../constants/offlineWriteCoverage';
 import { captureHandledError } from '../../../services/errorLog.service';
 import { HOUR_MS, MINUTE_MS } from '../../../constants/time';
+import { buildOfflineSystemSummary, getOfflineReporterLabel } from '../../../utils/offlineSyncHealth';
 
 type WindowKey = '1h' | '6h' | '24h' | '7d';
 type ViewMode = 'basic' | 'advanced';
+type IncidentFilter = 'all' | 'active' | 'failing' | 'stale' | 'queued';
 
 const WINDOW_OPTIONS: Array<{ key: WindowKey; label: string; ms: number }> = [
   { key: '1h', label: '1H', ms: OFFLINE_ANALYTICS_WINDOWS.oneHour },
@@ -143,10 +148,13 @@ function AdminOfflineSyncHealthPage() {
   const [matrixPage, setMatrixPage] = useState(1);
   const [matrixPageSize, setMatrixPageSize] = useState(10);
   const [expansionPage, setExpansionPage] = useState(1);
+  const [reporterPage, setReporterPage] = useState(1);
+  const [reporterPageSize, setReporterPageSize] = useState(8);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<number | null>(Date.now());
   const [refreshNowTs, setRefreshNowTs] = useState(Date.now());
   const [storageProbeTick, setStorageProbeTick] = useState(0);
   const [actionableOnly, setActionableOnly] = useState(false);
+  const [incidentFilter, setIncidentFilter] = useState<IncidentFilter>('active');
   const [acknowledgedFailureAt, setAcknowledgedFailureAt] = useState<number | null>(() => {
     if (typeof window === 'undefined') return null;
     try {
@@ -186,6 +194,7 @@ function AdminOfflineSyncHealthPage() {
   }, [acknowledgedFailureAt]);
 
   const selectedWindow = WINDOW_OPTIONS.find((option) => option.key === windowKey) || WINDOW_OPTIONS[2];
+  const systemHealthQuery = useAdminOfflineSyncHealth(selectedWindow.ms, 600);
   const coverage = useMemo(() => getOfflineWriteCoverageSummary(), []);
   const expansionTargets = useMemo(
     () => getOfflineWriteExpansionTargets(OFFLINE_WRITE_COVERAGE_CATALOG.length),
@@ -193,6 +202,14 @@ function AdminOfflineSyncHealthPage() {
   );
   const expansionPageSize = 5;
   const cutoff = Date.now() - selectedWindow.ms;
+  const systemSummary = useMemo(
+    () => buildOfflineSystemSummary(systemHealthQuery.data || [], refreshNowTs),
+    [refreshNowTs, systemHealthQuery.data],
+  );
+  const staleReporterThresholdMs = Math.max(
+    OFFLINE_HEALTH_THRESHOLDS.staleSyncMs,
+    OFFLINE_HEALTH_RECORDS_CONFIG.persistIntervalMs * 3,
+  );
   const filteredEvents = useMemo(
     () => telemetry.recentEvents.filter((event) => event.at >= cutoff),
     [telemetry.recentEvents, cutoff],
@@ -397,6 +414,16 @@ function AdminOfflineSyncHealthPage() {
     () => Object.entries(telemetry.pendingByType || {}).sort((a, b) => b[1] - a[1]),
     [telemetry.pendingByType],
   );
+  const reporterRows = useMemo(() => {
+    return systemSummary.rows.filter((row) => {
+      if (incidentFilter === 'all') return true;
+      if (incidentFilter === 'active') return row.deadLetterCount > 0 || row.pendingCount > 0 || row.stale;
+      if (incidentFilter === 'failing') return row.deadLetterCount > 0;
+      if (incidentFilter === 'stale') return row.stale;
+      if (incidentFilter === 'queued') return row.pendingCount > 0;
+      return true;
+    });
+  }, [incidentFilter, systemSummary.rows]);
 
   const pagedDeadLetters = useMemo(() => {
     const start = (deadLetterPage - 1) * deadLetterPageSize;
@@ -422,6 +449,10 @@ function AdminOfflineSyncHealthPage() {
     const start = (expansionPage - 1) * expansionPageSize;
     return expansionTargets.slice(start, start + expansionPageSize);
   }, [expansionTargets, expansionPage, expansionPageSize]);
+  const pagedReporterRows = useMemo(() => {
+    const start = (reporterPage - 1) * reporterPageSize;
+    return reporterRows.slice(start, start + reporterPageSize);
+  }, [reporterPage, reporterPageSize, reporterRows]);
 
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(visibleDeadLetters.length / deadLetterPageSize));
@@ -447,6 +478,11 @@ function AdminOfflineSyncHealthPage() {
     const maxPage = Math.max(1, Math.ceil(expansionTargets.length / expansionPageSize));
     if (expansionPage > maxPage) setExpansionPage(maxPage);
   }, [expansionTargets.length, expansionPage, expansionPageSize]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(reporterRows.length / reporterPageSize));
+    if (reporterPage > maxPage) setReporterPage(maxPage);
+  }, [reporterPage, reporterPageSize, reporterRows.length]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -507,6 +543,8 @@ function AdminOfflineSyncHealthPage() {
   }, []);
 
   const systemStatus: 'healthy' | 'warning' | 'critical' = (() => {
+    if (systemSummary.criticalReporterCount > 0) return 'critical';
+    if (systemSummary.affectedReporterCount > 0) return 'warning';
     if (!isOnline && telemetry.pendingCount >= OFFLINE_HEALTH_THRESHOLDS.queueCountWarning) return 'critical';
     if (deadLetterRisk === 'critical' || queueRisk === 'critical') return 'critical';
     if (persistenceStatus !== 'enabled') return 'warning';
@@ -577,6 +615,9 @@ function AdminOfflineSyncHealthPage() {
   );
 
   const narrativeSignals = [
+    systemSummary.criticalReporterCount > 0 ? `${systemSummary.criticalReporterCount} reporter(s) have failed sync items.` : null,
+    systemSummary.staleReporterCount > 0 ? `${systemSummary.staleReporterCount} reporter(s) are stale.` : null,
+    systemSummary.totalPendingCount > 0 ? `${systemSummary.totalPendingCount} queued action(s) remain across reporters.` : null,
     deadLetters.length > 0 ? `${deadLetters.length} failed item(s) require review.` : null,
     telemetry.pendingCount > 0 ? `${telemetry.pendingCount} action(s) are still queued.` : null,
     telemetry.policyViolationCount > 0 ? `${telemetry.policyViolationCount} update(s) were blocked by policy.` : null,
@@ -696,6 +737,188 @@ function AdminOfflineSyncHealthPage() {
           Last refreshed: {formatRefreshAgo(lastRefreshedAt, refreshNowTs)}
         </p>
       </div>
+
+      <AdminRefreshingBanner
+        show={systemHealthQuery.isFetching}
+        message="Refreshing system-wide offline sync health."
+      />
+      <AdminErrorCard
+        message={systemHealthQuery.error instanceof Error ? systemHealthQuery.error.message : null}
+        onRetry={() => {
+          void systemHealthQuery.refetch();
+        }}
+        retryLabel="Retry system data"
+      />
+
+      <section className="rounded-2xl border border-red-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100">System-Wide Sync Overview</h2>
+            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
+              Latest reporter snapshots from `offlineSyncHealthRecords` within the selected window.
+            </p>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-slate-400">
+            Stale after {Math.ceil(staleReporterThresholdMs / MINUTE_MS)}m without updates
+          </p>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+            <p className="text-xs uppercase tracking-[0.15em] text-gray-500 dark:text-slate-400">Reporters</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-slate-100">{systemSummary.reporterCount}</p>
+            <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-400">Unique latest reporters</p>
+          </div>
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+            <p className="text-xs uppercase tracking-[0.15em] text-emerald-700 dark:text-emerald-300">Active</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-300">{systemSummary.activeReporterCount}</p>
+            <p className="mt-1 text-[11px] text-emerald-700/80 dark:text-emerald-300/90">Fresh reporters</p>
+          </div>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+            <p className="text-xs uppercase tracking-[0.15em] text-amber-700 dark:text-amber-300">Stale</p>
+            <p className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-300">{systemSummary.staleReporterCount}</p>
+            <p className="mt-1 text-[11px] text-amber-700/80 dark:text-amber-300/90">No recent snapshot</p>
+          </div>
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/30 dark:bg-blue-500/10">
+            <p className="text-xs uppercase tracking-[0.15em] text-blue-700 dark:text-blue-300">Queued</p>
+            <p className="mt-1 text-2xl font-bold text-blue-800 dark:text-blue-200">{systemSummary.totalPendingCount}</p>
+            <p className="mt-1 text-[11px] text-blue-700/80 dark:text-blue-300/90">Across latest reporters</p>
+          </div>
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-500/30 dark:bg-rose-500/10">
+            <p className="text-xs uppercase tracking-[0.15em] text-rose-700 dark:text-rose-300">Failed</p>
+            <p className="mt-1 text-2xl font-bold text-rose-700 dark:text-rose-300">{systemSummary.totalDeadLetterCount}</p>
+            <p className="mt-1 text-[11px] text-rose-700/80 dark:text-rose-300/90">Dead letters in latest snapshots</p>
+          </div>
+        </div>
+      </section>
+
+      <section className={`rounded-2xl border p-5 shadow-sm ${
+        systemSummary.incident.severity === 'critical'
+          ? 'border-rose-200 bg-rose-50 dark:border-rose-500/30 dark:bg-rose-500/10'
+          : systemSummary.incident.severity === 'warning'
+            ? 'border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10'
+            : 'border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10'
+      }`}
+      >
+        <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100">System Incident Summary</h2>
+        <p className="mt-1 text-sm text-gray-700 dark:text-slate-300">{systemSummary.incident.title}</p>
+        <p className="mt-2 text-sm text-gray-600 dark:text-slate-300">{systemSummary.incident.summary}</p>
+        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-4 text-xs text-gray-700 dark:text-slate-300">
+          <p className="rounded-lg border border-white/70 bg-white/70 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/60">Affected reporters: <span className="font-semibold">{systemSummary.incident.affectedActors}</span></p>
+          <p className="rounded-lg border border-white/70 bg-white/70 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/60">
+            Likely cause: <span className="font-semibold">
+              {OFFLINE_MUTATION_LABELS[systemSummary.incident.likelyCause as keyof typeof OFFLINE_MUTATION_LABELS]
+                || systemSummary.incident.likelyCause}
+            </span>
+          </p>
+          <p className="rounded-lg border border-white/70 bg-white/70 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/60">Since: <span className="font-semibold">{formatAgo(systemSummary.incident.sinceAt)}</span></p>
+          <p className="rounded-lg border border-white/70 bg-white/70 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/60">Last fleet signal: <span className="font-semibold">{formatAgo(systemSummary.lastSeenAt)}</span></p>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100">Reporter Incidents</h2>
+            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
+              Fleet-level reporter state, separate from this browser&apos;s local diagnostics.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {([
+              ['active', 'Active issues'],
+              ['failing', 'Failing'],
+              ['queued', 'Queued'],
+              ['stale', 'Stale'],
+              ['all', 'All'],
+            ] as Array<[IncidentFilter, string]>).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setIncidentFilter(value)}
+                className={`rounded-md border px-2 py-1 text-xs font-semibold ${
+                  incidentFilter === value
+                    ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-400/50 dark:bg-red-500/15 dark:text-red-300'
+                    : 'border-gray-200 bg-white text-gray-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2">
+          {reporterRows.length ? pagedReporterRows.map((row) => (
+            <div key={row.uid} className="rounded-xl border border-gray-200 px-4 py-3 dark:border-slate-700">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-slate-100">{getOfflineReporterLabel(row)}</p>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+                    {row.actor?.role || 'unknown role'} • {row.uid}
+                  </p>
+                </div>
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${
+                  row.status === 'critical'
+                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
+                    : row.status === 'warning'
+                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                      : row.status === 'stale'
+                        ? 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
+                        : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                }`}
+                >
+                  {row.status}
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-gray-700 dark:text-slate-300 md:grid-cols-5">
+                <p className="rounded-lg border border-gray-100 px-3 py-2 dark:border-slate-700">Last seen: <span className="font-semibold">{formatAgo(row.lastSeenAt)}</span></p>
+                <p className="rounded-lg border border-gray-100 px-3 py-2 dark:border-slate-700">Queued: <span className="font-semibold">{row.pendingCount}</span></p>
+                <p className="rounded-lg border border-gray-100 px-3 py-2 dark:border-slate-700">Failed: <span className="font-semibold">{row.deadLetterCount}</span></p>
+                <p className="rounded-lg border border-gray-100 px-3 py-2 dark:border-slate-700">
+                  Top mutation: <span className="font-semibold">
+                    {(row.topMutationType && OFFLINE_MUTATION_LABELS[row.topMutationType as keyof typeof OFFLINE_MUTATION_LABELS]) || row.topMutationType || 'N/A'}
+                  </span>
+                </p>
+                <p className="rounded-lg border border-gray-100 px-3 py-2 dark:border-slate-700">Failure class: <span className="font-semibold">{row.topFailureClass || 'N/A'}</span></p>
+              </div>
+              <p className="mt-2 text-xs text-gray-600 dark:text-slate-400">{row.statusReason}</p>
+              {row.lastFailureMessage ? (
+                <p className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+                  Latest failure: {row.lastFailureMessage}
+                </p>
+              ) : null}
+            </div>
+          )) : (
+            <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-3 text-sm text-gray-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400">
+              No reporters matched this filter in the selected window.
+            </p>
+          )}
+        </div>
+        {reporterRows.length > 0 && (
+          <div className="mt-3">
+            <AdminPagination
+              page={reporterPage}
+              pageSize={reporterPageSize}
+              pageSizeOptions={[8, 16, 32]}
+              itemCount={reporterRows.length}
+              hasNextPage={reporterPage * reporterPageSize < reporterRows.length}
+              onPageChange={setReporterPage}
+              onPageSizeChange={(next) => {
+                setReporterPageSize(next);
+                setReporterPage(1);
+              }}
+            />
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <p className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-slate-400">This Device</p>
+        <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-slate-100">Local Runtime Diagnostics</h2>
+        <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
+          Browser-local queue, dead-letter, and runtime signals for the current signed-in session.
+        </p>
+      </section>
 
       <section className={`rounded-2xl border p-4 shadow-sm ${
         systemStatus === 'healthy'
@@ -1022,7 +1245,9 @@ function AdminOfflineSyncHealthPage() {
                   <div key={entry.id} className="min-w-0 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800/70">
                     <p className="font-semibold text-gray-900 break-words [overflow-wrap:anywhere] dark:text-slate-100">{entry.id}</p>
                     <p className="text-xs text-gray-600 break-words [overflow-wrap:anywhere] dark:text-slate-300">{entry.module} • {entry.area}</p>
-                    <p className="mt-1 break-words text-[11px] uppercase tracking-[0.12em] text-amber-700 [overflow-wrap:anywhere] dark:text-amber-300">{entry.mode.replace('_', ' ')}</p>
+                    <p className="mt-1 break-words text-[11px] uppercase tracking-[0.12em] text-amber-700 [overflow-wrap:anywhere] dark:text-amber-300">
+                      {entry.mode.replace('_', ' ')} • {entry.trust}
+                    </p>
                   </div>
                 )) : (
                   <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-3 text-sm text-gray-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400">No migration targets pending.</p>
@@ -1044,7 +1269,7 @@ function AdminOfflineSyncHealthPage() {
             </section>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-7">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5 2xl:grid-cols-10">
             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 shadow-sm dark:border-blue-500/30 dark:bg-blue-500/10">
               <p className="text-xs uppercase tracking-[0.15em] text-blue-700 dark:text-blue-300">Coverage</p>
               <p className="mt-1 text-2xl font-bold text-blue-800 dark:text-blue-200">{toPercent(coverage.queueCoveragePercent)}</p>
@@ -1075,6 +1300,21 @@ function AdminOfflineSyncHealthPage() {
               <p className="text-xs uppercase tracking-[0.15em] text-violet-700 dark:text-violet-300">Unknown Mapping</p>
               <p className="mt-1 text-2xl font-bold text-violet-700 dark:text-violet-300">{coverage.unknownCollection}</p>
             </div>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm dark:border-emerald-500/30 dark:bg-emerald-500/10">
+              <p className="text-xs uppercase tracking-[0.15em] text-emerald-700 dark:text-emerald-300">Verified</p>
+              <p className="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-300">{coverage.verified}</p>
+              <p className="mt-1 text-xs text-emerald-700/80 dark:text-emerald-300/90">Explicit evidence</p>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+              <p className="text-xs uppercase tracking-[0.15em] text-amber-700 dark:text-amber-300">Heuristic</p>
+              <p className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-300">{coverage.heuristic}</p>
+              <p className="mt-1 text-xs text-amber-700/80 dark:text-amber-300/90">Inference-based</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-600 dark:bg-slate-800/60">
+              <p className="text-xs uppercase tracking-[0.15em] text-slate-700 dark:text-slate-300">Unknown Trust</p>
+              <p className="mt-1 text-2xl font-bold text-slate-800 dark:text-slate-200">{coverage.unknown}</p>
+              <p className="mt-1 text-xs text-slate-700/80 dark:text-slate-300/90">Needs validation</p>
+            </div>
           </div>
 
           <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
@@ -1087,6 +1327,7 @@ function AdminOfflineSyncHealthPage() {
                     <th className="px-3 py-2">Module</th>
                     <th className="px-3 py-2">Area</th>
                     <th className="px-3 py-2">Mode</th>
+                    <th className="px-3 py-2">Trust</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1105,6 +1346,18 @@ function AdminOfflineSyncHealthPage() {
                         }`}
                         >
                           {entry.mode.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] ${
+                          entry.trust === 'verified'
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                            : entry.trust === 'heuristic'
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                              : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
+                        }`}
+                        >
+                          {entry.trust}
                         </span>
                       </td>
                     </tr>
@@ -1148,6 +1401,8 @@ function AdminOfflineSyncHealthPage() {
             <p className="text-xs text-gray-600 dark:text-slate-300">Blocked update = a write rejected by policy guard.</p>
             <p className="text-xs text-gray-600 dark:text-slate-300">Failed sync item = an update that exhausted retries.</p>
             <p className="text-xs text-gray-600 dark:text-slate-300">Unknown mapping = write location not yet mapped to a static collection key.</p>
+            <p className="text-xs text-gray-600 dark:text-slate-300">Verified trust = explicit metadata confirms the mode.</p>
+            <p className="text-xs text-gray-600 dark:text-slate-300">Heuristic trust = mode inferred from code shape or collection hints.</p>
             <p className="text-xs text-gray-600 dark:text-slate-300">Flush p50/p95 = median and high-percentile sync run duration.</p>
             <p className="mt-2 text-xs text-gray-700 dark:text-slate-300">Flush p50/p95: <span className="font-semibold">{Math.round(flushP50)}ms / {Math.round(flushP95)}ms</span></p>
             <p className="mt-1 text-xs text-gray-700 dark:text-slate-300">Storage compactions: <span className="font-semibold">{telemetry.storageCompactions || 0}</span> • Blocked updates: <span className="font-semibold">{telemetry.policyViolationCount || 0}</span></p>

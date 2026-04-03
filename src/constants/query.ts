@@ -61,6 +61,12 @@ export const ADMIN_QUERY_TIMINGS = {
     gcTime: TEN_MINUTES_MS,
     refetchInterval: TWO_MINUTES_MS,
   },
+  offlineSyncHealth: {
+    ttl: ONE_MINUTE_MS,
+    staleTime: ONE_MINUTE_MS,
+    gcTime: FIVE_MINUTES_MS,
+    refetchInterval: ONE_MINUTE_MS,
+  },
   contactSubmissions: {
     ttl: TWO_MINUTES_MS,
     staleTime: TWO_MINUTES_MS,

@@ -1234,23 +1234,23 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.updateDoc.services/adminUserDetail.service.ts:717",
+    "id": "USERS.updateDoc.services/adminUserDetail.service.ts:717",
     "method": "updateDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "USERS",
     "module": "services",
     "path": "services/adminUserDetail.service.ts",
     "line": 717,
-    "area": "UNKNOWN updateDoc",
+    "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.updateDoc.services/adminUserDetail.service.ts:734",
+    "id": "USERS.updateDoc.services/adminUserDetail.service.ts:734",
     "method": "updateDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "USERS",
     "module": "services",
     "path": "services/adminUserDetail.service.ts",
     "line": 734,
-    "area": "UNKNOWN updateDoc",
+    "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
@@ -1484,13 +1484,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.updateDoc.services/donorRequest.service.ts:151",
+    "id": "DONOR_REQUESTS.updateDoc.services/donorRequest.service.ts:151",
     "method": "updateDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DONOR_REQUESTS",
     "module": "services",
     "path": "services/donorRequest.service.ts",
     "line": 151,
-    "area": "UNKNOWN updateDoc",
+    "area": "DONOR_REQUESTS updateDoc",
     "mode": "queue_safe"
   },
   {
@@ -2194,13 +2194,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.updateDoc.services/offlineMutationOutbox.service.ts:2094",
+    "id": "DYNAMIC_COLLECTION.updateDoc.services/offlineMutationOutbox.service.ts:2094",
     "method": "updateDoc",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "DYNAMIC_COLLECTION",
     "module": "services",
     "path": "services/offlineMutationOutbox.service.ts",
     "line": 2094,
-    "area": "UNKNOWN updateDoc",
+    "area": "DYNAMIC_COLLECTION updateDoc",
     "mode": "queue_safe"
   },
   {
@@ -2264,63 +2264,63 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.writeBatch.utils/firestore.utils.ts:231",
+    "id": "GENERIC_BATCH_HELPER.writeBatch.utils/firestore.utils.ts:231",
     "method": "writeBatch",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "GENERIC_BATCH_HELPER",
     "module": "utils",
     "path": "utils/firestore.utils.ts",
     "line": 231,
-    "area": "UNKNOWN writeBatch",
+    "area": "GENERIC_BATCH_HELPER writeBatch",
     "mode": "online_only"
   },
   {
-    "id": "UNKNOWN.batch.set.utils/firestore.utils.ts:237",
+    "id": "GENERIC_BATCH_OPERATION.batch.set.utils/firestore.utils.ts:237",
     "method": "batch.set",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "GENERIC_BATCH_OPERATION",
     "module": "utils",
     "path": "utils/firestore.utils.ts",
     "line": 237,
-    "area": "UNKNOWN batch.set",
+    "area": "GENERIC_BATCH_OPERATION batch.set",
     "mode": "online_only"
   },
   {
-    "id": "UNKNOWN.batch.set.utils/firestore.utils.ts:239",
+    "id": "GENERIC_BATCH_OPERATION.batch.set.utils/firestore.utils.ts:239",
     "method": "batch.set",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "GENERIC_BATCH_OPERATION",
     "module": "utils",
     "path": "utils/firestore.utils.ts",
     "line": 239,
-    "area": "UNKNOWN batch.set",
+    "area": "GENERIC_BATCH_OPERATION batch.set",
     "mode": "online_only"
   },
   {
-    "id": "UNKNOWN.batch.update.utils/firestore.utils.ts:243",
+    "id": "GENERIC_BATCH_OPERATION.batch.update.utils/firestore.utils.ts:243",
     "method": "batch.update",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "GENERIC_BATCH_OPERATION",
     "module": "utils",
     "path": "utils/firestore.utils.ts",
     "line": 243,
-    "area": "UNKNOWN batch.update",
+    "area": "GENERIC_BATCH_OPERATION batch.update",
     "mode": "online_only"
   },
   {
-    "id": "UNKNOWN.batch.delete.utils/firestore.utils.ts:246",
+    "id": "GENERIC_BATCH_OPERATION.batch.delete.utils/firestore.utils.ts:246",
     "method": "batch.delete",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "GENERIC_BATCH_OPERATION",
     "module": "utils",
     "path": "utils/firestore.utils.ts",
     "line": 246,
-    "area": "UNKNOWN batch.delete",
+    "area": "GENERIC_BATCH_OPERATION batch.delete",
     "mode": "online_only"
   },
   {
-    "id": "UNKNOWN.writeBatch.utils/firestore.utils.ts:259",
+    "id": "GENERIC_BATCH_HELPER.writeBatch.utils/firestore.utils.ts:259",
     "method": "writeBatch",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "GENERIC_BATCH_HELPER",
     "module": "utils",
     "path": "utils/firestore.utils.ts",
     "line": 259,
-    "area": "UNKNOWN writeBatch",
+    "area": "GENERIC_BATCH_HELPER writeBatch",
     "mode": "online_only"
   },
   {
@@ -2334,13 +2334,13 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "UNKNOWN.runTransaction.utils/onlineOnlyTransaction.ts:40",
+    "id": "GENERIC_TRANSACTION_HELPER.runTransaction.utils/onlineOnlyTransaction.ts:40",
     "method": "runTransaction",
-    "collectionKey": "UNKNOWN",
+    "collectionKey": "GENERIC_TRANSACTION_HELPER",
     "module": "utils",
     "path": "utils/onlineOnlyTransaction.ts",
     "line": 40,
-    "area": "UNKNOWN runTransaction",
+    "area": "GENERIC_TRANSACTION_HELPER runTransaction",
     "mode": "online_only"
   }
 ];
