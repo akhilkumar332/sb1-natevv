@@ -403,7 +403,3 @@ Additional recommended governance files for a public distribution:
 - architecture decision records
 - environment and secret management policy
 - pull request and release templates
-
-## License
-
-No repository license file is currently present. I did not add one automatically because that is a legal and distribution decision. Add a `LICENSE` file before publishing or accepting external contributions under a defined license.
