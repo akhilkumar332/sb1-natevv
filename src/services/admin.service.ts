@@ -564,7 +564,43 @@ export const getVerificationRequests = async (
       'reviewedAt',
     ]);
   } catch (error) {
-    throw new DatabaseError('Failed to fetch verification requests');
+    reportAdminServiceError(error, 'admin.verification_requests.primary_query_failed', {
+      status: status || 'all',
+      limitCount,
+    });
+
+    if (isRecoverableQueryError(error)) {
+      try {
+        const constraints: QueryConstraint[] = [];
+        if (status) constraints.push(where('status', '==', status));
+        constraints.push(limit(Math.max(limitCount, 100)));
+
+        const fallbackSnapshot = await getDocs(
+          query(collection(db, COLLECTIONS.VERIFICATION_REQUESTS), ...constraints)
+        );
+        const fallback = extractQueryData<VerificationRequest>(fallbackSnapshot, [
+          'submittedAt',
+          'updatedAt',
+          'reviewedAt',
+        ]);
+
+        return fallback
+          .sort((a, b) => {
+            const aMs = toMillis((a as any).submittedAt || (a as any).createdAt);
+            const bMs = toMillis((b as any).submittedAt || (b as any).createdAt);
+            return bMs - aMs;
+          })
+          .slice(0, limitCount);
+      } catch (fallbackError) {
+        reportAdminServiceError(fallbackError, 'admin.verification_requests.fallback_query_failed', {
+          status: status || 'all',
+          limitCount,
+        });
+      }
+    }
+
+    const details = String((error as any)?.message || (error as any)?.code || 'unknown_error');
+    throw new DatabaseError(`Failed to fetch verification requests (${details})`);
   }
 };
 

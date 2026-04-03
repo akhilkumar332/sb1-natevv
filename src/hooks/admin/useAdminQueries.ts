@@ -1255,11 +1255,26 @@ export const useAdminOverviewData = () => {
     platformStatsQuery,
   ].some((entry) => entry.isLoading);
 
-  const error = verificationQuery.error
-    || emergencyQuery.error
-    || inventoryQuery.error
-    || recentActivityQuery.error
-    || platformStatsQuery.error;
+  const partialErrors = [
+    ['verification requests', verificationQuery.error],
+    ['emergency requests', emergencyQuery.error],
+    ['inventory alerts', inventoryQuery.error],
+    ['recent activity', recentActivityQuery.error],
+    ['platform stats', platformStatsQuery.error],
+  ]
+    .flatMap(([label, value]) => (value instanceof Error ? [`Failed to fetch ${label}: ${value.message}`] : []));
+
+  const hasAnyData = Boolean(platformStatsQuery.data)
+    || verificationRequests.length > 0
+    || emergencyRequests.length > 0
+    || inventoryAlerts.length > 0
+    || recentActivity.donations.length > 0
+    || recentActivity.requests.length > 0
+    || recentActivity.campaigns.length > 0;
+
+  const error = !hasAnyData && partialErrors.length > 0
+    ? partialErrors[0]
+    : null;
 
   const refreshData = async () => {
     await Promise.all([
@@ -1278,7 +1293,8 @@ export const useAdminOverviewData = () => {
     stats,
     recentActivity,
     loading,
-    error: error instanceof Error ? error.message : null,
+    error,
+    partialErrors,
     refreshData,
   };
 };
