@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { COLLECTIONS } from '../../../constants/firestore';
@@ -17,6 +18,7 @@ import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { refetchQuery } from '../../../utils/queryRefetch';
 
 export default function CmsPagesPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const pagesQuery = useAdminCmsPages();
@@ -72,9 +74,9 @@ export default function CmsPagesPage() {
       }
 
       await invalidateAdminRecipe(queryClient, 'cmsUpdated');
-      notify.success(`Synced defaults for ${preset.label}.`);
+      notify.success(t('cms.syncDefaultsSuccess', { label: preset.label }));
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : `Failed syncing ${preset.label}.`);
+      notify.error(error instanceof Error ? error.message : t('cms.syncDefaultsFailure', { label: preset.label }));
     } finally {
       setSyncingSlug(null);
     }
@@ -86,7 +88,7 @@ export default function CmsPagesPage() {
       for (const preset of CMS_FRONTEND_PAGE_PRESETS) {
         await syncPresetDefaults(preset);
       }
-      notify.success('Synced defaults for all frontend pages.');
+      notify.success(t('cms.syncAllDefaultsSuccess'));
     } finally {
       setSyncingAll(false);
     }
@@ -94,14 +96,14 @@ export default function CmsPagesPage() {
 
   const removePage = async (id?: string) => {
     if (!id) return;
-    if (!window.confirm('Delete this page from CMS?\n\nThis removes the page configuration and cannot be undone.')) return;
+    if (!window.confirm(t('cms.deletePageConfirm'))) return;
     setDeletingId(id);
     try {
       await deleteDoc(doc(db, COLLECTIONS.CMS_PAGES, id));
       await invalidateAdminRecipe(queryClient, 'cmsUpdated');
-      notify.success('Page deleted.');
+      notify.success(t('cms.pageDeleted'));
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : 'Failed to delete page.');
+      notify.error(error instanceof Error ? error.message : t('cms.pageDeleteFailed'));
     } finally {
       setDeletingId(null);
     }
@@ -112,31 +114,31 @@ export default function CmsPagesPage() {
       <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">CMS Pages</h2>
-            <p className="text-sm text-gray-600">Manage website pages in a human-friendly workflow.</p>
+            <h2 className="text-2xl font-bold text-gray-900">{t('cms.pagesTitle')}</h2>
+            <p className="text-sm text-gray-600">{t('cms.pagesDescription')}</p>
           </div>
           <div className="flex items-center gap-2">
             <Link
               to={ROUTES.portal.admin.dashboard.cmsPageEditor.replace(':slug', 'new')}
               className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
             >
-              New Page
+              {t('cms.newPage')}
             </Link>
-            <AdminRefreshButton onClick={() => refetchQuery(pagesQuery)} isRefreshing={pagesQuery.isFetching} label="Refresh pages" />
+            <AdminRefreshButton onClick={() => refetchQuery(pagesQuery)} isRefreshing={pagesQuery.isFetching} label={t('cms.refreshPages')} />
           </div>
         </div>
       </div>
 
       <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-gray-900">Manage Existing Frontend Routes</p>
+          <p className="text-sm font-semibold text-gray-900">{t('cms.manageExistingFrontendRoutes')}</p>
           <button
             type="button"
             onClick={() => void syncAllDefaults()}
             disabled={syncingAll || Boolean(syncingSlug)}
             className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
           >
-            {syncingAll ? 'Syncing...' : 'Sync All Defaults'}
+            {syncingAll ? t('cms.syncing') : t('cms.syncAllDefaults')}
           </button>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -151,7 +153,7 @@ export default function CmsPagesPage() {
                   <div className="text-sm font-semibold text-gray-900">{preset.label}</div>
                   <div className="text-xs text-gray-500">{preset.path}</div>
                   <div className="mt-1 text-[11px] font-semibold text-red-700">
-                    {existing ? `CMS: ${toHumanCmsStatus(existing.status)}` : 'CMS: Not created yet'}
+                    {existing ? t('cms.statusLabel', { status: toHumanCmsStatus(existing.status) }) : t('cms.statusLabel', { status: t('cms.notCreatedYet') })}
                   </div>
                 </Link>
                 <button
@@ -160,7 +162,7 @@ export default function CmsPagesPage() {
                   disabled={syncingSlug === preset.slug || syncingAll}
                   className="mt-2 rounded-md border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
                 >
-                  {syncingSlug === preset.slug ? 'Syncing...' : 'Sync Defaults'}
+                  {syncingSlug === preset.slug ? t('cms.syncing') : t('cms.syncDefaults')}
                 </button>
               </div>
             );
@@ -173,11 +175,11 @@ export default function CmsPagesPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-red-50 text-left text-xs uppercase tracking-[0.12em] text-red-800">
               <tr>
-                <th className="px-4 py-3">Title</th>
-                <th className="px-4 py-3">Slug</th>
-                <th className="px-4 py-3">Kind</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3">{t('cms.titleColumn')}</th>
+                <th className="px-4 py-3">{t('cms.slugColumn')}</th>
+                <th className="px-4 py-3">{t('cms.kindColumn')}</th>
+                <th className="px-4 py-3">{t('cms.statusColumn')}</th>
+                <th className="px-4 py-3 text-right">{t('cms.actionsColumn')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -195,14 +197,14 @@ export default function CmsPagesPage() {
                         rel="noreferrer"
                         className="mr-2 rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
                       >
-                        Visual
+                        {t('cms.visual')}
                       </Link>
                     ) : null}
                     <Link
                       to={ROUTES.portal.admin.dashboard.cmsPageEditor.replace(':slug', entry.slug || 'new')}
                       className="mr-2 rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
                     >
-                      Edit
+                      {t('cms.editPage')}
                     </Link>
                     <button
                       type="button"
@@ -210,7 +212,7 @@ export default function CmsPagesPage() {
                       disabled={deletingId === entry.id}
                       className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
                     >
-                      Delete
+                      {t('cms.deletePage')}
                     </button>
                   </td>
                 </tr>

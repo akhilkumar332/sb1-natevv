@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, setDoc, where } from 'firebase/firestore';
@@ -69,6 +70,7 @@ const revisionStorageKey = (slug: string) => `cms_blog_revisions_${slug}`;
 const draftStorageKey = (scope: string) => `cms_blog_draft_${scope}`;
 
 export default function CmsBlogPostEditorPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -141,26 +143,32 @@ export default function CmsBlogPostEditorPage() {
 
   const publishChecks = useMemo(() => {
     const critical = [
-      { id: 'title', label: 'Post title is set', passed: Boolean(title.trim()) },
-      { id: 'slug', label: 'Post slug is valid', passed: Boolean(toCmsSlug(slug || title)) },
-      { id: 'content', label: 'Post content is present', passed: Boolean(articlePlainText.trim()) },
+      { id: 'title', label: t('cms.postTitle'), passed: Boolean(title.trim()) },
+      { id: 'slug', label: t('cms.postSlug'), passed: Boolean(toCmsSlug(slug || title)) },
+      { id: 'content', label: t('cms.articleContent'), passed: Boolean(articlePlainText.trim()) },
     ];
     const warnings = [
-      { id: 'excerpt', label: 'Summary (excerpt) is added', passed: Boolean(excerpt.trim()) },
-      { id: 'image', label: 'Cover image is added', passed: Boolean(coverImageUrl.trim()) },
+      { id: 'excerpt', label: t('cms.summary'), passed: Boolean(excerpt.trim()) },
+      { id: 'image', label: t('cms.coverImageUrl'), passed: Boolean(coverImageUrl.trim()) },
       {
         id: 'seo-title',
-        label: `Search title is in range (${CMS_SEO_GUIDELINES.titleMin}-${CMS_SEO_GUIDELINES.titleMax})`,
+        label: t('cms.recommendedCharacters', {
+          min: CMS_SEO_GUIDELINES.titleMin,
+          max: CMS_SEO_GUIDELINES.titleMax,
+        }),
         passed: seoTitleLen >= CMS_SEO_GUIDELINES.titleMin && seoTitleLen <= CMS_SEO_GUIDELINES.titleMax,
       },
       {
         id: 'seo-desc',
-        label: `Search description is in range (${CMS_SEO_GUIDELINES.descriptionMin}-${CMS_SEO_GUIDELINES.descriptionMax})`,
+        label: t('cms.recommendedCharacters', {
+          min: CMS_SEO_GUIDELINES.descriptionMin,
+          max: CMS_SEO_GUIDELINES.descriptionMax,
+        }),
         passed: seoDescLen >= CMS_SEO_GUIDELINES.descriptionMin && seoDescLen <= CMS_SEO_GUIDELINES.descriptionMax,
       },
     ];
     return { critical, warnings };
-  }, [title, slug, articlePlainText, excerpt, coverImageUrl, seoTitleLen, seoDescLen]);
+  }, [title, slug, articlePlainText, excerpt, coverImageUrl, seoTitleLen, seoDescLen, t]);
 
   useEffect(() => {
     setIsDirty(false);
@@ -536,16 +544,16 @@ export default function CmsBlogPostEditorPage() {
     const nextStatus = targetStatus || status;
 
     if (!normalizedTitle || !normalizedSlug) {
-      notify.error('Post title and slug are required.');
+      notify.error(t('cms.postTitleRequired'));
       return;
     }
 
     if (nextStatus === CMS_STATUS.published && publishBlockers.length > 0) {
-      notify.error(publishBlockers[0] || 'Please complete all required publish checklist items.');
+      notify.error(publishBlockers[0] || t('cms.completeRequiredPublishChecklist'));
       return;
     }
     if (nextStatus === CMS_STATUS.published && (settingsQuery.isLoading || settingsQuery.isFetching)) {
-      notify.error('Please wait for CMS settings to load before publishing.');
+      notify.error(t('cms.waitForSettingsBeforePublishing'));
       return;
     }
     if (
@@ -553,7 +561,7 @@ export default function CmsBlogPostEditorPage() {
       && settingsQuery.data?.requireApprovalBeforePublish
       && reviewStatus !== CMS_REVIEW_STATUS.approved
     ) {
-      notify.error('Publishing requires review approval. Set review status to approved first.');
+      notify.error(t('cms.reviewApprovalRequired'));
       return;
     }
 
@@ -562,7 +570,7 @@ export default function CmsBlogPostEditorPage() {
       && entry.slug !== normalizedParamSlug
     ));
     if (duplicate) {
-      notify.error('A blog post with this slug already exists. Please use a unique slug.');
+      notify.error(t('cms.duplicateSlugError'));
       return;
     }
 
@@ -571,15 +579,15 @@ export default function CmsBlogPostEditorPage() {
       : '';
 
     if (normalizedContentJson.length > CMS_LIMITS.contentJson) {
-      notify.error(`Post content exceeds ${CMS_LIMITS.contentJson} characters.`);
+      notify.error(t('cms.contentTooLong', { count: CMS_LIMITS.contentJson }));
       return;
     }
     if (seoCanonicalUrl.trim() && !isAbsoluteHttpUrl(seoCanonicalUrl)) {
-      notify.error('Canonical URL must start with http:// or https://');
+      notify.error(t('cms.canonicalUrlInvalid'));
       return;
     }
     if (!isMediaUrlOrPath(coverImageUrl) || !isMediaUrlOrPath(ogImageUrl) || !isMediaUrlOrPath(twitterImageUrl)) {
-      notify.error('Image URLs must be absolute URLs or start with /.');
+      notify.error(t('cms.imageUrlInvalid'));
       return;
     }
     const scheduleValidation = validateScheduleWindow(scheduledPublishAt, scheduledUnpublishAt);
@@ -591,11 +599,11 @@ export default function CmsBlogPostEditorPage() {
       return;
     }
     if (parsedFeaturedUntil && Number.isNaN(parsedFeaturedUntil.getTime())) {
-      notify.error('Featured-until date/time is invalid.');
+      notify.error(t('cms.featuredUntilInvalid'));
       return;
     }
     if (relatedPostSlugs.includes(normalizedSlug)) {
-      notify.error('Related posts cannot include the same post slug.');
+      notify.error(t('cms.relatedPostsCannotIncludeSelf'));
       return;
     }
 
@@ -618,10 +626,10 @@ export default function CmsBlogPostEditorPage() {
         && latestUpdatedAtMs > loadedUpdatedAtRef.current
       ) {
         const shouldOverwrite = typeof window !== 'undefined'
-          ? window.confirm('This post was updated after you opened it. Continue and replace with your current version?')
+          ? window.confirm(t('cms.newerVersionConfirm'))
           : false;
         if (!shouldOverwrite) {
-          notify.error('Save cancelled to avoid overwriting a newer version.');
+          notify.error(t('cms.saveCancelledNewerVersion'));
           setSaving(false);
           return;
         }
@@ -744,7 +752,7 @@ export default function CmsBlogPostEditorPage() {
           // keep save flow resilient when storage is unavailable
         }
       }
-      notify.success(nextStatus === CMS_STATUS.published ? 'Post published.' : 'Draft saved.');
+      notify.success(nextStatus === CMS_STATUS.published ? t('cms.postPublished') : t('cms.draftSaved'));
 
       const targetPath = ROUTES.portal.admin.dashboard.cmsBlogPostEditor.replace(':slug', normalizedSlug);
       if (normalizedParamSlug !== normalizedSlug) {
@@ -755,7 +763,7 @@ export default function CmsBlogPostEditorPage() {
         'post_save',
         error instanceof Error ? error.message : 'Failed to save post.',
       );
-      notify.error(error instanceof Error ? error.message : 'Failed to save post.');
+      notify.error(error instanceof Error ? error.message : t('cms.savePostFailed'));
     } finally {
       setSaving(false);
     }
@@ -766,14 +774,14 @@ export default function CmsBlogPostEditorPage() {
       <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Blog Post Editor</h2>
-            <p className="text-sm text-gray-600 dark:text-slate-300">Human-friendly editor with optional advanced SEO controls.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">{t('cms.blogEditorTitle')}</h2>
+            <p className="text-sm text-gray-600 dark:text-slate-300">{t('cms.blogEditorDescription')}</p>
           </div>
           <Link
             to={ROUTES.portal.admin.dashboard.cmsBlogPosts}
             className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
-            Back to Blog Posts
+            {t('cms.backToBlogPosts')}
           </Link>
         </div>
       </div>
@@ -782,10 +790,10 @@ export default function CmsBlogPostEditorPage() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/70">
           <div className="flex flex-wrap items-center gap-2">
             {([
-              { id: 'content', label: '1. Content', ready: guideState.contentReady },
-              { id: 'media', label: '2. Media', ready: guideState.mediaReady },
-              { id: 'seo', label: '3. SEO', ready: guideState.seoReady },
-              { id: 'settings', label: '4. Review & Publish', ready: guideState.reviewReady },
+              { id: 'content', label: t('cms.contentStep'), ready: guideState.contentReady },
+              { id: 'media', label: t('cms.mediaStep'), ready: guideState.mediaReady },
+              { id: 'seo', label: t('cms.seoStep'), ready: guideState.seoReady },
+              { id: 'settings', label: t('cms.reviewPublishStep'), ready: guideState.reviewReady },
             ] as Array<{ id: EditorTab; label: string; ready: boolean }>).map((step) => (
               <button
                 key={step.id}
@@ -804,12 +812,12 @@ export default function CmsBlogPostEditorPage() {
             ))}
           </div>
           <p className="text-xs text-gray-600 dark:text-slate-400">
-            {autosaveSecondsAgo === null ? 'Autosave waiting for edits' : `Last saved ${autosaveSecondsAgo}s ago`}
+            {autosaveSecondsAgo === null ? t('cms.autosaveWaiting') : t('cms.lastSavedSecondsAgo', { count: autosaveSecondsAgo })}
           </p>
         </div>
         {restoreDraftPayload ? (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-            <p>Recovered a local unsaved draft for this post.</p>
+            <p>{t('cms.recoveredUnsavedDraft')}</p>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -850,11 +858,11 @@ export default function CmsBlogPostEditorPage() {
                   setFeaturedUntil(typeof v.featuredUntil === 'string' ? v.featuredUntil : featuredUntil);
                   setRestoreDraftPayload(null);
                   setIsDirty(true);
-                  notify.success('Recovered local draft loaded.');
+                  notify.success(t('cms.recoveredDraftLoaded'));
                 }}
                 className="rounded-md border border-amber-300 px-2 py-1 font-semibold hover:bg-amber-100 dark:border-amber-900/40 dark:hover:bg-amber-950/40"
               >
-                Restore Draft
+                {t('cms.restoreDraft')}
               </button>
               <button
                 type="button"
@@ -866,7 +874,7 @@ export default function CmsBlogPostEditorPage() {
                 }}
                 className="rounded-md border border-gray-300 bg-white px-2 py-1 font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                Discard
+                {t('cms.discardDraft')}
               </button>
             </div>
           </div>
@@ -885,7 +893,7 @@ export default function CmsBlogPostEditorPage() {
         </div>
         {publishBlockers.length > 0 ? (
           <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-            <p className="font-semibold">Ready to publish checklist</p>
+            <p className="font-semibold">{t('cms.readyToPublishChecklist')}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {publishBlockers.slice(0, 4).map((blocker) => (
                 <button
@@ -894,14 +902,14 @@ export default function CmsBlogPostEditorPage() {
                   onClick={() => setActiveTab(blockerTabMap.get(blocker) || 'content')}
                   className="rounded-md border border-amber-300 bg-white px-2 py-1 text-left font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-900/40 dark:bg-slate-900 dark:text-amber-200 dark:hover:bg-amber-950/40"
                 >
-                  Fix: {blocker}
+                  {t('cms.fixPrefix', { value: blocker })}
                 </button>
               ))}
             </div>
           </div>
         ) : (
           <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-200">
-            Publish checklist is complete. This post is ready to go live.
+            {t('cms.publishChecklistComplete')}
           </div>
         )}
 
@@ -909,12 +917,12 @@ export default function CmsBlogPostEditorPage() {
           <div className="grid gap-3 md:grid-cols-2">
             {CMS_FEATURE_FLAGS.blogEditorV2 ? (
               <div className="md:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-200">
-                Editor v2 enhancements enabled: richer formatting controls, quick insert blocks, and keyboard shortcuts (`Ctrl/Cmd+B`, `I`, `U`).
+                {t('cms.editorV2Enabled')}
               </div>
             ) : null}
             {isNewPost ? (
               <label className="block md:col-span-2">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Duplicate From Existing Post (Optional)</span>
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.duplicateExistingPost')}</span>
                 <select
                   value=""
                   onChange={(event) => {
@@ -937,11 +945,11 @@ export default function CmsBlogPostEditorPage() {
                     setAuthorName(selected.authorName || '');
                     setRelatedPostSlugsInput((selected.relatedPostSlugs || []).join(', '));
                     setIsDirty(true);
-                    notify.success('Post content duplicated. Update title/slug before saving.');
+                    notify.success(t('cms.duplicatePostLoaded'));
                   }}
                   className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                 >
-                  <option value="">Select an existing post</option>
+                  <option value="">{t('cms.selectExistingPost')}</option>
                   {rows.map((entry) => (
                     <option key={entry.id || entry.slug} value={entry.slug}>{entry.title}</option>
                   ))}
@@ -949,24 +957,24 @@ export default function CmsBlogPostEditorPage() {
               </label>
             ) : null}
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Post Title</span>
-              <input value={title} onChange={(event) => { setTitle(event.target.value); setIsDirty(true); if (!slug) setSlug(toCmsSlug(event.target.value)); }} placeholder="Write a clear title" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.postTitle')}</span>
+              <input value={title} onChange={(event) => { setTitle(event.target.value); setIsDirty(true); if (!slug) setSlug(toCmsSlug(event.target.value)); }} placeholder={t('cms.postTitlePlaceholder')} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
               <span className={`mt-1 block text-[11px] ${titleLen > CMS_LIMITS.title ? 'text-red-700 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'}`}>{titleLen}/{CMS_LIMITS.title}</span>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Post Slug</span>
-              <input value={slug} onChange={(event) => { setSlug(toCmsSlug(event.target.value)); setIsDirty(true); }} placeholder="post-slug" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.postSlug')}</span>
+              <input value={slug} onChange={(event) => { setSlug(toCmsSlug(event.target.value)); setIsDirty(true); }} placeholder={t('cms.postSlugPlaceholder')} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="block md:col-span-2">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Summary</span>
-              <textarea value={excerpt} onChange={(event) => { setExcerpt(event.target.value); setIsDirty(true); }} rows={3} placeholder="Short summary shown in blog list and search" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.summary')}</span>
+              <textarea value={excerpt} onChange={(event) => { setExcerpt(event.target.value); setIsDirty(true); }} rows={3} placeholder={t('cms.summaryPlaceholder')} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
               <span className={`mt-1 block text-[11px] ${excerptLen > CMS_LIMITS.excerpt ? 'text-red-700 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'}`}>{excerptLen}/{CMS_LIMITS.excerpt}</span>
             </label>
             <label className="block md:col-span-2">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Article Content</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.articleContent')}</span>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[11px] text-gray-500 dark:text-slate-400">
-                  Write for humans first. Keep paragraphs short and include actionable guidance.
+                  {t('cms.articleContentHint')}
                 </p>
               </div>
               <CmsRichTextEditor
@@ -975,18 +983,18 @@ export default function CmsBlogPostEditorPage() {
                   setContentJson(serializeCmsRichContent(nextHtml));
                   setIsDirty(true);
                 }}
-                placeholder="Write your article content here..."
+                placeholder={t('cms.articleContentPlaceholder')}
               />
             </label>
             <label className="block md:col-span-2">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Tags</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.tags')}</span>
               <input
                 value={tagsInput}
                 onChange={(event) => { setTagsInput(event.target.value); setIsDirty(true); }}
-                placeholder="blood donation, eligibility, donor tips"
+                placeholder={t('cms.tagsPlaceholder')}
                 className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
-              <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">Comma separated. Up to {CMS_LIMITS.tagsPerPost} tags.</span>
+              <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">{t('cms.tagsHint', { count: CMS_LIMITS.tagsPerPost })}</span>
               {normalizedTags.length ? (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {normalizedTags.map((tag) => (
@@ -997,7 +1005,7 @@ export default function CmsBlogPostEditorPage() {
             </label>
             {linkSuggestions.length ? (
               <div className="md:col-span-2 rounded-xl border border-blue-100 bg-blue-50 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-blue-700 dark:text-blue-300">Internal Link Suggestions</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-blue-700 dark:text-blue-300">{t('cms.internalLinkSuggestions')}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {linkSuggestions.map((entry) => (
                     <button
@@ -1009,15 +1017,15 @@ export default function CmsBlogPostEditorPage() {
                       }}
                       className="rounded-md border border-blue-200 bg-white px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900/40 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/40"
                     >
-                      Insert {entry.source}: {entry.label}
+                      {t('cms.insertLinkSuggestion', { source: entry.source, label: entry.label })}
                     </button>
                   ))}
                 </div>
               </div>
             ) : null}
             <div className="md:col-span-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-200">
-              <p className="font-semibold">Readability</p>
-              <p className="mt-1">Words: {readability.words} · Sentences: {readability.sentences} · Approx read time: {readability.readingMinutes} min · Difficulty: {readability.level} ({readability.score})</p>
+              <p className="font-semibold">{t('cms.readability')}</p>
+              <p className="mt-1">{t('cms.readabilitySummary', { words: readability.words, sentences: readability.sentences, minutes: readability.readingMinutes, level: readability.level, score: readability.score })}</p>
             </div>
           </div>
         ) : null}
@@ -1025,12 +1033,12 @@ export default function CmsBlogPostEditorPage() {
         {activeTab === 'media' ? (
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block md:col-span-2">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Cover Image URL</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.coverImageUrl')}</span>
               <input value={coverImageUrl} onChange={(event) => { setCoverImageUrl(event.target.value); setIsDirty(true); }} placeholder="https://..." className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="inline-flex items-center gap-2 rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
               <input type="checkbox" checked={featured} onChange={(event) => { setFeatured(event.target.checked); setIsDirty(true); }} />
-              Mark as featured post
+              {t('cms.featuredPost')}
             </label>
           </div>
         ) : null}
@@ -1038,34 +1046,34 @@ export default function CmsBlogPostEditorPage() {
         {activeTab === 'seo' ? (
           <div className="space-y-3">
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-950/70">
-              <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Publish Readiness</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">{t('cms.publishReadiness')}</p>
               <div className="mt-2 grid gap-1 sm:grid-cols-2">
                 {publishChecks.critical.map((check) => (
                   <div key={check.id} className={`rounded px-2 py-1 text-xs ${check.passed ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                    {check.passed ? 'Ready' : 'Required'}: {check.label}
+                    {check.passed ? t('cms.readyState') : t('cms.requiredState')}: {check.label}
                   </div>
                 ))}
                 {publishChecks.warnings.map((check) => (
                   <div key={check.id} className={`rounded px-2 py-1 text-xs ${check.passed ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                    {check.passed ? 'Good' : 'Optional'}: {check.label}
+                    {check.passed ? t('cms.goodState') : t('cms.optionalState')}: {check.label}
                   </div>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-gray-600 dark:text-slate-400">SEO quality score: {seoAudit.score}/100</p>
+              <p className="mt-2 text-xs text-gray-600 dark:text-slate-400">{t('cms.seoQualityScore', { score: seoAudit.score })}</p>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
               <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Search Title</span>
-                <input value={seoTitle} onChange={(event) => { setSeoTitle(event.target.value); setIsDirty(true); }} placeholder="Defaults to post title" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.searchTitle')}</span>
+                <input value={seoTitle} onChange={(event) => { setSeoTitle(event.target.value); setIsDirty(true); }} placeholder={t('cms.searchTitlePlaceholder')} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
                 <span className={`mt-1 block text-[11px] ${seoTitleLen > CMS_LIMITS.seoTitle ? 'text-red-700 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'}`}>{seoTitleLen}/{CMS_LIMITS.seoTitle}</span>
-                <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">Recommended {CMS_SEO_GUIDELINES.titleMin}-{CMS_SEO_GUIDELINES.titleMax} characters.</span>
+                <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">{t('cms.recommendedCharacters', { min: CMS_SEO_GUIDELINES.titleMin, max: CMS_SEO_GUIDELINES.titleMax })}</span>
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Search Description</span>
-                <input value={seoDescription} onChange={(event) => { setSeoDescription(event.target.value); setIsDirty(true); }} placeholder="Defaults to summary" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.searchDescription')}</span>
+                <input value={seoDescription} onChange={(event) => { setSeoDescription(event.target.value); setIsDirty(true); }} placeholder={t('cms.searchDescriptionPlaceholder')} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
                 <span className={`mt-1 block text-[11px] ${seoDescLen > CMS_LIMITS.seoDescription ? 'text-red-700 dark:text-red-400' : 'text-gray-500 dark:text-slate-400'}`}>{seoDescLen}/{CMS_LIMITS.seoDescription}</span>
-                <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">Recommended {CMS_SEO_GUIDELINES.descriptionMin}-{CMS_SEO_GUIDELINES.descriptionMax} characters.</span>
+                <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">{t('cms.recommendedCharacters', { min: CMS_SEO_GUIDELINES.descriptionMin, max: CMS_SEO_GUIDELINES.descriptionMax })}</span>
               </label>
             </div>
             <SeoSnippetPreview title={previewTitle} description={previewDescription} url={previewUrl} />
@@ -1078,7 +1086,7 @@ export default function CmsBlogPostEditorPage() {
                 }}
                 className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                Use Post Title
+                {t('cms.usePostTitle')}
               </button>
               <button
                 type="button"
@@ -1088,7 +1096,7 @@ export default function CmsBlogPostEditorPage() {
                 }}
                 className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                Use Summary
+                {t('cms.useSummary')}
               </button>
               <button
                 type="button"
@@ -1099,12 +1107,12 @@ export default function CmsBlogPostEditorPage() {
                 }}
                 className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                Use Cover Image for Social
+                {t('cms.useCoverImageForSocial')}
               </button>
             </div>
             {seoAudit.topFixes.length ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-                <p className="font-semibold">Top fixes to improve SEO:</p>
+                <p className="font-semibold">{t('cms.topSeoFixes')}</p>
                 <ul className="mt-1 list-disc pl-5">
                   {seoAudit.topFixes.map((fix) => <li key={fix}>{fix}</li>)}
                 </ul>
@@ -1117,28 +1125,28 @@ export default function CmsBlogPostEditorPage() {
                 onClick={() => setShowAdvancedSeo((prev) => !prev)}
                 className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                {showAdvancedSeo ? 'Hide Advanced SEO' : 'Show Advanced SEO (Optional)'}
+                {showAdvancedSeo ? t('cms.hideAdvancedSeo') : t('cms.showAdvancedSeo')}
               </button>
             ) : null}
 
             {(!CMS_FEATURE_FLAGS.simplifiedEditorMode || showAdvancedSeo) ? (
               <div className="grid gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-950/70 md:grid-cols-2">
-                <input value={seoCanonicalUrl} onChange={(event) => { setSeoCanonicalUrl(event.target.value); setIsDirty(true); }} placeholder="Canonical URL (optional, full URL)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <input value={seoCanonicalUrl} onChange={(event) => { setSeoCanonicalUrl(event.target.value); setIsDirty(true); }} placeholder={t('cms.canonicalUrlPlaceholder')} className="rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
                 {canonicalConflictCount > 0 ? (
                   <p className="text-xs text-amber-700 dark:text-amber-300 md:col-span-2">
-                    Canonical conflict: {canonicalConflictCount} other CMS item(s) use this canonical URL.
+                    {t('cms.canonicalConflict', { count: canonicalConflictCount })}
                   </p>
                 ) : null}
-                <input value={ogTitle} onChange={(event) => { setOgTitle(event.target.value); setIsDirty(true); }} placeholder="Social title (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
-                <input value={ogDescription} onChange={(event) => { setOgDescription(event.target.value); setIsDirty(true); }} placeholder="Social description (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
-                <input value={ogImageUrl} onChange={(event) => { setOgImageUrl(event.target.value); setIsDirty(true); }} placeholder="Social preview image URL (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
-                <input value={twitterImageUrl} onChange={(event) => { setTwitterImageUrl(event.target.value); setIsDirty(true); }} placeholder="Twitter image URL (optional)" className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <input value={ogTitle} onChange={(event) => { setOgTitle(event.target.value); setIsDirty(true); }} placeholder={t('cms.socialTitlePlaceholder')} className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <input value={ogDescription} onChange={(event) => { setOgDescription(event.target.value); setIsDirty(true); }} placeholder={t('cms.socialDescriptionPlaceholder')} className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <input value={ogImageUrl} onChange={(event) => { setOgImageUrl(event.target.value); setIsDirty(true); }} placeholder={t('cms.socialPreviewImagePlaceholder')} className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+                <input value={twitterImageUrl} onChange={(event) => { setTwitterImageUrl(event.target.value); setIsDirty(true); }} placeholder={t('cms.twitterImagePlaceholder')} className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
                 <div className="flex items-center gap-4 rounded-xl border border-gray-300 px-3 py-2 text-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={seoNoIndex} onChange={(event) => { setSeoNoIndex(event.target.checked); setIsDirty(true); }} />Disable indexing</label>
-                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={seoNoFollow} onChange={(event) => { setSeoNoFollow(event.target.checked); setIsDirty(true); }} />Disable link following</label>
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={seoNoIndex} onChange={(event) => { setSeoNoIndex(event.target.checked); setIsDirty(true); }} />{t('cms.disableIndexing')}</label>
+                  <label className="inline-flex items-center gap-2"><input type="checkbox" checked={seoNoFollow} onChange={(event) => { setSeoNoFollow(event.target.checked); setIsDirty(true); }} />{t('cms.disableLinkFollowing')}</label>
                 </div>
                 {status !== CMS_STATUS.published ? (
-                  <p className="text-xs text-amber-700 dark:text-amber-300 md:col-span-2">Draft and scheduled content is automatically kept noindex/nofollow for safety.</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-300 md:col-span-2">{t('cms.draftNoindexHint')}</p>
                 ) : null}
               </div>
             ) : null}
@@ -1148,59 +1156,59 @@ export default function CmsBlogPostEditorPage() {
         {activeTab === 'settings' ? (
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Category</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.category')}</span>
               <select value={categorySlug} onChange={(event) => { setCategorySlug(event.target.value); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
-                <option value="">No category</option>
+                <option value="">{t('cms.noCategory')}</option>
                 {categoryOptions.map((entry) => <option key={entry.id} value={entry.slug}>{entry.name}</option>)}
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Series Slug</span>
-              <input value={seriesSlug} onChange={(event) => { setSeriesSlug(toCmsSlug(event.target.value)); setIsDirty(true); }} placeholder="optional-series" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.seriesSlug')}</span>
+              <input value={seriesSlug} onChange={(event) => { setSeriesSlug(toCmsSlug(event.target.value)); setIsDirty(true); }} placeholder={t('cms.seriesSlugPlaceholder')} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Related Post Slugs</span>
-              <input value={relatedPostSlugsInput} onChange={(event) => { setRelatedPostSlugsInput(event.target.value); setIsDirty(true); }} placeholder="slug-one, slug-two" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
-              <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">Comma separated, max {CMS_LIMITS.relatedPostsPerEntry}.</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.relatedPostSlugs')}</span>
+              <input value={relatedPostSlugsInput} onChange={(event) => { setRelatedPostSlugsInput(event.target.value); setIsDirty(true); }} placeholder={t('cms.relatedPostSlugsPlaceholder')} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">{t('cms.relatedPostsHint', { count: CMS_LIMITS.relatedPostsPerEntry })}</span>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Author Name</span>
-              <input value={authorName} onChange={(event) => { setAuthorName(event.target.value); setIsDirty(true); }} placeholder="Author display name" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.authorName')}</span>
+              <input value={authorName} onChange={(event) => { setAuthorName(event.target.value); setIsDirty(true); }} placeholder={t('cms.authorNamePlaceholder')} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Status</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('inventory.status')}</span>
               <select value={status} onChange={(event) => { setStatus(event.target.value as (typeof statusOptions)[number]); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                 {statusOptions.map((entry) => <option key={entry} value={entry}>{toHumanCmsStatus(entry)}</option>)}
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Featured Until</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.featuredUntil')}</span>
               <input type="datetime-local" value={featuredUntil} onChange={(event) => { setFeaturedUntil(event.target.value); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Workflow Assignee</span>
-              <input value={workflowAssignee} onChange={(event) => { setWorkflowAssignee(event.target.value); setIsDirty(true); }} placeholder="Reviewer name or UID" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.workflowAssignee')}</span>
+              <input value={workflowAssignee} onChange={(event) => { setWorkflowAssignee(event.target.value); setIsDirty(true); }} placeholder={t('cms.workflowAssigneePlaceholder')} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Review Status</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.reviewStatus')}</span>
               <select value={reviewStatus} onChange={(event) => { setReviewStatus(event.target.value as (typeof CMS_REVIEW_STATUS)[keyof typeof CMS_REVIEW_STATUS]); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
                 {Object.values(CMS_REVIEW_STATUS).map((entry) => <option key={entry} value={entry}>{entry}</option>)}
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Scheduled Publish</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.scheduledPublish')}</span>
               <input type="datetime-local" value={scheduledPublishAt} onChange={(event) => { setScheduledPublishAt(event.target.value); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Scheduled Unpublish</span>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.scheduledUnpublish')}</span>
               <input type="datetime-local" value={scheduledUnpublishAt} onChange={(event) => { setScheduledUnpublishAt(event.target.value); setIsDirty(true); }} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <label className="block md:col-span-2">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Review Notes</span>
-              <textarea value={reviewNotes} onChange={(event) => { setReviewNotes(event.target.value); setIsDirty(true); }} rows={3} placeholder="Context for reviewers and publishers" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.reviewNotes')}</span>
+              <textarea value={reviewNotes} onChange={(event) => { setReviewNotes(event.target.value); setIsDirty(true); }} rows={3} placeholder={t('cms.reviewNotesPlaceholder')} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
             </label>
             <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-950/70">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Saved Versions (Local)</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">{t('cms.savedVersionsLocal')}</p>
               {revisionHistory.length ? (
                 <div className="mt-2 space-y-2">
                   {revisionHistory.map((entry, index) => (
@@ -1217,7 +1225,7 @@ export default function CmsBlogPostEditorPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          if (!window.confirm('Restore this local revision into the editor? Unsaved edits will be replaced.')) return;
+                          if (!window.confirm(t('cms.restoreRevisionConfirm'))) return;
                           setTitle(entry.title);
                           setExcerpt(entry.excerpt);
                           setContentJson(toModernBlogContentJson(entry.contentJson));
@@ -1225,17 +1233,17 @@ export default function CmsBlogPostEditorPage() {
                         }}
                         className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                       >
-                        Restore
+                        {t('cms.restore')}
                       </button>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">No revisions saved yet.</p>
+                <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">{t('cms.noLocalRevisions')}</p>
               )}
             </div>
             <div className="md:col-span-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900/40 dark:bg-indigo-950/20">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-indigo-700 dark:text-indigo-300">Saved Versions (Server)</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-indigo-700 dark:text-indigo-300">{t('cms.savedVersionsServer')}</p>
               {serverRevisionHistory.length ? (
                 <div className="mt-2 space-y-2">
                   {serverRevisionHistory.map((entry) => (
@@ -1252,7 +1260,7 @@ export default function CmsBlogPostEditorPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          if (!window.confirm('Restore this server revision into the editor? Unsaved edits will be replaced.')) return;
+                          if (!window.confirm(t('cms.restoreServerRevisionConfirm'))) return;
                           setTitle(entry.title);
                           setExcerpt(entry.excerpt);
                           setContentJson(toModernBlogContentJson(entry.contentJson));
@@ -1261,13 +1269,13 @@ export default function CmsBlogPostEditorPage() {
                         }}
                         className="rounded-md border border-indigo-300 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 dark:border-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
                       >
-                        Restore
+                        {t('cms.restore')}
                       </button>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="mt-2 text-xs text-indigo-700/80 dark:text-indigo-300/80">No server revisions yet for this post.</p>
+                <p className="mt-2 text-xs text-indigo-700/80 dark:text-indigo-300/80">{t('cms.noServerRevisions')}</p>
               )}
             </div>
           </div>
@@ -1275,22 +1283,22 @@ export default function CmsBlogPostEditorPage() {
 
         <div className="mt-4 flex flex-wrap gap-2">
           <button type="button" onClick={() => void savePost(CMS_STATUS.draft)} disabled={saving} className="rounded-lg border border-amber-600 bg-amber-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-            {saving && status === CMS_STATUS.draft ? 'Saving...' : 'Save Draft'}
+            {saving && status === CMS_STATUS.draft ? t('cms.saveDrafting') : t('cms.saveDraft')}
           </button>
           <button type="button" onClick={() => void savePost(CMS_STATUS.published)} disabled={saving || publishBlockers.length > 0 || settingsQuery.isLoading || settingsQuery.isFetching} className="rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-            {saving && status === CMS_STATUS.published ? 'Publishing...' : 'Publish'}
+            {saving && status === CMS_STATUS.published ? t('cms.publishing') : t('cms.publish')}
           </button>
           <button
             type="button"
             onClick={() => navigate(ROUTES.portal.admin.dashboard.cmsBlogPosts)}
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 dark:border-slate-700 dark:text-slate-200"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
         {publishBlockers.length > 0 ? (
           <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-            <p className="font-semibold">Publish blockers</p>
+            <p className="font-semibold">{t('cms.publishBlockers')}</p>
             <ul className="mt-1 list-disc pl-5">
               {publishBlockers.slice(0, 6).map((blocker) => (
                 <li key={blocker}>{blocker}</li>

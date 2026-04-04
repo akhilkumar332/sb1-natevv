@@ -1,5 +1,6 @@
 // src/pages/donor/DonorOnboarding.tsx
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { notify } from 'services/notify.service';
@@ -90,22 +91,15 @@ interface OnboardingFormData {
 }
 
 const donorOnboardingValidationRules: Array<OnboardingValidationRule<OnboardingFormData>> = [
-  { step: 0, required: ['name', 'gender', 'dateOfBirth'], message: 'Please fill in all required personal information' },
-  { step: 1, required: ['email', 'phone', 'address', 'country', 'state', 'city', 'postalCode'], message: 'Please fill in all required contact information' },
-  { step: 2, required: ['bloodType'], message: 'Please select your blood type' },
-  { step: 3, required: ['occupation', 'preferredLanguage', 'howHeardAboutUs'], message: 'Please fill in additional information' },
-  { step: 4, required: ['privacyPolicyAgreed', 'termsOfServiceAgreed'], message: 'Please agree to privacy policy and terms of service' },
-];
-
-const steps = [
-  { icon: User, title: 'Personal', subtitle: 'Basic info', color: 'blue' },
-  { icon: MapPin, title: 'Contact', subtitle: 'Location details', color: 'indigo' },
-  { icon: Droplet, title: 'Medical', subtitle: 'Health info', color: 'purple' },
-  { icon: Briefcase, title: 'Profile', subtitle: 'About you', color: 'pink' },
-  { icon: CheckCircle, title: 'Consent', subtitle: 'Agreement', color: 'red' },
+  { step: 0, required: ['name', 'gender', 'dateOfBirth'], message: 'onboarding.donorValidationPersonal' },
+  { step: 1, required: ['email', 'phone', 'address', 'country', 'state', 'city', 'postalCode'], message: 'onboarding.donorValidationContact' },
+  { step: 2, required: ['bloodType'], message: 'onboarding.donorValidationBlood' },
+  { step: 3, required: ['occupation', 'preferredLanguage', 'howHeardAboutUs'], message: 'onboarding.donorValidationAdditional' },
+  { step: 4, required: ['privacyPolicyAgreed', 'termsOfServiceAgreed'], message: 'onboarding.donorValidationConsent' },
 ];
 
 export function DonorOnboarding() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { user, updateUserProfile } = useAuth();
@@ -298,9 +292,17 @@ export function DonorOnboarding() {
       step: currentStep,
       data: formData,
       rules: donorOnboardingValidationRules,
-      onError: (message) => notify.error(message),
+      onError: (message) => notify.error(t(message)),
     });
   };
+
+  const steps = [
+    { icon: User, title: t('onboarding.personal'), subtitle: t('onboarding.basicInfo'), color: 'blue' },
+    { icon: MapPin, title: t('onboarding.contact'), subtitle: t('onboarding.locationDetails'), color: 'indigo' },
+    { icon: Droplet, title: t('onboarding.medical'), subtitle: t('onboarding.healthInfo'), color: 'purple' },
+    { icon: Briefcase, title: t('onboarding.profile'), subtitle: t('onboarding.aboutYou'), color: 'pink' },
+    { icon: CheckCircle, title: t('onboarding.consent'), subtitle: t('onboarding.agreement'), color: 'red' },
+  ] as const;
 
   const nextStep = () => {
     if (validateStep()) {
@@ -449,7 +451,7 @@ export function DonorOnboarding() {
         }
 
         setShowConfetti(true);
-        notify.success('Welcome to the BloodHub family! 🎉');
+        notify.success(t('onboarding.welcomeToFamily'));
 
         setTimeout(() => {
           const params = new URLSearchParams(location.search);
@@ -479,7 +481,7 @@ export function DonorOnboarding() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Full Name <span className="text-red-500">*</span>
+                  {t('onboarding.fullName')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -487,28 +489,32 @@ export function DonorOnboarding() {
                   value={formData.name}
                   onChange={handleChange}
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                  placeholder="Enter your full name"
+                  placeholder={t('onboarding.fullNamePlaceholder')}
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Gender <span className="text-red-500">*</span>
+                  {t('onboarding.gender')} <span className="text-red-500">*</span>
                 </label>
                 <div className="grid grid-cols-3 gap-3">
-                  {['Male', 'Female', 'Other'].map((gender) => (
+                  {[
+                    { value: 'Male', label: t('common.male') },
+                    { value: 'Female', label: t('common.female') },
+                    { value: 'Other', label: t('common.other') },
+                  ].map(({ value, label }) => (
                     <button
-                      key={gender}
+                      key={value}
                       type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, gender }))}
+                      onClick={() => setFormData(prev => ({ ...prev, gender: value }))}
                       className={`px-4 py-3 rounded-xl font-medium transition-all ${
-                        formData.gender === gender
+                        formData.gender === value
                           ? 'bg-red-600 text-white shadow-lg scale-105'
                           : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
                       }`}
                     >
-                      {gender}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -516,7 +522,7 @@ export function DonorOnboarding() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Date of Birth <span className="text-red-500">*</span>
+                  {t('onboarding.dateOfBirth')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
@@ -537,7 +543,7 @@ export function DonorOnboarding() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email <span className="text-red-500">*</span>
+                  {t('onboarding.email')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="email"
@@ -545,14 +551,14 @@ export function DonorOnboarding() {
                   value={formData.email}
                   onChange={handleChange}
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                  placeholder="your@email.com"
+                  placeholder={t('onboarding.emailPlaceholder')}
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Phone Number <span className="text-red-500">*</span>
+                  {t('onboarding.phoneNumber')} <span className="text-red-500">*</span>
                 </label>
                 <PhoneInput
                   international
@@ -565,7 +571,7 @@ export function DonorOnboarding() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Country <span className="text-red-500">*</span>
+                  {t('onboarding.country')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   name="country"
@@ -574,7 +580,7 @@ export function DonorOnboarding() {
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                   required
                 >
-                  <option value="">Select Country</option>
+                  <option value="">{t('onboarding.selectCountry')}</option>
                   {countries.map((country) => (
                     <option key={country.code} value={country.code}>
                       {country.name}
@@ -586,7 +592,7 @@ export function DonorOnboarding() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-semibold text-gray-700">
-                    Address <span className="text-red-500">*</span>
+                    {t('onboarding.address')} <span className="text-red-500">*</span>
                   </label>
                   <button
                     type="button"
@@ -597,12 +603,12 @@ export function DonorOnboarding() {
                     {locationLoading ? (
                       <>
                         <Loader className="w-4 h-4 animate-spin" />
-                        Detecting...
+                        {t('onboarding.detecting')}
                       </>
                     ) : (
                       <>
                         <Locate className="w-4 h-4" />
-                        Use Current Location
+                        {t('onboarding.useCurrentLocation')}
                       </>
                     )}
                   </button>
@@ -622,7 +628,7 @@ export function DonorOnboarding() {
                     <LeafletClickMarker
                       position={mapPosition}
                       onPositionChange={handleMapPositionChange}
-                      popupText="Your selected location"
+                      popupText={t('onboarding.selectedLocation')}
                     />
                     <LeafletMapUpdater center={mapPosition} zoom={13} />
                   </MapContainer>
@@ -635,7 +641,7 @@ export function DonorOnboarding() {
                     value={formData.address}
                     onChange={handleAddressChange}
                     className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                    placeholder="Start typing your address..."
+                    placeholder={t('onboarding.addressPlaceholder')}
                     required
                     autoComplete="off"
                   />
@@ -658,13 +664,13 @@ export function DonorOnboarding() {
                     </div>
                   )}
 
-                  <p className="text-xs text-gray-500 mt-1">Type to search or click on the map to set your location</p>
+                  <p className="text-xs text-gray-500 mt-1">{t('onboarding.searchAddressHint')}</p>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  State <span className="text-red-500">*</span>
+                  {t('onboarding.state')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   name="state"
@@ -674,7 +680,7 @@ export function DonorOnboarding() {
                   required
                   disabled={!formData.country}
                 >
-                  <option value="">Select State</option>
+                  <option value="">{t('onboarding.selectState')}</option>
                   {availableStates.map((state) => (
                     <option key={state.name} value={state.name}>
                       {state.name}
@@ -686,7 +692,7 @@ export function DonorOnboarding() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    City <span className="text-red-500">*</span>
+                    {t('onboarding.city')} <span className="text-red-500">*</span>
                   </label>
                   <select
                     name="city"
@@ -696,7 +702,7 @@ export function DonorOnboarding() {
                     required
                     disabled={!formData.state}
                   >
-                    <option value="">Select City</option>
+                    <option value="">{t('onboarding.selectCity')}</option>
                     {availableCities.map((city) => (
                       <option key={city} value={city}>
                         {city}
@@ -707,7 +713,7 @@ export function DonorOnboarding() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Pincode <span className="text-red-500">*</span>
+                    {t('onboarding.pincode')} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -715,7 +721,7 @@ export function DonorOnboarding() {
                     value={formData.postalCode}
                     onChange={handleChange}
                     className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                    placeholder="XXXXXX"
+                    placeholder={t('onboarding.pincodePlaceholder')}
                     required
                   />
                 </div>
@@ -730,7 +736,7 @@ export function DonorOnboarding() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Blood Type <span className="text-red-500">*</span>
+                  {t('onboarding.bloodType')} <span className="text-red-500">*</span>
                 </label>
                 <div className="grid grid-cols-4 gap-3">
                   {BLOOD_TYPES.map((type) => (
@@ -752,7 +758,7 @@ export function DonorOnboarding() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Last Donation Date <span className="text-gray-400">(Optional)</span>
+                  {t('onboarding.lastDonationDate')} <span className="text-gray-400">({t('onboarding.optional')})</span>
                 </label>
                 <input
                   type="date"
@@ -765,7 +771,7 @@ export function DonorOnboarding() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Medical Conditions <span className="text-gray-400">(Optional)</span>
+                  {t('onboarding.medicalConditions')} <span className="text-gray-400">({t('onboarding.optional')})</span>
                 </label>
                 <textarea
                   name="medicalConditions"
@@ -773,7 +779,7 @@ export function DonorOnboarding() {
                   onChange={handleChange}
                   rows={4}
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all resize-none"
-                  placeholder="Let us know if you have any medical conditions we should be aware of..."
+                  placeholder={t('onboarding.medicalConditionsPlaceholder')}
                 />
               </div>
             </div>
@@ -786,7 +792,7 @@ export function DonorOnboarding() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Occupation <span className="text-red-500">*</span>
+                  {t('onboarding.occupation')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -794,14 +800,14 @@ export function DonorOnboarding() {
                   value={formData.occupation}
                   onChange={handleChange}
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                  placeholder="What do you do?"
+                  placeholder={t('onboarding.occupationPlaceholder')}
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Preferred Language <span className="text-red-500">*</span>
+                  {t('onboarding.preferredLanguage')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -809,14 +815,14 @@ export function DonorOnboarding() {
                   value={formData.preferredLanguage}
                   onChange={handleChange}
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                  placeholder="English, Hindi, etc."
+                  placeholder={t('onboarding.preferredLanguagePlaceholder')}
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  How did you hear about us? <span className="text-red-500">*</span>
+                  {t('onboarding.howHeardAboutUs')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   name="howHeardAboutUs"
@@ -825,12 +831,12 @@ export function DonorOnboarding() {
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                   required
                 >
-                  <option value="">Select an option</option>
-                  <option value="social_media">Social Media</option>
-                  <option value="friend">Friend/Family</option>
-                  <option value="search">Search Engine</option>
-                  <option value="advertisement">Advertisement</option>
-                  <option value="other">Other</option>
+                  <option value="">{t('onboarding.selectOption')}</option>
+                  <option value="social_media">{t('onboarding.socialMedia')}</option>
+                  <option value="friend">{t('onboarding.friendFamily')}</option>
+                  <option value="search">{t('onboarding.searchEngine')}</option>
+                  <option value="advertisement">{t('onboarding.advertisement')}</option>
+                  <option value="other">{t('common.other')}</option>
                 </select>
               </div>
 
@@ -846,9 +852,9 @@ export function DonorOnboarding() {
                   <div className="ml-3">
                     <div className="flex items-center">
                       <Heart className="w-4 h-4 text-red-600 mr-2" />
-                      <span className="font-semibold text-gray-900">Interested in Volunteering?</span>
+                      <span className="font-semibold text-gray-900">{t('onboarding.volunteeringInterest')}</span>
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">Join our community of volunteers and make a bigger impact!</p>
+                    <p className="text-sm text-gray-600 mt-1">{t('onboarding.volunteeringDescription')}</p>
                   </div>
                 </label>
               </div>
@@ -871,9 +877,9 @@ export function DonorOnboarding() {
                     required
                   />
                   <div className="ml-3">
-                    <span className="font-semibold text-gray-900">I agree to the Privacy Policy</span>
+                    <span className="font-semibold text-gray-900">{t('onboarding.privacyAgreement')}</span>
                     <p className="text-sm text-gray-600 mt-1">
-                      We respect your privacy and will never share your personal information without your consent.
+                      {t('onboarding.privacyDescription')}
                     </p>
                   </div>
                 </label>
@@ -890,9 +896,9 @@ export function DonorOnboarding() {
                     required
                   />
                   <div className="ml-3">
-                    <span className="font-semibold text-gray-900">I agree to the Terms of Service</span>
+                    <span className="font-semibold text-gray-900">{t('onboarding.termsAgreement')}</span>
                     <p className="text-sm text-gray-600 mt-1">
-                      By agreeing, you confirm that you meet the eligibility criteria for blood donation.
+                      {t('onboarding.termsDescription')}
                     </p>
                   </div>
                 </label>
@@ -901,10 +907,10 @@ export function DonorOnboarding() {
               <div className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-xl p-6 mt-6">
                 <div className="flex items-center mb-3">
                   <Sparkles className="w-6 h-6 text-red-600 mr-2" />
-                  <h3 className="text-lg font-bold text-gray-900">You're about to become a hero!</h3>
+                  <h3 className="text-lg font-bold text-gray-900">{t('onboarding.heroTitle')}</h3>
                 </div>
                 <p className="text-gray-700 text-sm">
-                  Every donation can save up to 3 lives. Thank you for taking this step to make a difference.
+                  {t('onboarding.heroDescription')}
                 </p>
               </div>
             </div>
@@ -942,9 +948,9 @@ export function DonorOnboarding() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center space-x-2 mb-4">
               <Droplet className="w-8 h-8 text-red-600" />
-              <h1 className="text-2xl font-bold text-gray-900">Complete Your Profile</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{t('onboarding.completeProfile')}</h1>
             </div>
-            <p className="text-gray-600">Just a few steps to get you started as a life-saver</p>
+            <p className="text-gray-600">{t('onboarding.donorIntro')}</p>
           </div>
 
           {/* Modern Stepper - Horizontal */}
@@ -1017,16 +1023,16 @@ export function DonorOnboarding() {
                   onClick={prevStep}
                   className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-all"
                 >
-                  Previous
+                  {t('common.previous')}
                 </button>
               )}
 
               {currentStep < steps.length - 1 ? (
                 <button
                   onClick={nextStep}
-                  className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-all flex items-center justify-center group"
-                >
-                  Continue
+                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-all flex items-center justify-center group"
+              >
+                  {t('common.continue')}
                   <ChevronRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </button>
               ) : (
@@ -1057,11 +1063,11 @@ export function DonorOnboarding() {
                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                         ></path>
                       </svg>
-                      Completing...
+                      {t('common.completing')}
                     </>
                   ) : (
                     <>
-                      Complete Onboarding
+                      {t('common.completeOnboarding')}
                       <Award className="ml-2 w-5 h-5 group-hover:rotate-12 transition-transform" />
                     </>
                   )}
@@ -1073,7 +1079,7 @@ export function DonorOnboarding() {
           {/* Motivational Quote */}
           <div className="text-center">
             <p className="text-gray-500 text-sm italic">
-              "The gift of blood is the gift of life. Thank you for being a hero."
+              "{t('onboarding.donorHeroQuote')}"
             </p>
           </div>
         </div>

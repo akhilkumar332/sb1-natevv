@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { User } from '../../../types/database.types';
@@ -41,15 +42,25 @@ const normalizeRole = (role?: string | null) => {
 
 export function AdminUsersPage({
   roleFilter = 'all',
-  title = 'User Management',
-  description = 'Manage users across all portal roles.',
+  title,
+  description,
 }: AdminUsersPageProps) {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
+  const pageTitle = title || t('admin.userManagementTitle');
+  const pageDescription = description || t('admin.userManagementDescription');
+  const getStatusLabel = (status: string) => {
+    if (status === 'active') return t('admin.activeStatus');
+    if (status === 'inactive') return t('admin.inactiveStatus');
+    if (status === 'suspended') return t('admin.suspendedStatus');
+    if (status === 'pending_verification') return t('admin.pendingVerificationStatus');
+    return status;
+  };
   const usersQuery = useAdminUsers(roleFilter);
   const loading = usersQuery.isLoading;
   const error = usersQuery.error instanceof Error ? usersQuery.error.message : null;
@@ -69,7 +80,7 @@ export function AdminUsersPage({
       .map((entry) => ({
         id: entry.id || entry.uid,
         uid: entry.uid,
-        displayName: entry.displayName || entry.organizationName || entry.hospitalName || entry.bloodBankName || 'User',
+        displayName: entry.displayName || entry.organizationName || entry.hospitalName || entry.bloodBankName || t('common.userFallback'),
         email: entry.email || '-',
         role: normalizeRole(entry.role),
         status: normalizeUserStatus(entry.status),
@@ -80,7 +91,7 @@ export function AdminUsersPage({
         lastLoginAt: toDateValue(entry.lastLoginAt),
       }))
       .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-  }, [usersQuery.data]);
+  }, [usersQuery.data, t]);
 
   useEffect(() => {
     setPage(1);
@@ -129,13 +140,13 @@ export function AdminUsersPage({
       <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
-            <p className="text-sm text-gray-600">{description}</p>
+            <h2 className="text-2xl font-bold text-gray-900">{pageTitle}</h2>
+            <p className="text-sm text-gray-600">{pageDescription}</p>
           </div>
           <AdminRefreshButton
             onClick={() => refetchQuery(usersQuery)}
             isRefreshing={usersQuery.isFetching}
-            label="Refresh users"
+            label={t('admin.refreshUsers')}
           />
         </div>
       </div>
@@ -143,7 +154,7 @@ export function AdminUsersPage({
       <AdminListToolbar
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
-        searchPlaceholder="Search by name, email, uid, city, or BH ID"
+        searchPlaceholder={t('admin.searchUsersPlaceholder')}
         leftContent={
           <>
             <select
@@ -151,22 +162,22 @@ export function AdminUsersPage({
               onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
               className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-700"
             >
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="suspended">Suspended</option>
-              <option value="pending_verification">Pending verification</option>
+              <option value="all">{t('admin.allStatuses')}</option>
+              <option value="active">{t('admin.activeStatus')}</option>
+              <option value="inactive">{t('admin.inactiveStatus')}</option>
+              <option value="suspended">{t('admin.suspendedStatus')}</option>
+              <option value="pending_verification">{t('admin.pendingVerificationStatus')}</option>
             </select>
           </>
         }
-        rightContent={<span className="text-xs font-semibold text-gray-500">{filteredUsers.length} users</span>}
+        rightContent={<span className="text-xs font-semibold text-gray-500">{t('admin.usersCount', { count: filteredUsers.length })}</span>}
       />
 
-      <AdminRefreshingBanner show={loading} message="Refreshing users..." />
+      <AdminRefreshingBanner show={loading} message={t('admin.refreshingUsers')} />
       <AdminErrorCard message={error} onRetry={() => refetchQuery(usersQuery)} />
 
       {pagedUsers.length === 0 ? (
-        <AdminEmptyStateCard message="No users found for current filters." />
+        <AdminEmptyStateCard message={t('admin.noUsersFoundForFilters')} />
       ) : (
         <>
           <div className="space-y-3 lg:hidden">
@@ -177,13 +188,13 @@ export function AdminUsersPage({
                     <div>
                       <p className="font-semibold text-gray-900">{entry.displayName}</p>
                       <p className="text-xs text-gray-500">{entry.email}</p>
-                      <p className="text-xs text-gray-400">UID: {entry.uid}</p>
+                      <p className="text-xs text-gray-400">{t('admin.uidLabel', { uid: entry.uid })}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => navigate(entry.uid)}
                       className="rounded-md p-2 text-red-700 hover:bg-red-100"
-                      title="View"
+                      title={t('common.view')}
                     >
                       <Eye className="h-4 w-4" />
                     </button>
@@ -200,19 +211,19 @@ export function AdminUsersPage({
                             ? 'bg-amber-100 text-amber-700'
                             : 'bg-gray-100 text-gray-700'
                     }`}>
-                      {entry.status}
+                      {getStatusLabel(entry.status)}
                     </span>
                     <span className={`rounded-full px-2 py-1 font-semibold text-center ${entry.verified ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>
-                      {entry.verified ? 'Verified' : 'Unverified'}
+                      {entry.verified ? t('admin.verified') : t('admin.unverified')}
                     </span>
                     <span className="rounded-full bg-gray-100 px-2 py-1 font-semibold text-gray-700 text-center">
-                      {entry.city || 'No city'}
+                      {entry.city || t('admin.noCity')}
                     </span>
                   </div>
 
                   <div className="mt-3 text-xs text-gray-500 space-y-1">
-                    <p>Created: {entry.createdAt ? entry.createdAt.toLocaleDateString() : 'N/A'}</p>
-                    <p>Last Login: {entry.lastLoginAt ? entry.lastLoginAt.toLocaleDateString() : 'Never'}</p>
+                    <p>{t('common.created')}: {entry.createdAt ? entry.createdAt.toLocaleDateString(i18n.language) : t('admin.notAvailable')}</p>
+                    <p>{t('common.lastLogin')}: {entry.lastLoginAt ? entry.lastLoginAt.toLocaleDateString(i18n.language) : t('common.never')}</p>
                   </div>
                 </article>
               );
@@ -224,13 +235,13 @@ export function AdminUsersPage({
               <table className="min-w-full text-sm">
                 <thead className="bg-red-50 text-left text-xs uppercase tracking-[0.12em] text-red-800">
                   <tr>
-                    <th className="px-4 py-3">User</th>
-                    <th className="px-4 py-3">Role</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Verification</th>
-                    <th className="px-4 py-3">Created</th>
-                    <th className="px-4 py-3">Last Login</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
+                    <th className="px-4 py-3">{t('admin.userColumn')}</th>
+                    <th className="px-4 py-3">{t('admin.roleLabel')}</th>
+                    <th className="px-4 py-3">{t('cms.statusColumn')}</th>
+                    <th className="px-4 py-3">{t('admin.verificationColumn')}</th>
+                    <th className="px-4 py-3">{t('common.created')}</th>
+                    <th className="px-4 py-3">{t('common.lastLogin')}</th>
+                    <th className="px-4 py-3 text-right">{t('cms.actionsColumn')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -240,7 +251,7 @@ export function AdminUsersPage({
                         <td className="px-4 py-3">
                           <p className="font-semibold text-gray-900">{entry.displayName}</p>
                           <p className="text-xs text-gray-500">{entry.email}</p>
-                          <p className="text-xs text-gray-400">UID: {entry.uid}</p>
+                          <p className="text-xs text-gray-400">{t('admin.uidLabel', { uid: entry.uid })}</p>
                         </td>
                         <td className="px-4 py-3">
                           <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700 capitalize">{entry.role}</span>
@@ -254,22 +265,22 @@ export function AdminUsersPage({
                                 : entry.status === 'pending_verification'
                                   ? 'bg-amber-100 text-amber-700'
                                   : 'bg-gray-100 text-gray-700'
-                          }`}>{entry.status}</span>
+                          }`}>{getStatusLabel(entry.status)}</span>
                         </td>
                         <td className="px-4 py-3">
                           <span className={`rounded-full px-2 py-1 text-xs font-semibold ${entry.verified ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>
-                            {entry.verified ? 'Verified' : 'Unverified'}
+                            {entry.verified ? t('admin.verified') : t('admin.unverified')}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-gray-600">{entry.createdAt ? entry.createdAt.toLocaleDateString() : 'N/A'}</td>
-                        <td className="px-4 py-3 text-gray-600">{entry.lastLoginAt ? entry.lastLoginAt.toLocaleDateString() : 'Never'}</td>
+                        <td className="px-4 py-3 text-gray-600">{entry.createdAt ? entry.createdAt.toLocaleDateString(i18n.language) : t('admin.notAvailable')}</td>
+                        <td className="px-4 py-3 text-gray-600">{entry.lastLoginAt ? entry.lastLoginAt.toLocaleDateString(i18n.language) : t('common.never')}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <button
                               type="button"
                               onClick={() => navigate(entry.uid)}
                               className="rounded-md p-2 text-red-700 hover:bg-red-100"
-                              title="View"
+                              title={t('common.view')}
                             >
                               <Eye className="h-4 w-4" />
                             </button>

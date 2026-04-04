@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { deleteDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../../firebase';
 import { COLLECTIONS } from '../../../constants/firestore';
@@ -27,6 +28,7 @@ const toHumanLabel = (value: string) => value
   .join(' ');
 
 export default function CmsBlogPostsPage() {
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const postsQuery = useAdminCmsBlogPosts();
@@ -205,7 +207,7 @@ export default function CmsBlogPostsPage() {
 
   const removePost = async (id?: string) => {
     if (!id) return;
-    if (!window.confirm('Delete this blog post?\n\nThis permanently removes the post and its summary.')) return;
+    if (!window.confirm(t('cms.deletePostConfirm'))) return;
     setDeletingId(id);
     try {
       await deleteDoc(doc(db, COLLECTIONS.CMS_BLOG_POSTS, id));
@@ -216,9 +218,9 @@ export default function CmsBlogPostsPage() {
         next.delete(id);
         return next;
       });
-      notify.success('Post deleted.');
+      notify.success(t('cms.postDeleted'));
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : 'Failed to delete post.');
+      notify.error(error instanceof Error ? error.message : t('cms.postDeleteFailed'));
     } finally {
       setDeletingId(null);
     }
@@ -227,10 +229,10 @@ export default function CmsBlogPostsPage() {
   const updateSelectedStatus = async (nextStatus: (typeof CMS_STATUS)[keyof typeof CMS_STATUS]) => {
     const ids = [...selectedIds];
     if (ids.length === 0) {
-      notify.error('Select at least one post.');
+      notify.error(t('cms.selectAtLeastOnePost'));
       return;
     }
-    if (!window.confirm(`Update ${ids.length} selected posts to "${toHumanCmsStatus(nextStatus)}"?`)) return;
+    if (!window.confirm(t('cms.updateSelectedPostsConfirm', { count: ids.length, status: toHumanCmsStatus(nextStatus) }))) return;
 
     setBulkMutating(true);
     try {
@@ -256,9 +258,9 @@ export default function CmsBlogPostsPage() {
       }));
       await invalidateAdminRecipe(queryClient, 'cmsUpdated');
       setSelectedIds(new Set());
-      notify.success(`Updated ${ids.length} posts.`);
+      notify.success(t('cms.updatedSelectedPosts', { count: ids.length }));
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : 'Failed to update selected posts.');
+      notify.error(error instanceof Error ? error.message : t('cms.updateSelectedPostsFailed'));
     } finally {
       setBulkMutating(false);
     }
@@ -267,10 +269,10 @@ export default function CmsBlogPostsPage() {
   const deleteSelected = async () => {
     const ids = [...selectedIds];
     if (ids.length === 0) {
-      notify.error('Select at least one post.');
+      notify.error(t('cms.selectAtLeastOnePost'));
       return;
     }
-    if (!window.confirm(`Delete ${ids.length} selected posts?\n\nThis cannot be undone.`)) return;
+    if (!window.confirm(t('cms.deleteSelectedPostsConfirm', { count: ids.length }))) return;
 
     setBulkMutating(true);
     try {
@@ -280,9 +282,9 @@ export default function CmsBlogPostsPage() {
       }));
       await invalidateAdminRecipe(queryClient, 'cmsUpdated');
       setSelectedIds(new Set());
-      notify.success(`Deleted ${ids.length} posts.`);
+      notify.success(t('cms.deletedSelectedPosts', { count: ids.length }));
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : 'Failed to delete selected posts.');
+      notify.error(error instanceof Error ? error.message : t('cms.deleteSelectedPostsFailed'));
     } finally {
       setBulkMutating(false);
     }
@@ -293,28 +295,28 @@ export default function CmsBlogPostsPage() {
       <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">CMS Blog Posts</h2>
-            <p className="text-sm text-gray-600 dark:text-slate-300">Manage articles with a clear publish workflow.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">{t('cms.blogPostsTitle')}</h2>
+            <p className="text-sm text-gray-600 dark:text-slate-300">{t('cms.blogPostsDescription')}</p>
           </div>
           <div className="flex items-center gap-2">
             <Link
               to={ROUTES.portal.admin.dashboard.cmsBlogPostEditor.replace(':slug', 'new')}
               className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 dark:border-red-900/40 dark:text-red-300 dark:hover:bg-red-950/40"
             >
-              New Post
+              {t('cms.newPost')}
             </Link>
-            <AdminRefreshButton onClick={() => refetchQuery(postsQuery)} isRefreshing={postsQuery.isFetching} label="Refresh posts" />
+            <AdminRefreshButton onClick={() => refetchQuery(postsQuery)} isRefreshing={postsQuery.isFetching} label={t('cms.refreshPosts')} />
           </div>
         </div>
       </div>
 
       <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => { setActiveQueue('all'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'all' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>All ({rows.length})</button>
-          <button type="button" onClick={() => { setActiveQueue('needs-review'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'needs-review' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>Needs Review ({queueCounts.needsReview})</button>
-          <button type="button" onClick={() => { setActiveQueue('ready-publish'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'ready-publish' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>Ready To Publish ({queueCounts.readyPublish})</button>
-          <button type="button" onClick={() => { setActiveQueue('scheduled'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'scheduled' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>Scheduled ({queueCounts.scheduled})</button>
-          <button type="button" onClick={() => { setActiveQueue('seo-fix'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'seo-fix' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>SEO Needs Fix ({queueCounts.seoFix})</button>
+          <button type="button" onClick={() => { setActiveQueue('all'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'all' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>{t('cms.allQueue', { count: rows.length })}</button>
+          <button type="button" onClick={() => { setActiveQueue('needs-review'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'needs-review' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>{t('cms.needsReviewQueue', { count: queueCounts.needsReview })}</button>
+          <button type="button" onClick={() => { setActiveQueue('ready-publish'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'ready-publish' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>{t('cms.readyToPublishQueue', { count: queueCounts.readyPublish })}</button>
+          <button type="button" onClick={() => { setActiveQueue('scheduled'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'scheduled' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>{t('cms.scheduledQueue', { count: queueCounts.scheduled })}</button>
+          <button type="button" onClick={() => { setActiveQueue('seo-fix'); setPage(1); }} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${activeQueue === 'seo-fix' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700 dark:border-slate-700 dark:text-slate-200'}`}>{t('cms.seoNeedsFixQueue', { count: queueCounts.seoFix })}</button>
         </div>
         <div className="grid gap-2 md:grid-cols-6">
           <input
@@ -323,7 +325,7 @@ export default function CmsBlogPostsPage() {
               setSearchTerm(event.target.value);
               setPage(1);
             }}
-            placeholder="Search title, slug, category"
+            placeholder={t('cms.searchTitleSlugCategory')}
             className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
           <select
@@ -334,7 +336,7 @@ export default function CmsBlogPostsPage() {
             }}
             className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           >
-            <option value="all">All statuses</option>
+            <option value="all">{t('admin.allStatuses')}</option>
             {Object.values(CMS_STATUS).map((status) => (
               <option key={status} value={status}>{toHumanCmsStatus(status)}</option>
             ))}
@@ -347,7 +349,7 @@ export default function CmsBlogPostsPage() {
             }}
             className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           >
-            <option value="all">All categories</option>
+            <option value="all">{t('cms.allCategories')}</option>
             {categories.map((category) => (
               <option key={category} value={category}>{category}</option>
             ))}
@@ -360,7 +362,7 @@ export default function CmsBlogPostsPage() {
             }}
             className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           >
-            <option value="all">All tags</option>
+            <option value="all">{t('cms.allTags')}</option>
             {tags.map((tag) => (
               <option key={tag} value={tag}>{tag}</option>
             ))}
@@ -373,7 +375,7 @@ export default function CmsBlogPostsPage() {
             }}
             className="rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           >
-            <option value="all">All series</option>
+            <option value="all">{t('cms.allSeries')}</option>
             {series.map((seriesSlug) => (
               <option key={seriesSlug} value={seriesSlug}>{seriesSlug}</option>
             ))}
@@ -391,7 +393,7 @@ export default function CmsBlogPostsPage() {
             }}
             className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
-            Reset Filters
+            {t('common.resetFilters')}
           </button>
         </div>
 
@@ -402,7 +404,7 @@ export default function CmsBlogPostsPage() {
             disabled={bulkMutating || selectedCount === 0}
             className="rounded-md border border-green-300 px-2.5 py-1.5 text-xs font-semibold text-green-700 disabled:opacity-50"
           >
-            Publish Selected ({selectedCount})
+            {t('cms.publishSelected', { count: selectedCount })}
           </button>
           <button
             type="button"
@@ -410,7 +412,7 @@ export default function CmsBlogPostsPage() {
             disabled={bulkMutating || selectedCount === 0}
             className="rounded-md border border-amber-300 px-2.5 py-1.5 text-xs font-semibold text-amber-700 disabled:opacity-50"
           >
-            Move To Draft
+            {t('cms.moveToDraft')}
           </button>
           <button
             type="button"
@@ -418,7 +420,7 @@ export default function CmsBlogPostsPage() {
             disabled={bulkMutating || selectedCount === 0}
             className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
           >
-            Hide Selected
+            {t('cms.hideSelected')}
           </button>
           <button
             type="button"
@@ -426,12 +428,16 @@ export default function CmsBlogPostsPage() {
             disabled={bulkMutating || selectedCount === 0}
             className="rounded-md border border-red-300 px-2.5 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-50"
           >
-            Delete Selected
+            {t('cms.deleteSelected')}
           </button>
-          <span className="text-xs text-gray-500 dark:text-slate-400">Filtered: {filteredRows.length}</span>
+          <span className="text-xs text-gray-500 dark:text-slate-400">{t('cms.filteredCount', { count: filteredRows.length })}</span>
           {selectedCount > 0 ? (
             <span className="text-xs text-gray-500 dark:text-slate-400">
-              Selected impact: {selectedPublishedCount} published, {selectedDraftCount} drafts, {selectedScheduledCount} scheduled
+              {t('cms.selectedImpact', {
+                published: selectedPublishedCount,
+                drafts: selectedDraftCount,
+                scheduled: selectedScheduledCount,
+              })}
             </span>
           ) : null}
         </div>
@@ -447,15 +453,15 @@ export default function CmsBlogPostsPage() {
                     type="checkbox"
                     checked={areAllFilteredSelected}
                     onChange={toggleSelectAllFiltered}
-                    aria-label="Select all filtered"
+                    aria-label={t('cms.selectAllFiltered')}
                   />
                 </th>
-                <th className="px-4 py-3">Title</th>
-                <th className="px-4 py-3">Slug</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Published</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3">{t('cms.titleColumn')}</th>
+                <th className="px-4 py-3">{t('cms.slugColumn')}</th>
+                <th className="px-4 py-3">{t('cms.categoryColumn')}</th>
+                <th className="px-4 py-3">{t('cms.statusColumn')}</th>
+                <th className="px-4 py-3">{t('cms.publishedColumn')}</th>
+                <th className="px-4 py-3 text-right">{t('cms.actionsColumn')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
@@ -466,20 +472,20 @@ export default function CmsBlogPostsPage() {
                       type="checkbox"
                       checked={Boolean(entry.id && selectedIds.has(entry.id))}
                       onChange={() => toggleSelected(entry.id)}
-                      aria-label={`Select ${entry.title}`}
+                      aria-label={t('cms.selectItem', { title: entry.title })}
                     />
                   </td>
                   <td className="px-4 py-3 font-semibold text-gray-900 dark:text-slate-100">{entry.title}</td>
                   <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{entry.slug}</td>
                   <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{entry.categorySlug ? toHumanLabel(entry.categorySlug) : '-'}</td>
                   <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{toHumanCmsStatus(entry.status)}</td>
-                  <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{toDateValue(entry.publishedAt)?.toLocaleString() || '-'}</td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{toDateValue(entry.publishedAt)?.toLocaleString(i18n.resolvedLanguage) || '-'}</td>
                   <td className="px-4 py-3 text-right">
                     <Link
                       to={ROUTES.portal.admin.dashboard.cmsBlogPostEditor.replace(':slug', entry.slug || 'new')}
                       className="mr-2 rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                     >
-                      Edit
+                      {t('cms.editPage')}
                     </Link>
                     <button
                       type="button"
@@ -487,14 +493,14 @@ export default function CmsBlogPostsPage() {
                       disabled={deletingId === entry.id || bulkMutating}
                       className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
                     >
-                      Delete
+                      {t('cms.deletePage')}
                     </button>
                   </td>
                 </tr>
               ))}
               {pagedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-slate-400">No posts found for selected filters.</td>
+                  <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-slate-400">{t('cms.noPostsFoundForFilters')}</td>
                 </tr>
               ) : null}
             </tbody>
@@ -503,7 +509,7 @@ export default function CmsBlogPostsPage() {
       </div>
 
       <div className="flex items-center justify-between rounded-2xl border border-red-100 bg-white px-4 py-3 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <p className="text-gray-600 dark:text-slate-300">Page {currentPage} of {totalPages}</p>
+        <p className="text-gray-600 dark:text-slate-300">{t('common.page', { current: currentPage, total: totalPages })}</p>
         <div className="flex gap-2">
           <button
             type="button"
@@ -511,7 +517,7 @@ export default function CmsBlogPostsPage() {
             disabled={currentPage <= 1}
             className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
           >
-            Prev
+            {t('cms.prev')}
           </button>
           <button
             type="button"
@@ -519,7 +525,7 @@ export default function CmsBlogPostsPage() {
             disabled={currentPage >= totalPages}
             className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
           >
-            Next
+            {t('common.next')}
           </button>
         </div>
       </div>

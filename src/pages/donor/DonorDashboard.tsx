@@ -1,6 +1,7 @@
 import { FIVE_MINUTES_MS, ONE_DAY_MS, TWELVE_HUNDRED_MS, TWO_POINT_FIVE_SECONDS_MS } from '../../constants/time';
 // src/pages/donor/DonorDashboard.tsx
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   User as LucideUser,
   MapPin,
@@ -81,6 +82,7 @@ const isExpectedNetworkFetchError = (error: unknown): boolean => {
 };
 
 function DonorDashboard() {
+  const { t } = useTranslation();
   const {
     user,
     updateUserProfile,
@@ -2384,13 +2386,13 @@ function DonorDashboard() {
     return badge;
   });
   const menuItems = [
-    { id: 'overview', label: 'Overview', to: 'overview', icon: Activity },
-    { id: 'readiness', label: 'Readiness', to: 'readiness', icon: CheckCircle },
-    { id: 'requests', label: 'Requests', to: 'requests', icon: AlertCircle },
-    { id: 'blood-drives', label: 'Blood Drives', to: 'blood-drives', icon: MapPinned },
-    { id: 'journey', label: 'Journey', to: 'journey', icon: Trophy },
-    { id: 'referrals', label: 'Referrals', to: 'referrals', icon: Users },
-    { id: 'account', label: 'Account', to: 'account', icon: LucideUser },
+    { id: 'overview', label: t('dashboard.overview'), to: 'overview', icon: Activity },
+    { id: 'readiness', label: t('dashboard.readiness'), to: 'readiness', icon: CheckCircle },
+    { id: 'requests', label: t('dashboard.requests'), to: 'requests', icon: AlertCircle },
+    { id: 'blood-drives', label: t('dashboard.bloodDrives'), to: 'blood-drives', icon: MapPinned },
+    { id: 'journey', label: t('dashboard.journey'), to: 'journey', icon: Trophy },
+    { id: 'referrals', label: t('dashboard.referrals'), to: 'referrals', icon: Users },
+    { id: 'account', label: t('dashboard.account'), to: 'account', icon: LucideUser },
   ] as const;
   const dashboardContext = {
     user,
@@ -2524,12 +2526,12 @@ function DonorDashboard() {
       <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
-          <p className="text-gray-800 text-lg font-semibold mb-2">Error Loading Dashboard</p>
+          <p className="text-gray-800 text-lg font-semibold mb-2">{t('dashboard.errorLoadingDashboard')}</p>
           <p className="text-gray-600 mb-4">{error}</p>
           <AdminRefreshButton
             onClick={() => void refreshData()}
             isRefreshing={loading}
-            label="Retry loading donor dashboard"
+            label={t('dashboard.retryLoadingDashboard')}
             className="h-12 w-12 mx-auto border-red-600 bg-red-600 text-white hover:bg-red-700"
           />
         </div>
@@ -2563,7 +2565,7 @@ function DonorDashboard() {
           <main className="min-w-0 flex-1">
             <PortalNotificationBridge disabled={user?.notificationPreferences?.push === false} />
             <PendingActionsPanel />
-            <NpsFeedbackPrompt userId={user?.uid} userRole={user?.role} className="mb-4" promptLabel="Feedback" />
+            <NpsFeedbackPrompt userId={user?.uid} userRole={user?.role} className="mb-4" promptLabel={t('dashboard.feedbackLabel')} />
             <Outlet context={dashboardContext} />
           </main>
         </div>
@@ -2574,7 +2576,7 @@ function DonorDashboard() {
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">All Emergency Requests</h2>
+              <h2 className="text-2xl font-bold text-gray-900">{t('dashboard.allEmergencyRequests')}</h2>
               <button
                 onClick={() => setShowAllRequests(false)}
                 className="p-2 hover:bg-gray-100 rounded-full transition-all"

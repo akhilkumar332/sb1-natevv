@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { CalendarDays, Tag, Linkedin, Share2, Copy, Check } from 'lucide-react';
 import { ROUTES } from '../constants/routes';
 import { CMS_DEFAULTS, CMS_QUERY_LIMITS, CMS_SEO_DEFAULTS } from '../constants/cms';
@@ -8,6 +9,7 @@ import { toDateValue } from '../utils/dateValue';
 import SeoHead from '../components/SeoHead';
 import { buildArticleSchema, buildBreadcrumbSchema } from '../utils/seoStructuredData';
 import { parseCmsRichContent } from '../utils/cmsRichContent';
+import { pickLocalizedCmsString } from '../utils/cmsLocalization';
 
 function XBrandIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
@@ -18,6 +20,7 @@ function XBrandIcon({ className = 'h-4 w-4' }: { className?: string }) {
 }
 
 export default function BlogPostPage() {
+  const { t, i18n } = useTranslation();
   const { slug = '' } = useParams();
   const [readingProgress, setReadingProgress] = useState(0);
   const [readerTextSize, setReaderTextSize] = useState<'sm' | 'md' | 'lg'>('md');
@@ -35,12 +38,17 @@ export default function BlogPostPage() {
   const defaultOgImageUrl = settingsQuery.data?.defaultOgImageUrl || '';
   const robotsPolicy = settingsQuery.data?.robotsPolicy === 'noindex_nofollow' ? 'noindex,nofollow' : 'index,follow';
 
-  const resolvedTitle = post?.seoTitle || post?.title || 'Blog';
-  const resolvedDescription = post?.seoDescription || post?.excerpt || defaultSeoDescription;
+  const localizedTitle = pickLocalizedCmsString(i18n.resolvedLanguage, post?.titleByLocale, post?.title || null) || post?.title || t('blog.title');
+  const localizedExcerpt = pickLocalizedCmsString(i18n.resolvedLanguage, post?.excerptByLocale, post?.excerpt || null);
+  const localizedSeoTitle = pickLocalizedCmsString(i18n.resolvedLanguage, post?.seoTitleByLocale, post?.seoTitle || null);
+  const localizedSeoDescription = pickLocalizedCmsString(i18n.resolvedLanguage, post?.seoDescriptionByLocale, post?.seoDescription || null);
+  const localizedContentJson = pickLocalizedCmsString(i18n.resolvedLanguage, post?.contentJsonByLocale, post?.contentJson || null);
+  const resolvedTitle = localizedSeoTitle || localizedTitle;
+  const resolvedDescription = localizedSeoDescription || localizedExcerpt || defaultSeoDescription;
   const canonicalPath = ROUTES.blogPost.replace(':slug', slug);
   const renderedContent = useMemo(
-    () => parseCmsRichContent(post?.contentJson || ''),
-    [post?.contentJson],
+    () => parseCmsRichContent(localizedContentJson || ''),
+    [localizedContentJson],
   );
   const tableOfContents = useMemo(() => {
     if (typeof window === 'undefined' || !renderedContent.html) return [];
@@ -131,7 +139,7 @@ export default function BlogPostPage() {
   if (postQuery.isLoading) {
     return (
       <>
-        <SeoHead title={`${siteTitle} | Blog`} description={defaultSeoDescription} canonicalPath={canonicalPath} canonicalBaseUrl={canonicalBaseUrl} />
+        <SeoHead title={`${siteTitle} | ${t('blog.title')}`} description={defaultSeoDescription} canonicalPath={canonicalPath} canonicalBaseUrl={canonicalBaseUrl} />
         <div className="container mx-auto px-4 py-8">
           <div className="h-96 animate-pulse rounded-2xl border border-red-100 bg-white" />
         </div>
@@ -142,13 +150,13 @@ export default function BlogPostPage() {
   if (postQuery.isError) {
     return (
       <>
-        <SeoHead title={`${siteTitle} | Blog`} description={defaultSeoDescription} canonicalPath={canonicalPath} canonicalBaseUrl={canonicalBaseUrl} />
+        <SeoHead title={`${siteTitle} | ${t('blog.title')}`} description={defaultSeoDescription} canonicalPath={canonicalPath} canonicalBaseUrl={canonicalBaseUrl} />
         <div className="container mx-auto px-4 py-8">
           <div className="rounded-2xl border border-red-100 bg-white p-8 text-center shadow-sm">
-            <h1 className="text-2xl font-bold text-gray-900">Unable to load post</h1>
-            <p className="mt-2 text-sm text-gray-600">Please try again in a moment.</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('blog.unableToLoadPost')}</h1>
+            <p className="mt-2 text-sm text-gray-600">{t('blog.postLoadRetrySoon')}</p>
             <Link to={ROUTES.blog} className="mt-4 inline-flex rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50">
-              Back to Blog
+              {t('blog.backToBlog')}
             </Link>
           </div>
         </div>
@@ -159,13 +167,13 @@ export default function BlogPostPage() {
   if (!post) {
     return (
       <>
-        <SeoHead title={`${siteTitle} | Blog`} description={defaultSeoDescription} canonicalPath={canonicalPath} canonicalBaseUrl={canonicalBaseUrl} />
+        <SeoHead title={`${siteTitle} | ${t('blog.title')}`} description={defaultSeoDescription} canonicalPath={canonicalPath} canonicalBaseUrl={canonicalBaseUrl} />
         <div className="container mx-auto px-4 py-8">
           <div className="rounded-2xl border border-red-100 bg-white p-8 text-center shadow-sm">
-            <h1 className="text-2xl font-bold text-gray-900">Post not found</h1>
-            <p className="mt-2 text-sm text-gray-600">The requested article is unavailable or not published.</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t('blog.postNotFound')}</h1>
+            <p className="mt-2 text-sm text-gray-600">{t('blog.postUnavailable')}</p>
             <Link to={ROUTES.blog} className="mt-4 inline-flex rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50">
-              Back to Blog
+              {t('blog.backToBlog')}
             </Link>
           </div>
         </div>
@@ -187,15 +195,15 @@ export default function BlogPostPage() {
   const breadcrumbSchema = buildBreadcrumbSchema({
     baseUrl: canonicalBaseUrl,
     items: [
-      { name: 'Home', path: ROUTES.home },
-      { name: 'Blog', path: ROUTES.blog },
-      { name: post.title, path: canonicalPath },
+      { name: t('common.home'), path: ROUTES.home },
+      { name: t('blog.title'), path: ROUTES.blog },
+      { name: localizedTitle, path: canonicalPath },
     ],
   });
   const articleSchema = buildArticleSchema({
     baseUrl: canonicalBaseUrl,
     path: canonicalPath,
-    headline: post.title,
+    headline: localizedTitle,
     description: resolvedDescription,
     imageUrl: ogImageUrl,
     datePublished: publishedAtIso,
@@ -211,7 +219,7 @@ export default function BlogPostPage() {
     })
     .slice(0, 3);
   const shareUrl = `${canonicalBaseUrl.replace(/\/+$/, '')}${canonicalPath}`;
-  const shareText = encodeURIComponent(post.title);
+  const shareText = encodeURIComponent(localizedTitle);
   const textSizeClass = readerTextSize === 'sm' ? 'text-sm' : readerTextSize === 'lg' ? 'text-lg' : 'text-base';
   const lineHeightClass = readerComfort ? 'leading-8' : 'leading-7';
 
@@ -240,22 +248,22 @@ export default function BlogPostPage() {
       />
       <div className="bg-gradient-to-br from-red-50 via-white to-pink-50 py-10">
         <div className="container mx-auto px-4">
-          <Link to={ROUTES.blog} className="text-sm font-semibold text-red-700 hover:underline">← Back to Blog</Link>
-          <h1 className="mt-3 max-w-5xl text-3xl font-extrabold text-gray-900 sm:text-4xl">{post.title}</h1>
+          <Link to={ROUTES.blog} className="text-sm font-semibold text-red-700 hover:underline">← {t('blog.backToBlog')}</Link>
+          <h1 className="mt-3 max-w-5xl text-3xl font-extrabold text-gray-900 sm:text-4xl">{localizedTitle}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-500">
-            <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{publishedAt ? publishedAt.toLocaleString() : 'N/A'}</span>
+            <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{publishedAt ? publishedAt.toLocaleString(i18n.resolvedLanguage) : t('admin.notAvailable')}</span>
             {post.categorySlug ? <span className="inline-flex items-center gap-1"><Tag className="h-3.5 w-3.5" />{post.categorySlug}</span> : null}
             {post.seriesSlug ? (
               <Link to={ROUTES.blogSeries.replace(':seriesSlug', encodeURIComponent(post.seriesSlug))} className="rounded-full border border-gray-300 px-2 py-0.5 font-semibold text-gray-700 hover:bg-gray-50">
-                Series: {post.seriesSlug}
+                {t('blog.seriesChip', { series: post.seriesSlug })}
               </Link>
             ) : null}
             {post.authorName ? (
               <Link to={ROUTES.blogAuthor.replace(':authorName', encodeURIComponent(post.authorName))} className="rounded-full border border-gray-300 px-2 py-0.5 font-semibold text-gray-700 hover:bg-gray-50">
-                By {post.authorName}
+                {t('blog.byAuthor', { author: post.authorName })}
               </Link>
             ) : null}
-            <span>{readingMinutes} min read</span>
+            <span>{t('blog.minRead', { count: readingMinutes })}</span>
           </div>
         </div>
       </div>
@@ -264,22 +272,22 @@ export default function BlogPostPage() {
         <div className="mx-auto max-w-5xl rounded-2xl border border-red-100 bg-white p-6 shadow-sm sm:p-8">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-gray-700">Reader settings</span>
+              <span className="text-xs font-semibold text-gray-700">{t('blog.readerSettings')}</span>
               <button type="button" onClick={() => setReaderTextSize('sm')} className={`rounded border px-2 py-1 text-xs ${readerTextSize === 'sm' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>S</button>
               <button type="button" onClick={() => setReaderTextSize('md')} className={`rounded border px-2 py-1 text-xs ${readerTextSize === 'md' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>M</button>
               <button type="button" onClick={() => setReaderTextSize('lg')} className={`rounded border px-2 py-1 text-xs ${readerTextSize === 'lg' ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>L</button>
             </div>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setReaderComfort((prev) => !prev)} className={`rounded border px-2 py-1 text-xs font-semibold ${readerComfort ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>
-                Comfortable spacing
+                {t('blog.comfortableSpacing')}
               </button>
               <button type="button" onClick={() => setFocusMode((prev) => !prev)} className={`rounded border px-2 py-1 text-xs font-semibold ${focusMode ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 text-gray-700'}`}>
-                Focus mode
+                {t('blog.focusMode')}
               </button>
             </div>
           </div>
           {post.coverImageUrl ? (
-            <img src={post.coverImageUrl} alt={post.title} className="mb-6 h-auto w-full rounded-xl object-cover" loading="lazy" />
+            <img src={post.coverImageUrl} alt={localizedTitle} className="mb-6 h-auto w-full rounded-xl object-cover" loading="lazy" />
           ) : null}
           {renderedContent.html ? (
             <div
@@ -289,17 +297,17 @@ export default function BlogPostPage() {
             />
           ) : (
             <div className="space-y-4 text-base leading-7 text-gray-700">
-              <p>Content coming soon.</p>
+              <p>{t('blog.contentComingSoon')}</p>
             </div>
           )}
           <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
-            <span className="text-sm font-semibold text-gray-700">Share:</span>
+            <span className="text-sm font-semibold text-gray-700">{t('blog.share')}</span>
             <a
               href={`https://twitter.com/intent/tweet?text=${shareText}&url=${encodeURIComponent(shareUrl)}`}
               target="_blank"
               rel="noreferrer"
-              aria-label="Share on X"
-              title="Share on X"
+              aria-label={t('blog.shareOnX')}
+              title={t('blog.shareOnX')}
               className="rounded-md border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
             >
               <XBrandIcon className="h-4 w-4" />
@@ -308,8 +316,8 @@ export default function BlogPostPage() {
               href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`}
               target="_blank"
               rel="noreferrer"
-              aria-label="Share on LinkedIn"
-              title="Share on LinkedIn"
+              aria-label={t('blog.shareOnLinkedIn')}
+              title={t('blog.shareOnLinkedIn')}
               className="rounded-md border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
             >
               <Linkedin className="h-4 w-4" />
@@ -318,11 +326,11 @@ export default function BlogPostPage() {
               type="button"
               onClick={() => {
                 if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-                  void navigator.share({ title: post.title, url: shareUrl }).catch(() => undefined);
+                  void navigator.share({ title: localizedTitle, url: shareUrl }).catch(() => undefined);
                 }
               }}
-              aria-label="Share"
-              title="Share"
+              aria-label={t('blog.shareGeneric')}
+              title={t('blog.shareGeneric')}
               className="rounded-md border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
             >
               <Share2 className="h-4 w-4" />
@@ -337,8 +345,8 @@ export default function BlogPostPage() {
                   }).catch(() => undefined);
                 }
               }}
-              aria-label={copiedLink ? 'Copied link' : 'Copy link'}
-              title={copiedLink ? 'Copied' : 'Copy link'}
+              aria-label={copiedLink ? t('blog.copiedLink') : t('blog.copyLink')}
+              title={copiedLink ? t('blog.copied') : t('blog.copyLink')}
               className="rounded-md border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
             >
               {copiedLink ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -346,11 +354,11 @@ export default function BlogPostPage() {
           </div>
           {featuredPosts.length ? (
             <div className="mt-6 rounded-xl border border-red-100 bg-white p-4">
-              <p className="text-sm font-semibold text-gray-900">Featured Articles</p>
+              <p className="text-sm font-semibold text-gray-900">{t('blog.featuredArticles')}</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
                 {featuredPosts.map((entry) => (
                   <Link key={`featured-${entry.id}`} to={ROUTES.blogPost.replace(':slug', entry.slug)} className="rounded-lg border border-red-100 bg-red-50/30 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-red-50">
-                    {entry.title}
+                    {pickLocalizedCmsString(i18n.resolvedLanguage, entry.titleByLocale, entry.title) || entry.title}
                   </Link>
                 ))}
               </div>
@@ -358,7 +366,7 @@ export default function BlogPostPage() {
           ) : null}
           {tableOfContents.length ? (
             <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4">
-              <p className="text-sm font-semibold text-gray-900">On this page</p>
+              <p className="text-sm font-semibold text-gray-900">{t('blog.onThisPage')}</p>
               <div className="mt-2 space-y-1">
                 {tableOfContents.map((entry) => (
                   <a
@@ -374,7 +382,7 @@ export default function BlogPostPage() {
           ) : null}
           {(previousInSeries || nextInSeries) ? (
             <div className="mt-6 rounded-xl border border-red-100 bg-red-50/40 p-4">
-              <p className="text-sm font-semibold text-gray-900">Series navigation</p>
+              <p className="text-sm font-semibold text-gray-900">{t('blog.seriesNavigation')}</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {previousInSeries ? (
                   <Link to={ROUTES.blogPost.replace(':slug', previousInSeries.slug)} className="rounded-lg border border-red-100 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-red-50">
@@ -397,7 +405,7 @@ export default function BlogPostPage() {
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           className="fixed bottom-4 right-4 z-40 rounded-full border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-700 shadow-md hover:bg-red-50"
         >
-          Top
+          {t('blog.top')}
         </button>
       ) : null}
     </article>

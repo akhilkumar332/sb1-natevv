@@ -1,5 +1,6 @@
 // src/pages/bloodbank/BloodBankOnboarding.tsx
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { applyReferralTrackingForUser, ensureReferralTrackingForExistingReferral } from '../../services/referral.service';
@@ -80,20 +81,14 @@ interface OnboardingFormData {
 }
 
 const bloodBankOnboardingValidationRules: Array<OnboardingValidationRule<OnboardingFormData>> = [
-  { step: 0, required: ['hospitalName', 'registrationNumber', 'hospitalType', 'contactPersonName'], message: 'Please fill in all required bloodbank information' },
-  { step: 1, required: ['email', 'phone', 'dateOfBirth', 'address', 'city', 'state', 'postalCode', 'country'], message: 'Please fill in all required contact information' },
-  { step: 2, required: ['numberOfBeds', 'description'], message: 'Please fill in number of beds and description' },
-  { step: 3, required: ['privacyPolicyAgreed', 'termsOfServiceAgreed'], message: 'Please agree to terms and privacy policy' },
-];
-
-const steps = [
-  { icon: Building2, title: 'BloodBank', subtitle: 'Basic details', color: 'yellow' },
-  { icon: MapPin, title: 'Contact', subtitle: 'Location details', color: 'yellow' },
-  { icon: FileText, title: 'Facilities', subtitle: 'Services info', color: 'red' },
-  { icon: CheckCircle, title: 'Consent', subtitle: 'Agreement', color: 'yellow' },
+  { step: 0, required: ['hospitalName', 'registrationNumber', 'hospitalType', 'contactPersonName'], message: 'onboarding.bloodbankValidationInfo' },
+  { step: 1, required: ['email', 'phone', 'dateOfBirth', 'address', 'city', 'state', 'postalCode', 'country'], message: 'onboarding.bloodbankValidationContact' },
+  { step: 2, required: ['numberOfBeds', 'description'], message: 'onboarding.bloodbankValidationFacilities' },
+  { step: 3, required: ['privacyPolicyAgreed', 'termsOfServiceAgreed'], message: 'onboarding.bloodbankValidationConsent' },
 ];
 
 export function BloodBankOnboarding() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, updateUserProfile } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
@@ -142,6 +137,16 @@ export function BloodBankOnboarding() {
     page: 'BloodBankOnboarding',
   });
   const { resolveCurrentLocation, resolveFromCoordinates } = useLocationResolver('bloodbank');
+  const bloodBankTypeLabels: Record<string, string> = {
+    Government: t('onboarding.bloodbankTypes.government'),
+    Private: t('onboarding.bloodbankTypes.private'),
+    'Multi-Specialty': t('onboarding.bloodbankTypes.multiSpecialty'),
+    'Super-Specialty': t('onboarding.bloodbankTypes.superSpecialty'),
+    General: t('onboarding.bloodbankTypes.general'),
+    'Teaching Blood Bank': t('onboarding.bloodbankTypes.teaching'),
+    'Community Blood Bank': t('onboarding.bloodbankTypes.community'),
+    Other: t('onboarding.bloodbankTypes.other'),
+  };
 
   useEffect(() => {
     if (user) {
@@ -257,7 +262,7 @@ export function BloodBankOnboarding() {
 
     try {
       const result = await resolveFromCoordinates(newPosition, {
-        errorMessage: 'Could not fetch address for this location',
+        errorMessage: t('onboarding.couldNotFetchAddress'),
       });
       if (!isMountedRef.current) return;
 
@@ -282,9 +287,16 @@ export function BloodBankOnboarding() {
       step: currentStep,
       data: formData,
       rules: bloodBankOnboardingValidationRules,
-      onError: (message) => notify.error(message),
+      onError: (message) => notify.error(t(message)),
     });
   };
+
+  const steps = [
+    { icon: Building2, title: t('onboarding.bloodbank'), subtitle: t('onboarding.basicInfo'), color: 'yellow' },
+    { icon: MapPin, title: t('onboarding.contact'), subtitle: t('onboarding.locationDetails'), color: 'yellow' },
+    { icon: FileText, title: t('onboarding.facilities'), subtitle: t('onboarding.servicesInfo'), color: 'red' },
+    { icon: CheckCircle, title: t('onboarding.consent'), subtitle: t('onboarding.agreement'), color: 'yellow' },
+  ] as const;
 
   const handleNext = () => {
     if (validateStep()) {
@@ -305,7 +317,7 @@ export function BloodBankOnboarding() {
 
     const parsedDob = formData.dateOfBirth ? new Date(formData.dateOfBirth) : null;
     if (parsedDob && Number.isNaN(parsedDob.getTime())) {
-      notify.error('Please enter a valid date of birth');
+      notify.error(t('onboarding.validDateOfBirthRequired'));
       return;
     }
 
@@ -337,7 +349,7 @@ export function BloodBankOnboarding() {
           reportOnboardingError(referralError, 'bloodbank.onboarding.referral_sync');
         }
       }
-      notify.success('BloodBank profile completed successfully!');
+      notify.success(t('onboarding.bloodbankCompleted'));
       navigate(ROUTES.portal.bloodbank.dashboard.root);
     } catch (error) {
       reportOnboardingError(error, 'bloodbank.onboarding.submit');
@@ -354,7 +366,7 @@ export function BloodBankOnboarding() {
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                BloodBank Name <span className="text-red-500">*</span>
+                {t('onboarding.bloodbankName')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -362,14 +374,14 @@ export function BloodBankOnboarding() {
                 value={formData.hospitalName}
                 onChange={handleChange}
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                placeholder="Enter blood bank name"
+                placeholder={t('onboarding.bloodbankNamePlaceholder')}
                 required
               />
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Registration Number <span className="text-red-500">*</span>
+                {t('onboarding.registrationNumber')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -377,14 +389,14 @@ export function BloodBankOnboarding() {
                 value={formData.registrationNumber}
                 onChange={handleChange}
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                placeholder="BloodBank registration number"
+                placeholder={t('onboarding.bloodbankRegistrationPlaceholder')}
                 required
               />
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                BloodBank Type <span className="text-red-500">*</span>
+                {t('onboarding.bloodbankType')} <span className="text-red-500">*</span>
               </label>
               <select
                 name="hospitalType"
@@ -393,16 +405,16 @@ export function BloodBankOnboarding() {
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                 required
               >
-                <option value="">Select bloodbank type</option>
+                <option value="">{t('onboarding.selectBloodbankType')}</option>
                 {BLOODBANK_TYPES.map((type) => (
-                  <option key={type} value={type}>{type}</option>
+                  <option key={type} value={type}>{bloodBankTypeLabels[type] || type}</option>
                 ))}
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Contact Person Name <span className="text-red-500">*</span>
+                {t('onboarding.contactPersonName')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -410,7 +422,7 @@ export function BloodBankOnboarding() {
                 value={formData.contactPersonName}
                 onChange={handleChange}
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                placeholder="Primary contact person"
+                placeholder={t('onboarding.contactPersonPlaceholder')}
                 required
               />
             </div>
@@ -423,7 +435,7 @@ export function BloodBankOnboarding() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email <span className="text-red-500">*</span>
+                  {t('onboarding.email')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="email"
@@ -431,14 +443,14 @@ export function BloodBankOnboarding() {
                   value={formData.email}
                   onChange={handleChange}
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                  placeholder="bloodbank@example.com"
+                  placeholder={t('onboarding.bloodbankEmailPlaceholder')}
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Phone Number <span className="text-red-500">*</span>
+                  {t('onboarding.phoneNumber')} <span className="text-red-500">*</span>
                 </label>
                 <PhoneInput
                   international
@@ -451,7 +463,7 @@ export function BloodBankOnboarding() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Date of Birth <span className="text-red-500">*</span>
+                  {t('onboarding.dateOfBirth')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
@@ -465,7 +477,7 @@ export function BloodBankOnboarding() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Country <span className="text-red-500">*</span>
+                  {t('onboarding.country')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   name="country"
@@ -474,7 +486,7 @@ export function BloodBankOnboarding() {
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                   required
                 >
-                  <option value="">Select Country</option>
+                  <option value="">{t('onboarding.selectCountry')}</option>
                   {countries.map((country) => (
                     <option key={country.code} value={country.code}>
                       {country.name}
@@ -486,7 +498,7 @@ export function BloodBankOnboarding() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-semibold text-gray-700">
-                    Address <span className="text-red-500">*</span>
+                    {t('onboarding.address')} <span className="text-red-500">*</span>
                   </label>
                   <button
                     type="button"
@@ -497,12 +509,12 @@ export function BloodBankOnboarding() {
                     {locationLoading ? (
                       <>
                         <Loader className="w-4 h-4 animate-spin" />
-                        Detecting...
+                        {t('onboarding.detecting')}
                       </>
                     ) : (
                       <>
                         <Locate className="w-4 h-4" />
-                        Use Current Location
+                        {t('onboarding.useCurrentLocation')}
                       </>
                     )}
                   </button>
@@ -522,7 +534,7 @@ export function BloodBankOnboarding() {
                     <LeafletClickMarker
                       position={mapPosition}
                       onPositionChange={handleMapPositionChange}
-                      popupText="Your selected location"
+                      popupText={t('onboarding.selectedLocation')}
                     />
                     <LeafletMapUpdater center={mapPosition} zoom={13} />
                   </MapContainer>
@@ -535,7 +547,7 @@ export function BloodBankOnboarding() {
                     value={formData.address}
                     onChange={handleAddressChange}
                     className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                    placeholder="Start typing your address..."
+                    placeholder={t('onboarding.addressPlaceholder')}
                     required
                     autoComplete="off"
                   />
@@ -558,13 +570,13 @@ export function BloodBankOnboarding() {
                     </div>
                   )}
 
-                  <p className="text-xs text-gray-500 mt-1">Type to search or click on the map to set your location</p>
+                  <p className="text-xs text-gray-500 mt-1">{t('onboarding.searchAddressHint')}</p>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  State <span className="text-red-500">*</span>
+                  {t('onboarding.state')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   name="state"
@@ -574,7 +586,7 @@ export function BloodBankOnboarding() {
                   required
                   disabled={!formData.country}
                 >
-                  <option value="">Select State</option>
+                  <option value="">{t('onboarding.selectState')}</option>
                   {availableStates.map((state) => (
                     <option key={state.name} value={state.name}>
                       {state.name}
@@ -586,7 +598,7 @@ export function BloodBankOnboarding() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    City <span className="text-red-500">*</span>
+                    {t('onboarding.city')} <span className="text-red-500">*</span>
                   </label>
                   <select
                     name="city"
@@ -596,7 +608,7 @@ export function BloodBankOnboarding() {
                     required
                     disabled={!formData.state}
                   >
-                    <option value="">Select City</option>
+                    <option value="">{t('onboarding.selectCity')}</option>
                     {availableCities.map((city) => (
                       <option key={city} value={city}>
                         {city}
@@ -607,7 +619,7 @@ export function BloodBankOnboarding() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Pincode <span className="text-red-500">*</span>
+                    {t('onboarding.pincode')} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -615,7 +627,7 @@ export function BloodBankOnboarding() {
                     value={formData.postalCode}
                     onChange={handleChange}
                     className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                    placeholder="XXXXXX"
+                    placeholder={t('onboarding.pincodePlaceholder')}
                     required
                   />
                 </div>
@@ -629,7 +641,7 @@ export function BloodBankOnboarding() {
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Website
+                {t('onboarding.website')}
               </label>
               <input
                 type="url"
@@ -637,13 +649,13 @@ export function BloodBankOnboarding() {
                 value={formData.website}
                 onChange={handleChange}
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                placeholder="https://www.example.com"
+                placeholder={t('onboarding.websitePlaceholder')}
               />
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Number of Beds <span className="text-red-500">*</span>
+                {t('onboarding.numberOfBeds')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -651,7 +663,7 @@ export function BloodBankOnboarding() {
                 value={formData.numberOfBeds}
                 onChange={handleChange}
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                placeholder="Total number of beds"
+                placeholder={t('onboarding.numberOfBedsPlaceholder')}
                 min="1"
                 required
               />
@@ -667,7 +679,7 @@ export function BloodBankOnboarding() {
                   className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
                 />
                 <span className="text-sm font-semibold text-gray-700">
-                  Blood Bank Available
+                  {t('onboarding.bloodBankAvailable')}
                 </span>
               </label>
 
@@ -680,14 +692,14 @@ export function BloodBankOnboarding() {
                   className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
                 />
                 <span className="text-sm font-semibold text-gray-700">
-                  Emergency Services Available
+                  {t('onboarding.emergencyServicesAvailable')}
                 </span>
               </label>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Description <span className="text-red-500">*</span>
+                {t('onboarding.description')} <span className="text-red-500">*</span>
               </label>
               <textarea
                 name="description"
@@ -695,7 +707,7 @@ export function BloodBankOnboarding() {
                 onChange={handleChange}
                 rows={5}
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all resize-none"
-                placeholder="Brief description of your bloodbank and services offered..."
+                placeholder={t('onboarding.bloodbankDescriptionPlaceholder')}
                 required
               />
             </div>
@@ -706,16 +718,16 @@ export function BloodBankOnboarding() {
         return (
           <div className="space-y-6">
             <div className="bg-yellow-50 rounded-xl p-6 border border-yellow-100">
-              <h3 className="font-bold text-gray-900 mb-4">Review Your Information</h3>
+              <h3 className="font-bold text-gray-900 mb-4">{t('onboarding.reviewInformation')}</h3>
               <div className="space-y-2 text-sm">
-                <p><span className="font-semibold">BloodBank:</span> {formData.hospitalName}</p>
-                <p><span className="font-semibold">Type:</span> {formData.hospitalType}</p>
-                <p><span className="font-semibold">Contact Person:</span> {formData.contactPersonName}</p>
-                <p><span className="font-semibold">Email:</span> {formData.email}</p>
-                <p><span className="font-semibold">Location:</span> {formData.city}, {formData.state}</p>
-                <p><span className="font-semibold">Beds:</span> {formData.numberOfBeds}</p>
-                <p><span className="font-semibold">Blood Bank:</span> {formData.hasBloodBank ? 'Yes' : 'No'}</p>
-                <p><span className="font-semibold">Emergency Services:</span> {formData.hasEmergencyServices ? 'Yes' : 'No'}</p>
+                <p><span className="font-semibold">{t('onboarding.reviewBloodbank')}</span> {formData.hospitalName}</p>
+                <p><span className="font-semibold">{t('onboarding.reviewType')}</span> {bloodBankTypeLabels[formData.hospitalType] || formData.hospitalType}</p>
+                <p><span className="font-semibold">{t('onboarding.reviewContactPerson')}</span> {formData.contactPersonName}</p>
+                <p><span className="font-semibold">{t('onboarding.reviewEmail')}</span> {formData.email}</p>
+                <p><span className="font-semibold">{t('onboarding.reviewLocation')}</span> {formData.city}, {formData.state}</p>
+                <p><span className="font-semibold">{t('onboarding.reviewBeds')}</span> {formData.numberOfBeds}</p>
+                <p><span className="font-semibold">{t('onboarding.reviewBloodBankAvailability')}</span> {formData.hasBloodBank ? t('common.yes') : t('common.no')}</p>
+                <p><span className="font-semibold">{t('onboarding.reviewEmergencyServices')}</span> {formData.hasEmergencyServices ? t('common.yes') : t('common.no')}</p>
               </div>
             </div>
 
@@ -730,7 +742,7 @@ export function BloodBankOnboarding() {
                   required
                 />
                 <span className="text-sm text-gray-700">
-                  I agree to the <a href="#" className="text-red-600 hover:text-red-700 font-semibold">Terms of Service</a>
+                  {t('onboarding.termsAgreement')}
                 </span>
               </label>
 
@@ -744,7 +756,7 @@ export function BloodBankOnboarding() {
                   required
                 />
                 <span className="text-sm text-gray-700">
-                  I agree to the <a href="#" className="text-red-600 hover:text-red-700 font-semibold">Privacy Policy</a>
+                  {t('onboarding.privacyAgreement')}
                 </span>
               </label>
             </div>
@@ -807,7 +819,7 @@ export function BloodBankOnboarding() {
                   onClick={handleBack}
                   className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
                 >
-                  Back
+                  {t('common.back')}
                 </button>
               )}
 
@@ -817,7 +829,7 @@ export function BloodBankOnboarding() {
                   onClick={handleNext}
                   className="ml-auto px-6 py-3 bg-gradient-to-r from-red-600 to-yellow-500 text-white rounded-xl font-semibold hover:from-red-700 hover:to-yellow-600 transition-colors flex items-center space-x-2"
                 >
-                  <span>Next</span>
+                  <span>{t('common.next')}</span>
                   <ChevronRight className="w-5 h-5" />
                 </button>
               ) : (
@@ -829,11 +841,11 @@ export function BloodBankOnboarding() {
                   {isLoading ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Completing...</span>
+                      <span>{t('common.completing')}</span>
                     </>
                   ) : (
                     <>
-                      <span>Complete Onboarding</span>
+                      <span>{t('common.completeOnboarding')}</span>
                       <CheckCircle className="w-5 h-5" />
                     </>
                   )}

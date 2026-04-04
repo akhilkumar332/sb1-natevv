@@ -1,12 +1,14 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { CalendarDays, Tag } from 'lucide-react';
 import { ROUTES } from '../constants/routes';
 import { CMS_DEFAULTS, CMS_LIMITS, CMS_QUERY_LIMITS, CMS_RUNTIME, CMS_SEO_DEFAULTS, toCmsSlug } from '../constants/cms';
 import { usePublishedBlogPosts, usePublicCmsSettings } from '../hooks/useCmsContent';
 import { getPublishedBlogPostBySlug, getPublishedBlogPosts } from '../services/cms.service';
 import { toDateValue } from '../utils/dateValue';
+import { pickLocalizedCmsString } from '../utils/cmsLocalization';
 import SeoHead from '../components/SeoHead';
 import { buildBlogSchema, buildBreadcrumbSchema, buildOrganizationSchema, buildWebSiteSchema } from '../utils/seoStructuredData';
 
@@ -25,6 +27,7 @@ const getPaginationItems = (currentPage: number, totalPages: number): Array<numb
 };
 
 export default function BlogPage() {
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { categorySlug: routeCategorySlug, seriesSlug: routeSeriesSlug, authorName: routeAuthorName } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -98,6 +101,13 @@ export default function BlogPage() {
   const selectedQuery = (searchParams.get('q') || '').trim().toLowerCase();
 
   const posts = postsQuery.data || [];
+  const blogHeading = routeCategorySlug
+    ? t('blog.categoryHeading', { value: toHumanLabel(routeCategorySlug) })
+    : routeSeriesSlug
+      ? t('blog.seriesHeading', { value: toHumanLabel(routeSeriesSlug) })
+      : routeAuthorName
+        ? t('blog.authorHeading', { value: decodeURIComponent(routeAuthorName) })
+        : t('blog.title');
   const prefetchPostBySlug = (postSlug: string) => {
     const normalizedSlug = toCmsSlug(postSlug);
     if (!normalizedSlug) return;
@@ -157,16 +167,18 @@ export default function BlogPage() {
 
   const filteredPosts = useMemo(() => (
     posts.filter((post) => {
+      const localizedTitle = pickLocalizedCmsString(i18n.resolvedLanguage, post.titleByLocale, post.title) || post.title;
+      const localizedExcerpt = pickLocalizedCmsString(i18n.resolvedLanguage, post.excerptByLocale, post.excerpt) || '';
       const categoryMatch = effectiveCategory === 'all' || post.categorySlug === effectiveCategory;
       const seriesMatch = effectiveSeries === 'all' || post.seriesSlug === effectiveSeries;
       const authorMatch = effectiveAuthor === 'all' || post.authorName === effectiveAuthor;
       const searchMatch = !selectedQuery
-        || post.title.toLowerCase().includes(selectedQuery)
-        || (post.excerpt || '').toLowerCase().includes(selectedQuery)
+        || localizedTitle.toLowerCase().includes(selectedQuery)
+        || localizedExcerpt.toLowerCase().includes(selectedQuery)
         || (post.tags || []).some((tag) => tag.toLowerCase().includes(selectedQuery));
       return categoryMatch && seriesMatch && authorMatch && searchMatch;
     })
-  ), [posts, effectiveCategory, effectiveSeries, effectiveAuthor, selectedQuery]);
+  ), [posts, effectiveCategory, effectiveSeries, effectiveAuthor, selectedQuery, i18n.resolvedLanguage]);
   const sortedPosts = useMemo(() => {
     const next = [...filteredPosts];
     next.sort((a, b) => {
@@ -238,7 +250,7 @@ export default function BlogPage() {
   return (
     <div className="w-full public-app-page public-app-blog">
       <SeoHead
-        title={`${seoTitle} | Blog`}
+        title={`${seoTitle} | ${t('blog.title')}`}
         description={seoDescription}
         type="website"
         siteName={siteTitle}
@@ -262,8 +274,8 @@ export default function BlogPage() {
           buildBreadcrumbSchema({
             baseUrl: canonicalBase || (typeof window !== 'undefined' ? window.location.origin : ''),
             items: [
-              { name: 'Home', path: ROUTES.home },
-              { name: 'Blog', path: ROUTES.blog },
+              { name: t('common.home'), path: ROUTES.home },
+              { name: t('blog.title'), path: ROUTES.blog },
             ],
           }),
           buildBlogSchema({
@@ -276,11 +288,9 @@ export default function BlogPage() {
       />
       <section className="bg-gradient-to-br from-red-50 via-white to-pink-50 py-14">
         <div className="container mx-auto px-4">
-          <h1 className="text-4xl font-extrabold text-gray-900">
-            {routeCategorySlug ? `Category: ${toHumanLabel(routeCategorySlug)}` : routeSeriesSlug ? `Series: ${toHumanLabel(routeSeriesSlug)}` : routeAuthorName ? `Author: ${decodeURIComponent(routeAuthorName)}` : 'Blog'}
-          </h1>
+          <h1 className="text-4xl font-extrabold text-gray-900">{blogHeading}</h1>
           <p className="mt-2 max-w-2xl text-gray-600">
-            Stories, updates, and practical blood donation guidance from the BloodHub team.
+            {t('blog.intro')}
           </p>
         </div>
       </section>
@@ -290,25 +300,25 @@ export default function BlogPage() {
           <div className="grid gap-4 lg:grid-cols-[15%_85%]">
             <aside className="space-y-2 lg:sticky lg:top-24 lg:self-start">
               <div className="rounded-xl border border-red-100 bg-white p-2 shadow-sm">
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600">Filters</p>
-                <label className="text-[11px] font-semibold text-gray-700">Search articles</label>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600">{t('blog.filters')}</p>
+                <label className="text-[11px] font-semibold text-gray-700">{t('blog.searchArticles')}</label>
                 <input
                   type="search"
                   value={searchParams.get('q') || ''}
                   onChange={(event) => applyParams({ q: event.target.value })}
-                  placeholder="Try donation, platelets, eligibility..."
+                  placeholder={t('blog.searchPlaceholder')}
                   className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs"
                 />
-                <label className="mt-2 block text-[11px] font-semibold text-gray-700">Sort articles</label>
+                <label className="mt-2 block text-[11px] font-semibold text-gray-700">{t('blog.sortArticles')}</label>
                 <select
                   value={selectedSort}
                   onChange={(event) => applyParams({ sort: event.target.value as 'newest' | 'oldest' })}
                   className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs"
                 >
-                  <option value="newest">Newest first</option>
-                  <option value="oldest">Oldest first</option>
+                  <option value="newest">{t('blog.newestFirst')}</option>
+                  <option value="oldest">{t('blog.oldestFirst')}</option>
                 </select>
-                <p className="mt-2 text-[11px] font-semibold text-gray-700">Topics</p>
+                <p className="mt-2 text-[11px] font-semibold text-gray-700">{t('blog.topics')}</p>
                 <div className="mt-1 flex flex-wrap gap-1">
                   <button
                     type="button"
@@ -319,7 +329,7 @@ export default function BlogPage() {
                         : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    All topics
+                    {t('blog.allTopics')}
                   </button>
                   {categories.map((category) => (
                     <button
@@ -336,24 +346,24 @@ export default function BlogPage() {
                     </button>
                   ))}
                 </div>
-                <label className="mt-2 block text-[11px] font-semibold text-gray-700">Series</label>
+                <label className="mt-2 block text-[11px] font-semibold text-gray-700">{t('blog.series')}</label>
                 <select
                   value={effectiveSeries}
                   onChange={(event) => applyParams({ series: event.target.value })}
                   className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs"
                 >
-                  <option value="all">All series</option>
+                  <option value="all">{t('cms.allSeries')}</option>
                   {series.map((entry) => (
                     <option key={entry} value={entry}>{toHumanLabel(entry)}</option>
                   ))}
                 </select>
-                <label className="mt-2 block text-[11px] font-semibold text-gray-700">Written by</label>
+                <label className="mt-2 block text-[11px] font-semibold text-gray-700">{t('blog.writtenBy')}</label>
                 <select
                   value={effectiveAuthor}
                   onChange={(event) => applyParams({ author: event.target.value })}
                   className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs"
                 >
-                  <option value="all">All authors</option>
+                  <option value="all">{t('blog.allAuthors')}</option>
                   {authors.map((entry) => (
                     <option key={entry} value={entry}>{entry}</option>
                   ))}
@@ -372,7 +382,7 @@ export default function BlogPage() {
                   }}
                   className="mt-2 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
                 >
-                  Reset filters
+                  {t('common.resetFilters')}
                 </button>
               </div>
             </aside>
@@ -385,40 +395,40 @@ export default function BlogPage() {
                 </div>
               ) : postsQuery.isLoading && posts.length === 0 && loadingStalled ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center text-amber-900 shadow-sm">
-                  Blog is taking longer than expected to load.
+                  {t('blog.loadingSlowly')}
                   <div className="mt-3 flex justify-center gap-2">
                     <button type="button" onClick={() => void postsQuery.refetch()} className="rounded-md border border-amber-300 px-3 py-1.5 text-xs font-semibold hover:bg-amber-100">
-                      Retry
+                      {t('common.retry')}
                     </button>
                     <button type="button" onClick={() => void refreshAppCache()} className="rounded-md border border-amber-600 bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
-                      Refresh App Cache
+                      {t('common.refreshAppCache')}
                     </button>
                   </div>
                 </div>
               ) : postsQuery.isError && posts.length === 0 ? (
                 <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-600 shadow-sm">
-                  Failed to load blog posts. Please try again.
+                  {t('blog.loadFailed')}
                   <div className="mt-3 flex justify-center gap-2">
                     <button type="button" onClick={() => void postsQuery.refetch()} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
-                      Retry
+                      {t('common.retry')}
                     </button>
                     <button type="button" onClick={() => void refreshAppCache()} className="rounded-md border border-red-600 bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">
-                      Refresh App Cache
+                      {t('common.refreshAppCache')}
                     </button>
                   </div>
                 </div>
               ) : sortedPosts.length === 0 ? (
                 <div className="rounded-2xl border border-red-100 bg-white p-8 text-center text-gray-600 shadow-sm">
                   {effectiveCategory === 'all' && effectiveSeries === 'all' && effectiveAuthor === 'all'
-                    ? 'No published blog posts yet.'
-                    : 'No posts found for selected filters.'}
+                    ? t('blog.noPublishedPosts')
+                    : t('blog.noPostsForFilters')}
                   {hasActiveFilters ? (
                     <p className="mt-2 text-xs text-gray-500">
-                      Try clearing filters or searching with broader keywords.
+                      {t('blog.broadenSearch')}
                     </p>
                   ) : (
                     <p className="mt-2 text-xs text-gray-500">
-                      Check back soon for new donation stories and practical guides.
+                      {t('blog.checkBackSoon')}
                     </p>
                   )}
                 </div>
@@ -426,19 +436,21 @@ export default function BlogPage() {
                 <>
                   {postsQuery.isError ? (
                     <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
-                      Showing cached posts. Latest refresh failed.
+                      {t('blog.showingCachedPosts')}
                     </div>
                   ) : null}
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {pagedPosts.map((post) => {
                       const publishedAt = toDateValue(post.publishedAt);
-                      const readingMinutes = Math.max(1, Math.ceil(((post.excerpt || '').split(/\s+/).filter(Boolean).length || 120) / 180));
+                      const postTitle = pickLocalizedCmsString(i18n.resolvedLanguage, post.titleByLocale, post.title) || post.title;
+                      const postExcerpt = pickLocalizedCmsString(i18n.resolvedLanguage, post.excerptByLocale, post.excerpt) || t('blog.noExcerpt');
+                      const readingMinutes = Math.max(1, Math.ceil(((postExcerpt || '').split(/\s+/).filter(Boolean).length || 120) / 180));
                       return (
                         <article key={post.id} className="overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                           {post.coverImageUrl ? (
                             <img
                               src={post.coverImageUrl}
-                              alt={post.title}
+                              alt={postTitle}
                               className="h-40 w-full object-cover"
                               loading="lazy"
                               decoding="async"
@@ -447,12 +459,12 @@ export default function BlogPage() {
                             <div className="h-40 w-full bg-gradient-to-br from-red-100 to-red-50" />
                           )}
                           <div className="space-y-3 p-4">
-                            <h2 className="line-clamp-2 text-lg font-bold text-gray-900">{post.title}</h2>
-                            <p className="line-clamp-3 text-sm text-gray-600">{post.excerpt || 'No excerpt available for this post.'}</p>
+                            <h2 className="line-clamp-2 text-lg font-bold text-gray-900">{postTitle}</h2>
+                            <p className="line-clamp-3 text-sm text-gray-600">{postExcerpt}</p>
                             <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
-                              <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{publishedAt ? publishedAt.toLocaleDateString() : 'N/A'}</span>
+                              <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{publishedAt ? publishedAt.toLocaleDateString(i18n.resolvedLanguage) : t('admin.notAvailable')}</span>
                               {post.categorySlug ? <span className="inline-flex items-center gap-1"><Tag className="h-3.5 w-3.5" />{toHumanLabel(post.categorySlug)}</span> : null}
-                              <span>{readingMinutes} min read</span>
+                              <span>{t('blog.minRead', { count: readingMinutes })}</span>
                             </div>
                             <Link
                               to={ROUTES.blogPost.replace(':slug', post.slug)}
@@ -461,7 +473,7 @@ export default function BlogPage() {
                               onFocus={() => prefetchPostBySlug(post.slug)}
                               onTouchStart={() => prefetchPostBySlug(post.slug)}
                             >
-                              Read article
+                              {t('blog.readArticle')}
                             </Link>
                           </div>
                         </article>
@@ -471,8 +483,8 @@ export default function BlogPage() {
 
                   <div className="flex items-center justify-between rounded-2xl border border-red-100 bg-white px-4 py-3 text-sm shadow-sm">
                     <div>
-                      <p className="text-gray-600">Page {currentPage} of {totalPages}</p>
-                      <p className="text-xs text-gray-500">Showing {pageStartItem}-{pageEndItem} of {sortedPosts.length} posts</p>
+                      <p className="text-gray-600">{t('common.page', { current: currentPage, total: totalPages })}</p>
+                      <p className="text-xs text-gray-500">{t('common.showingRangeOfTotal', { start: pageStartItem, end: pageEndItem, total: sortedPosts.length })} {t('blog.postsLabel')}</p>
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       <button
@@ -481,7 +493,7 @@ export default function BlogPage() {
                         disabled={currentPage <= 1}
                         className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
                       >
-                        First
+                        {t('common.first')}
                       </button>
                       <button
                         type="button"
@@ -489,7 +501,7 @@ export default function BlogPage() {
                         disabled={currentPage <= 1}
                         className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
                       >
-                        Prev
+                        {t('cms.prev')}
                       </button>
                       {pageItems.map((item, index) => (
                         item === 'ellipsis' ? (
@@ -515,7 +527,7 @@ export default function BlogPage() {
                         disabled={currentPage >= totalPages}
                         className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
                       >
-                        Next
+                        {t('common.next')}
                       </button>
                       <button
                         type="button"
@@ -523,7 +535,7 @@ export default function BlogPage() {
                         disabled={currentPage >= totalPages}
                         className="rounded-md border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 disabled:opacity-50"
                       >
-                        Last
+                        {t('common.last')}
                       </button>
                     </div>
                   </div>

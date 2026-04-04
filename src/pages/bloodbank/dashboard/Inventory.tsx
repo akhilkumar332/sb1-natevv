@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useOutletContext } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -114,6 +115,7 @@ type BloodBankBranch = {
 };
 
 function BloodBankInventory() {
+  const { t } = useTranslation();
   const {
     user,
     inventory,
@@ -1587,9 +1589,9 @@ function BloodBankInventory() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-red-600">Inventory</p>
-          <h2 className="text-2xl font-bold text-gray-900">Blood inventory CRM</h2>
-          <p className="text-sm text-gray-500 mt-1">Track, adjust, and audit blood units by batch.</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-red-600">{t('inventory.title')}</p>
+          <h2 className="text-2xl font-bold text-gray-900">{t('inventory.subtitle')}</h2>
+          <p className="text-sm text-gray-500 mt-1">{t('inventory.description')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
@@ -1599,7 +1601,7 @@ function BloodBankInventory() {
               onChange={(e) => setBranchFilter(e.target.value)}
               className="text-sm font-semibold text-gray-700 focus:outline-none"
             >
-              <option value="all">All branches</option>
+              <option value="all">{t('inventory.allBranches')}</option>
               {branchOptions.map((branch) => (
                 <option key={branch.id} value={branch.id}>
                   {branch.name}
@@ -1614,7 +1616,7 @@ function BloodBankInventory() {
               className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
             >
               <Building2 className="w-4 h-4" />
-              Manage branches
+              {t('inventory.manageBranches')}
             </button>
           )}
           <button
@@ -1627,7 +1629,7 @@ function BloodBankInventory() {
             className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
           >
             <ClipboardList className="w-4 h-4" />
-            Reserve units
+            {t('inventory.reserveUnits')}
           </button>
           <button
             type="button"
@@ -1635,7 +1637,7 @@ function BloodBankInventory() {
             className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
           >
             <ScanLine className="w-4 h-4" />
-            Scan QR
+            {t('inventory.scanQr')}
           </button>
           <button
             type="button"
@@ -1647,7 +1649,7 @@ function BloodBankInventory() {
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-yellow-600 px-4 py-2 text-sm font-semibold text-white shadow-lg disabled:opacity-50"
           >
             <Plus className="w-4 h-4" />
-            Add batch
+            {t('inventory.addBatch')}
           </button>
           <button
             type="button"
@@ -1659,7 +1661,7 @@ function BloodBankInventory() {
             className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-white px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
           >
             <ClipboardList className="w-4 h-4" />
-            Adjust units
+            {t('inventory.adjustUnits')}
           </button>
           <button
             type="button"
@@ -1671,7 +1673,7 @@ function BloodBankInventory() {
             className="inline-flex items-center gap-2 rounded-xl border border-yellow-200 bg-white px-4 py-2 text-sm font-semibold text-yellow-700 hover:bg-yellow-50 disabled:opacity-50"
           >
             <Send className="w-4 h-4" />
-            Transfer
+            {t('inventory.transfer')}
           </button>
           <button
             type="button"
@@ -1680,11 +1682,11 @@ function BloodBankInventory() {
             className="inline-flex items-center gap-2 rounded-xl border border-yellow-200 bg-white px-4 py-2 text-sm font-semibold text-yellow-700 hover:bg-yellow-50 disabled:opacity-50"
           >
             <CalendarClock className="w-4 h-4" />
-            Cleanup expired
+            {t('inventory.cleanupExpired')}
           </button>
           <AdminRefreshButton
             onClick={() => void refreshData()}
-            label="Refresh inventory"
+            label={t('inventory.refreshInventory')}
             className="border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
           />
         </div>
@@ -1692,34 +1694,34 @@ function BloodBankInventory() {
 
       <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-red-100">
-          <p className="text-xs text-gray-500">Total units</p>
+          <p className="text-xs text-gray-500">{t('inventory.totalUnits')}</p>
           <p className="text-3xl font-bold text-gray-900 mt-2">{summary.totalUnits}</p>
-          <p className="text-xs text-gray-500 mt-2">Available {summary.availableUnits} • Reserved {summary.reservedUnits}</p>
+          <p className="text-xs text-gray-500 mt-2">{t('inventory.availableReserved', { available: summary.availableUnits, reserved: summary.reservedUnits })}</p>
         </div>
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-yellow-100">
-          <p className="text-xs text-gray-500">Expiring (7d)</p>
+          <p className="text-xs text-gray-500">{t('inventory.expiringSevenDays')}</p>
           <p className="text-3xl font-bold text-gray-900 mt-2">{summary.expiring7Units}</p>
         </div>
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-red-100">
-          <p className="text-xs text-gray-500">Critical types</p>
+          <p className="text-xs text-gray-500">{t('inventory.criticalTypes')}</p>
           <p className="text-3xl font-bold text-gray-900 mt-2">{summary.criticalTypes}</p>
         </div>
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-yellow-100">
-          <p className="text-xs text-gray-500">Low stock types</p>
+          <p className="text-xs text-gray-500">{t('inventory.lowStockTypes')}</p>
           <p className="text-3xl font-bold text-gray-900 mt-2">{summary.lowTypes}</p>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-xl p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-lg font-bold text-gray-900">Inventory by blood type</h3>
+          <h3 className="text-lg font-bold text-gray-900">{t('inventory.byBloodType')}</h3>
           <div className="flex flex-wrap gap-2 text-xs font-semibold">
             {[
-              { id: 'all', label: 'All' },
-              { id: 'critical', label: 'Critical' },
-              { id: 'low', label: 'Low' },
-              { id: 'adequate', label: 'Adequate' },
-              { id: 'surplus', label: 'Surplus' },
+              { id: 'all', label: t('inventory.allStatuses') },
+              { id: 'critical', label: t('inventory.critical') },
+              { id: 'low', label: t('inventory.low') },
+              { id: 'adequate', label: t('inventory.adequate') },
+              { id: 'surplus', label: t('inventory.surplus') },
             ].map((item) => (
               <button
                 key={item.id}
@@ -1740,23 +1742,23 @@ function BloodBankInventory() {
         {filteredInventory.length === 0 ? (
           <div className="mt-6 text-center text-gray-500">
             <Package className="w-10 h-10 text-red-200 mx-auto mb-2" />
-            <p>No inventory items match this filter.</p>
+            <p>{t('inventory.noItemsForFilter')}</p>
           </div>
         ) : (
           <div className="mt-6 overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
-                  <th className="py-3 px-4 font-semibold">Blood type</th>
+                  <th className="py-3 px-4 font-semibold">{t('inventory.bloodType')}</th>
                   {branchOptions.length > 1 && (
-                    <th className="py-3 px-4 font-semibold">Branch</th>
+                    <th className="py-3 px-4 font-semibold">{t('inventory.branch')}</th>
                   )}
-                  <th className="py-3 px-4 font-semibold">Units</th>
-                  <th className="py-3 px-4 font-semibold">Status</th>
-                  <th className="py-3 px-4 font-semibold">Thresholds</th>
-                  <th className="py-3 px-4 font-semibold">Expiring (7d)</th>
-                  <th className="py-3 px-4 font-semibold">Last restock</th>
-                  <th className="py-3 px-4 font-semibold">Actions</th>
+                  <th className="py-3 px-4 font-semibold">{t('inventory.units')}</th>
+                  <th className="py-3 px-4 font-semibold">{t('inventory.status')}</th>
+                  <th className="py-3 px-4 font-semibold">{t('inventory.thresholds')}</th>
+                  <th className="py-3 px-4 font-semibold">{t('inventory.expiringLabel')}</th>
+                  <th className="py-3 px-4 font-semibold">{t('inventory.lastRestock')}</th>
+                  <th className="py-3 px-4 font-semibold">{t('inventory.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1765,7 +1767,7 @@ function BloodBankInventory() {
                     <td className="py-4 px-4 font-semibold text-gray-900">{item.bloodType}</td>
                     {branchOptions.length > 1 && (
                       <td className="py-4 px-4 text-xs text-gray-600">
-                        {branchOptions.find((branch) => branch.id === (item.branchId || item.hospitalId))?.name || 'Main branch'}
+                        {branchOptions.find((branch) => branch.id === (item.branchId || item.hospitalId))?.name || t('inventory.mainBranch')}
                       </td>
                     )}
                     <td className="py-4 px-4 text-sm text-gray-700">{item.units}</td>
@@ -1775,7 +1777,7 @@ function BloodBankInventory() {
                       </span>
                     </td>
                     <td className="py-4 px-4 text-xs text-gray-600">
-                      Low: {item.lowLevel} / Critical: {item.criticalLevel}
+                      {t('inventory.thresholdSummary', { low: item.lowLevel, critical: item.criticalLevel })}
                     </td>
                     <td className="py-4 px-4 text-sm text-gray-700">
                       {expiringCountFor(item, 7)} batches
@@ -1835,23 +1837,23 @@ function BloodBankInventory() {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900">Expiry alerts</h3>
+            <h3 className="text-lg font-bold text-gray-900">{t('inventory.expiryAlerts')}</h3>
             <AlertTriangle className="w-5 h-5 text-yellow-500" />
           </div>
           {alerts.filter((alert) => alert.status === 'open').length === 0 ? (
-            <div className="text-center py-6 text-gray-500">No expiry alerts right now.</div>
+            <div className="text-center py-6 text-gray-500">{t('inventory.noExpiryAlerts')}</div>
           ) : (
             <div className="space-y-3">
               {alerts.filter((alert) => alert.status === 'open').map((alert) => (
                 <div key={alert.id} className="rounded-xl border border-yellow-100 bg-yellow-50 px-4 py-3 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="font-semibold text-gray-900">
-                      {alert.bloodType} · Batch {alert.batchId}
+                      {alert.bloodType} · {t('inventory.batchLabel', { id: alert.batchId })}
                     </div>
-                    <span className="text-xs font-semibold text-yellow-700">{alert.daysToExpiry}d to expiry</span>
+                    <span className="text-xs font-semibold text-yellow-700">{t('inventory.daysToExpiry', { count: alert.daysToExpiry })}</span>
                   </div>
                   <div className="mt-1 text-xs text-gray-600">
-                    {alert.message || 'Upcoming expiry alert.'}
+                    {alert.message || t('inventory.upcomingExpiryAlert')}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button
@@ -1859,7 +1861,7 @@ function BloodBankInventory() {
                       onClick={() => dismissAlert(alert.id)}
                       className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
                     >
-                      Dismiss
+                      {t('inventory.dismiss')}
                     </button>
                   </div>
                 </div>
@@ -1870,11 +1872,11 @@ function BloodBankInventory() {
 
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900">Reservations</h3>
+            <h3 className="text-lg font-bold text-gray-900">{t('inventory.reservationsTitle')}</h3>
             <ClipboardList className="w-5 h-5 text-emerald-500" />
           </div>
           {reservations.length === 0 ? (
-            <div className="text-center py-6 text-gray-500">No active reservations yet.</div>
+            <div className="text-center py-6 text-gray-500">{t('inventory.noReservations')}</div>
           ) : (
             <div className="space-y-3">
               {reservations.map((reservation) => (
@@ -1885,7 +1887,7 @@ function BloodBankInventory() {
                     </div>
                     <span className="text-xs font-semibold text-gray-600">{reservation.status}</span>
                   </div>
-                  <div className="mt-1 text-xs text-gray-500">Request {reservation.requestId}</div>
+                  <div className="mt-1 text-xs text-gray-500">{t('inventory.requestLabel', { id: reservation.requestId })}</div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {reservation.status === 'active' && (
                       <>
@@ -1895,7 +1897,7 @@ function BloodBankInventory() {
                           disabled={!canEdit || busyAction}
                           className="rounded-lg border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
                         >
-                          Mark fulfilled
+                          {t('inventory.markFulfilled')}
                         </button>
                         <button
                           type="button"
@@ -1903,7 +1905,7 @@ function BloodBankInventory() {
                           disabled={!canEdit || busyAction}
                           className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                         >
-                          Release
+                          {t('inventory.release')}
                         </button>
                       </>
                     )}
@@ -1918,11 +1920,11 @@ function BloodBankInventory() {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900">Inventory activity</h3>
+            <h3 className="text-lg font-bold text-gray-900">{t('inventory.inventoryActivity')}</h3>
             <AlertTriangle className="w-5 h-5 text-yellow-500" />
           </div>
           {transactions.length === 0 ? (
-            <div className="text-center py-6 text-gray-500">No inventory activity yet.</div>
+            <div className="text-center py-6 text-gray-500">{t('inventory.noInventoryActivity')}</div>
           ) : (
             <div className="space-y-3">
               {transactions.map((entry) => (
@@ -1936,7 +1938,7 @@ function BloodBankInventory() {
                     </div>
                   </div>
                   <div className="mt-1 text-xs text-gray-500">
-                    {entry.reason || 'No reason provided'}
+                    {entry.reason || t('inventory.noReasonProvided')}
                     {entry.createdAt ? ` • ${entry.createdAt.toLocaleString()}` : ''}
                   </div>
                 </div>
@@ -1947,15 +1949,15 @@ function BloodBankInventory() {
 
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900">Transfers</h3>
+            <h3 className="text-lg font-bold text-gray-900">{t('inventory.transfersTitle')}</h3>
             <Send className="w-5 h-5 text-yellow-500" />
           </div>
 
           <div className="space-y-5">
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Outgoing</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('inventory.outgoing')}</p>
               {outgoingTransfers.length === 0 ? (
-                <p className="mt-2 text-sm text-gray-500">No outgoing transfers yet.</p>
+                <p className="mt-2 text-sm text-gray-500">{t('inventory.noOutgoingTransfers')}</p>
               ) : (
                 <div className="mt-3 space-y-3">
                   {outgoingTransfers.map((transfer) => (
@@ -1966,7 +1968,7 @@ function BloodBankInventory() {
                         </div>
                         <span className="text-xs font-semibold text-gray-600">{transfer.status}</span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">To {transfer.toHospitalName || 'BloodBank'}</p>
+                      <p className="text-xs text-gray-500 mt-1">{t('inventory.transferToLabel', { name: transfer.toHospitalName || t('portal.bloodbank') })}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {transfer.status === 'pending' && (
                           <>
@@ -1976,14 +1978,14 @@ function BloodBankInventory() {
                               disabled={busyAction}
                               className="rounded-lg border border-yellow-200 px-3 py-1 text-xs font-semibold text-yellow-700 hover:bg-yellow-50"
                             >
-                              Mark sent
+                              {t('inventory.markSent')}
                             </button>
                             <button
                               type="button"
                               onClick={() => cancelTransfer(transfer)}
                               className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
                             >
-                              Cancel
+                              {t('common.cancel')}
                             </button>
                           </>
                         )}
@@ -1995,9 +1997,9 @@ function BloodBankInventory() {
             </div>
 
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Incoming</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('inventory.incoming')}</p>
               {incomingTransfers.length === 0 ? (
-                <p className="mt-2 text-sm text-gray-500">No incoming transfers.</p>
+                <p className="mt-2 text-sm text-gray-500">{t('inventory.noIncomingTransfers')}</p>
               ) : (
                 <div className="mt-3 space-y-3">
                   {incomingTransfers.map((transfer) => (
@@ -2008,7 +2010,7 @@ function BloodBankInventory() {
                         </div>
                         <span className="text-xs font-semibold text-gray-600">{transfer.status}</span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">From {transfer.fromHospitalName || 'BloodBank'}</p>
+                      <p className="text-xs text-gray-500 mt-1">{t('inventory.transferFromLabel', { name: transfer.fromHospitalName || t('portal.bloodbank') })}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {(transfer.status === 'pending' || transfer.status === 'sent') && (
                           <>
@@ -2018,14 +2020,14 @@ function BloodBankInventory() {
                               disabled={busyAction}
                               className="rounded-lg border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
                             >
-                              Mark received
+                              {t('inventory.markReceived')}
                             </button>
                             <button
                               type="button"
                               onClick={() => rejectTransfer(transfer)}
                               className="rounded-lg border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
                             >
-                              Reject
+                              {t('inventory.reject')}
                             </button>
                           </>
                         )}
@@ -2043,7 +2045,7 @@ function BloodBankInventory() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-gray-900">Add batch</h3>
+              <h3 className="text-lg font-bold text-gray-900">{t('inventory.addBatchTitle')}</h3>
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
@@ -2056,7 +2058,7 @@ function BloodBankInventory() {
             <form onSubmit={handleAddBatch} className="p-6 space-y-4 overflow-y-auto">
               {branchOptions.length > 1 && (
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Branch</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.branch')}</label>
                   <select
                     value={batchForm.branchId}
                     onChange={(e) => setBatchForm((prev) => ({ ...prev, branchId: e.target.value }))}
@@ -2071,7 +2073,7 @@ function BloodBankInventory() {
               )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Blood type</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.bloodType')}</label>
                   <select
                     value={batchForm.bloodType}
                     onChange={(e) => setBatchForm((prev) => ({ ...prev, bloodType: e.target.value }))}
@@ -2084,7 +2086,7 @@ function BloodBankInventory() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Units</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.units')}</label>
                   <input
                     type="number"
                     min="1"
@@ -2098,7 +2100,7 @@ function BloodBankInventory() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Collection date</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.collectionDate')}</label>
                   <input
                     type="date"
                     value={batchForm.collectionDate}
@@ -2108,7 +2110,7 @@ function BloodBankInventory() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Expiry date</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.expiryDate')}</label>
                   <input
                     type="date"
                     value={batchForm.expiryDate}
@@ -2121,7 +2123,7 @@ function BloodBankInventory() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Source</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.source')}</label>
                   <select
                     value={batchForm.source}
                     onChange={(e) => setBatchForm((prev) => ({ ...prev, source: e.target.value }))}
@@ -2129,18 +2131,18 @@ function BloodBankInventory() {
                   >
                     <option value="donation">Donation</option>
                     <option value="camp">Campaign</option>
-                    <option value="transfer">Transfer</option>
-                    <option value="other">Other</option>
+                    <option value="transfer">{t('inventory.transfer')}</option>
+                    <option value="other">{t('common.other')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Test status</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.testStatus')}</label>
                   <select
                     value={batchForm.testedStatus}
                     onChange={(e) => setBatchForm((prev) => ({ ...prev, testedStatus: e.target.value }))}
                     className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                   >
-                    <option value="pending">Pending</option>
+                    <option value="pending">{t('common.pending')}</option>
                     <option value="passed">Passed</option>
                     <option value="failed">Failed</option>
                   </select>
@@ -2148,7 +2150,7 @@ function BloodBankInventory() {
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-gray-700">Notes</label>
+                <label className="text-sm font-semibold text-gray-700">{t('inventory.notes')}</label>
                 <textarea
                   rows={3}
                   value={batchForm.notes}
@@ -2163,14 +2165,14 @@ function BloodBankInventory() {
                   onClick={() => setShowAddModal(false)}
                   className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={busyAction}
                   className="rounded-xl bg-gradient-to-r from-red-600 to-yellow-600 px-4 py-2 text-sm font-semibold text-white shadow-lg disabled:opacity-50"
                 >
-                  Save batch
+                  {t('inventory.saveBatch')}
                 </button>
               </div>
             </form>
@@ -2182,7 +2184,7 @@ function BloodBankInventory() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-gray-900">Adjust units</h3>
+              <h3 className="text-lg font-bold text-gray-900">{t('inventory.adjustUnitsTitle')}</h3>
               <button
                 type="button"
                 onClick={() => setShowAdjustModal(false)}
@@ -2195,7 +2197,7 @@ function BloodBankInventory() {
             <form onSubmit={handleAdjustUnits} className="p-6 space-y-4 overflow-y-auto">
               {branchOptions.length > 1 && (
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Branch</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.branch')}</label>
                   <select
                     value={adjustForm.branchId}
                     onChange={(e) => setAdjustForm((prev) => ({ ...prev, branchId: e.target.value }))}
@@ -2209,7 +2211,7 @@ function BloodBankInventory() {
                 </div>
               )}
               <div>
-                <label className="text-sm font-semibold text-gray-700">Blood type</label>
+                <label className="text-sm font-semibold text-gray-700">{t('inventory.bloodType')}</label>
                 <select
                   value={adjustForm.bloodType}
                   onChange={(e) => setAdjustForm((prev) => ({ ...prev, bloodType: e.target.value }))}
@@ -2223,19 +2225,19 @@ function BloodBankInventory() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Mode</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.mode')}</label>
                   <select
                     value={adjustForm.mode}
                     onChange={(e) => setAdjustForm((prev) => ({ ...prev, mode: e.target.value }))}
                     className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                   >
-                    <option value="add">Add units</option>
-                    <option value="remove">Remove units</option>
-                    <option value="set">Set exact units</option>
+                    <option value="add">{t('inventory.addUnits')}</option>
+                    <option value="remove">{t('inventory.removeUnits')}</option>
+                    <option value="set">{t('inventory.setExactUnits')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Units</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.units')}</label>
                   <input
                     type="number"
                     min="0"
@@ -2247,12 +2249,12 @@ function BloodBankInventory() {
                 </div>
               </div>
               <div>
-                <label className="text-sm font-semibold text-gray-700">Reason</label>
+                <label className="text-sm font-semibold text-gray-700">{t('common.reason')}</label>
                 <input
                   value={adjustForm.reason}
                   onChange={(e) => setAdjustForm((prev) => ({ ...prev, reason: e.target.value }))}
                   className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                  placeholder="Audit reason"
+                  placeholder={t('inventory.auditReasonPlaceholder')}
                 />
               </div>
               <div className="flex items-center justify-end gap-3 pt-2">
@@ -2261,14 +2263,14 @@ function BloodBankInventory() {
                   onClick={() => setShowAdjustModal(false)}
                   className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={busyAction}
                   className="rounded-xl bg-gradient-to-r from-red-600 to-yellow-600 px-4 py-2 text-sm font-semibold text-white shadow-lg disabled:opacity-50"
                 >
-                  Apply
+                  {t('inventory.apply')}
                 </button>
               </div>
             </form>
@@ -2280,7 +2282,7 @@ function BloodBankInventory() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-gray-900">Transfer to another blood bank</h3>
+              <h3 className="text-lg font-bold text-gray-900">{t('inventory.transferTitle')}</h3>
               <button
                 type="button"
                 onClick={() => setShowTransferModal(false)}
@@ -2293,7 +2295,7 @@ function BloodBankInventory() {
             <form onSubmit={handleCreateTransfer} className="p-6 space-y-4 overflow-y-auto">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Transfer type</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.transferType')}</label>
                   <select
                     value={transferForm.transferType}
                     onChange={(e) => {
@@ -2307,13 +2309,13 @@ function BloodBankInventory() {
                     }}
                     className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                   >
-                    <option value="external">External blood bank</option>
-                    <option value="internal">Internal branch transfer</option>
+                    <option value="external">{t('inventory.externalBloodbank')}</option>
+                    <option value="internal">{t('inventory.internalBranchTransfer')}</option>
                   </select>
                 </div>
                 {branchOptions.length > 1 && (
                   <div>
-                    <label className="text-sm font-semibold text-gray-700">From branch</label>
+                    <label className="text-sm font-semibold text-gray-700">{t('inventory.fromBranch')}</label>
                     <select
                       value={transferForm.fromBranchId}
                       onChange={(e) => setTransferForm((prev) => ({ ...prev, fromBranchId: e.target.value }))}
@@ -2330,14 +2332,14 @@ function BloodBankInventory() {
 
               {transferForm.transferType === 'external' ? (
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Recipient blood bank</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.recipientBloodbank')}</label>
                   <select
                     value={transferForm.toHospitalId}
                     onChange={(e) => setTransferForm((prev) => ({ ...prev, toHospitalId: e.target.value }))}
                     className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                     required
                   >
-                    <option value="">Select blood bank</option>
+                    <option value="">{t('inventory.selectBloodbank')}</option>
                     {bloodbanks.map((bank) => (
                       <option key={bank.id} value={bank.id}>
                         {bank.name}{bank.bhId ? ` · ${bank.bhId}` : ''}
@@ -2347,14 +2349,14 @@ function BloodBankInventory() {
                 </div>
               ) : (
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Recipient branch</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.recipientBranch')}</label>
                   <select
                     value={transferForm.toBranchId}
                     onChange={(e) => setTransferForm((prev) => ({ ...prev, toBranchId: e.target.value }))}
                     className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                     required
                   >
-                    <option value="">Select branch</option>
+                    <option value="">{t('inventory.selectBranch')}</option>
                     {branchOptions
                       .filter((branch) => branch.id !== (transferForm.fromBranchId || activeBranchId))
                       .map((branch) => (
@@ -2366,7 +2368,7 @@ function BloodBankInventory() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Blood type</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.bloodType')}</label>
                   <select
                     value={transferForm.bloodType}
                     onChange={(e) => setTransferForm((prev) => ({ ...prev, bloodType: e.target.value }))}
@@ -2379,7 +2381,7 @@ function BloodBankInventory() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Units</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.units')}</label>
                   <input
                     type="number"
                     min="1"
@@ -2393,7 +2395,7 @@ function BloodBankInventory() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Collection date</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.collectionDate')}</label>
                   <input
                     type="date"
                     value={transferForm.collectionDate}
@@ -2403,7 +2405,7 @@ function BloodBankInventory() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Expiry date</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.expiryDate')}</label>
                   <input
                     type="date"
                     value={transferForm.expiryDate}
@@ -2415,7 +2417,7 @@ function BloodBankInventory() {
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-gray-700">Notes</label>
+                <label className="text-sm font-semibold text-gray-700">{t('inventory.notes')}</label>
                 <textarea
                   rows={3}
                   value={transferForm.notes}
@@ -2449,7 +2451,7 @@ function BloodBankInventory() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-gray-900">Reserve units</h3>
+              <h3 className="text-lg font-bold text-gray-900">{t('inventory.reserveUnitsTitle')}</h3>
               <button
                 type="button"
                 onClick={() => setShowReserveModal(false)}
@@ -2461,7 +2463,7 @@ function BloodBankInventory() {
             </div>
             <form onSubmit={handleCreateReservation} className="p-6 space-y-4 overflow-y-auto">
               <div>
-                <label className="text-sm font-semibold text-gray-700">Request</label>
+                <label className="text-sm font-semibold text-gray-700">{t('inventory.request')}</label>
                 <select
                   value={reserveForm.requestId}
                   onChange={(e) => {
@@ -2477,7 +2479,7 @@ function BloodBankInventory() {
                   className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                   required
                 >
-                  <option value="">Select request</option>
+                  <option value="">{t('inventory.selectRequest')}</option>
                   {activeRequests.map((request) => (
                     <option key={request.id} value={request.id}>
                       {request.bloodType} · {request.units} units · {request.urgency}
@@ -2488,7 +2490,7 @@ function BloodBankInventory() {
 
               {branchOptions.length > 1 && (
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Branch</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.branch')}</label>
                   <select
                     value={reserveForm.branchId}
                     onChange={(e) => setReserveForm((prev) => ({ ...prev, branchId: e.target.value }))}
@@ -2504,7 +2506,7 @@ function BloodBankInventory() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Blood type</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.bloodType')}</label>
                   <select
                     value={reserveForm.bloodType}
                     onChange={(e) => setReserveForm((prev) => ({ ...prev, bloodType: e.target.value }))}
@@ -2517,7 +2519,7 @@ function BloodBankInventory() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Units</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.units')}</label>
                   <input
                     type="number"
                     min="1"
@@ -2530,7 +2532,7 @@ function BloodBankInventory() {
               </div>
 
               <p className="text-xs text-gray-500">
-                Available units: {availableUnitsFor(reserveForm.bloodType, reserveForm.branchId || activeBranchId)}
+                {t('inventory.availableUnits', { count: availableUnitsFor(reserveForm.bloodType, reserveForm.branchId || activeBranchId) })}
               </p>
 
               <div className="flex items-center justify-end gap-3 pt-2">
@@ -2539,14 +2541,14 @@ function BloodBankInventory() {
                   onClick={() => setShowReserveModal(false)}
                   className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={busyAction || !canEdit}
                   className="rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg disabled:opacity-50"
                 >
-                  Reserve
+                  {t('inventory.reserveUnits')}
                 </button>
               </div>
             </form>
@@ -2558,7 +2560,7 @@ function BloodBankInventory() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-gray-900">Scan batch QR</h3>
+              <h3 className="text-lg font-bold text-gray-900">{t('inventory.scanBatchQr')}</h3>
               <button
                 type="button"
                 onClick={() => setShowScanModal(false)}
@@ -2582,7 +2584,7 @@ function BloodBankInventory() {
                       : 'border-gray-200 text-gray-500'
                   }`}
                 >
-                  Camera scan
+                  {t('inventory.cameraScan')}
                 </button>
                 <button
                   type="button"
@@ -2596,7 +2598,7 @@ function BloodBankInventory() {
                       : 'border-gray-200 text-gray-500'
                   }`}
                 >
-                  Manual entry
+                  {t('inventory.manualEntry')}
                 </button>
               </div>
 
@@ -2609,13 +2611,13 @@ function BloodBankInventory() {
                     <p className="text-sm text-rose-600">{scanError}</p>
                   ) : (
                     <p className="text-xs text-gray-500">
-                      Point the camera at the batch QR code. Scanning starts automatically.
+                      {t('inventory.cameraScanHint')}
                     </p>
                   )}
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-sm text-gray-600">Paste the QR payload or batch ID to locate the batch.</p>
+                  <p className="text-sm text-gray-600">{t('inventory.manualScanHint')}</p>
                   <input
                     value={scanValue}
                     onChange={(e) => {
@@ -2623,7 +2625,7 @@ function BloodBankInventory() {
                       setScanError(null);
                     }}
                     className="w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                    placeholder="BB-A+-123456 or QR payload"
+                    placeholder={t('inventory.scanPlaceholder')}
                   />
                   {scanError && <p className="text-xs text-rose-600">{scanError}</p>}
                 </div>
@@ -2635,7 +2637,7 @@ function BloodBankInventory() {
                   onClick={() => setShowScanModal(false)}
                   className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
                 >
-                  Close
+                  {t('common.close')}
                 </button>
                 {scanMode === 'manual' && (
                   <button
@@ -2643,7 +2645,7 @@ function BloodBankInventory() {
                     onClick={handleScanLookup}
                     className="rounded-xl bg-gradient-to-r from-red-600 to-yellow-600 px-4 py-2 text-sm font-semibold text-white shadow-lg"
                   >
-                    Lookup
+                    {t('inventory.lookup')}
                   </button>
                 )}
               </div>
@@ -2656,7 +2658,7 @@ function BloodBankInventory() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-gray-900">Batch QR</h3>
+              <h3 className="text-lg font-bold text-gray-900">{t('inventory.batchQr')}</h3>
               <button
                 type="button"
                 onClick={() => setShowQrModal(false)}
@@ -2693,7 +2695,7 @@ function BloodBankInventory() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-gray-900">Manage branches</h3>
+              <h3 className="text-lg font-bold text-gray-900">{t('inventory.manageBranchesTitle')}</h3>
               <button
                 type="button"
                 onClick={() => setShowBranchModal(false)}
@@ -2705,7 +2707,7 @@ function BloodBankInventory() {
             </div>
             <div className="p-6 grid gap-6 lg:grid-cols-2 overflow-y-auto">
               <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">Existing branches</h4>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">{t('inventory.existingBranches')}</h4>
                 <div className="space-y-3">
                   {branchOptions.map((branch) => (
                     <div key={branch.id} className="rounded-xl border border-gray-100 p-3 text-sm">
@@ -2718,9 +2720,9 @@ function BloodBankInventory() {
                 </div>
               </div>
               <form onSubmit={handleCreateBranch} className="space-y-4">
-                <h4 className="text-sm font-semibold text-gray-700">Add new branch</h4>
+                <h4 className="text-sm font-semibold text-gray-700">{t('inventory.addNewBranch')}</h4>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Branch name</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.branchName')}</label>
                   <input
                     value={branchForm.name}
                     onChange={(e) => setBranchForm((prev) => ({ ...prev, name: e.target.value }))}
@@ -2729,7 +2731,7 @@ function BloodBankInventory() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Address</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('onboarding.address')}</label>
                   <input
                     value={branchForm.address}
                     onChange={(e) => setBranchForm((prev) => ({ ...prev, address: e.target.value }))}
@@ -2738,7 +2740,7 @@ function BloodBankInventory() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="text-sm font-semibold text-gray-700">City</label>
+                    <label className="text-sm font-semibold text-gray-700">{t('onboarding.city')}</label>
                     <input
                       value={branchForm.city}
                       onChange={(e) => setBranchForm((prev) => ({ ...prev, city: e.target.value }))}
@@ -2746,7 +2748,7 @@ function BloodBankInventory() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-semibold text-gray-700">State</label>
+                    <label className="text-sm font-semibold text-gray-700">{t('onboarding.state')}</label>
                     <input
                       value={branchForm.state}
                       onChange={(e) => setBranchForm((prev) => ({ ...prev, state: e.target.value }))}
@@ -2755,7 +2757,7 @@ function BloodBankInventory() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Phone</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.phone')}</label>
                   <input
                     value={branchForm.phone}
                     onChange={(e) => setBranchForm((prev) => ({ ...prev, phone: e.target.value }))}
@@ -2767,7 +2769,7 @@ function BloodBankInventory() {
                   disabled={busyAction || !canManage}
                   className="w-full rounded-xl bg-gradient-to-r from-red-600 to-yellow-600 px-4 py-2 text-sm font-semibold text-white shadow-lg disabled:opacity-50"
                 >
-                  Save branch
+                  {t('inventory.saveBranch')}
                 </button>
               </form>
             </div>
@@ -2780,8 +2782,8 @@ function BloodBankInventory() {
           <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Batches · {selectedInventory.bloodType}</h3>
-                <p className="text-xs text-gray-500">Manage batch status and expiry.</p>
+                <h3 className="text-lg font-bold text-gray-900">{t('inventory.batchesTitle')} · {selectedInventory.bloodType}</h3>
+                <p className="text-xs text-gray-500">{t('inventory.manageBatchStatus')}</p>
               </div>
               <button
                 type="button"
@@ -2797,7 +2799,7 @@ function BloodBankInventory() {
             </div>
             <div className="p-6 space-y-3 overflow-y-auto">
               {selectedInventory.batches.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">No batches recorded yet.</div>
+                <div className="text-center py-8 text-gray-500">{t('inventory.noBatches')}</div>
               ) : (
                 selectedInventory.batches.map((batch) => (
                   <div
@@ -2810,12 +2812,12 @@ function BloodBankInventory() {
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <p className="font-semibold text-gray-900">Batch {batch.batchId}</p>
+                        <p className="font-semibold text-gray-900">{t('inventory.batchLabel', { id: batch.batchId })}</p>
                         <p className="text-xs text-gray-500">{batch.units} units · {batch.status}</p>
                         {batch.status === 'used' && batch.notes?.includes('Transfer to') ? (
-                          <p className="text-[11px] text-gray-400 mt-1">Transfer-out used units</p>
+                          <p className="text-[11px] text-gray-400 mt-1">{t('inventory.transferOutUsedUnits')}</p>
                         ) : null}
-                        <p className="text-xs text-gray-500">Collected {batch.collectionDate.toLocaleDateString()} · Expires {batch.expiryDate.toLocaleDateString()}</p>
+                        <p className="text-xs text-gray-500">{t('inventory.collectedExpires', { collected: batch.collectionDate.toLocaleDateString(), expires: batch.expiryDate.toLocaleDateString() })}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -2824,7 +2826,7 @@ function BloodBankInventory() {
                           className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
                           disabled={busyAction || !canEdit}
                         >
-                          Edit
+                          {t('common.edit')}
                         </button>
                         <button
                           type="button"
@@ -2833,7 +2835,7 @@ function BloodBankInventory() {
                         >
                           <span className="inline-flex items-center gap-1">
                             <QrCode className="w-3.5 h-3.5" />
-                            QR
+                            {t('inventory.qr')}
                           </span>
                         </button>
                         {batch.status === 'available' || batch.status === 'reserved' ? (
@@ -2844,7 +2846,7 @@ function BloodBankInventory() {
                               className="rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
                               disabled={busyAction || !canEdit}
                             >
-                              Mark used
+                              {t('inventory.markUsed')}
                             </button>
                             <button
                               type="button"
@@ -2852,7 +2854,7 @@ function BloodBankInventory() {
                               className="rounded-lg border border-yellow-200 px-3 py-1 text-xs font-semibold text-yellow-700 hover:bg-yellow-50 disabled:opacity-50"
                               disabled={busyAction || !canEdit}
                             >
-                              Mark expired
+                              {t('inventory.markExpired')}
                             </button>
                           </>
                         ) : null}
@@ -2862,7 +2864,7 @@ function BloodBankInventory() {
                           className="rounded-lg border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
                           disabled={busyAction || !canEdit}
                         >
-                          Delete
+                          {t('common.delete')}
                         </button>
                       </div>
                     </div>
@@ -2878,7 +2880,7 @@ function BloodBankInventory() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-gray-900">Edit batch</h3>
+              <h3 className="text-lg font-bold text-gray-900">{t('inventory.editBatchTitle')}</h3>
               <button
                 type="button"
                 onClick={() => setShowEditBatch(false)}
@@ -2890,7 +2892,7 @@ function BloodBankInventory() {
             </div>
             <form onSubmit={handleEditBatch} className="p-6 space-y-4 overflow-y-auto">
               <div>
-                <label className="text-sm font-semibold text-gray-700">Units</label>
+                <label className="text-sm font-semibold text-gray-700">{t('inventory.units')}</label>
                 <input
                   type="number"
                   min="1"
@@ -2902,7 +2904,7 @@ function BloodBankInventory() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Collection date</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.collectionDate')}</label>
                   <input
                     type="date"
                     value={editBatchForm.collectionDate}
@@ -2912,7 +2914,7 @@ function BloodBankInventory() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Expiry date</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.expiryDate')}</label>
                   <input
                     type="date"
                     value={editBatchForm.expiryDate}
@@ -2924,7 +2926,7 @@ function BloodBankInventory() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Source</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.source')}</label>
                   <select
                     value={editBatchForm.source}
                     onChange={(e) => setEditBatchForm((prev) => ({ ...prev, source: e.target.value }))}
@@ -2932,25 +2934,25 @@ function BloodBankInventory() {
                   >
                     <option value="donation">Donation</option>
                     <option value="camp">Campaign</option>
-                    <option value="transfer">Transfer</option>
-                    <option value="other">Other</option>
+                    <option value="transfer">{t('inventory.transfer')}</option>
+                    <option value="other">{t('common.other')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm font-semibold text-gray-700">Test status</label>
+                  <label className="text-sm font-semibold text-gray-700">{t('inventory.testStatus')}</label>
                   <select
                     value={editBatchForm.testedStatus}
                     onChange={(e) => setEditBatchForm((prev) => ({ ...prev, testedStatus: e.target.value }))}
                     className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                   >
-                    <option value="pending">Pending</option>
+                    <option value="pending">{t('common.pending')}</option>
                     <option value="passed">Passed</option>
                     <option value="failed">Failed</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label className="text-sm font-semibold text-gray-700">Notes</label>
+                <label className="text-sm font-semibold text-gray-700">{t('inventory.notes')}</label>
                 <textarea
                   rows={3}
                   value={editBatchForm.notes}
@@ -2964,14 +2966,14 @@ function BloodBankInventory() {
                   onClick={() => setShowEditBatch(false)}
                   className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={busyAction}
                   className="rounded-xl bg-gradient-to-r from-red-600 to-yellow-600 px-4 py-2 text-sm font-semibold text-white shadow-lg disabled:opacity-50"
                 >
-                  Save changes
+                  {t('inventory.saveChanges')}
                 </button>
               </div>
             </form>

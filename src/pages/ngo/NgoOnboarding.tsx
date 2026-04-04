@@ -1,5 +1,6 @@
 // src/pages/ngo/NgoOnboarding.tsx
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { notify } from 'services/notify.service';
@@ -69,20 +70,14 @@ interface OnboardingFormData {
 }
 
 const ngoOnboardingValidationRules: Array<OnboardingValidationRule<OnboardingFormData>> = [
-  { step: 0, required: ['organizationName', 'registrationNumber', 'ngoType', 'contactPersonName'], message: 'Please fill in all required organization information' },
-  { step: 1, required: ['email', 'phone', 'dateOfBirth', 'address', 'city', 'state', 'postalCode', 'country'], message: 'Please fill in all required contact information' },
-  { step: 2, required: ['yearEstablished', 'description'], message: 'Please fill in year established and description' },
-  { step: 3, required: ['privacyPolicyAgreed', 'termsOfServiceAgreed'], message: 'Please agree to terms and privacy policy' },
-];
-
-const steps = [
-  { icon: Building2, title: 'Organization', subtitle: 'Basic details', color: 'blue' },
-  { icon: MapPin, title: 'Contact', subtitle: 'Location details', color: 'indigo' },
-  { icon: FileText, title: 'Additional', subtitle: 'More info', color: 'purple' },
-  { icon: CheckCircle, title: 'Consent', subtitle: 'Agreement', color: 'blue' },
+  { step: 0, required: ['organizationName', 'registrationNumber', 'ngoType', 'contactPersonName'], message: 'onboarding.ngoValidationOrganization' },
+  { step: 1, required: ['email', 'phone', 'dateOfBirth', 'address', 'city', 'state', 'postalCode', 'country'], message: 'onboarding.ngoValidationContact' },
+  { step: 2, required: ['yearEstablished', 'description'], message: 'onboarding.ngoValidationAdditional' },
+  { step: 3, required: ['privacyPolicyAgreed', 'termsOfServiceAgreed'], message: 'onboarding.ngoValidationConsent' },
 ];
 
 export function NgoOnboarding() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, updateUserProfile } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
@@ -129,6 +124,16 @@ export function NgoOnboarding() {
     page: 'NgoOnboarding',
   });
   const { resolveCurrentLocation, resolveFromCoordinates } = useLocationResolver('ngo');
+  const ngoTypeLabels: Record<string, string> = {
+    'Health & Medical': t('onboarding.ngoTypes.healthMedical'),
+    'Social Welfare': t('onboarding.ngoTypes.socialWelfare'),
+    Educational: t('onboarding.ngoTypes.educational'),
+    'Community Development': t('onboarding.ngoTypes.communityDevelopment'),
+    Environmental: t('onboarding.ngoTypes.environmental'),
+    'Women Empowerment': t('onboarding.ngoTypes.womenEmpowerment'),
+    'Child Welfare': t('onboarding.ngoTypes.childWelfare'),
+    Other: t('onboarding.ngoTypes.other'),
+  };
 
   useEffect(() => {
     if (user) {
@@ -244,7 +249,7 @@ export function NgoOnboarding() {
 
     try {
       const result = await resolveFromCoordinates(newPosition, {
-        errorMessage: 'Could not fetch address for this location',
+        errorMessage: t('onboarding.couldNotFetchAddress'),
       });
       if (!isMountedRef.current) return;
 
@@ -269,9 +274,16 @@ export function NgoOnboarding() {
       step: currentStep,
       data: formData,
       rules: ngoOnboardingValidationRules,
-      onError: (message) => notify.error(message),
+      onError: (message) => notify.error(t(message)),
     });
   };
+
+  const steps = [
+    { icon: Building2, title: t('onboarding.organization'), subtitle: t('onboarding.basicInfo'), color: 'blue' },
+    { icon: MapPin, title: t('onboarding.contact'), subtitle: t('onboarding.locationDetails'), color: 'indigo' },
+    { icon: FileText, title: t('onboarding.additional'), subtitle: t('onboarding.moreInfo'), color: 'purple' },
+    { icon: CheckCircle, title: t('onboarding.consent'), subtitle: t('onboarding.agreement'), color: 'blue' },
+  ] as const;
 
   const handleNext = () => {
     if (validateStep()) {
@@ -305,7 +317,7 @@ export function NgoOnboarding() {
           role: user.role || 'ngo',
         });
       }
-      notify.success('NGO profile completed successfully!');
+      notify.success(t('onboarding.ngoCompleted'));
       navigate(ROUTES.portal.ngo.dashboard.root);
     } catch (error) {
       reportOnboardingError(error, 'ngo.onboarding.submit');
@@ -322,7 +334,7 @@ export function NgoOnboarding() {
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Organization Name <span className="text-red-500">*</span>
+                {t('onboarding.organizationName')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -330,14 +342,14 @@ export function NgoOnboarding() {
                 value={formData.organizationName}
                 onChange={handleChange}
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                placeholder="Enter organization name"
+                placeholder={t('onboarding.organizationNamePlaceholder')}
                 required
               />
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Registration Number <span className="text-red-500">*</span>
+                {t('onboarding.registrationNumber')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -345,14 +357,14 @@ export function NgoOnboarding() {
                 value={formData.registrationNumber}
                 onChange={handleChange}
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                placeholder="NGO registration number"
+                placeholder={t('onboarding.ngoRegistrationPlaceholder')}
                 required
               />
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                NGO Type <span className="text-red-500">*</span>
+                {t('onboarding.ngoType')} <span className="text-red-500">*</span>
               </label>
               <select
                 name="ngoType"
@@ -361,16 +373,16 @@ export function NgoOnboarding() {
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                 required
               >
-                <option value="">Select NGO type</option>
+                <option value="">{t('onboarding.selectNgoType')}</option>
                 {NGO_TYPES.map((type) => (
-                  <option key={type} value={type}>{type}</option>
+                  <option key={type} value={type}>{ngoTypeLabels[type] || type}</option>
                 ))}
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Contact Person Name <span className="text-red-500">*</span>
+                {t('onboarding.contactPersonName')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -378,7 +390,7 @@ export function NgoOnboarding() {
                 value={formData.contactPersonName}
                 onChange={handleChange}
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                placeholder="Primary contact person"
+                placeholder={t('onboarding.contactPersonPlaceholder')}
                 required
               />
             </div>
@@ -391,7 +403,7 @@ export function NgoOnboarding() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email <span className="text-red-500">*</span>
+                  {t('onboarding.email')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="email"
@@ -399,14 +411,14 @@ export function NgoOnboarding() {
                   value={formData.email}
                   onChange={handleChange}
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                  placeholder="organization@example.com"
+                  placeholder={t('onboarding.ngoEmailPlaceholder')}
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Phone Number <span className="text-red-500">*</span>
+                  {t('onboarding.phoneNumber')} <span className="text-red-500">*</span>
                 </label>
                 <PhoneInput
                   international
@@ -419,7 +431,7 @@ export function NgoOnboarding() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Date of Birth <span className="text-red-500">*</span>
+                  {t('onboarding.dateOfBirth')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
@@ -433,7 +445,7 @@ export function NgoOnboarding() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Country <span className="text-red-500">*</span>
+                  {t('onboarding.country')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   name="country"
@@ -442,7 +454,7 @@ export function NgoOnboarding() {
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                   required
                 >
-                  <option value="">Select Country</option>
+                  <option value="">{t('onboarding.selectCountry')}</option>
                   {countries.map((country) => (
                     <option key={country.code} value={country.code}>
                       {country.name}
@@ -454,7 +466,7 @@ export function NgoOnboarding() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-semibold text-gray-700">
-                    Address <span className="text-red-500">*</span>
+                    {t('onboarding.address')} <span className="text-red-500">*</span>
                   </label>
                   <button
                     type="button"
@@ -465,12 +477,12 @@ export function NgoOnboarding() {
                     {locationLoading ? (
                       <>
                         <Loader className="w-4 h-4 animate-spin" />
-                        Detecting...
+                        {t('onboarding.detecting')}
                       </>
                     ) : (
                       <>
                         <Locate className="w-4 h-4" />
-                        Use Current Location
+                        {t('onboarding.useCurrentLocation')}
                       </>
                     )}
                   </button>
@@ -490,7 +502,7 @@ export function NgoOnboarding() {
                     <LeafletClickMarker
                       position={mapPosition}
                       onPositionChange={handleMapPositionChange}
-                      popupText="Your selected location"
+                      popupText={t('onboarding.selectedLocation')}
                     />
                     <LeafletMapUpdater center={mapPosition} zoom={13} />
                   </MapContainer>
@@ -503,7 +515,7 @@ export function NgoOnboarding() {
                     value={formData.address}
                     onChange={handleAddressChange}
                     className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                    placeholder="Start typing your address..."
+                    placeholder={t('onboarding.addressPlaceholder')}
                     required
                     autoComplete="off"
                   />
@@ -526,13 +538,13 @@ export function NgoOnboarding() {
                     </div>
                   )}
 
-                  <p className="text-xs text-gray-500 mt-1">Type to search or click on the map to set your location</p>
+                  <p className="text-xs text-gray-500 mt-1">{t('onboarding.searchAddressHint')}</p>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  State <span className="text-red-500">*</span>
+                  {t('onboarding.state')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   name="state"
@@ -542,7 +554,7 @@ export function NgoOnboarding() {
                   required
                   disabled={!formData.country}
                 >
-                  <option value="">Select State</option>
+                  <option value="">{t('onboarding.selectState')}</option>
                   {availableStates.map((state) => (
                     <option key={state.name} value={state.name}>
                       {state.name}
@@ -554,7 +566,7 @@ export function NgoOnboarding() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    City <span className="text-red-500">*</span>
+                    {t('onboarding.city')} <span className="text-red-500">*</span>
                   </label>
                   <select
                     name="city"
@@ -564,7 +576,7 @@ export function NgoOnboarding() {
                     required
                     disabled={!formData.state}
                   >
-                    <option value="">Select City</option>
+                    <option value="">{t('onboarding.selectCity')}</option>
                     {availableCities.map((city) => (
                       <option key={city} value={city}>
                         {city}
@@ -575,7 +587,7 @@ export function NgoOnboarding() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Pincode <span className="text-red-500">*</span>
+                    {t('onboarding.pincode')} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -583,7 +595,7 @@ export function NgoOnboarding() {
                     value={formData.postalCode}
                     onChange={handleChange}
                     className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                    placeholder="XXXXXX"
+                    placeholder={t('onboarding.pincodePlaceholder')}
                     required
                   />
                 </div>
@@ -597,7 +609,7 @@ export function NgoOnboarding() {
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Website
+                {t('onboarding.website')}
               </label>
               <input
                 type="url"
@@ -605,13 +617,13 @@ export function NgoOnboarding() {
                 value={formData.website}
                 onChange={handleChange}
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                placeholder="https://www.example.com"
+                placeholder={t('onboarding.websitePlaceholder')}
               />
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Year Established <span className="text-red-500">*</span>
+                {t('onboarding.yearEstablished')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -619,7 +631,7 @@ export function NgoOnboarding() {
                 value={formData.yearEstablished}
                 onChange={handleChange}
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                placeholder="YYYY"
+                placeholder={t('onboarding.yearEstablishedPlaceholder')}
                 min="1900"
                 max={new Date().getFullYear()}
                 required
@@ -628,7 +640,7 @@ export function NgoOnboarding() {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Description <span className="text-red-500">*</span>
+                {t('onboarding.description')} <span className="text-red-500">*</span>
               </label>
               <textarea
                 name="description"
@@ -636,7 +648,7 @@ export function NgoOnboarding() {
                 onChange={handleChange}
                 rows={5}
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all resize-none"
-                placeholder="Brief description of your organization and its mission..."
+                placeholder={t('onboarding.ngoDescriptionPlaceholder')}
                 required
               />
             </div>
@@ -647,13 +659,13 @@ export function NgoOnboarding() {
         return (
           <div className="space-y-6">
             <div className="bg-amber-50 rounded-xl p-6 border border-amber-100">
-              <h3 className="font-bold text-gray-900 mb-4">Review Your Information</h3>
+              <h3 className="font-bold text-gray-900 mb-4">{t('onboarding.reviewInformation')}</h3>
               <div className="space-y-2 text-sm">
-                <p><span className="font-semibold">Organization:</span> {formData.organizationName}</p>
-                <p><span className="font-semibold">Type:</span> {formData.ngoType}</p>
-                <p><span className="font-semibold">Contact Person:</span> {formData.contactPersonName}</p>
-                <p><span className="font-semibold">Email:</span> {formData.email}</p>
-                <p><span className="font-semibold">Location:</span> {formData.city}, {formData.state}</p>
+                <p><span className="font-semibold">{t('onboarding.reviewOrganization')}</span> {formData.organizationName}</p>
+                <p><span className="font-semibold">{t('onboarding.reviewType')}</span> {ngoTypeLabels[formData.ngoType] || formData.ngoType}</p>
+                <p><span className="font-semibold">{t('onboarding.reviewContactPerson')}</span> {formData.contactPersonName}</p>
+                <p><span className="font-semibold">{t('onboarding.reviewEmail')}</span> {formData.email}</p>
+                <p><span className="font-semibold">{t('onboarding.reviewLocation')}</span> {formData.city}, {formData.state}</p>
               </div>
             </div>
 
@@ -668,7 +680,7 @@ export function NgoOnboarding() {
                   required
                 />
                 <span className="text-sm text-gray-700">
-                  I agree to the <a href="#" className="text-red-600 hover:text-red-700 font-semibold">Terms of Service</a>
+                  {t('onboarding.termsAgreement')}
                 </span>
               </label>
 
@@ -682,7 +694,7 @@ export function NgoOnboarding() {
                   required
                 />
                 <span className="text-sm text-gray-700">
-                  I agree to the <a href="#" className="text-red-600 hover:text-red-700 font-semibold">Privacy Policy</a>
+                  {t('onboarding.privacyAgreement')}
                 </span>
               </label>
             </div>
@@ -745,7 +757,7 @@ export function NgoOnboarding() {
                   onClick={handleBack}
                   className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
                 >
-                  Back
+                  {t('common.back')}
                 </button>
               )}
               
@@ -755,7 +767,7 @@ export function NgoOnboarding() {
                   onClick={handleNext}
                   className="ml-auto px-6 py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors flex items-center space-x-2"
                 >
-                  <span>Next</span>
+                  <span>{t('common.next')}</span>
                   <ChevronRight className="w-5 h-5" />
                 </button>
               ) : (
@@ -767,11 +779,11 @@ export function NgoOnboarding() {
                   {isLoading ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Completing...</span>
+                      <span>{t('common.completing')}</span>
                     </>
                   ) : (
                     <>
-                      <span>Complete Onboarding</span>
+                      <span>{t('common.completeOnboarding')}</span>
                       <CheckCircle className="w-5 h-5" />
                     </>
                   )}
