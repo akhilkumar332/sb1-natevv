@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Mail, Phone, MapPin, Send, MessageCircle, Clock, Headphones } from 'lucide-react';
 import { notify } from 'services/notify.service';
 import { CONTACT_SUBJECT_OPTIONS } from '../constants/contact';
@@ -11,6 +12,7 @@ import CmsCustomSections from '../components/cms/CmsCustomSections';
 import CmsVisualEditor from '../components/cms/CmsVisualEditor';
 
 function Contact() {
+  const { t } = useTranslation();
   const cmsPage = useCmsFrontendPageContent('contact');
   const { content } = cmsPage;
   const settingsQuery = usePublicCmsSettings();
@@ -33,7 +35,7 @@ function Contact() {
     setSubmitting(true);
     try {
       await submitContactForm(formData);
-      notify.success('Message sent successfully! We\'ll get back to you soon.');
+      notify.success(t('contact.successMessage'));
       setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
     } catch (error) {
       void captureHandledError(error, {
@@ -41,7 +43,7 @@ function Contact() {
         scope: 'unknown',
         metadata: { kind: 'contact.form.submit' },
       });
-      notify.error(error instanceof Error ? error.message : 'Failed to submit contact form.');
+      notify.error(error instanceof Error ? error.message : t('contact.submitFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -182,7 +184,7 @@ function Contact() {
 
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">{t('contact.fullName')}</label>
                       <input
                         type="text"
                         name="name"
@@ -190,12 +192,12 @@ function Contact() {
                         onChange={handleChange}
                         required
                         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors"
-                        placeholder="John Doe"
+                        placeholder={t('contact.fullNamePlaceholder')}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">{t('contact.emailAddress')}</label>
                       <input
                         type="email"
                         name="email"
@@ -203,24 +205,24 @@ function Contact() {
                         onChange={handleChange}
                         required
                         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors"
-                        placeholder="john@example.com"
+                        placeholder={t('contact.emailPlaceholder')}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">{t('contact.phoneNumber')}</label>
                       <input
                         type="tel"
                         name="phone"
                         value={formData.phone}
                         onChange={handleChange}
                         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors"
-                        placeholder="+91 9876543210"
+                        placeholder={t('contact.phonePlaceholder')}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Subject</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">{t('contact.subject')}</label>
                       <select
                         name="subject"
                         value={formData.subject}
@@ -228,7 +230,7 @@ function Contact() {
                         required
                         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors"
                       >
-                        <option value="">Select a subject</option>
+                        <option value="">{t('contact.selectSubject')}</option>
                         {CONTACT_SUBJECT_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>{option.label}</option>
                         ))}
@@ -236,7 +238,7 @@ function Contact() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Message</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">{t('contact.message')}</label>
                       <textarea
                         name="message"
                         value={formData.message}
@@ -244,7 +246,7 @@ function Contact() {
                         required
                         rows={4}
                         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-colors resize-none"
-                        placeholder="How can we help you?"
+                        placeholder={t('contact.messagePlaceholder')}
                       />
                     </div>
 
@@ -254,7 +256,7 @@ function Contact() {
                       className="w-full py-4 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center"
                     >
                       <Send className="w-5 h-5 mr-2" />
-                      {submitting ? 'Sending...' : content.submitButton}
+                      {submitting ? t('contact.sending') : content.submitButton}
                     </button>
                   </form>
                 </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Heart, Phone, Mail, MapPin, Facebook, Twitter, Instagram, Linkedin, AlertCircle, ChevronDown } from 'lucide-react';
 import LogoMark from './LogoMark';
 import { ROUTES } from '../constants/routes';
@@ -10,6 +11,7 @@ import { CMS_MENU_LOCATION } from '../constants/cms';
 import { getPublishedBlogPosts } from '../services/cms.service';
 
 function Footer() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const settingsQuery = usePublicCmsSettings();
   const footerResourcesQuery = usePublicCmsMenu(CMS_MENU_LOCATION.footerResources);
@@ -38,17 +40,17 @@ function Footer() {
     { key: 'linkedin', href: toSafeExternalUrl(socialLinks.linkedin) || socialDefaults.linkedin, icon: <Linkedin className="w-5 h-5 text-red-600 relative z-10" /> },
   ] as const;
   const defaultResourceLinks = [
-    { id: 'donor-portal', label: 'Donor Portal', path: ROUTES.portal.donor.login, external: false },
-    { id: 'bloodbank-portal', label: 'BloodBank Portal', path: ROUTES.portal.bloodbank.login, external: false },
-    { id: 'ngo-portal', label: 'NGO Portal', path: ROUTES.portal.ngo.login, external: false },
-    { id: 'faq', label: 'FAQ', path: '/faq', external: false },
-    ...(showBlogInFooter ? [{ id: 'blog', label: 'Blog', path: ROUTES.blog, external: false }] : []),
+    { id: 'donor-portal', path: ROUTES.portal.donor.login, external: false },
+    { id: 'bloodbank-portal', path: ROUTES.portal.bloodbank.login, external: false },
+    { id: 'ngo-portal', path: ROUTES.portal.ngo.login, external: false },
+    { id: 'faq', path: '/faq', external: false },
+    ...(showBlogInFooter ? [{ id: 'blog', path: ROUTES.blog, external: false }] : []),
   ];
   const defaultLegalLinks = [
-    { id: 'privacy', label: 'Privacy Policy', path: '/privacy', external: false },
-    { id: 'terms', label: 'Terms of Service', path: '/terms', external: false },
-    { id: 'disclaimer', label: 'Disclaimer', path: '/disclaimer', external: false },
-    { id: 'sitemap', label: 'Sitemap', path: '/sitemap', external: false },
+    { id: 'privacy', path: '/privacy', external: false },
+    { id: 'terms', path: '/terms', external: false },
+    { id: 'disclaimer', path: '/disclaimer', external: false },
+    { id: 'sitemap', path: '/sitemap', external: false },
   ];
   const resourceLinks = footerResourcesQuery.data?.items?.length ? footerResourcesQuery.data.items : defaultResourceLinks;
   const legalLinks = footerLegalQuery.data?.items?.length ? footerLegalQuery.data.items : defaultLegalLinks;
@@ -69,6 +71,24 @@ function Footer() {
       staleTime: 60_000,
     });
   };
+  const defaultFooterLabel = (id: string) => {
+    const keyById: Record<string, string> = {
+      'donor-portal': 'footer.donorPortal',
+      'bloodbank-portal': 'footer.bloodbankPortal',
+      'ngo-portal': 'footer.ngoPortal',
+      faq: 'footer.faq',
+      blog: 'nav.blog',
+      privacy: 'footer.privacyPolicy',
+      terms: 'footer.termsOfService',
+      disclaimer: 'footer.disclaimer',
+      sitemap: 'footer.sitemap',
+    };
+    return t(keyById[id] || 'common.overview');
+  };
+  const getFooterItemLabel = (item: { id: string } | { id: string; label?: string }) => {
+    if ('label' in item && item.label) return item.label;
+    return defaultFooterLabel(item.id);
+  };
 
   return (
     <footer className="relative bg-gradient-to-br from-gray-50 to-white border-t border-gray-200 overflow-hidden">
@@ -86,20 +106,20 @@ function Footer() {
                 <h3 className="text-xl font-extrabold bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
                   BloodHub
                 </h3>
-                <p className="text-[10px] text-gray-500 -mt-1 tracking-wider">INDIA</p>
+                <p className="text-[10px] text-gray-500 -mt-1 tracking-wider">{t('brand.india')}</p>
               </div>
             </div>
             <p className="text-gray-600 mb-4 leading-relaxed text-sm">
-              India's most advanced blood donation platform, connecting donors with those in need through cutting-edge technology and unwavering compassion.
+              {t('footer.description')}
             </p>
             <div className="flex items-center text-red-600 font-semibold">
               <Heart className="w-5 h-5 mr-2 animate-pulse" />
-              <span>Saving Lives Together</span>
+              <span>{t('footer.savingLivesTogether')}</span>
             </div>
 
             {/* Social Media - PhonePe-inspired */}
             <div className="mt-6">
-              <p className="text-sm font-semibold text-gray-900 mb-3">Follow Us</p>
+              <p className="text-sm font-semibold text-gray-900 mb-3">{t('footer.followUs')}</p>
               <div className="flex space-x-3">
                 {socialConfig.map((item) => (
                   <a
@@ -126,10 +146,10 @@ function Footer() {
               aria-expanded={openSections.quickLinks}
               aria-controls="footer-quick-links"
             >
-              <span className="text-lg font-bold text-gray-900">Quick Links</span>
+              <span className="text-lg font-bold text-gray-900">{t('footer.quickLinks')}</span>
               <ChevronDown className={`h-5 w-5 text-red-600 transition-transform ${openSections.quickLinks ? 'rotate-180' : ''}`} />
             </button>
-            <h3 className="hidden text-lg font-bold text-gray-900 mb-4 lg:block">Quick Links</h3>
+            <h3 className="hidden text-lg font-bold text-gray-900 mb-4 lg:block">{t('footer.quickLinks')}</h3>
             <div id="footer-quick-links" className={`${openSections.quickLinks ? 'block' : 'hidden'} pt-4 lg:block lg:pt-0`}>
               <ul className="space-y-3">
                 <li>
@@ -138,7 +158,7 @@ function Footer() {
                     className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                   >
                     <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                    Become a Donor
+                    {t('footer.becomeDonor')}
                   </Link>
                 </li>
                 <li>
@@ -147,7 +167,7 @@ function Footer() {
                     className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                   >
                     <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                    Request Blood
+                    {t('nav.requestBlood')}
                   </Link>
                 </li>
                 <li>
@@ -156,7 +176,7 @@ function Footer() {
                     className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                   >
                     <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                    Find Donors
+                    {t('nav.findDonors')}
                   </Link>
                 </li>
                 <li>
@@ -165,7 +185,7 @@ function Footer() {
                     className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                   >
                     <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                    About Us
+                    {t('footer.aboutUs')}
                   </Link>
                 </li>
                 <li>
@@ -174,7 +194,7 @@ function Footer() {
                     className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                   >
                     <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                    Contact Us
+                    {t('footer.contactUs')}
                   </Link>
                 </li>
               </ul>
@@ -190,10 +210,10 @@ function Footer() {
               aria-expanded={openSections.resources}
               aria-controls="footer-resources"
             >
-              <span className="text-lg font-bold text-gray-900">Resources</span>
+              <span className="text-lg font-bold text-gray-900">{t('footer.resources')}</span>
               <ChevronDown className={`h-5 w-5 text-red-600 transition-transform ${openSections.resources ? 'rotate-180' : ''}`} />
             </button>
-            <h3 className="hidden text-lg font-bold text-gray-900 mb-4 lg:block">Resources</h3>
+            <h3 className="hidden text-lg font-bold text-gray-900 mb-4 lg:block">{t('footer.resources')}</h3>
             <div id="footer-resources" className={`${openSections.resources ? 'block' : 'hidden'} pt-4 lg:block lg:pt-0`}>
               <ul className="space-y-3">
                 {resourceLinks.map((item) => (
@@ -206,7 +226,7 @@ function Footer() {
                         className="text-gray-600 hover:text-red-600 transition-colors flex items-center group"
                       >
                         <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                        {item.label}
+                        {getFooterItemLabel(item)}
                       </a>
                     ) : (
                     <Link
@@ -217,7 +237,7 @@ function Footer() {
                       onTouchStart={item.path === ROUTES.blog ? prefetchBlogList : undefined}
                     >
                       <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                      {item.label}
+                      {getFooterItemLabel(item)}
                     </Link>
                     )}
                   </li>
@@ -235,16 +255,16 @@ function Footer() {
               aria-expanded={openSections.contact}
               aria-controls="footer-contact"
             >
-              <span className="text-lg font-bold text-gray-900">Get in Touch</span>
+              <span className="text-lg font-bold text-gray-900">{t('footer.getInTouch')}</span>
               <ChevronDown className={`h-5 w-5 text-red-600 transition-transform ${openSections.contact ? 'rotate-180' : ''}`} />
             </button>
-            <h3 className="hidden text-lg font-bold text-gray-900 mb-4 lg:block">Get in Touch</h3>
+            <h3 className="hidden text-lg font-bold text-gray-900 mb-4 lg:block">{t('footer.getInTouch')}</h3>
             <div id="footer-contact" className={`${openSections.contact ? 'block' : 'hidden'} pt-4 lg:block lg:pt-0`}>
               <ul className="space-y-3 mb-6">
                 <li className="flex items-start text-gray-600 group">
                   <Phone className="w-5 h-5 mr-3 text-red-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-medium text-gray-900">General Inquiries</p>
+                    <p className="font-medium text-gray-900">{t('footer.generalInquiries')}</p>
                     <a href={`tel:${supportPhone}`} className="hover:text-red-600 transition-colors">
                       {supportPhone}
                     </a>
@@ -253,7 +273,7 @@ function Footer() {
                 <li className="flex items-start text-gray-600 group">
                   <Mail className="w-5 h-5 mr-3 text-red-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-medium text-gray-900">Email Us</p>
+                    <p className="font-medium text-gray-900">{t('footer.emailUs')}</p>
                     <a href={`mailto:${supportEmail}`} className="hover:text-red-600 transition-colors">
                       {supportEmail}
                     </a>
@@ -262,7 +282,7 @@ function Footer() {
                 <li className="flex items-start text-gray-600">
                   <MapPin className="w-5 h-5 mr-3 text-red-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-medium text-gray-900">Head Office</p>
+                    <p className="font-medium text-gray-900">{t('footer.headOffice')}</p>
                     <p className="text-sm">{officeCity}</p>
                   </div>
                 </li>
@@ -278,7 +298,7 @@ function Footer() {
                     <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-r from-red-600 to-red-700 mr-2 shadow-md transform group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
                       <AlertCircle className="w-4 h-4 text-white" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
                     </div>
-                    <p className="text-red-700 font-bold">24/7 Emergency</p>
+                    <p className="text-red-700 font-bold">{t('footer.emergency247')}</p>
                   </div>
                   <a
                     href="tel:+911800999888"
@@ -286,7 +306,7 @@ function Footer() {
                   >
                     +91 1800-999-888
                   </a>
-                  <p className="text-xs text-gray-600 mt-1">Available round the clock</p>
+                  <p className="text-xs text-gray-600 mt-1">{t('footer.availableRoundTheClock')}</p>
                 </div>
               </div>
             </div>
@@ -298,11 +318,11 @@ function Footer() {
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4">
               <p className="text-gray-600 text-sm">
-                © {new Date().getFullYear()} BloodHub India. All rights reserved.
+                © {new Date().getFullYear()} BloodHub India. {t('footer.allRightsReserved')}
               </p>
               <div className="flex items-center text-xs text-gray-500">
                 <Heart className="w-3 h-3 text-red-600 mr-1" />
-                <span>Made with love for humanity</span>
+                <span>{t('footer.madeWithLove')}</span>
               </div>
             </div>
             <div className="flex flex-wrap justify-center gap-4 md:gap-6">
@@ -315,7 +335,7 @@ function Footer() {
                     rel="noopener noreferrer"
                     className="text-gray-600 hover:text-red-600 text-sm transition-colors"
                   >
-                    {item.label}
+                    {getFooterItemLabel(item)}
                   </a>
                 ) : (
                   <Link
@@ -323,7 +343,7 @@ function Footer() {
                     to={item.path}
                     className="text-gray-600 hover:text-red-600 text-sm transition-colors"
                   >
-                    {item.label}
+                    {getFooterItemLabel(item)}
                   </Link>
                 )
               ))}
@@ -333,9 +353,7 @@ function Footer() {
           {/* Additional Info */}
           <div className="mt-6 pt-6 border-t border-gray-100">
             <p className="text-center text-xs text-gray-500 leading-relaxed">
-              BloodHub is committed to connecting blood donors with those in need across India.
-              We facilitate voluntary blood donation and do not store or sell blood.
-              All donations are made directly at registered blood banks.
+              {t('footer.bottomDescription')}
             </p>
           </div>
         </div>

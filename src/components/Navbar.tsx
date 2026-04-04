@@ -2,18 +2,19 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Menu, X, LogOut, LayoutDashboard, Heart, ChevronDown, ChevronRight, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import LogoMark from './LogoMark';
 import NotificationBadge from './shared/NotificationBadge';
 import { gamificationService } from '../services/gamification.service';
 import ThemeToggle from './ThemeToggle';
+import LanguageSwitcher from './LanguageSwitcher';
 import { captureHandledError } from '../services/errorLog.service';
 import { useScopedErrorReporter } from '../hooks/useScopedErrorReporter';
 import {
   DASHBOARD_LINKS,
   DASHBOARD_PREFIX,
-  PORTAL_LABELS,
   PORTAL_OPTIONS,
   ROUTES,
   SIGNIN_OPTIONS,
@@ -25,6 +26,7 @@ import {
 } from '../constants/routes';
 import { CMS_QUERY_LIMITS } from '../constants/cms';
 import { getPublishedBlogPosts } from '../services/cms.service';
+import { getAdminGroupLabel, getAdminItemLabel, getDashboardLinkLabel, getPortalLabel } from '../utils/i18nLabels';
 
 import { TEN_MINUTES_MS } from '../constants/time';
 const TOP_BADGE_TTL_MS = TEN_MINUTES_MS;
@@ -493,6 +495,7 @@ function MobileUserMenu({
 }
 
 const Navbar: React.FC = () => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [pendingPortal, setPendingPortal] = useState<PortalRole | null>(null);
@@ -519,19 +522,19 @@ const Navbar: React.FC = () => {
   const showNotificationBadge = isDonorDashboard || isNgoDashboard || isBloodbankDashboard;
   const dashboardInfoChips = [
     ...(user?.bhId && (isNgoDashboard || isBloodbankDashboard || isAdminDashboard)
-      ? [`BH ID: ${user.bhId}`]
+      ? [t('common.bhId', { value: user.bhId })]
       : []),
     ...(user?.registrationNumber && (isNgoDashboard || isBloodbankDashboard)
-      ? [`Reg ID: ${user.registrationNumber}`]
+      ? [t('common.regId', { value: user.registrationNumber })]
       : []),
     ...(isAdminDashboard
-      ? [`Role: ${isSuperAdmin ? 'superadmin' : 'admin'}`]
+      ? [t('common.roleChip', { role: isSuperAdmin ? 'superadmin' : 'admin' })]
       : []),
   ];
   const topBadge = useTopDonorBadge(user);
   const achievementLabel = topBadge.name
     ? `${topBadge.icon ? `${topBadge.icon} ` : ''}${topBadge.name}`
-    : (user?.role === 'donor' ? 'New Donor' : '');
+    : (user?.role === 'donor' ? t('common.newDonor') : '');
   const currentPortal = portalRole
     ?? (PORTAL_OPTIONS.some(option => option.role === user?.role)
       ? (user?.role as PortalRole)
@@ -603,7 +606,7 @@ const Navbar: React.FC = () => {
                   <span className="font-extrabold text-2xl bg-gradient-to-r from-red-600 via-red-700 to-red-800 bg-clip-text text-transparent">
                     BloodHub
                   </span>
-                  <p className="text-[10px] text-gray-500 -mt-1 tracking-wider">INDIA</p>
+                  <p className="text-[10px] text-gray-500 -mt-1 tracking-wider">{t('brand.india')}</p>
                 </div>
               </Link>
             </div>
@@ -612,11 +615,11 @@ const Navbar: React.FC = () => {
             <div className="hidden md:flex items-center space-x-1">
               {!hidePublicNav && (
                 <>
-                  <DesktopNavLink to={ROUTES.donors}>Find Donors</DesktopNavLink>
-                  <DesktopNavLink to={ROUTES.requestBlood}>Request Blood</DesktopNavLink>
-                  <DesktopNavLink to={ROUTES.about}>About</DesktopNavLink>
-                  <DesktopNavLink to={ROUTES.contact}>Contact</DesktopNavLink>
-                  <DesktopNavLink to={ROUTES.blog} onIntent={prefetchBlogList}>Blog</DesktopNavLink>
+                  <DesktopNavLink to={ROUTES.donors}>{t('nav.findDonors')}</DesktopNavLink>
+                  <DesktopNavLink to={ROUTES.requestBlood}>{t('nav.requestBlood')}</DesktopNavLink>
+                  <DesktopNavLink to={ROUTES.about}>{t('nav.about')}</DesktopNavLink>
+                  <DesktopNavLink to={ROUTES.contact}>{t('nav.contact')}</DesktopNavLink>
+                  <DesktopNavLink to={ROUTES.blog} onIntent={prefetchBlogList}>{t('nav.blog')}</DesktopNavLink>
                 </>
               )}
 
@@ -632,6 +635,10 @@ const Navbar: React.FC = () => {
                   ))}
                 </div>
               )}
+
+              <div className="ml-4">
+                <LanguageSwitcher />
+              </div>
 
               <div className="ml-4">
                 <ThemeToggle />
@@ -650,7 +657,7 @@ const Navbar: React.FC = () => {
                       {isSuperAdmin && (
                         <div className="flex items-center gap-2">
                           <span className="inline-flex items-center rounded-full bg-red-600 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-white shadow-sm">
-                            SuperAdmin Mode
+                            {t('common.superadminMode')}
                           </span>
                           <div className="flex items-center gap-1 rounded-full border border-red-100 bg-white/80 p-1 shadow-sm">
                             {PORTAL_OPTIONS.map((option) => {
@@ -669,7 +676,7 @@ const Navbar: React.FC = () => {
                                   }`}
                                   aria-pressed={isActive}
                                 >
-                                  {option.label}
+                                  {getPortalLabel(option.role, t)}
                                 </button>
                               );
                             })}
@@ -711,14 +718,13 @@ const Navbar: React.FC = () => {
           <div className="container mx-auto px-4 py-2 text-xs font-medium text-amber-900 sm:text-sm flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col gap-1">
               <span>
-                You are impersonating{' '}
-                <span className="font-semibold">
-                  {impersonationSession.targetDisplayName || impersonationSession.targetEmail || 'User'}
-                </span>
-                {impersonationSession.targetRole ? ` (${impersonationSession.targetRole})` : '.'}
+                {t('common.impersonatingUser', {
+                  user: impersonationSession.targetDisplayName || impersonationSession.targetEmail || t('common.userFallback'),
+                  role: impersonationSession.targetRole ? `(${impersonationSession.targetRole})` : '.',
+                })}
               </span>
               <span className="text-[11px] text-amber-800">
-                Reason: {impersonationSession.reason || 'Not provided'}
+                {t('common.reason')}: {impersonationSession.reason || t('common.notProvided')}
               </span>
             </div>
             <button
@@ -726,7 +732,7 @@ const Navbar: React.FC = () => {
               disabled={impersonationTransition === 'stopping'}
               className="self-start sm:self-auto rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-900 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {impersonationTransition === 'stopping' ? 'Stopping…' : 'Stop impersonation'}
+              {impersonationTransition === 'stopping' ? t('common.processing') : t('common.stopImpersonation')}
             </button>
           </div>
         </div>
@@ -735,7 +741,7 @@ const Navbar: React.FC = () => {
       {isSuperAdmin && !isImpersonating && currentPortal && currentPortal !== 'admin' && (
         <div className="border-b border-amber-200 bg-amber-50">
           <div className="container mx-auto px-4 py-2 text-xs font-medium text-amber-900 sm:text-sm">
-            You are acting as <span className="font-semibold">{PORTAL_LABELS[currentPortal]}</span> portal.
+            {t('common.actingAsPortal', { portal: getPortalLabel(currentPortal, t) })}
           </div>
         </div>
       )}
@@ -767,10 +773,11 @@ const Navbar: React.FC = () => {
                     <h2 className="text-xl font-extrabold bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
                       BloodHub
                     </h2>
-                    <p className="text-[10px] text-gray-500 -mt-1 tracking-wider">INDIA</p>
+                    <p className="text-[10px] text-gray-500 -mt-1 tracking-wider">{t('brand.india')}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <LanguageSwitcher />
                   <ThemeToggle className="px-2.5 py-2" />
                   <button
                     onClick={() => setIsOpen(false)}
@@ -801,58 +808,58 @@ const Navbar: React.FC = () => {
                 {!hidePublicNav && (
                   <>
                     <div className="animate-slideInRight" style={{ animationDelay: '0.1s', animationFillMode: 'both' }}>
-                      <MobileNavLink to={ROUTES.donors} onClick={() => setIsOpen(false)}>Find Donors</MobileNavLink>
+                      <MobileNavLink to={ROUTES.donors} onClick={() => setIsOpen(false)}>{t('nav.findDonors')}</MobileNavLink>
                     </div>
                     <div className="animate-slideInRight" style={{ animationDelay: '0.15s', animationFillMode: 'both' }}>
-                      <MobileNavLink to={ROUTES.requestBlood} onClick={() => setIsOpen(false)}>Request Blood</MobileNavLink>
+                      <MobileNavLink to={ROUTES.requestBlood} onClick={() => setIsOpen(false)}>{t('nav.requestBlood')}</MobileNavLink>
                     </div>
                     <div className="animate-slideInRight" style={{ animationDelay: '0.2s', animationFillMode: 'both' }}>
-                      <MobileNavLink to={ROUTES.about} onClick={() => setIsOpen(false)}>About</MobileNavLink>
+                      <MobileNavLink to={ROUTES.about} onClick={() => setIsOpen(false)}>{t('nav.about')}</MobileNavLink>
                     </div>
                     <div className="animate-slideInRight" style={{ animationDelay: '0.25s', animationFillMode: 'both' }}>
-                      <MobileNavLink to={ROUTES.contact} onClick={() => setIsOpen(false)}>Contact</MobileNavLink>
+                      <MobileNavLink to={ROUTES.contact} onClick={() => setIsOpen(false)}>{t('nav.contact')}</MobileNavLink>
                     </div>
                     <div className="animate-slideInRight" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
-                      <MobileNavLink to={ROUTES.blog} onClick={() => setIsOpen(false)} onIntent={prefetchBlogList}>Blog</MobileNavLink>
+                      <MobileNavLink to={ROUTES.blog} onClick={() => setIsOpen(false)} onIntent={prefetchBlogList}>{t('nav.blog')}</MobileNavLink>
                     </div>
                   </>
                 )}
 
                 {isDonorDashboard && (
                   <div className="space-y-2 border-b border-gray-200 pb-4 mb-4 dark:border-gray-700">
-                    <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">Donor Menu</p>
+                    <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">{t('nav.donorMenu')}</p>
                     {DASHBOARD_LINKS.donor.map((item) => (
                       <MobileNavLink key={item.path} to={item.path} onClick={() => setIsOpen(false)}>
-                        {item.label}
+                        {getDashboardLinkLabel('donor', item.path, t)}
                       </MobileNavLink>
                     ))}
                   </div>
                 )}
                 {isNgoDashboard && (
                   <div className="space-y-2 border-b border-gray-200 pb-4 mb-4 dark:border-gray-700">
-                    <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">NGO Menu</p>
+                    <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">{t('nav.ngoMenu')}</p>
                     {DASHBOARD_LINKS.ngo.map((item) => (
                       <MobileNavLink key={item.path} to={item.path} onClick={() => setIsOpen(false)}>
-                        {item.label}
+                        {getDashboardLinkLabel('ngo', item.path, t)}
                       </MobileNavLink>
                     ))}
                   </div>
                 )}
                 {isBloodbankDashboard && (
                   <div className="space-y-2 border-b border-gray-200 pb-4 mb-4 dark:border-gray-700">
-                    <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">BloodBank Menu</p>
+                    <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">{t('nav.bloodbankMenu')}</p>
                     {DASHBOARD_LINKS.bloodbank.map((item) => (
                       <MobileNavLink key={item.path} to={item.path} onClick={() => setIsOpen(false)}>
-                        {item.label}
+                        {getDashboardLinkLabel('bloodbank', item.path, t)}
                       </MobileNavLink>
                     ))}
                   </div>
                 )}
                 {isAdminDashboard && (
                   <div className="space-y-2 border-b border-gray-200 pb-4 mb-4 dark:border-gray-700">
-                    <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">Admin Menu</p>
+                    <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-red-600">{t('nav.adminMenu')}</p>
                     <MobileNavLink to={ROUTES.portal.admin.dashboard.overview} onClick={() => setIsOpen(false)}>
-                      Overview
+                      {t('common.overview')}
                     </MobileNavLink>
                     {adminMobileGroups.map((group) => (
                       <div key={group.id} className="space-y-1.5">
@@ -865,7 +872,7 @@ const Navbar: React.FC = () => {
                           aria-expanded={adminMobileExpandedGroups[group.id] ?? false}
                         >
                           <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                            {group.label}
+                            {getAdminGroupLabel(group.id, t)}
                           </span>
                           {(adminMobileExpandedGroups[group.id] ?? false) ? (
                             <ChevronDown className="h-3.5 w-3.5 text-red-500" />
@@ -875,7 +882,7 @@ const Navbar: React.FC = () => {
                         </button>
                         {(adminMobileExpandedGroups[group.id] ?? false) && group.items.map((item) => (
                           <MobileNavLink key={item.path} to={item.path} onClick={() => setIsOpen(false)}>
-                            {item.label}
+                            {getAdminItemLabel(item.id, t)}
                           </MobileNavLink>
                         ))}
                       </div>
@@ -906,7 +913,7 @@ const Navbar: React.FC = () => {
               <div className="p-6 border-t border-gray-200 bg-gradient-to-r from-red-50 to-pink-50 dark:border-gray-700 dark:from-gray-950 dark:to-gray-900">
                 <div className="flex items-center text-red-600 font-semibold justify-center">
                   <Heart className="w-4 h-4 mr-2 animate-pulse" />
-                  <span className="text-sm">Saving Lives Together</span>
+                  <span className="text-sm">{t('footer.savingLivesTogether')}</span>
                 </div>
               </div>
             </div>
@@ -923,7 +930,7 @@ const Navbar: React.FC = () => {
             </div>
             <div className="px-6 py-5 space-y-4">
               <p className="text-sm text-gray-600">
-                You are about to switch to the <span className="font-semibold">{PORTAL_LABELS[pendingPortal]}</span> portal.
+                {t('common.actingAsPortal', { portal: getPortalLabel(pendingPortal, t) })}
               </p>
               <div className="flex items-center justify-end gap-3">
                 <button

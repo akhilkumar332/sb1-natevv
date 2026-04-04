@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Phone, Heart, Shield, Users, Award, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import PhoneInput from 'react-phone-number-input';
@@ -12,6 +13,7 @@ import { ROUTES } from '../../constants/routes';
 import { readRegistrationIntent } from '../../utils/registrationIntent';
 
 export function DonorRegister() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, profileResolved } = useAuth();
   const hasNavigated = useRef(false);
@@ -52,7 +54,7 @@ export function DonorRegister() {
     <div className="space-y-6">
       <div>
         <label htmlFor="identifier" className="block text-sm font-semibold text-gray-700 mb-2">
-          Phone Number
+          {t('auth.phoneNumber')}
         </label>
         <div className="relative">
           <PhoneInput
@@ -77,11 +79,11 @@ export function DonorRegister() {
         {authLoading ? (
           <>
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            <span>Processing...</span>
+            <span>{t('common.processing')}</span>
           </>
         ) : (
           <>
-            <span>Send OTP</span>
+            <span>{t('auth.sendOtp')}</span>
             <ArrowRight className="w-5 h-5" />
           </>
         )}
@@ -93,7 +95,7 @@ export function DonorRegister() {
     <div className="space-y-6">
       <div>
         <label htmlFor="otp" className="block text-sm font-semibold text-gray-700 mb-2">
-          Enter OTP
+          {t('auth.enterOtp')}
         </label>
         <div className="relative">
           <input
@@ -123,7 +125,7 @@ export function DonorRegister() {
           />
         </div>
         <p className="mt-2 text-sm text-gray-500 text-center">
-          We've sent a 6-digit code to your phone
+          {t('auth.weSentCode')}
         </p>
       </div>
 
@@ -136,11 +138,11 @@ export function DonorRegister() {
         {otpLoading ? (
           <>
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            <span>Verifying...</span>
+            <span>{t('common.verifying')}</span>
           </>
         ) : (
           <>
-            <span>Verify OTP</span>
+            <span>{t('auth.verifyOtp')}</span>
             <ArrowRight className="w-5 h-5" />
           </>
         )}
@@ -149,7 +151,7 @@ export function DonorRegister() {
       <div className="text-center">
         {otpResendTimer > 0 ? (
           <p className="text-sm text-gray-500">
-            Resend OTP in <span className="font-bold text-red-600">{otpResendTimer}s</span>
+            {t('auth.resendOtpIn', { seconds: otpResendTimer })}
           </p>
         ) : (
           <button
@@ -158,7 +160,7 @@ export function DonorRegister() {
             disabled={otpLoading}
             className="text-sm text-red-600 hover:text-red-700 font-semibold disabled:opacity-50 transition-colors"
           >
-            Resend OTP
+            {t('auth.resendOtp')}
           </button>
         )}
       </div>
@@ -179,12 +181,12 @@ export function DonorRegister() {
               <LogoMark className="w-12 h-12" />
               <div>
                 <h1 className="text-3xl font-extrabold">BloodHub</h1>
-                <p className="text-sm tracking-wider opacity-90">INDIA</p>
+                <p className="text-sm tracking-wider opacity-90">{t('brand.india')}</p>
               </div>
             </div>
-            <h2 className="text-4xl font-bold mb-4">Become a Life-Saver</h2>
+            <h2 className="text-4xl font-bold mb-4">{t('auth.becomeLifeSaver')}</h2>
             <p className="text-xl opacity-90 leading-relaxed">
-              Join thousands of heroes who are saving lives through blood donation.
+              {t('auth.joinHeroes')}
             </p>
           </div>
 
@@ -194,8 +196,8 @@ export function DonorRegister() {
                 <Heart className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Save Lives</h3>
-                <p className="opacity-90 text-sm">One donation can save up to three lives</p>
+                <h3 className="font-bold text-lg mb-1">{t('auth.saveLives')}</h3>
+                <p className="opacity-90 text-sm">{t('auth.saveLivesText')}</p>
               </div>
             </div>
 
@@ -204,8 +206,8 @@ export function DonorRegister() {
                 <Users className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Join the Community</h3>
-                <p className="opacity-90 text-sm">Connect with 50,000+ active donors</p>
+                <h3 className="font-bold text-lg mb-1">{t('auth.joinCommunity')}</h3>
+                <p className="opacity-90 text-sm">{t('auth.joinCommunityText')}</p>
               </div>
             </div>
 
@@ -214,8 +216,8 @@ export function DonorRegister() {
                 <Award className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Track Your Impact</h3>
-                <p className="opacity-90 text-sm">Monitor your donation history and badges</p>
+                <h3 className="font-bold text-lg mb-1">{t('auth.trackImpact')}</h3>
+                <p className="opacity-90 text-sm">{t('auth.trackImpactText')}</p>
               </div>
             </div>
 
@@ -224,8 +226,8 @@ export function DonorRegister() {
                 <Shield className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Safe & Secure</h3>
-                <p className="opacity-90 text-sm">Your privacy is our top priority</p>
+                <h3 className="font-bold text-lg mb-1">{t('auth.safeSecure')}</h3>
+                <p className="opacity-90 text-sm">{t('auth.safeSecureText')}</p>
               </div>
             </div>
           </div>
@@ -252,8 +254,8 @@ export function DonorRegister() {
               <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-red-600 to-red-700 rounded-2xl mb-4">
                 <Heart className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Donor Registration</h2>
-              <p className="text-gray-600">Join our community of life-savers!</p>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">{t('auth.donorRegister')}</h2>
+              <p className="text-gray-600">{t('auth.registerSubtitle')}</p>
             </div>
 
             <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
@@ -264,7 +266,7 @@ export function DonorRegister() {
                   <div className="w-full border-t border-gray-200" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white text-gray-500 font-medium">Or continue with</span>
+                  <span className="px-4 bg-white text-gray-500 font-medium">{t('auth.orContinueWith')}</span>
                 </div>
               </div>
 
@@ -277,7 +279,7 @@ export function DonorRegister() {
                 {googleLoading || otpLoading ? (
                   <span className="flex items-center space-x-2">
                     <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span>{googleLoading ? 'Signing up...' : 'Verifying...'}</span>
+                    <span>{googleLoading ? t('auth.registerNow') : t('common.verifying')}</span>
                   </span>
                 ) : (
                   <>
@@ -286,19 +288,19 @@ export function DonorRegister() {
                       src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
                       alt="Google logo"
                     />
-                    Sign up with Google
+                    {t('auth.signInWithGoogle')}
                   </>
                 )}
               </button>
 
               <div className="pt-4 border-t border-gray-100">
                 <p className="text-center text-sm text-gray-600">
-                  Already have an account?{' '}
+                  {t('auth.alreadyHaveAccount')}{' '}
                   <Link
                     to={ROUTES.portal.donor.login}
                     className="font-semibold text-red-600 hover:text-red-700 transition-colors"
                   >
-                    Login now
+                    {t('auth.loginNow')}
                   </Link>
                 </p>
               </div>
@@ -309,31 +311,31 @@ export function DonorRegister() {
           <div className="mt-6 bg-gradient-to-r from-red-50 to-pink-50 rounded-2xl p-6 border border-red-100">
             <h3 className="font-bold text-gray-900 mb-3 flex items-center">
               <Heart className="w-5 h-5 text-red-600 mr-2" />
-              Why Donate Blood?
+              {t('auth.whyDonateBlood')}
             </h3>
             <ul className="space-y-2 text-sm text-gray-700">
               <li className="flex items-center">
                 <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2"></span>
-                Save up to 3 lives with one donation
+                {t('auth.benefitSaveThreeLives')}
               </li>
               <li className="flex items-center">
                 <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2"></span>
-                Free health checkup before every donation
+                {t('auth.benefitFreeCheckup')}
               </li>
               <li className="flex items-center">
                 <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2"></span>
-                Reduces risk of heart diseases
+                {t('auth.benefitHeartRisk')}
               </li>
               <li className="flex items-center">
                 <span className="w-1.5 h-1.5 bg-red-600 rounded-full mr-2"></span>
-                Join a community of heroes
+                {t('auth.benefitJoinHeroes')}
               </li>
             </ul>
           </div>
 
           {/* Terms */}
           <div className="mt-4 text-center text-xs text-gray-500">
-            <p>By registering, you agree to our Terms of Service and Privacy Policy</p>
+            <p>{t('auth.registerConsent')}</p>
           </div>
         </div>
       </div>

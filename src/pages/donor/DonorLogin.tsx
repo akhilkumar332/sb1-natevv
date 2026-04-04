@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Phone, Droplet, Heart, Shield, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import type { ImpersonationUser } from '../../services/admin.service';
@@ -16,6 +17,7 @@ import { navigateToPortalDashboard, resolveImpersonationRole, resolvePortalRole 
 import { ROUTES } from '../../constants/routes';
 
 export function DonorLogin() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const {
@@ -101,7 +103,7 @@ export function DonorLogin() {
   ]);
 
   if (user && isSuperAdmin && !profileResolved) {
-    return <AuthStatusScreen message="Checking account…" />;
+    return <AuthStatusScreen message={t('common.checkingAccount')} />;
   }
 
   const handlePortalSelect = (role: 'donor' | 'ngo' | 'bloodbank' | 'admin') => {
@@ -123,7 +125,7 @@ export function DonorLogin() {
     <div className="space-y-6">
       <div>
         <label htmlFor="identifier" className="block text-sm font-semibold text-gray-700 mb-2">
-          Phone Number
+          {t('auth.phoneNumber')}
         </label>
         <div className="relative">
           <PhoneInput
@@ -148,11 +150,11 @@ export function DonorLogin() {
         {authLoading ? (
           <>
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            <span>Processing...</span>
+            <span>{t('common.processing')}</span>
           </>
         ) : (
           <>
-            <span>Send OTP</span>
+            <span>{t('auth.sendOtp')}</span>
             <ArrowRight className="w-5 h-5" />
           </>
         )}
@@ -164,7 +166,7 @@ export function DonorLogin() {
     <div className="space-y-6">
       <div>
         <label htmlFor="otp" className="block text-sm font-semibold text-gray-700 mb-2">
-          Enter OTP
+          {t('auth.enterOtp')}
         </label>
         <div className="relative">
           <input
@@ -194,7 +196,7 @@ export function DonorLogin() {
           />
         </div>
         <p className="mt-2 text-sm text-gray-500 text-center">
-          We've sent a 6-digit code to your phone
+          {t('auth.weSentCode')}
         </p>
       </div>
 
@@ -207,11 +209,11 @@ export function DonorLogin() {
         {otpLoading ? (
           <>
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            <span>Verifying...</span>
+            <span>{t('common.verifying')}</span>
           </>
         ) : (
           <>
-            <span>Verify OTP</span>
+            <span>{t('auth.verifyOtp')}</span>
             <ArrowRight className="w-5 h-5" />
           </>
         )}
@@ -220,7 +222,7 @@ export function DonorLogin() {
       <div className="text-center">
         {otpResendTimer > 0 ? (
           <p className="text-sm text-gray-500">
-            Resend OTP in <span className="font-bold text-red-600">{otpResendTimer}s</span>
+            {t('auth.resendOtpIn', { seconds: otpResendTimer })}
           </p>
         ) : (
           <button
@@ -229,7 +231,7 @@ export function DonorLogin() {
             disabled={otpLoading}
             className="text-sm text-red-600 hover:text-red-700 font-semibold disabled:opacity-50 transition-colors"
           >
-            Resend OTP
+            {t('auth.resendOtp')}
           </button>
         )}
       </div>
@@ -264,12 +266,12 @@ export function DonorLogin() {
               <LogoMark className="w-12 h-12" />
               <div>
                 <h1 className="text-3xl font-extrabold">BloodHub</h1>
-                <p className="text-sm tracking-wider opacity-90">INDIA</p>
+                <p className="text-sm tracking-wider opacity-90">{t('brand.india')}</p>
               </div>
             </div>
-            <h2 className="text-4xl font-bold mb-4">Welcome Back, Hero!</h2>
+            <h2 className="text-4xl font-bold mb-4">{t('auth.welcomeBackHero')}</h2>
             <p className="text-xl opacity-90 leading-relaxed">
-              Every donation saves lives. Sign in to continue your journey of compassion.
+              {t('auth.loginHeroDescription')}
             </p>
           </div>
 
@@ -279,8 +281,8 @@ export function DonorLogin() {
                 <Shield className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Secure & Safe</h3>
-                <p className="opacity-90 text-sm">Your data is protected with enterprise-grade security</p>
+                <h3 className="font-bold text-lg mb-1">{t('auth.safeSecure')}</h3>
+                <p className="opacity-90 text-sm">{t('auth.enterpriseSecurityText')}</p>
               </div>
             </div>
 
@@ -289,8 +291,8 @@ export function DonorLogin() {
                 <Droplet className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Track Your Impact</h3>
-                <p className="opacity-90 text-sm">Monitor your donations and lives saved</p>
+                <h3 className="font-bold text-lg mb-1">{t('auth.trackImpact')}</h3>
+                <p className="opacity-90 text-sm">{t('auth.loginImpactText')}</p>
               </div>
             </div>
 
@@ -299,8 +301,8 @@ export function DonorLogin() {
                 <Heart className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Join the Community</h3>
-                <p className="opacity-90 text-sm">Connect with thousands of donors across India</p>
+                <h3 className="font-bold text-lg mb-1">{t('auth.joinCommunity')}</h3>
+                <p className="opacity-90 text-sm">{t('auth.loginCommunityText')}</p>
               </div>
             </div>
           </div>
@@ -327,8 +329,8 @@ export function DonorLogin() {
               <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-red-600 to-red-700 rounded-2xl mb-4">
                 <Heart className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Donor Login</h2>
-              <p className="text-gray-600">Enter your details to continue</p>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">{t('auth.donorLogin')}</h2>
+              <p className="text-gray-600">{t('auth.enterDetailsToContinue')}</p>
             </div>
 
             <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
@@ -339,7 +341,7 @@ export function DonorLogin() {
                   <div className="w-full border-t border-gray-200" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-white text-gray-500 font-medium">Or continue with</span>
+                  <span className="px-4 bg-white text-gray-500 font-medium">{t('auth.orContinueWith')}</span>
                 </div>
               </div>
 
@@ -352,7 +354,7 @@ export function DonorLogin() {
                 {googleLoading || otpLoading ? (
                   <span className="flex items-center space-x-2">
                     <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span>{googleLoading ? 'Signing in...' : 'Verifying...'}</span>
+                    <span>{googleLoading ? t('nav.signIn') : t('common.verifying')}</span>
                   </span>
                 ) : (
                   <>
@@ -361,24 +363,24 @@ export function DonorLogin() {
                       src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
                       alt="Google logo"
                     />
-                    Sign in with Google
+                    {t('auth.signInWithGoogle')}
                   </>
                 )}
               </button>
 
               <PwaInstallCta
-                label="Install Donor App"
+                label={t('auth.installDonorApp')}
                 buttonClassName="bg-red-600 text-white hover:bg-red-700 focus:ring-red-500"
               />
 
               <div className="pt-4 border-t border-gray-100">
                 <p className="text-center text-sm text-gray-600">
-                  Don't have an account?{' '}
+                  {t('auth.dontHaveAccount')}{' '}
                   <Link
                     to={ROUTES.portal.donor.register}
                     className="font-semibold text-red-600 hover:text-red-700 transition-colors"
                   >
-                    Register now
+                    {t('auth.registerNow')}
                   </Link>
                 </p>
               </div>
@@ -387,7 +389,7 @@ export function DonorLogin() {
 
           {/* Additional Info */}
           <div className="mt-6 text-center text-sm text-gray-500">
-            <p>By signing in, you agree to our Terms of Service and Privacy Policy</p>
+            <p>{t('auth.loginConsent')}</p>
           </div>
         </div>
       </div>

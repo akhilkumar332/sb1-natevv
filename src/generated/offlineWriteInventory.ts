@@ -304,12 +304,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.setDoc.hooks/useRegister.ts:184",
+    "id": "USERS.setDoc.hooks/useRegister.ts:186",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "hooks",
     "path": "hooks/useRegister.ts",
-    "line": 184,
+    "line": 186,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },

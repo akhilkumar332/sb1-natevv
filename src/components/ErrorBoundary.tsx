@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, Home } from 'lucide-react';
 import { captureFatalError } from '../services/errorLog.service';
 import { ROUTES } from '../constants/routes';
+import i18n from '../i18n';
 
 interface Props {
   children: React.ReactNode;
@@ -53,9 +54,9 @@ class ErrorBoundary extends React.Component<Props, State> {
         <div className="min-h-[80vh] flex items-center justify-center px-4 sm:px-6 lg:px-8">
           <div className="max-w-md w-full text-center">
             <AlertTriangle className="mx-auto h-16 w-16 text-red-500" />
-            <h1 className="mt-6 text-3xl font-bold text-gray-900">Oops! Something went wrong</h1>
+            <h1 className="mt-6 text-3xl font-bold text-gray-900">{i18n.t('route.somethingWentWrong')}</h1>
             <p className="mt-4 text-gray-500">
-              We're sorry, but something went wrong. Please try again later.
+              {i18n.t('route.somethingWentWrongDescription')}
             </p>
             <div className="mt-8">
               <Link
@@ -63,14 +64,14 @@ class ErrorBoundary extends React.Component<Props, State> {
                 className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-red-600 hover:bg-red-700 transition"
               >
                 <Home className="w-5 h-5 mr-2" />
-                Back to Home
+                {i18n.t('common.backToHome')}
               </Link>
             </div>
             <div className="mt-8 text-sm text-gray-500">
               <p>
-                Need help?{' '}
+                {i18n.t('common.needHelp')}{' '}
                 <Link to={ROUTES.contact} className="text-red-600 hover:text-red-500 font-medium">
-                  Contact Support
+                  {i18n.t('common.contactSupport')}
                 </Link>
               </p>
             </div>

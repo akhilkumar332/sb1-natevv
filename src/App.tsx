@@ -1,6 +1,7 @@
 // src/App.tsx
 import { Suspense, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Loading from './components/Loading';
@@ -29,6 +30,7 @@ function App() {
   useAuthSync();
   useActivityTracker();
   useVersionCheck();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { isDark } = useTheme();
   const { isMobileOrTablet, isTablet } = useViewport();
@@ -105,8 +107,8 @@ function App() {
   }, [location.search]);
 
   useEffect(() => {
-    applyPwaBranding(location.pathname);
-  }, [location.pathname]);
+    applyPwaBranding(location.pathname, t);
+  }, [i18n.resolvedLanguage, location.pathname, t]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;

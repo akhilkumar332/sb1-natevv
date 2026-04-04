@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import { captureHandledError } from './services/errorLog.service';
 import { ROUTES } from './constants/routes';
+import i18n from './i18n';
 
 const LAZY_RELOAD_KEY = 'bh_lazy_reload_attempted';
 
@@ -45,9 +46,9 @@ const lazyLoad = (importPromise: Promise<any>) => {
     });
     const reloading = tryAutoReload(error);
     if (reloading) {
-      return { default: () => <div>Reloading...</div> };
+      return { default: () => <div>{i18n.t('route.reloading')}</div> };
     }
-    return { default: () => <div>Error loading, please reload.</div> };
+    return { default: () => <div>{i18n.t('route.errorLoadingPleaseReload')}</div> };
   });
 };
 

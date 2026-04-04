@@ -5,6 +5,7 @@ import { Home } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 import DashboardMobileDrawer from '../DashboardMobileDrawer';
 import { ROUTES } from '../../../constants/routes';
+import '../../../i18n';
 
 describe('DashboardMobileDrawer', () => {
   it('renders menu title and items when opened', () => {

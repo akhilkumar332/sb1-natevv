@@ -1,5 +1,6 @@
 // src/hooks/useLogin.ts
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { PhoneAuthError } from '../errors/PhoneAuthError';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -21,6 +22,7 @@ interface LoginFormData {
 }
 
 export const useLogin = () => {
+  const { t } = useTranslation();
   const [googleLoading, setGoogleLoading] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [formData, setFormData] = useState<LoginFormData>({
@@ -119,7 +121,7 @@ export const useLogin = () => {
       }
 
       navigateAfterDonorLogin(verifiedUser);
-      notify.success('Login successful!');
+      notify.success(t('auth.loginSuccessful'));
     } catch (error) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.otp.verify' } });
 
@@ -196,12 +198,12 @@ export const useLogin = () => {
         if (result?.token) {
           handleLoginSuccess(result.token);
         }
-        notify.success('Select a portal to continue.');
+        notify.success(t('auth.selectPortalToContinue'));
         return;
       }
       if (result?.token && result?.user) {
         handleLoginSuccess(result.token);
-        notify.success('Successfully logged in with Google!');
+        notify.success(t('auth.googleLoginSuccessful'));
 
         // Navigate based on onboarding status - if not explicitly true, go to onboarding
         navigateAfterDonorLogin(result.user);

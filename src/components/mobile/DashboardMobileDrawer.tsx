@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import { NavLink } from 'react-router-dom';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export type DashboardDrawerItem = {
   id: string;
@@ -32,6 +33,7 @@ export default function DashboardMobileDrawer({
   inactiveClassName = DEFAULT_INACTIVE_CLASS,
   widthClassName = 'w-72',
 }: DashboardMobileDrawerProps) {
+  const { t } = useTranslation();
   return (
     <div
       className={`fixed inset-0 z-50 lg:hidden transition-opacity duration-300 ${
@@ -43,7 +45,7 @@ export default function DashboardMobileDrawer({
         type="button"
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
-        aria-label="Close menu overlay"
+        aria-label={t('common.closeMenuOverlay')}
       />
       <div
         className={`absolute left-0 top-0 h-full ${widthClassName} bg-white p-4 shadow-2xl transition-transform duration-300 dark:bg-[#0a0f1a] ${
@@ -56,7 +58,7 @@ export default function DashboardMobileDrawer({
             type="button"
             onClick={onClose}
             className="rounded-full p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
-            aria-label="Close menu"
+            aria-label={t('common.closeMenu')}
           >
             <X className="h-5 w-5 text-gray-600 dark:text-gray-300" />
           </button>

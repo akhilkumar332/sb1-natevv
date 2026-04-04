@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Activity,
   AlertTriangle,
@@ -28,6 +29,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { ROUTES, getAdminDashboardMenuGroups, type AdminDashboardMenuGroup, type AdminDashboardMenuItem } from '../../constants/routes';
 import PendingActionsPanel from '../../components/shared/PendingActionsPanel';
+import { getAdminGroupLabel, getAdminItemLabel } from '../../utils/i18nLabels';
 
 const ADMIN_MENU_STATE_KEY = 'admin_dashboard_menu_groups_v1';
 
@@ -39,11 +41,12 @@ type MenuGroup = {
 };
 
 function AdminPortal() {
+  const { t } = useTranslation();
   const { isSuperAdmin } = useAuth();
   const location = useLocation();
   const overviewItem = {
     id: 'overview',
-    label: 'Overview',
+    label: t('common.overview'),
     to: 'overview',
     icon: LayoutDashboard,
   };
@@ -97,7 +100,7 @@ function AdminPortal() {
         icon: itemIconMap[item.id] ?? Settings,
       })),
     }));
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, t]);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const OverviewIcon = overviewItem.icon;
 
@@ -167,7 +170,7 @@ function AdminPortal() {
                       >
                         <span className="flex items-center gap-2">
                           <GroupIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
-                          <span className="text-xs font-bold uppercase tracking-[0.12em] text-red-700 dark:text-red-300">{group.label}</span>
+                          <span className="text-xs font-bold uppercase tracking-[0.12em] text-red-700 dark:text-red-300">{getAdminGroupLabel(group.id, t)}</span>
                         </span>
                         {isExpanded ? (
                           <ChevronDown className="h-4 w-4 text-red-500 dark:text-red-400" />
@@ -182,7 +185,7 @@ function AdminPortal() {
                             return (
                               <NavLink key={item.id} to={item.to} className={navItemClass}>
                                 <Icon className="h-4 w-4" />
-                                {item.label}
+                                {getAdminItemLabel(item.id, t)}
                               </NavLink>
                             );
                           })}

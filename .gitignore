@@ -47,6 +47,8 @@ secrets/
 docs/
 
 GEMINI.md
+AGENTS.md
+workflow/*
 
 .gemini/
 gha-creds-*.json

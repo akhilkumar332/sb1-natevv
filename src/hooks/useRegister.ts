@@ -1,5 +1,6 @@
 // src/hooks/useRegister.ts
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { notify } from 'services/notify.service';
@@ -32,6 +33,7 @@ interface RegisterFormData {
 }
 
 export const useRegister = () => {
+  const { t } = useTranslation();
   const [googleLoading, setGoogleLoading] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [formData, setFormData] = useState<RegisterFormData>({
@@ -152,7 +154,7 @@ export const useRegister = () => {
         const existingData = userDoc.data() as { role?: string; onboardingCompleted?: boolean };
         clearRegistrationIntent();
         if (existingData?.role === 'donor' && existingData?.onboardingCompleted !== true) {
-          notify.success('Continue onboarding to finish registration.');
+          notify.success(t('auth.continueOnboarding'));
           navigate(ROUTES.portal.donor.onboarding);
           return;
         }

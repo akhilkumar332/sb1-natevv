@@ -1,9 +1,11 @@
 import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useNetworkStatus } from '../../contexts/NetworkStatusContext';
 import { APP_ROUTE_PREFIXES_WITH_LEGACY } from '../../constants/routes';
 
 export const NetworkStatusBadge = () => {
+  const { t } = useTranslation();
   const location = useLocation();
   const {
     syncStatus,
@@ -25,8 +27,8 @@ export const NetworkStatusBadge = () => {
   };
 
   const dataSaverText = dataSaverMode === 'auto'
-    ? (isLowBandwidth ? 'Data Saver: Auto(ON)' : 'Data Saver: Auto')
-    : `Data Saver: ${dataSaverMode === 'on' ? 'ON' : 'OFF'}`;
+    ? (isLowBandwidth ? t('network.dataSaverAutoOn') : t('network.dataSaverAuto'))
+    : (dataSaverMode === 'on' ? t('network.dataSaverOn') : t('network.dataSaverOff'));
 
   if (syncStatus === 'offline') {
     return (
@@ -37,7 +39,7 @@ export const NetworkStatusBadge = () => {
         title={dataSaverText}
       >
         <WifiOff className="h-3.5 w-3.5" />
-        Offline • {dataSaverText}
+        {t('network.offline')} • {dataSaverText}
       </button>
     );
   }
@@ -51,7 +53,7 @@ export const NetworkStatusBadge = () => {
         title={dataSaverText}
       >
         <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-        Syncing • {dataSaverText}
+        {t('network.syncing')} • {dataSaverText}
       </button>
     );
   }

@@ -1,10 +1,11 @@
 import { APP_ROUTE_PREFIXES_WITH_LEGACY, LEGACY_ROUTE_PREFIXES, PORTAL_PATH_PREFIXES } from '../constants/routes';
 import { PWA_THEME_COLORS } from '../constants/theme';
+import type { TFunction } from 'i18next';
 
 type PwaBrand = {
   manifest: string;
   themeColor: string;
-  title: string;
+  titleKey: string;
   icon: string;
 };
 
@@ -12,25 +13,25 @@ const PWA_BRANDS: Record<string, PwaBrand> = {
   donor: {
     manifest: '/manifest-donor.json',
     themeColor: PWA_THEME_COLORS.donor,
-    title: 'BloodHub Donor',
+    titleKey: 'pwa.donorTitle',
     icon: '/icons/apple-touch-icon.png',
   },
   ngo: {
     manifest: '/manifest-ngo.json',
     themeColor: PWA_THEME_COLORS.ngo,
-    title: 'BloodHub NGO',
+    titleKey: 'pwa.ngoTitle',
     icon: '/icons/apple-touch-icon.png',
   },
   bloodbank: {
     manifest: '/manifest-bloodbank.json',
     themeColor: PWA_THEME_COLORS.bloodbank,
-    title: 'BloodHub Bloodbank',
+    titleKey: 'pwa.bloodbankTitle',
     icon: '/icons/apple-touch-icon.png',
   },
   default: {
     manifest: '/manifest-donor.json',
     themeColor: PWA_THEME_COLORS.default,
-    title: 'BloodHub',
+    titleKey: 'pwa.defaultTitle',
     icon: '/icons/apple-touch-icon.png',
   },
 };
@@ -69,12 +70,13 @@ const ensureLink = (rel: string, href: string, id?: string) => {
   el.setAttribute('href', href);
 };
 
-export const applyPwaBranding = (pathname: string) => {
+export const applyPwaBranding = (pathname: string, t: TFunction) => {
   const brandKey = resolveBrandKey(pathname);
   const brand = PWA_BRANDS[brandKey] || PWA_BRANDS.default;
+  const title = t(brand.titleKey);
 
   ensureLink('manifest', brand.manifest, 'pwa-manifest');
   ensureMeta('theme-color', brand.themeColor);
-  ensureMeta('apple-mobile-web-app-title', brand.title);
+  ensureMeta('apple-mobile-web-app-title', title);
   ensureLink('apple-touch-icon', brand.icon, 'pwa-apple-touch-icon');
 };
