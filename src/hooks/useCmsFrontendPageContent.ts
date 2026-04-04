@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePublishedCmsPageBySlug } from './useCmsContent';
 import { getCmsFrontendPageDefaultContent, type CmsFrontendPageContentMap } from '../constants/cmsPageDefaults';
 import type { CmsFrontendPageSlug } from '../constants/cms';
 import { resolveCmsFrontendContent } from '../utils/cmsFrontendContent';
+import { pickLocalizedCmsString } from '../utils/cmsLocalization';
 
 const CMS_PREVIEW_EVENT = 'cms:preview:update';
 const CMS_PREVIEW_CLEAR_EVENT = 'cms:preview:clear';
 
 export const useCmsFrontendPageContent = <T extends CmsFrontendPageSlug>(slug: T) => {
+  const { i18n } = useTranslation();
   const pageQuery = usePublishedCmsPageBySlug(slug);
   const [previewOverride, setPreviewOverride] = useState<Record<string, unknown> | null>(null);
 
@@ -43,13 +46,18 @@ export const useCmsFrontendPageContent = <T extends CmsFrontendPageSlug>(slug: T
   }, [slug]);
 
   const content = useMemo(() => {
+    const localizedContentJson = pickLocalizedCmsString(
+      i18n.resolvedLanguage,
+      pageQuery.data?.contentJsonByLocale,
+      pageQuery.data?.contentJson || null,
+    );
     const baseResolved = resolveCmsFrontendContent(
-      pageQuery.data?.contentJson,
+      localizedContentJson,
       getCmsFrontendPageDefaultContent(slug)
     );
     if (!previewOverride) return baseResolved;
     return resolveCmsFrontendContent(JSON.stringify(previewOverride), baseResolved);
-  }, [pageQuery.data?.contentJson, previewOverride, slug]);
+  }, [i18n.resolvedLanguage, pageQuery.data?.contentJson, pageQuery.data?.contentJsonByLocale, previewOverride, slug]);
 
   return {
     ...pageQuery,

@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 type SecurityEventsFilterProps = {
   kind: 'all' | 'impersonationEvents' | 'auditLogs';
   search: string;
@@ -6,6 +8,8 @@ type SecurityEventsFilterProps = {
 };
 
 function SecurityEventsFilter({ kind, search, onKindChange, onSearchChange }: SecurityEventsFilterProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <select
@@ -13,15 +17,15 @@ function SecurityEventsFilter({ kind, search, onKindChange, onSearchChange }: Se
         onChange={(event) => onKindChange(event.target.value as 'all' | 'impersonationEvents' | 'auditLogs')}
         className="rounded-lg border border-gray-300 px-3 py-2 text-xs text-gray-700"
       >
-        <option value="all">All Sources</option>
-        <option value="impersonationEvents">Impersonation</option>
-        <option value="auditLogs">Audit Logs</option>
+        <option value="all">{t('admin.allSources')}</option>
+        <option value="impersonationEvents">{t('admin.impersonationAudit')}</option>
+        <option value="auditLogs">{t('admin.auditLogs')}</option>
       </select>
       <input
         type="text"
         value={search}
         onChange={(event) => onSearchChange(event.target.value)}
-        placeholder="Search IP or user-agent"
+        placeholder={t('admin.searchIpUserAgent')}
         className="rounded-lg border border-gray-300 px-3 py-2 text-xs text-gray-700"
       />
     </div>

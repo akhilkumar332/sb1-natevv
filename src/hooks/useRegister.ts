@@ -18,6 +18,7 @@ import { registerWithGoogleRole } from '../utils/googleRegister';
 import { notifyMobileAlreadyRegistered, requireValue } from '../utils/validationFeedback';
 import { COLLECTIONS } from '../constants/firestore';
 import { ROUTES } from '../constants/routes';
+import { authMessages } from '../constants/messages';
 import { captureFirestoreOperationError } from '../utils/firestoreDiagnostics';
 import {
   clearPendingPortalRole,
@@ -303,7 +304,7 @@ export const useRegister = () => {
 
       clearRegistrationIntent();
 
-      notify.success('Registration successful!');
+      notify.success(authMessages.registrationSuccessful);
       navigate(ROUTES.portal.donor.onboarding);
     } catch (error: any) {
       clearRegistrationIntent();

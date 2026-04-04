@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Chrome, Phone, Trash2, MapPin, Locate, Loader } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
@@ -41,6 +42,7 @@ L.Icon.Default.mergeOptions({
 });
 
 const DonorAccount = () => {
+  const { t } = useTranslation();
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
   const navigate = useNavigate();
@@ -157,6 +159,7 @@ const DonorAccount = () => {
   const matchesEmail = Boolean(emailTarget && inputEmail === emailTarget);
   const matchesPhone = Boolean(phoneTarget && inputPhone === phoneTarget);
   const canConfirmDelete = matchesEmail || matchesPhone;
+  const notSet = t('common.notSet');
 
   useEffect(() => {
     if (!user) return;
@@ -170,7 +173,7 @@ const DonorAccount = () => {
       const wantsEnable = !pushEnabled;
       setPushMessage(null);
       if (typeof window === 'undefined' || !('Notification' in window)) {
-        setPushMessage('Push notifications are not supported in this browser.');
+        setPushMessage(t('network.pushUnsupported'));
         return;
       }
       if (wantsEnable) {
@@ -185,7 +188,7 @@ const DonorAccount = () => {
             },
           });
           if (result.queued) {
-            setPushMessage('You are offline. This change will sync automatically.');
+            setPushMessage(t('network.changeWillSyncAutomatically'));
           }
         } else {
           setPushEnabled(false);
@@ -197,9 +200,9 @@ const DonorAccount = () => {
             },
           });
           if (result.queued) {
-            setPushMessage('You are offline. This change will sync automatically.');
+            setPushMessage(t('network.changeWillSyncAutomatically'));
           }
-          setPushMessage('Notifications are blocked. Enable them in your browser settings.');
+          setPushMessage(t('network.notificationsBlocked'));
         }
       } else {
         await unsubscribe();
@@ -212,13 +215,13 @@ const DonorAccount = () => {
           },
         });
         if (result.queued) {
-          setPushMessage('You are offline. This change will sync automatically.');
+          setPushMessage(t('network.changeWillSyncAutomatically'));
         }
       }
     } catch (error) {
       setPushEnabled(previousPushEnabled);
       reportDonorAccountError(error, 'donor.account.push.toggle');
-      setPushMessage('Failed to update notification preference. Please try again.');
+      setPushMessage(t('network.updateNotificationPreferenceFailed'));
     }
   };
 
@@ -986,19 +989,19 @@ const DonorAccount = () => {
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-lg font-bold text-gray-800">Notification Preferences</h2>
-              <p className="text-xs text-gray-500">Manage alerts and availability.</p>
+              <h2 className="text-lg font-bold text-gray-800">{t('notificationPreferences.title')}</h2>
+              <p className="text-xs text-gray-500">{t('notificationPreferences.subtitle')}</p>
             </div>
           </div>
 
           <div className="mt-4 space-y-4">
             <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
               <div>
-                <p className="text-sm font-semibold text-gray-800">Push Notifications</p>
-                <p className="text-xs text-gray-500">Receive push alerts in your browser.</p>
+                <p className="text-sm font-semibold text-gray-800">{t('notificationPreferences.pushTitle')}</p>
+                <p className="text-xs text-gray-500">{t('notificationPreferences.pushSubtitle')}</p>
                 {pushPermission === 'denied' && !pushMessage && (
                   <p className="text-xs text-red-600 mt-1">
-                    Notifications are blocked. Enable them in your browser settings.
+                    {t('network.notificationsBlocked')}
                   </p>
                 )}
                 {pushMessage && (
@@ -1025,8 +1028,8 @@ const DonorAccount = () => {
 
             <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
               <div>
-                <p className="text-sm font-semibold text-gray-800">Availability</p>
-                <p className="text-xs text-gray-500">Control emergency notifications.</p>
+                <p className="text-sm font-semibold text-gray-800">{t('dashboard.readiness')}</p>
+                <p className="text-xs text-gray-500">{t('notificationPreferences.emergencySubtitle')}</p>
               </div>
               <button
                 type="button"
@@ -1047,14 +1050,14 @@ const DonorAccount = () => {
             </div>
             {availabilityExpiryLabel && availabilityEnabled && (
               <p className="text-[11px] text-gray-500">
-                Available until {availabilityExpiryLabel}
+                {t('common.active')} until {availabilityExpiryLabel}
               </p>
             )}
 
             <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
               <div>
-                <p className="text-sm font-semibold text-gray-800">Emergency Alerts</p>
-                <p className="text-xs text-gray-500">Get notified about urgent requests.</p>
+                <p className="text-sm font-semibold text-gray-800">{t('notificationPreferences.emergencyTitle')}</p>
+                <p className="text-xs text-gray-500">{t('notificationPreferences.emergencySubtitle')}</p>
               </div>
               <button
                 type="button"
@@ -1079,7 +1082,7 @@ const DonorAccount = () => {
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-lg font-bold text-gray-800">Contact Info</h2>
+              <h2 className="text-lg font-bold text-gray-800">{t('profile.complianceContact')}</h2>
               <p className="text-xs text-gray-500">Update email or phone with verification.</p>
             </div>
           </div>
@@ -1095,7 +1098,7 @@ const DonorAccount = () => {
                   <div>
                     <p className="text-xs uppercase tracking-wide text-gray-500">Email</p>
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-gray-800">{user?.email || 'Not set'}</p>
+                      <p className="text-sm font-semibold text-gray-800">{user?.email || notSet}</p>
                       {user?.email && (
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                           user.emailVerified ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
@@ -1111,7 +1114,7 @@ const DonorAccount = () => {
                       onClick={() => setIsEditingEmail(true)}
                       className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
                     >
-                      Edit
+                      {t('common.edit')}
                     </button>
                   ) : (
                     <div className="flex gap-2">
@@ -1121,7 +1124,7 @@ const DonorAccount = () => {
                         disabled={emailSaving}
                         className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                       >
-                        Cancel
+                        {t('common.cancel')}
                       </button>
                       <button
                         type="button"
@@ -1129,7 +1132,7 @@ const DonorAccount = () => {
                         disabled={emailSaving}
                         className="rounded-full border border-red-200 bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                       >
-                        {emailSaving ? 'Saving...' : 'Save'}
+                        {emailSaving ? t('common.saving') : t('common.save')}
                       </button>
                     </div>
                   )}
@@ -1163,7 +1166,7 @@ const DonorAccount = () => {
                   <div>
                     <p className="text-xs uppercase tracking-wide text-gray-500">Phone</p>
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-gray-800">{user?.phoneNumber || 'Not set'}</p>
+                      <p className="text-sm font-semibold text-gray-800">{user?.phoneNumber || notSet}</p>
                       {user?.phoneNumber && (
                         <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-700">
                           Verified
@@ -1177,7 +1180,7 @@ const DonorAccount = () => {
                       onClick={() => setIsEditingPhone(true)}
                       className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
                     >
-                      Edit
+                      {t('common.edit')}
                     </button>
                   ) : (
                     <div className="flex gap-2">

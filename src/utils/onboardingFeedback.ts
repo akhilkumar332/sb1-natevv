@@ -1,7 +1,9 @@
+import i18n from '../i18n';
+
 type OnboardingRole = 'donor' | 'ngo' | 'bloodbank';
 
-const DEFAULT_ONBOARDING_ERROR_MESSAGE = 'Failed to complete onboarding. Please try again.';
-const OFFLINE_ONBOARDING_ERROR_MESSAGE = 'Internet connection lost while saving your profile. Please reconnect and try again.';
+const DEFAULT_ONBOARDING_ERROR_MESSAGE = () => i18n.t('auth.onboardingSubmitFailed');
+const OFFLINE_ONBOARDING_ERROR_MESSAGE = () => i18n.t('auth.onboardingOfflineFailed');
 
 const isLikelyOfflineError = (error: unknown): boolean => {
   const anyError = error as { code?: string; message?: string };
@@ -32,20 +34,20 @@ export const resolveOnboardingSubmitErrorMessage = (
   const normalizedMessage = rawMessage.toLowerCase();
 
   if (isLikelyOfflineError(error)) {
-    return OFFLINE_ONBOARDING_ERROR_MESSAGE;
+    return OFFLINE_ONBOARDING_ERROR_MESSAGE();
   }
 
   if (role === 'bloodbank' && normalizedMessage.includes('permission')) {
-    return 'Permission denied while saving your profile. Please sign in again.';
+    return i18n.t('auth.bloodbankPermissionDenied');
   }
 
   if (role === 'donor' && normalizedMessage.includes('permission')) {
-    return 'Permission denied while saving your donor profile. If this persists after reconnecting, the failing Firestore rule still needs adjustment.';
+    return i18n.t('auth.donorPermissionDenied');
   }
 
   if (role === 'donor' && rawMessage) {
     return rawMessage;
   }
 
-  return DEFAULT_ONBOARDING_ERROR_MESSAGE;
+  return DEFAULT_ONBOARDING_ERROR_MESSAGE();
 };

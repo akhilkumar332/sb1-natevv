@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Search, Shield } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { searchUsersForImpersonation, searchUsersForImpersonationFast } from '../../services/admin.service';
 import type { ImpersonationUser } from '../../services/admin.service';
 import { ONE_MINUTE_MS, THREE_FIFTY_MS } from '../../constants/time';
+import { getPortalLabel } from '../../utils/i18nLabels';
 
 type PortalRole = 'donor' | 'ngo' | 'bloodbank' | 'admin';
 
@@ -19,21 +21,8 @@ interface SuperAdminPortalModalProps {
   impersonationLoading?: boolean;
 }
 
-const portalLabels: Record<PortalRole, string> = {
-  donor: 'Donor',
-  ngo: 'NGO',
-  bloodbank: 'Blood Bank',
-  admin: 'Admin',
-};
-
 const portalOrder: PortalRole[] = ['donor', 'ngo', 'bloodbank', 'admin'];
 const restrictedStatuses = new Set(['suspended', 'pending_verification']);
-
-const getStatusLabel = (status?: string | null) => {
-  if (!status) return 'Active';
-  if (status === 'pending_verification') return 'Pending';
-  return status.charAt(0).toUpperCase() + status.slice(1);
-};
 
 const getStatusStyle = (status?: string | null) => {
   if (status === 'suspended') return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-100 dark:text-red-700 dark:border-red-200';
@@ -50,6 +39,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
   impersonationUser,
   impersonationLoading = false,
 }) => {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<ImpersonationUser[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -66,6 +56,14 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
   const inflightFastRef = React.useRef(new Map<string, Promise<ImpersonationUser[]>>());
   const recentStorageKey = 'bh_impersonation_recent';
   const hasFastResultsRef = React.useRef(false);
+  const getPortalText = (role: PortalRole) => getPortalLabel(role, t);
+  const getStatusLabel = (status?: string | null) => {
+    if (!status) return t('common.active');
+    if (status === 'pending_verification') return t('status.pendingVerification');
+    if (status === 'inactive') return t('common.inactive');
+    if (status === 'suspended') return t('common.suspended');
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
 
   const matchesQuery = React.useCallback((user: ImpersonationUser, query: string) => {
     const normalized = query.trim().toLowerCase();
@@ -200,7 +198,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
       } catch (error) {
         inflightRef.current.delete(normalized);
         if (isActive) {
-          setSearchError('Search failed. Please try again.');
+          setSearchError(t('superadmin.searchFailed'));
           setSearchResults([]);
         }
       } finally {
@@ -214,7 +212,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
       isActive = false;
       window.clearTimeout(handle);
     };
-  }, [isOpen, searchTerm, matchesQuery, readRecent]);
+  }, [isOpen, searchTerm, matchesQuery, readRecent, t]);
 
   const handleImpersonateClick = (user: ImpersonationUser) => {
     if (!onImpersonate) return;
@@ -257,25 +255,24 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
               <Shield className="h-6 w-6 text-white" />
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-[0.35em] text-white/70">SuperAdmin Console</p>
-              <h3 className="text-xl font-semibold">Session Control</h3>
-              <p className="text-xs text-white/70">Switch portals or impersonate users with full access.</p>
+              <p className="text-[10px] uppercase tracking-[0.35em] text-white/70">{t('common.superadminConsole')}</p>
+              <h3 className="text-xl font-semibold">{t('superadmin.sessionControl')}</h3>
+              <p className="text-xs text-white/70">{t('superadmin.switchPortalsOrImpersonate')}</p>
             </div>
           </div>
           {impersonationUser && (
             <div className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-white/90">
-              Impersonation Active
+              {t('superadmin.active')}
             </div>
           )}
         </div>
         <div className="px-5 sm:px-8 py-6 space-y-6">
           {impersonationUser && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-200 dark:bg-amber-50 dark:text-amber-900">
-              Acting as{' '}
-              <span className="font-semibold">
-                {impersonationUser.displayName || impersonationUser.email || 'User'}
-              </span>
-              {impersonationUser.role ? ` (${impersonationUser.role})` : ''}. Session expires after 30 minutes.
+              {t('superadmin.actingAs', {
+                user: impersonationUser.displayName || impersonationUser.email || t('common.userFallback'),
+                role: impersonationUser.role ? ` (${impersonationUser.role})` : '',
+              })}
             </div>
           )}
 
@@ -283,11 +280,11 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
             <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-5 dark:border-gray-200 dark:bg-[#101826]/80">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-400 dark:text-gray-500">Portal Access</p>
-                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-600">Select a portal for this session.</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-400 dark:text-gray-500">{t('superadmin.portalAccess')}</p>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-600">{t('superadmin.selectPortalForSession')}</p>
                 </div>
                 <span className="rounded-full border border-red-100 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-red-600 dark:border-red-200 dark:bg-[#0a0f1a] dark:text-red-600">
-                  Current: {portalLabels[currentPortal]}
+                  {t('superadmin.currentPortal', { portal: getPortalText(currentPortal) })}
                 </span>
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -295,7 +292,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                   onClick={() => onSelect(currentPortal)}
                   className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-red-700"
                 >
-                  Continue to {portalLabels[currentPortal]}
+                  {t('superadmin.continueToPortal', { portal: getPortalText(currentPortal) })}
                 </button>
                 {otherPortals.map((role) => (
                   <button
@@ -303,7 +300,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                     onClick={() => onSelect(role)}
                     className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-all duration-300 hover:border-red-200 hover:bg-red-50 dark:border-gray-200 dark:bg-[#0a0f1a] dark:text-gray-700 dark:hover:border-red-200 dark:hover:bg-red-50"
                   >
-                    Go to {portalLabels[role]}
+                    {t('superadmin.goToPortal', { portal: getPortalText(role) })}
                   </button>
                 ))}
               </div>
@@ -313,25 +310,25 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
               <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-200 dark:bg-[#0f1726]">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-400 dark:text-gray-500">Impersonation</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gray-400 dark:text-gray-500">{t('superadmin.impersonation')}</p>
                     <p className="mt-1 text-sm text-gray-600 dark:text-gray-600">
-                      Full access, 30-minute session limit.
+                      {t('superadmin.fullAccessLimit')}
                     </p>
                   </div>
                   <span className="rounded-full border border-red-100 bg-red-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-red-600 dark:border-red-200 dark:bg-red-50 dark:text-red-600">
-                    Full Access
+                    {t('superadmin.fullAccess')}
                   </span>
                 </div>
 
                 <div className="mt-4">
                   <label className="block text-xs font-semibold text-gray-600 dark:text-gray-700">
-                    Search by name, email, or BH ID
+                    {t('superadmin.searchByNameEmailBhId')}
                   </label>
                   <div className="relative mt-2">
                     <input
                       value={searchTerm}
                       onChange={(event) => setSearchTerm(event.target.value)}
-                      placeholder="Type at least 2 characters"
+                      placeholder={t('superadmin.typeAtLeastTwoCharacters')}
                       disabled={impersonationLoading}
                       className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 pr-10 text-sm text-gray-700 transition-all focus:border-red-300 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-300 dark:bg-[#0a0f1a] dark:text-gray-700 dark:focus:border-red-200 dark:disabled:bg-gray-100 dark:disabled:text-gray-500"
                     />
@@ -341,12 +338,12 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
 
                 <div className="mt-4">
                   <label className="block text-xs font-semibold text-gray-600 dark:text-gray-700">
-                    Reason (optional)
+                    {t('superadmin.reasonOptional')}
                   </label>
                   <textarea
                     value={impersonationReason}
                     onChange={(event) => setImpersonationReason(event.target.value)}
-                    placeholder="Add context for audit logs"
+                    placeholder={t('superadmin.addAuditContext')}
                     disabled={impersonationLoading}
                     rows={2}
                     className="mt-2 w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 transition-all focus:border-red-300 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-300 dark:bg-[#0a0f1a] dark:text-gray-700 dark:focus:border-red-200 dark:disabled:bg-gray-100 dark:disabled:text-gray-500"
@@ -357,19 +354,19 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                   {impersonationLoading && (
                     <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                       <span className="h-3 w-3 animate-spin rounded-full border border-amber-400 border-t-transparent" />
-                      Switching user…
+                      {t('superadmin.switchingUser')}
                     </div>
                   )}
                   {!impersonationLoading && (
                     <p className="text-[11px] text-gray-500 dark:text-gray-600">
-                      Suspended or pending verification accounts cannot be impersonated.
+                      {t('superadmin.restrictedAccountImpersonation')}
                     </p>
                   )}
                   {!impersonationLoading && searchTerm.trim().length < 2 && recentImpersonations.length > 0 && (
                     <>
                       <div className="flex items-center justify-between">
                         <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                          Recent impersonations
+                          {t('superadmin.recentImpersonations')}
                         </p>
                         {recentImpersonations.length > 3 && (
                           <button
@@ -380,7 +377,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                             }}
                             className="text-[10px] font-semibold uppercase tracking-widest text-red-600 hover:text-red-700 dark:text-red-600 dark:hover:text-red-700"
                           >
-                            View all
+                            {t('superadmin.viewAll')}
                           </button>
                         )}
                       </div>
@@ -394,10 +391,10 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <p className="text-sm font-semibold text-gray-900 dark:text-gray-900">
-                                {user.displayName || user.email || 'User'}
+                                {user.displayName || user.email || t('common.userFallback')}
                               </p>
                               <p className="text-xs text-gray-500 dark:text-gray-600">
-                                {user.email || 'No email'}
+                                {user.email || t('common.noEmail')}
                                 {user.bhId ? ` · ${user.bhId}` : ''}
                               </p>
                             </div>
@@ -415,13 +412,13 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                     </>
                   )}
                   {searchLoading && (
-                    <p className="text-xs text-gray-500 dark:text-gray-600">Searching…</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-600">{t('superadmin.searching')}</p>
                   )}
                   {!searchLoading && searchError && (
                     <p className="text-xs text-red-600 dark:text-red-600">{searchError}</p>
                   )}
                   {!impersonationLoading && !searchLoading && !searchError && searchTerm.trim().length >= 2 && searchResults.length === 0 && (
-                    <p className="text-xs text-gray-500 dark:text-gray-600">No users found.</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-600">{t('superadmin.noUsersFound')}</p>
                   )}
                   {searchResults.map((user) => (
                     <button
@@ -433,10 +430,10 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold text-gray-900 dark:text-gray-900">
-                            {user.displayName || user.email || 'User'}
+                            {user.displayName || user.email || t('common.userFallback')}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-600">
-                            {user.email || 'No email'}
+                            {user.email || t('common.noEmail')}
                             {user.bhId ? ` · ${user.bhId}` : ''}
                           </p>
                         </div>
@@ -461,20 +458,19 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
       {pendingImpersonation && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-300 dark:bg-[#0b1220]">
-            <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-900">Confirm Impersonation</h4>
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-900">{t('superadmin.confirmImpersonation')}</h4>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-600">
-              You are about to impersonate{' '}
-              <span className="font-semibold">
-                {pendingImpersonation.displayName || pendingImpersonation.email || 'User'}
-              </span>
-              {pendingImpersonation.role ? ` (${pendingImpersonation.role})` : ''}.
+              {t('superadmin.aboutToImpersonate', {
+                user: pendingImpersonation.displayName || pendingImpersonation.email || t('common.userFallback'),
+                role: pendingImpersonation.role ? ` (${pendingImpersonation.role})` : '',
+              })}
             </p>
             <p className="mt-2 text-xs text-amber-700 dark:text-amber-800">
-              This will switch your session to the selected user until you stop impersonation.
+              {t('superadmin.willSwitchSession')}
             </p>
             {impersonationReason.trim() && (
               <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-gray-200 dark:bg-gray-100 dark:text-gray-600">
-                <span className="font-semibold text-gray-700 dark:text-gray-700">Reason:</span>{' '}
+                <span className="font-semibold text-gray-700 dark:text-gray-700">{t('common.reason')}:</span>{' '}
                 {impersonationReason.trim()}
               </div>
             )}
@@ -484,13 +480,13 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                 disabled={impersonationLoading}
                 className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                Yes, impersonate
+                {t('superadmin.yesImpersonate')}
               </button>
               <button
                 onClick={cancelImpersonation}
                 className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-300 dark:text-gray-700 dark:hover:bg-gray-100"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -502,9 +498,13 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
           <div className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl max-h-[75vh] overflow-y-auto dark:border-gray-300 dark:bg-[#0b1220]">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-200">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Recent impersonations</p>
+                <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">{t('superadmin.recentImpersonations')}</p>
                 <p className="text-sm text-gray-600 dark:text-gray-600">
-                  Showing {recentStartIndex + 1}-{Math.min(recentStartIndex + RECENT_PAGE_SIZE, recentImpersonations.length)} of {recentImpersonations.length}
+                  {t('common.showingRangeOfTotal', {
+                    start: recentStartIndex + 1,
+                    end: Math.min(recentStartIndex + RECENT_PAGE_SIZE, recentImpersonations.length),
+                    total: recentImpersonations.length,
+                  })}
                 </p>
               </div>
               <button
@@ -512,7 +512,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                 onClick={() => setShowRecentDrawer(false)}
                 className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-300 dark:text-gray-700 dark:hover:bg-gray-100"
               >
-                Close
+                {t('common.close')}
               </button>
             </div>
             <div className="p-4 space-y-2">
@@ -526,10 +526,10 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-gray-900 dark:text-gray-900">
-                        {user.displayName || user.email || 'User'}
+                        {user.displayName || user.email || t('common.userFallback')}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-600">
-                        {user.email || 'No email'}
+                        {user.email || t('common.noEmail')}
                         {user.bhId ? ` · ${user.bhId}` : ''}
                       </p>
                     </div>
@@ -553,10 +553,10 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                   disabled={clampedRecentPage === 1}
                   className="rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-300 dark:text-gray-700 dark:hover:bg-gray-100"
                 >
-                  Previous
+                  {t('common.previous')}
                 </button>
                 <span className="text-xs font-semibold text-gray-600 dark:text-gray-700">
-                  Page {clampedRecentPage} of {totalRecentPages}
+                  {t('common.page', { current: clampedRecentPage, total: totalRecentPages })}
                 </span>
                 <button
                   type="button"
@@ -564,7 +564,7 @@ const SuperAdminPortalModal: React.FC<SuperAdminPortalModalProps> = ({
                   disabled={clampedRecentPage === totalRecentPages}
                   className="rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-300 dark:text-gray-700 dark:hover:bg-gray-100"
                 >
-                  Next
+                  {t('common.next')}
                 </button>
               </div>
             )}

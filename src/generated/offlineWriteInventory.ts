@@ -34,12 +34,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.components/shared/NotificationPreferences.tsx:102",
+    "id": "USERS.updateDoc.components/shared/NotificationPreferences.tsx:104",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "components",
     "path": "components/shared/NotificationPreferences.tsx",
-    "line": 102,
+    "line": 104,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
@@ -284,12 +284,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "USERS.setDoc.hooks/useNgoRegister.ts:99",
+    "id": "USERS.setDoc.hooks/useNgoRegister.ts:100",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "hooks",
     "path": "hooks/useNgoRegister.ts",
-    "line": 99,
+    "line": 100,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },
@@ -304,12 +304,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.setDoc.hooks/useRegister.ts:186",
+    "id": "USERS.setDoc.hooks/useRegister.ts:187",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "hooks",
     "path": "hooks/useRegister.ts",
-    "line": 186,
+    "line": 187,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },
@@ -1104,12 +1104,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.pages/donor/dashboard/Account.tsx:621",
+    "id": "USERS.updateDoc.pages/donor/dashboard/Account.tsx:624",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "pages/donor",
     "path": "pages/donor/dashboard/Account.tsx",
-    "line": 621,
+    "line": 624,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useOutletContext } from 'react-router-dom';
 import { CheckCircle, MapPin, User, Building2, FileText } from 'lucide-react';
 import type { BloodBankDashboardContext } from '../BloodBankDashboard';
@@ -8,6 +9,7 @@ import { captureHandledError } from '../../../services/errorLog.service';
 import { ROUTES } from '../../../constants/routes';
 
 function BloodBankAccount() {
+  const { t } = useTranslation();
   const { user } = useOutletContext<BloodBankDashboardContext>();
   const {
     permission: pushPermission,
@@ -17,6 +19,7 @@ function BloodBankAccount() {
   } = usePushNotifications();
   const [pushEnabled, setPushEnabled] = useState(true);
   const [pushMessage, setPushMessage] = useState<string | null>(null);
+  const notSet = t('common.notSet');
 
   useEffect(() => {
     if (!user) return;
@@ -30,7 +33,7 @@ function BloodBankAccount() {
       const wantsEnable = !pushEnabled;
       setPushMessage(null);
       if (typeof window === 'undefined' || !('Notification' in window)) {
-        setPushMessage('Push notifications are not supported in this browser.');
+        setPushMessage(t('network.pushUnsupported'));
         return;
       }
 
@@ -46,7 +49,7 @@ function BloodBankAccount() {
             },
           });
           if (result.queued) {
-            setPushMessage('You are offline. This change will sync automatically.');
+            setPushMessage(t('network.changeWillSyncAutomatically'));
           }
         } else {
           setPushEnabled(false);
@@ -58,9 +61,9 @@ function BloodBankAccount() {
             },
           });
           if (result.queued) {
-            setPushMessage('You are offline. This change will sync automatically.');
+            setPushMessage(t('network.changeWillSyncAutomatically'));
           }
-          setPushMessage('Notifications are blocked. Enable them in your browser settings.');
+          setPushMessage(t('network.notificationsBlocked'));
         }
       } else {
         await unsubscribe();
@@ -73,7 +76,7 @@ function BloodBankAccount() {
           },
         });
         if (result.queued) {
-          setPushMessage('You are offline. This change will sync automatically.');
+          setPushMessage(t('network.changeWillSyncAutomatically'));
         }
       }
     } catch (error) {
@@ -83,7 +86,7 @@ function BloodBankAccount() {
         scope: 'bloodbank',
         metadata: { kind: 'bloodbank.account.push.toggle' },
       });
-      setPushMessage('Failed to update notification preference. Please try again.');
+      setPushMessage(t('network.updateNotificationPreferenceFailed'));
     }
   };
 
@@ -92,9 +95,9 @@ function BloodBankAccount() {
       <div className="bg-white rounded-2xl shadow-xl p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-red-600">Account</p>
-            <h2 className="text-2xl font-bold text-gray-900">BloodBank profile</h2>
-            <p className="text-sm text-gray-500 mt-1">Review and update blood bank credentials.</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-red-600">{t('profile.account')}</p>
+            <h2 className="text-2xl font-bold text-gray-900">{t('profile.bloodbankProfile')}</h2>
+            <p className="text-sm text-gray-500 mt-1">{t('profile.reviewBloodbankCredentials')}</p>
           </div>
           <User className="w-7 h-7 text-red-500" />
         </div>
@@ -111,18 +114,18 @@ function BloodBankAccount() {
                 <h3 className="text-base font-semibold text-gray-900">
                   {user?.contactPersonName || user?.displayName || 'BloodBank Admin'}
                 </h3>
-                <p className="text-xs text-gray-500">{user?.email || 'Email not set'}</p>
+                <p className="text-xs text-gray-500">{user?.email || t('common.noEmail')}</p>
               </div>
             </div>
 
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {[
-                { label: 'Role', value: 'BloodBank' },
-                { label: 'BH ID', value: user?.bhId || 'Not assigned' },
-                { label: 'Registration ID', value: user?.registrationNumber || 'Not set' },
-                { label: 'Onboarding', value: user?.onboardingCompleted ? 'Completed' : 'Pending' },
-                { label: 'Primary login', value: 'Google' },
-                { label: 'Contact phone', value: user?.phoneNumber || user?.phone || 'Not set' },
+                { label: t('profile.role'), value: t('portal.bloodbank') },
+                { label: 'BH ID', value: user?.bhId || t('common.notAssigned') },
+                { label: t('profile.registrationId'), value: user?.registrationNumber || notSet },
+                { label: t('profile.onboarding'), value: user?.onboardingCompleted ? t('common.completed') : t('common.pending') },
+                { label: t('profile.primaryLogin'), value: 'Google' },
+                { label: t('profile.contactPhone'), value: user?.phoneNumber || user?.phone || notSet },
               ].map((item) => (
                 <div
                   key={item.label}
@@ -139,7 +142,7 @@ function BloodBankAccount() {
                 to={ROUTES.portal.bloodbank.onboarding}
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-yellow-600 px-4 py-2 text-xs font-semibold text-white shadow-lg hover:from-red-700 hover:to-yellow-700"
               >
-                Update blood bank profile
+                {t('profile.updateBloodbankProfile')}
                 <CheckCircle className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -148,32 +151,32 @@ function BloodBankAccount() {
           <div className="bg-white rounded-2xl shadow-xl p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
               <Building2 className="w-5 h-5 text-yellow-500" />
-              BloodBank details
+              {t('profile.bloodbankDetails')}
             </div>
             <div className="mt-4 space-y-3 text-sm text-gray-700">
               <div className="flex items-start justify-between gap-3">
-                <span className="text-gray-500">BloodBank name</span>
+                <span className="text-gray-500">{t('profile.bloodbankName')}</span>
                 <span className="font-semibold text-gray-900 text-right">
-                  {user?.bloodBankName || user?.hospitalName || 'Not set'}
+                  {user?.bloodBankName || user?.hospitalName || notSet}
                 </span>
               </div>
               <div className="flex items-start justify-between gap-3">
-                <span className="text-gray-500">BloodBank type</span>
+                <span className="text-gray-500">{t('profile.bloodbankType')}</span>
                 <span className="font-semibold text-gray-900 text-right">
-                  {user?.bloodBankType || user?.hospitalType || 'Not set'}
+                  {user?.bloodBankType || user?.hospitalType || notSet}
                 </span>
               </div>
               <div className="flex items-start justify-between gap-3">
-                <span className="text-gray-500">Website</span>
-                <span className="font-semibold text-gray-900 text-right">{user?.website || 'Not set'}</span>
+                <span className="text-gray-500">{t('profile.website')}</span>
+                <span className="font-semibold text-gray-900 text-right">{user?.website || notSet}</span>
               </div>
               <div className="flex items-start justify-between gap-3">
-                <span className="text-gray-500">Beds</span>
-                <span className="font-semibold text-gray-900 text-right">{user?.numberOfBeds || 'Not set'}</span>
+                <span className="text-gray-500">{t('profile.beds')}</span>
+                <span className="font-semibold text-gray-900 text-right">{user?.numberOfBeds || notSet}</span>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-gray-500">Description</span>
-                <span className="font-semibold text-gray-900">{user?.description || 'Not set'}</span>
+                <span className="text-gray-500">{t('profile.description')}</span>
+                <span className="font-semibold text-gray-900">{user?.description || notSet}</span>
               </div>
             </div>
           </div>
@@ -183,33 +186,33 @@ function BloodBankAccount() {
           <div className="bg-white rounded-2xl shadow-xl p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
               <MapPin className="w-5 h-5 text-yellow-500" />
-              Location details
+              {t('profile.locationDetails')}
             </div>
             <div className="mt-4 space-y-3 text-sm text-gray-700">
               <div className="flex flex-col gap-1">
-                <span className="text-gray-500">Address</span>
-                <span className="font-semibold text-gray-900">{user?.address || 'Not set'}</span>
+                <span className="text-gray-500">{t('profile.address')}</span>
+                <span className="font-semibold text-gray-900">{user?.address || notSet}</span>
               </div>
               <div className="flex items-start justify-between gap-3">
-                <span className="text-gray-500">City / State</span>
+                <span className="text-gray-500">{t('profile.cityState')}</span>
                 <span className="font-semibold text-gray-900 text-right">
-                  {[user?.city, user?.state].filter(Boolean).join(', ') || 'Not set'}
+                  {[user?.city, user?.state].filter(Boolean).join(', ') || notSet}
                 </span>
               </div>
               <div className="flex items-start justify-between gap-3">
-                <span className="text-gray-500">Postal code</span>
-                <span className="font-semibold text-gray-900">{user?.postalCode || 'Not set'}</span>
+                <span className="text-gray-500">{t('profile.postalCode')}</span>
+                <span className="font-semibold text-gray-900">{user?.postalCode || notSet}</span>
               </div>
               <div className="flex items-start justify-between gap-3">
-                <span className="text-gray-500">Country</span>
-                <span className="font-semibold text-gray-900">{user?.country || 'Not set'}</span>
+                <span className="text-gray-500">{t('profile.country')}</span>
+                <span className="font-semibold text-gray-900">{user?.country || notSet}</span>
               </div>
               <div className="flex items-start justify-between gap-3">
-                <span className="text-gray-500">Coordinates</span>
+                <span className="text-gray-500">{t('profile.coordinates')}</span>
                 <span className="font-semibold text-gray-900">
                   {typeof user?.latitude === 'number' && typeof user?.longitude === 'number'
                     ? `${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}`
-                    : 'Not set'}
+                    : notSet}
                 </span>
               </div>
             </div>
@@ -218,41 +221,41 @@ function BloodBankAccount() {
           <div className="bg-white rounded-2xl shadow-xl p-5">
             <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
               <FileText className="w-5 h-5 text-yellow-500" />
-              Compliance & contact
+              {t('profile.complianceContact')}
             </div>
             <div className="mt-4 space-y-3 text-sm text-gray-700">
               <div className="flex items-start justify-between gap-3">
-                <span className="text-gray-500">Contact person</span>
+                <span className="text-gray-500">{t('profile.contactPerson')}</span>
                 <span className="font-semibold text-gray-900 text-right">
-                  {user?.contactPersonName || user?.displayName || 'Not set'}
+                  {user?.contactPersonName || user?.displayName || notSet}
                 </span>
               </div>
               <div className="flex items-start justify-between gap-3">
-                <span className="text-gray-500">Date of birth</span>
+                <span className="text-gray-500">{t('profile.dateOfBirth')}</span>
                 <span className="font-semibold text-gray-900">
-                  {user?.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString() : 'Not set'}
+                  {user?.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString() : notSet}
                 </span>
               </div>
               <div className="flex items-start justify-between gap-3">
-                <span className="text-gray-500">Email</span>
-                <span className="font-semibold text-gray-900 text-right">{user?.email || 'Not set'}</span>
+                <span className="text-gray-500">{t('profile.email')}</span>
+                <span className="font-semibold text-gray-900 text-right">{user?.email || notSet}</span>
               </div>
               <div className="flex items-start justify-between gap-3">
-                <span className="text-gray-500">Phone</span>
+                <span className="text-gray-500">{t('profile.phone')}</span>
                 <span className="font-semibold text-gray-900 text-right">
-                  {user?.phoneNumber || user?.phone || 'Not set'}
+                  {user?.phoneNumber || user?.phone || notSet}
                 </span>
               </div>
               <div className="flex items-start justify-between gap-3">
-                <span className="text-gray-500">Privacy policy</span>
+                <span className="text-gray-500">{t('profile.privacyPolicy')}</span>
                 <span className="font-semibold text-gray-900">
-                  {user?.privacyPolicyAgreed ? 'Agreed' : 'Pending'}
+                  {user?.privacyPolicyAgreed ? t('common.agreed') : t('common.pending')}
                 </span>
               </div>
               <div className="flex items-start justify-between gap-3">
-                <span className="text-gray-500">Terms of service</span>
+                <span className="text-gray-500">{t('profile.termsOfService')}</span>
                 <span className="font-semibold text-gray-900">
-                  {user?.termsOfServiceAgreed ? 'Agreed' : 'Pending'}
+                  {user?.termsOfServiceAgreed ? t('common.agreed') : t('common.pending')}
                 </span>
               </div>
             </div>
@@ -263,19 +266,19 @@ function BloodBankAccount() {
       <div className="bg-white rounded-2xl shadow-xl p-5">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-red-600">Notifications</p>
-            <h3 className="text-lg font-semibold text-gray-900">Push Notifications</h3>
-            <p className="text-xs text-gray-500 mt-1">Get alerts in your browser.</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-red-600">{t('profile.notifications')}</p>
+            <h3 className="text-lg font-semibold text-gray-900">{t('profile.pushNotifications')}</h3>
+            <p className="text-xs text-gray-500 mt-1">{t('profile.getBrowserAlerts')}</p>
           </div>
         </div>
 
         <div className="mt-4 flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
           <div>
-            <p className="text-sm font-semibold text-gray-800">Enable Push</p>
-            <p className="text-xs text-gray-500">Receive inventory and request alerts.</p>
+            <p className="text-sm font-semibold text-gray-800">{t('profile.enablePush')}</p>
+            <p className="text-xs text-gray-500">{t('profile.receiveBloodbankUpdates')}</p>
             {pushPermission === 'denied' && !pushMessage && (
               <p className="text-xs text-red-600 mt-1">
-                Notifications are blocked. Enable them in your browser settings.
+                {t('network.notificationsBlocked')}
               </p>
             )}
             {pushMessage && (

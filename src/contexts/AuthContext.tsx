@@ -1945,7 +1945,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           await signOut(auth);
           throw new PhoneAuthError(
-            'Phone number already registered. Please sign in with Google to link.',
+            authMessages.phoneAlreadyRegisteredLinkGoogle,
             'link_required'
           );
         }

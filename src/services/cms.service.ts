@@ -4,6 +4,7 @@ import { COLLECTIONS } from '../constants/firestore';
 import { CMS_DEFAULTS, CMS_LIMITS, CMS_PAGE_KIND, CMS_QUERY_LIMITS, CMS_SETTINGS_DOC_ID, CMS_STATUS, getCmsMenuDocId, getCmsPostDocId, type CmsMenuLocation } from '../constants/cms';
 import type { CmsBlogPost, CmsNavMenu, CmsPage, CmsSettings } from '../types/database.types';
 import { toDateValue } from '../utils/dateValue';
+import { normalizeLocalizedCmsMap } from '../utils/cmsLocalization';
 
 const QUERY_TIMEOUT_MS = 12000;
 
@@ -43,8 +44,11 @@ const mapCmsBlogPost = (id: string, data: Record<string, any>): CmsBlogPost => (
   id,
   slug: typeof data.slug === 'string' ? data.slug : '',
   title: typeof data.title === 'string' ? data.title : '',
+  titleByLocale: normalizeLocalizedCmsMap(data.titleByLocale) || null,
   excerpt: typeof data.excerpt === 'string' ? data.excerpt : null,
+  excerptByLocale: normalizeLocalizedCmsMap(data.excerptByLocale) || null,
   contentJson: typeof data.contentJson === 'string' ? data.contentJson : null,
+  contentJsonByLocale: normalizeLocalizedCmsMap(data.contentJsonByLocale) || null,
   categorySlug: typeof data.categorySlug === 'string' ? data.categorySlug : null,
   tags: Array.isArray(data.tags) ? data.tags.filter((item: unknown) => typeof item === 'string') : [],
   slugAliases: Array.isArray(data.slugAliases) ? data.slugAliases.filter((item: unknown) => typeof item === 'string') : [],
@@ -55,7 +59,9 @@ const mapCmsBlogPost = (id: string, data: Record<string, any>): CmsBlogPost => (
   status: normalizeCmsStatus(data.status),
   featured: data.featured === true,
   seoTitle: typeof data.seoTitle === 'string' ? data.seoTitle : null,
+  seoTitleByLocale: normalizeLocalizedCmsMap(data.seoTitleByLocale) || null,
   seoDescription: typeof data.seoDescription === 'string' ? data.seoDescription : null,
+  seoDescriptionByLocale: normalizeLocalizedCmsMap(data.seoDescriptionByLocale) || null,
   seoCanonicalUrl: typeof data.seoCanonicalUrl === 'string' ? data.seoCanonicalUrl : null,
   seoNoIndex: data.seoNoIndex === true,
   seoNoFollow: data.seoNoFollow === true,
@@ -125,12 +131,17 @@ const mapCmsPage = (id: string, data: Record<string, any>): CmsPage => ({
   id,
   slug: typeof data.slug === 'string' ? data.slug : '',
   title: typeof data.title === 'string' ? data.title : '',
+  titleByLocale: normalizeLocalizedCmsMap(data.titleByLocale) || null,
   kind: normalizeCmsPageKind(data.kind),
   status: normalizeCmsStatus(data.status),
   contentJson: typeof data.contentJson === 'string' ? data.contentJson : null,
+  contentJsonByLocale: normalizeLocalizedCmsMap(data.contentJsonByLocale) || null,
   excerpt: typeof data.excerpt === 'string' ? data.excerpt : null,
+  excerptByLocale: normalizeLocalizedCmsMap(data.excerptByLocale) || null,
   seoTitle: typeof data.seoTitle === 'string' ? data.seoTitle : null,
+  seoTitleByLocale: normalizeLocalizedCmsMap(data.seoTitleByLocale) || null,
   seoDescription: typeof data.seoDescription === 'string' ? data.seoDescription : null,
+  seoDescriptionByLocale: normalizeLocalizedCmsMap(data.seoDescriptionByLocale) || null,
   seoCanonicalUrl: typeof data.seoCanonicalUrl === 'string' ? data.seoCanonicalUrl : null,
   seoNoIndex: data.seoNoIndex === true,
   seoNoFollow: data.seoNoFollow === true,

@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Bell, Mail, Smartphone, AlertCircle, Save } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -29,6 +30,7 @@ interface Preferences {
  * NotificationPreferences Component
  */
 export const NotificationPreferences: React.FC<NotificationPreferencesProps> = ({ onSave }) => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const {
     permission,
@@ -64,7 +66,7 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
       setPushMessage(null);
 
       if (typeof window === 'undefined' || !('Notification' in window)) {
-        setPushMessage('Push notifications are not supported in this browser.');
+        setPushMessage(t('network.pushUnsupported'));
         return;
       }
 
@@ -73,7 +75,7 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
         const granted = Notification.permission === 'granted';
         setPreferences((prev) => ({ ...prev, push: granted }));
         if (!granted) {
-          setPushMessage('Notifications are blocked. Enable them in your browser settings.');
+          setPushMessage(t('network.notificationsBlocked'));
         }
       } else {
         await unsubscribe();
@@ -124,10 +126,10 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
       {/* Header */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-1">
-          Notification Preferences
+          {t('notificationPreferences.title')}
         </h3>
         <p className="text-sm text-gray-600">
-          Choose how you want to receive notifications
+          {t('notificationPreferences.subtitle')}
         </p>
       </div>
 
@@ -139,9 +141,9 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
             <Mail className="w-5 h-5 text-blue-600" />
           </div>
           <div className="flex-1">
-            <h4 className="font-medium text-gray-900">Email Notifications</h4>
+            <h4 className="font-medium text-gray-900">{t('notificationPreferences.emailTitle')}</h4>
             <p className="text-sm text-gray-600 mt-1">
-              Receive notifications via email
+              {t('notificationPreferences.emailSubtitle')}
             </p>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
@@ -161,9 +163,9 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
             <Smartphone className="w-5 h-5 text-green-600" />
           </div>
           <div className="flex-1">
-            <h4 className="font-medium text-gray-900">SMS Notifications</h4>
+            <h4 className="font-medium text-gray-900">{t('notificationPreferences.smsTitle')}</h4>
             <p className="text-sm text-gray-600 mt-1">
-              Receive notifications via SMS
+              {t('notificationPreferences.smsSubtitle')}
             </p>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
@@ -183,13 +185,13 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
             <Bell className="w-5 h-5 text-purple-600" />
           </div>
           <div className="flex-1">
-            <h4 className="font-medium text-gray-900">Push Notifications</h4>
+            <h4 className="font-medium text-gray-900">{t('notificationPreferences.pushTitle')}</h4>
             <p className="text-sm text-gray-600 mt-1">
-              Receive push notifications in your browser
+              {t('notificationPreferences.pushSubtitle')}
             </p>
             {permission === 'denied' && !pushMessage && (
               <p className="text-xs text-red-600 mt-2">
-                Notifications are blocked. Enable them in your browser settings.
+                {t('network.notificationsBlocked')}
               </p>
             )}
             {pushMessage && (
@@ -199,7 +201,7 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
             )}
             {pushLoading && (
               <p className="text-xs text-gray-500 mt-2">
-                Updating push preference...
+                {t('network.updatingPushPreference')}
               </p>
             )}
           </div>
@@ -221,12 +223,12 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
             <AlertCircle className="w-5 h-5 text-red-600" />
           </div>
           <div className="flex-1">
-            <h4 className="font-medium text-gray-900">Emergency Alerts</h4>
+            <h4 className="font-medium text-gray-900">{t('notificationPreferences.emergencyTitle')}</h4>
             <p className="text-sm text-gray-600 mt-1">
-              Critical alerts for emergency blood requests nearby
+              {t('notificationPreferences.emergencySubtitle')}
             </p>
             <p className="text-xs text-red-600 mt-1">
-              Recommended to keep enabled to help save lives
+              {t('notificationPreferences.emergencyRecommended')}
             </p>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
@@ -249,13 +251,13 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
           className="flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-400 transition-colors font-medium"
         >
           <Save className="w-4 h-4" />
-          {saving ? 'Saving...' : 'Save Preferences'}
+          {saving ? t('common.saving') : t('notificationPreferences.savePreferences')}
         </button>
 
         {saved && (
           <span className="text-sm text-green-600 flex items-center gap-1">
             <CheckCircle className="w-4 h-4" />
-            Saved successfully
+            {t('notificationPreferences.savedSuccessfully')}
           </span>
         )}
       </div>

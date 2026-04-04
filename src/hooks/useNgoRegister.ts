@@ -15,6 +15,7 @@ import { registerWithGoogleRole } from '../utils/googleRegister';
 import { requireValue } from '../utils/validationFeedback';
 import { COLLECTIONS } from '../constants/firestore';
 import { ROUTES } from '../constants/routes';
+import { authMessages } from '../constants/messages';
 
 interface RegisterFormData {
   identifier: string;
@@ -89,7 +90,7 @@ export const useNgoRegister = () => {
       if (userDoc.exists()) {
         // User already exists - sign them out and redirect to login
         await signOut(auth);
-        notify.error('Phone number already registered. Please use the login page.');
+        notify.error(authMessages.phoneRegisteredUseLogin);
         navigate(ROUTES.portal.ngo.login);
         return;
       }
@@ -114,7 +115,7 @@ export const useNgoRegister = () => {
 
       await applyReferralTrackingForUser(userCredential.user.uid);
 
-      notify.success('Registration successful!');
+      notify.success(authMessages.registrationSuccessful);
       navigate(ROUTES.portal.ngo.onboarding);
     } catch (error: any) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.register.ngo.otp.verify' } });

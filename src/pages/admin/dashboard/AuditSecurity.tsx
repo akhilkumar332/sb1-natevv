@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Shield, UserCog } from 'lucide-react';
 import { collection, getDocs, limit, orderBy, query, startAfter, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
@@ -22,6 +23,7 @@ type AuditRow = {
 };
 
 function AuditSecurityPage() {
+  const { t } = useTranslation();
   const { isSuperAdmin } = useAuth();
   const [events, setEvents] = useState<AuditRow[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -106,8 +108,8 @@ function AuditSecurityPage() {
       <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Audit & Security</h2>
-            <p className="text-sm text-gray-600 dark:text-slate-300">Review admin security actions and audit events.</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">{t('admin.auditSecurity')}</h2>
+            <p className="text-sm text-gray-600 dark:text-slate-300">{t('admin.reviewSecurityActions')}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <AdminRefreshButton
@@ -117,27 +119,27 @@ function AuditSecurityPage() {
                 try {
                   await fetchAuditLogsPage({ reset: true });
                 } catch (nextError) {
-                  setError(nextError instanceof Error ? nextError.message : 'Failed to refresh audit logs.');
+                  setError(nextError instanceof Error ? nextError.message : t('admin.failedRefreshAuditLogs'));
                 } finally {
                   setRefreshing(false);
                 }
               }}
               isRefreshing={refreshing}
-              label="Refresh audit logs"
+              label={t('admin.refreshAuditLogs')}
             />
             <Link
               to={ROUTES.portal.admin.dashboard.impersonationAudit}
               className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/60"
             >
               <UserCog className="h-4 w-4" />
-              Impersonation Audit
+              {t('admin.impersonationAudit')}
             </Link>
           </div>
         </div>
 
         {!isSuperAdmin && (
           <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200">
-            You are viewing general audit logs. Impersonation audit details are restricted to superadmins.
+            {t('admin.impersonationRestrictedToSuperadmins')}
           </div>
         )}
       </div>
@@ -145,23 +147,23 @@ function AuditSecurityPage() {
       <AdminListToolbar
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
-        searchPlaceholder="Search actor uid, role, action, target uid"
-        rightContent={<span className="text-xs font-semibold text-gray-500 dark:text-slate-400">{filtered.length} loaded events</span>}
+        searchPlaceholder={t('admin.searchAuditLogsPlaceholder')}
+        rightContent={<span className="text-xs font-semibold text-gray-500 dark:text-slate-400">{t('admin.loadedEvents', { count: filtered.length })}</span>}
       />
 
-      <AdminRefreshingBanner show={loading || refreshing || loadingMore} message="Refreshing audit logs..." />
+      <AdminRefreshingBanner show={loading || refreshing || loadingMore} message={t('admin.refreshingAuditLogs')} />
       <AdminErrorCard message={error} onRetry={() => {
         setLoading(true);
         setError(null);
         void fetchAuditLogsPage({ reset: true })
           .catch((nextError) => {
-            setError(nextError instanceof Error ? nextError.message : 'Failed to fetch audit logs.');
+            setError(nextError instanceof Error ? nextError.message : t('admin.failedFetchAuditLogs'));
           })
           .finally(() => setLoading(false));
       }} />
 
       {paged.length === 0 ? (
-        <AdminEmptyStateCard message="No audit events found." />
+        <AdminEmptyStateCard message={t('admin.noAuditEventsFound')} />
       ) : (
         <>
           <div className="space-y-3 lg:hidden">
@@ -169,10 +171,10 @@ function AuditSecurityPage() {
               <article key={`mobile-${entry.id}`} className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <p className="font-semibold text-gray-900 dark:text-slate-100">{entry.actorUid}</p>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-slate-400">
-                  <p>Role: <span className="font-semibold text-gray-800 dark:text-slate-200">{entry.actorRole || '-'}</span></p>
-                  <p>Action: <span className="font-semibold text-gray-800 dark:text-slate-200">{entry.action}</span></p>
-                  <p className="col-span-2">Target UID: <span className="font-semibold text-gray-800 dark:text-slate-200">{entry.targetUid || '-'}</span></p>
-                  <p className="col-span-2">Timestamp: <span className="font-semibold text-gray-800 dark:text-slate-200">{entry.createdAt ? entry.createdAt.toLocaleString() : 'N/A'}</span></p>
+                  <p>{t('admin.roleLabel')}: <span className="font-semibold text-gray-800 dark:text-slate-200">{entry.actorRole || '-'}</span></p>
+                  <p>{t('admin.actionLabel')}: <span className="font-semibold text-gray-800 dark:text-slate-200">{entry.action}</span></p>
+                  <p className="col-span-2">{t('admin.targetUidLabel')}: <span className="font-semibold text-gray-800 dark:text-slate-200">{entry.targetUid || '-'}</span></p>
+                  <p className="col-span-2">{t('admin.timestampLabel')}: <span className="font-semibold text-gray-800 dark:text-slate-200">{entry.createdAt ? entry.createdAt.toLocaleString() : t('admin.notAvailable')}</span></p>
                 </div>
               </article>
             ))}

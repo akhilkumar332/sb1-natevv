@@ -19,6 +19,11 @@ export const authMessages = {
     get deleteAccount() { return i18n.t('auth.reloginDeleteAccount'); },
   },
   get recaptchaExpired() { return i18n.t('auth.recaptchaExpired'); },
+  get mobileNotRegistered() { return i18n.t('auth.mobileNotRegistered'); },
+  get mobileLinkedMultiple() { return i18n.t('auth.mobileLinkedMultiple'); },
+  get phoneAlreadyRegisteredLinkGoogle() { return i18n.t('auth.phoneAlreadyRegisteredLinkGoogle'); },
+  get phoneRegisteredUseLogin() { return i18n.t('auth.phoneRegisteredUseLogin'); },
+  get registrationSuccessful() { return i18n.t('auth.registrationSuccessful'); },
 };
 
 export const referralMessages = {

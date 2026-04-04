@@ -127,12 +127,12 @@ export const useLogin = () => {
 
       if (error instanceof PhoneAuthError) {
         if (error.code === 'not_registered') {
-          notify.error('Mobile Number not registered. Please sign up.');
+          notify.error(authMessages.mobileNotRegistered);
           navigate(ROUTES.portal.donor.register);
           return;
         }
         if (error.code === 'multiple_accounts') {
-          notify.error('Mobile Number is linked to Multiple account, Contact Support');
+          notify.error(authMessages.mobileLinkedMultiple);
           return;
         }
         if (error.code === 'role_mismatch') {
@@ -144,7 +144,7 @@ export const useLogin = () => {
           return;
         }
         if (error.code === 'link_required') {
-          notify.error('Phone number already registered. Please sign in with Google to link.');
+          notify.error(authMessages.phoneAlreadyRegisteredLinkGoogle);
           return;
         }
       }

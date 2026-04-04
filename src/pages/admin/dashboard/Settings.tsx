@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { notify } from 'services/notify.service';
 import { Save } from 'lucide-react';
@@ -6,6 +7,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { ROUTES } from '../../../constants/routes';
 
 function SettingsPage() {
+  const { t } = useTranslation();
   const { isSuperAdmin } = useAuth();
   const [values, setValues] = useState({
     enableEmergencyEscalation: true,
@@ -81,17 +83,17 @@ function SettingsPage() {
       </div>
 
       <div className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-900">Admin Navigation</h3>
+        <h3 className="text-lg font-bold text-gray-900">{t('admin.adminNavigation')}</h3>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link to={ROUTES.portal.admin.dashboard.auditSecurity} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
-            Open Audit & Security
+            {t('admin.openAuditSecurity')}
           </Link>
           <Link to={ROUTES.portal.admin.dashboard.errorLogs} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
-            Open Error Logs
+            {t('admin.openErrorLogs')}
           </Link>
           {isSuperAdmin && (
             <Link to={ROUTES.portal.admin.dashboard.impersonationAudit} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
-              Open Impersonation Audit
+              {t('admin.openImpersonationAudit')}
             </Link>
           )}
         </div>
