@@ -36,6 +36,7 @@ export const getAdminItemLabel = (itemId: string, t: TFunction) => {
     'cms-menus': 'admin.cmsMenus',
     'cms-media': 'admin.cmsMedia',
     'cms-settings': 'admin.cmsSettings',
+    translations: 'admin.translations',
     audit: 'admin.auditSecurity',
     errors: 'admin.errorLogs',
     impersonation: 'admin.impersonationAudit',

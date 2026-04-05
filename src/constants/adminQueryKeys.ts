@@ -62,6 +62,8 @@ export const adminQueryKeys = {
   cmsMedia: (limit: number = 1000) => ['admin', 'cmsMedia', { limit }] as const,
   cmsSettingsRoot: ['admin', 'cmsSettings'] as const,
   cmsSettings: () => ['admin', 'cmsSettings'] as const,
+  translationOverridesRoot: ['admin', 'translationOverrides'] as const,
+  translationOverrides: () => ['admin', 'translationOverrides'] as const,
   auditRoot: ['admin', 'auditLogs'] as const,
   auditLogs: (limit: number = 1000) => ['admin', 'auditLogs', { limit }] as const,
   errorRoot: ['admin', 'errorLogs'] as const,

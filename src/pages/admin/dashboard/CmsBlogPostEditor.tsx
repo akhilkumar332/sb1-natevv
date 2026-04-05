@@ -32,6 +32,7 @@ import { isAbsoluteHttpUrl, isMediaUrlOrPath, validateScheduleWindow } from '../
 import { recordCmsOperationFailure } from '../../../services/cmsDiagnostics.service';
 import { toHumanCmsStatus } from '../../../constants/cmsHuman';
 import { appendInternalLinkToCmsRichContent, extractCmsPlainText, parseCmsRichContent, serializeCmsRichContent } from '../../../utils/cmsRichContent';
+import { SUPPORTED_LANGUAGES, getLanguageNativeLabel, type SupportedLanguage } from '../../../locales';
 
 const statusOptions = Object.values(CMS_STATUS);
 const toDateTimeLocalValue = (value: unknown): string => {
@@ -58,6 +59,13 @@ type ServerRevisionEntry = RevisionEntry & {
   savedBy: string;
   version: number;
 };
+type LocalizedCmsBlogFields = {
+  title: string;
+  excerpt: string;
+  seoTitle: string;
+  seoDescription: string;
+  contentJson: string;
+};
 
 const toModernBlogContentJson = (value: unknown): string => {
   const raw = typeof value === 'string' ? value : '';
@@ -68,6 +76,44 @@ const toModernBlogContentJson = (value: unknown): string => {
 const REVISION_LIMIT = 10;
 const revisionStorageKey = (slug: string) => `cms_blog_revisions_${slug}`;
 const draftStorageKey = (scope: string) => `cms_blog_draft_${scope}`;
+const EDITABLE_LOCALES = SUPPORTED_LANGUAGES.filter((language) => language !== 'en');
+
+const buildEmptyLocalizedCmsBlogFields = (): Partial<Record<SupportedLanguage, LocalizedCmsBlogFields>> => (
+  Object.fromEntries(
+    EDITABLE_LOCALES.map((language) => [language, {
+      title: '',
+      excerpt: '',
+      seoTitle: '',
+      seoDescription: '',
+      contentJson: '',
+    }]),
+  ) as Partial<Record<SupportedLanguage, LocalizedCmsBlogFields>>
+);
+
+const buildLocalizedCmsBlogFields = (entry?: Partial<Record<string, any>> | null): Partial<Record<SupportedLanguage, LocalizedCmsBlogFields>> => {
+  const next = buildEmptyLocalizedCmsBlogFields();
+  EDITABLE_LOCALES.forEach((language) => {
+    next[language] = {
+      title: typeof entry?.titleByLocale?.[language] === 'string' ? entry.titleByLocale[language] : '',
+      excerpt: typeof entry?.excerptByLocale?.[language] === 'string' ? entry.excerptByLocale[language] : '',
+      seoTitle: typeof entry?.seoTitleByLocale?.[language] === 'string' ? entry.seoTitleByLocale[language] : '',
+      seoDescription: typeof entry?.seoDescriptionByLocale?.[language] === 'string' ? entry.seoDescriptionByLocale[language] : '',
+      contentJson: typeof entry?.contentJsonByLocale?.[language] === 'string' ? entry.contentJsonByLocale[language] : '',
+    };
+  });
+  return next;
+};
+
+const toLocalizedCmsBlogStringMap = (
+  localizedFields: Partial<Record<SupportedLanguage, LocalizedCmsBlogFields>>,
+  key: keyof LocalizedCmsBlogFields,
+) => (
+  EDITABLE_LOCALES.reduce<Record<string, string>>((acc, language) => {
+    const value = localizedFields[language]?.[key]?.trim();
+    if (value) acc[language] = value;
+    return acc;
+  }, {})
+);
 
 export default function CmsBlogPostEditorPage() {
   const { t } = useTranslation();
@@ -87,6 +133,8 @@ export default function CmsBlogPostEditorPage() {
   const [seoTitle, setSeoTitle] = useState('');
   const [seoDescription, setSeoDescription] = useState('');
   const [contentJson, setContentJson] = useState('');
+  const [selectedLocale, setSelectedLocale] = useState<SupportedLanguage>('hi');
+  const [localizedFields, setLocalizedFields] = useState<Partial<Record<SupportedLanguage, LocalizedCmsBlogFields>>>(buildEmptyLocalizedCmsBlogFields);
   const [tagsInput, setTagsInput] = useState('');
   const [categorySlug, setCategorySlug] = useState('');
   const [coverImageUrl, setCoverImageUrl] = useState('');
@@ -192,6 +240,7 @@ export default function CmsBlogPostEditorPage() {
       setSeoTitle('');
       setSeoDescription('');
       setContentJson('');
+      setLocalizedFields(buildEmptyLocalizedCmsBlogFields());
       setTagsInput('');
       setCategorySlug('');
       setCoverImageUrl('');
@@ -227,6 +276,7 @@ export default function CmsBlogPostEditorPage() {
       setSeoTitle(existing.seoTitle || '');
       setSeoDescription(existing.seoDescription || '');
       setContentJson(toModernBlogContentJson(existing.contentJson || ''));
+      setLocalizedFields(buildLocalizedCmsBlogFields(existing));
       setTagsInput(Array.isArray(existing.tags) ? existing.tags.join(', ') : '');
       setCategorySlug(existing.categorySlug || '');
       setCoverImageUrl(existing.coverImageUrl || '');
@@ -487,6 +537,7 @@ export default function CmsBlogPostEditorPage() {
         authorName,
         relatedPostSlugsInput,
         featuredUntil,
+        localizedFields,
       };
       try {
         window.localStorage.setItem(draftStorageKey(draftScopeKey), JSON.stringify({ savedAt: Date.now(), values }));
@@ -526,6 +577,7 @@ export default function CmsBlogPostEditorPage() {
     authorName,
     relatedPostSlugsInput,
     featuredUntil,
+    localizedFields,
   ]);
   useEffect(() => {
     if (!lastSavedAt || typeof window === 'undefined') {
@@ -537,6 +589,27 @@ export default function CmsBlogPostEditorPage() {
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
   }, [lastSavedAt]);
+
+  const updateLocalizedField = (
+    language: SupportedLanguage,
+    key: keyof LocalizedCmsBlogFields,
+    value: string,
+  ) => {
+    setLocalizedFields((prev) => ({
+      ...prev,
+      [language]: {
+        ...(prev[language] || {
+          title: '',
+          excerpt: '',
+          seoTitle: '',
+          seoDescription: '',
+          contentJson: '',
+        }),
+        [key]: value,
+      },
+    }));
+    setIsDirty(true);
+  };
 
   const savePost = async (targetStatus?: (typeof statusOptions)[number]) => {
     const normalizedTitle = title.trim();
@@ -577,6 +650,11 @@ export default function CmsBlogPostEditorPage() {
     const normalizedContentJson = contentJson.trim()
       ? serializeCmsRichContent(parsedArticleContent.html)
       : '';
+    const titleByLocale = toLocalizedCmsBlogStringMap(localizedFields, 'title');
+    const excerptByLocale = toLocalizedCmsBlogStringMap(localizedFields, 'excerpt');
+    const contentJsonByLocale = toLocalizedCmsBlogStringMap(localizedFields, 'contentJson');
+    const seoTitleByLocale = toLocalizedCmsBlogStringMap(localizedFields, 'seoTitle');
+    const seoDescriptionByLocale = toLocalizedCmsBlogStringMap(localizedFields, 'seoDescription');
 
     if (normalizedContentJson.length > CMS_LIMITS.contentJson) {
       notify.error(t('cms.contentTooLong', { count: CMS_LIMITS.contentJson }));
@@ -662,6 +740,9 @@ export default function CmsBlogPostEditorPage() {
         status: nextStatus,
         excerpt: excerpt.trim().slice(0, CMS_LIMITS.excerpt) || null,
         contentJson: normalizedContentJson.slice(0, CMS_LIMITS.contentJson) || null,
+        titleByLocale: Object.keys(titleByLocale).length ? titleByLocale : null,
+        excerptByLocale: Object.keys(excerptByLocale).length ? excerptByLocale : null,
+        contentJsonByLocale: Object.keys(contentJsonByLocale).length ? contentJsonByLocale : null,
         tags: normalizedTags,
         slugAliases,
         seriesSlug: toCmsSlug(seriesSlug) || null,
@@ -672,7 +753,9 @@ export default function CmsBlogPostEditorPage() {
         coverImageUrl: coverImageUrl.trim() || null,
         featured,
         seoTitle: resolvedSeoTitle,
+        seoTitleByLocale: Object.keys(seoTitleByLocale).length ? seoTitleByLocale : null,
         seoDescription: resolvedSeoDescription,
+        seoDescriptionByLocale: Object.keys(seoDescriptionByLocale).length ? seoDescriptionByLocale : null,
         seoCanonicalUrl: seoCanonicalUrl.trim().slice(0, CMS_LIMITS.canonicalUrl) || null,
         seoNoIndex: shouldForceNoIndex ? true : seoNoIndex,
         seoNoFollow: shouldForceNoIndex ? true : seoNoFollow,
@@ -856,6 +939,9 @@ export default function CmsBlogPostEditorPage() {
                   setAuthorName(typeof v.authorName === 'string' ? v.authorName : authorName);
                   setRelatedPostSlugsInput(typeof v.relatedPostSlugsInput === 'string' ? v.relatedPostSlugsInput : relatedPostSlugsInput);
                   setFeaturedUntil(typeof v.featuredUntil === 'string' ? v.featuredUntil : featuredUntil);
+                  if (v.localizedFields && typeof v.localizedFields === 'object') {
+                    setLocalizedFields(v.localizedFields as Partial<Record<SupportedLanguage, LocalizedCmsBlogFields>>);
+                  }
                   setRestoreDraftPayload(null);
                   setIsDirty(true);
                   notify.success(t('cms.recoveredDraftLoaded'));
@@ -944,6 +1030,7 @@ export default function CmsBlogPostEditorPage() {
                     setSeriesSlug(selected.seriesSlug || '');
                     setAuthorName(selected.authorName || '');
                     setRelatedPostSlugsInput((selected.relatedPostSlugs || []).join(', '));
+                    setLocalizedFields(buildLocalizedCmsBlogFields(selected));
                     setIsDirty(true);
                     notify.success(t('cms.duplicatePostLoaded'));
                   }}
@@ -1280,6 +1367,71 @@ export default function CmsBlogPostEditorPage() {
             </div>
           </div>
         ) : null}
+
+        <div className="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">Localized blog content</p>
+              <p className="text-xs text-indigo-800/80 dark:text-indigo-200/80">
+                These values populate locale-specific blog title, summary, body, and SEO metadata while English base fields remain the fallback.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {EDITABLE_LOCALES.map((language) => (
+                <button
+                  key={language}
+                  type="button"
+                  onClick={() => setSelectedLocale(language)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                    selectedLocale === language
+                      ? 'border-indigo-600 bg-indigo-600 text-white'
+                      : 'border-indigo-200 text-indigo-800 hover:bg-indigo-100 dark:border-indigo-900/40 dark:text-indigo-200 dark:hover:bg-indigo-950/40'
+                  }`}
+                >
+                  {getLanguageNativeLabel(language)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <input
+              value={localizedFields[selectedLocale]?.title || ''}
+              onChange={(event) => updateLocalizedField(selectedLocale, 'title', event.target.value)}
+              placeholder={`Localized title (${getLanguageNativeLabel(selectedLocale)})`}
+              className="rounded-xl border border-indigo-200 px-3 py-2 text-sm dark:border-indigo-900/40 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <input
+              value={localizedFields[selectedLocale]?.excerpt || ''}
+              onChange={(event) => updateLocalizedField(selectedLocale, 'excerpt', event.target.value)}
+              placeholder={`Localized summary (${getLanguageNativeLabel(selectedLocale)})`}
+              className="rounded-xl border border-indigo-200 px-3 py-2 text-sm dark:border-indigo-900/40 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <input
+              value={localizedFields[selectedLocale]?.seoTitle || ''}
+              onChange={(event) => updateLocalizedField(selectedLocale, 'seoTitle', event.target.value)}
+              placeholder={`Localized SEO title (${getLanguageNativeLabel(selectedLocale)})`}
+              className="rounded-xl border border-indigo-200 px-3 py-2 text-sm dark:border-indigo-900/40 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <input
+              value={localizedFields[selectedLocale]?.seoDescription || ''}
+              onChange={(event) => updateLocalizedField(selectedLocale, 'seoDescription', event.target.value)}
+              placeholder={`Localized SEO description (${getLanguageNativeLabel(selectedLocale)})`}
+              className="rounded-xl border border-indigo-200 px-3 py-2 text-sm dark:border-indigo-900/40 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <label className="block md:col-span-2">
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-indigo-900 dark:text-indigo-100">
+                Localized article content JSON
+              </span>
+              <textarea
+                value={localizedFields[selectedLocale]?.contentJson || ''}
+                onChange={(event) => updateLocalizedField(selectedLocale, 'contentJson', event.target.value)}
+                rows={10}
+                placeholder={`Localized article content for ${getLanguageNativeLabel(selectedLocale)}. Paste serialized rich content JSON or supported article content payload.`}
+                className="w-full rounded-xl border border-indigo-200 px-3 py-2 font-mono text-xs dark:border-indigo-900/40 dark:bg-slate-900 dark:text-slate-100"
+              />
+            </label>
+          </div>
+        </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
           <button type="button" onClick={() => void savePost(CMS_STATUS.draft)} disabled={saving} className="rounded-lg border border-amber-600 bg-amber-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">

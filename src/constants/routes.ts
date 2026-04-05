@@ -99,6 +99,7 @@ export const ROUTES = {
         cmsMedia: '/admin/dashboard/cms/media',
         cmsSettings: '/admin/dashboard/cms/settings',
         cmsSettingsEditor: '/admin/dashboard/cms/settings/edit',
+        translations: '/admin/dashboard/translations',
         impersonationAudit: '/admin/dashboard/impersonation-audit',
         notifications: '/admin/dashboard/notifications',
         settings: '/admin/dashboard/settings',
@@ -245,6 +246,7 @@ const ADMIN_DASHBOARD_MENU_GROUPS_BASE: AdminDashboardMenuGroup[] = [
       { id: 'cms-menus', label: 'Menus', path: ROUTES.portal.admin.dashboard.cmsMenus },
       { id: 'cms-media', label: 'Media', path: ROUTES.portal.admin.dashboard.cmsMedia },
       { id: 'cms-settings', label: 'CMS Settings', path: ROUTES.portal.admin.dashboard.cmsSettings },
+      { id: 'translations', label: 'Translations', path: ROUTES.portal.admin.dashboard.translations },
     ],
   },
   {

@@ -333,6 +333,7 @@ export default {
     offlineSyncHealth: "ഓഫ്‌ലൈൻ സിങ്ക് നില",
     notifications: "നോട്ടിഫിക്കേഷനുകൾ",
     settings: "സെറ്റിംഗുകൾ",
+    translations: "പരിഭാഷകൾ",
     openImpersonationAudit: "ഇംപേഴ്സണേഷൻ ഓഡിറ്റ് തുറക്കുക",
     openAuditSecurity: "ഓഡിറ്റ് & സുരക്ഷ തുറക്കുക",
     openErrorLogs: "പിശക് ലോഗുകൾ തുറക്കുക",

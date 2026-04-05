@@ -19,7 +19,6 @@ function ThemeToggle({ className = '' }: ThemeToggleProps) {
       title={isDark ? t('theme.switchToLight') : t('theme.switchToDark')}
     >
       {isDark ? <Sun className="h-4 w-4 text-amber-300" /> : <Moon className="h-4 w-4 text-text-secondary" />}
-      <span>{isDark ? t('theme.light') : t('theme.dark')}</span>
     </button>
   );
 }

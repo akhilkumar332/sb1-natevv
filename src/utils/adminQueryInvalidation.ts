@@ -64,6 +64,9 @@ const recipes = {
     adminQueryKeys.cmsMediaRoot,
     adminQueryKeys.cmsSettingsRoot,
   ],
+  translationsUpdated: [
+    adminQueryKeys.translationOverridesRoot,
+  ],
   volunteerUpdated: [
     adminQueryKeys.volunteersRoot,
   ],

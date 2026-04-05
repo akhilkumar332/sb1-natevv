@@ -344,62 +344,62 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:696",
+    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:779",
     "method": "setDoc",
     "collectionKey": "CMS_BLOG_POST_SUMMARIES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
-    "line": 696,
+    "line": 779,
     "area": "CMS_BLOG_POST_SUMMARIES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:697",
+    "id": "CMS_BLOG_POST_SUMMARIES.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:780",
     "method": "setDoc",
     "collectionKey": "CMS_BLOG_POST_SUMMARIES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
-    "line": 697,
+    "line": 780,
     "area": "CMS_BLOG_POST_SUMMARIES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_BLOG_POST_REVISIONS.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:712",
+    "id": "CMS_BLOG_POST_REVISIONS.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:795",
     "method": "setDoc",
     "collectionKey": "CMS_BLOG_POST_REVISIONS",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
-    "line": 712,
+    "line": 795,
     "area": "CMS_BLOG_POST_REVISIONS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_BLOG_POSTS.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:725",
+    "id": "CMS_BLOG_POSTS.setDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:808",
     "method": "setDoc",
     "collectionKey": "CMS_BLOG_POSTS",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
-    "line": 725,
+    "line": 808,
     "area": "CMS_BLOG_POSTS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_BLOG_POSTS.deleteDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:726",
+    "id": "CMS_BLOG_POSTS.deleteDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:809",
     "method": "deleteDoc",
     "collectionKey": "CMS_BLOG_POSTS",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
-    "line": 726,
+    "line": 809,
     "area": "CMS_BLOG_POSTS deleteDoc",
     "mode": "online_only"
   },
   {
-    "id": "CMS_BLOG_POST_SUMMARIES.deleteDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:727",
+    "id": "CMS_BLOG_POST_SUMMARIES.deleteDoc.pages/admin/dashboard/CmsBlogPostEditor.tsx:810",
     "method": "deleteDoc",
     "collectionKey": "CMS_BLOG_POST_SUMMARIES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsBlogPostEditor.tsx",
-    "line": 727,
+    "line": 810,
     "area": "CMS_BLOG_POST_SUMMARIES deleteDoc",
     "mode": "online_only"
   },
@@ -564,32 +564,32 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPageEditor.tsx:709",
+    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPageEditor.tsx:796",
     "method": "setDoc",
     "collectionKey": "CMS_PAGES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsPageEditor.tsx",
-    "line": 709,
+    "line": 796,
     "area": "CMS_PAGES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPageEditor.tsx:741",
+    "id": "CMS_PAGES.setDoc.pages/admin/dashboard/CmsPageEditor.tsx:833",
     "method": "setDoc",
     "collectionKey": "CMS_PAGES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsPageEditor.tsx",
-    "line": 741,
+    "line": 833,
     "area": "CMS_PAGES setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "CMS_PAGES.deleteDoc.pages/admin/dashboard/CmsPageEditor.tsx:770",
+    "id": "CMS_PAGES.deleteDoc.pages/admin/dashboard/CmsPageEditor.tsx:867",
     "method": "deleteDoc",
     "collectionKey": "CMS_PAGES",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsPageEditor.tsx",
-    "line": 770,
+    "line": 867,
     "area": "CMS_PAGES deleteDoc",
     "mode": "online_only"
   },
@@ -2261,6 +2261,16 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "path": "services/referral.service.ts",
     "line": 494,
     "area": "REFERRAL_TRACKING setDoc",
+    "mode": "queue_safe"
+  },
+  {
+    "id": "TRANSLATION_OVERRIDES.setDoc.services/translationOverrides.service.ts:64",
+    "method": "setDoc",
+    "collectionKey": "TRANSLATION_OVERRIDES",
+    "module": "services",
+    "path": "services/translationOverrides.service.ts",
+    "line": 64,
+    "area": "TRANSLATION_OVERRIDES setDoc",
     "mode": "queue_safe"
   },
   {

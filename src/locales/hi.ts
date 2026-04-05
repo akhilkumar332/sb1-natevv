@@ -333,6 +333,7 @@ export default {
     offlineSyncHealth: "ऑफ़लाइन सिंक हेल्थ",
     notifications: "नोटिफिकेशन्स",
     settings: "सेटिंग्स",
+    translations: "अनुवाद",
     openImpersonationAudit: "इम्पर्सनेशन ऑडिट खोलें",
     openAuditSecurity: "ऑडिट और सुरक्षा खोलें",
     openErrorLogs: "एरर लॉग्स खोलें",

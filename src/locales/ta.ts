@@ -333,6 +333,7 @@ export default {
     offlineSyncHealth: "ஆஃப்லைன் ஒத்திசைவு நிலை",
     notifications: "அறிவிப்புகள்",
     settings: "அமைப்புகள்",
+    translations: "மொழிபெயர்ப்புகள்",
     openImpersonationAudit: "இம்பர்சனேஷன் தணிக்கையைத் திறக்கவும்",
     openAuditSecurity: "தணிக்கை & பாதுகாப்பைத் திறக்கவும்",
     openErrorLogs: "பிழை பதிவுகளைத் திறக்கவும்",

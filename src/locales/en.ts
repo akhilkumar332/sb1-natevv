@@ -335,6 +335,7 @@ export default {
     offlineSyncHealth: 'Offline Sync Health',
     notifications: 'Notifications',
     settings: 'Settings',
+    translations: 'Translations',
     openImpersonationAudit: 'Open Impersonation Audit',
     openAuditSecurity: 'Open Audit & Security',
     openErrorLogs: 'Open Error Logs',

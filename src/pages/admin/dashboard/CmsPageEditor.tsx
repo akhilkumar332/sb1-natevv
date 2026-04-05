@@ -31,6 +31,7 @@ import { parseJsonObject, isAbsoluteHttpUrl, isMediaUrlOrPath, validateScheduleW
 import SeoSnippetPreview from '../../../components/cms/SeoSnippetPreview';
 import { recordCmsOperationFailure } from '../../../services/cmsDiagnostics.service';
 import { toHumanCmsStatus } from '../../../constants/cmsHuman';
+import { SUPPORTED_LANGUAGES, getLanguageNativeLabel, type SupportedLanguage } from '../../../locales';
 
 const statusOptions = Object.values(CMS_STATUS);
 const kindOptions = Object.values(CMS_PAGE_KIND);
@@ -47,6 +48,52 @@ const draftStorageKey = (scope: string) => `cms_page_draft_${scope}`;
 
 type JsonLike = string | number | boolean | null | JsonLike[] | { [key: string]: JsonLike };
 type JsonPath = Array<string | number>;
+type LocalizedCmsPageFields = {
+  title: string;
+  excerpt: string;
+  seoTitle: string;
+  seoDescription: string;
+  contentJson: string;
+};
+
+const EDITABLE_LOCALES = SUPPORTED_LANGUAGES.filter((language) => language !== 'en');
+
+const buildEmptyLocalizedCmsPageFields = (): Partial<Record<SupportedLanguage, LocalizedCmsPageFields>> => (
+  Object.fromEntries(
+    EDITABLE_LOCALES.map((language) => [language, {
+      title: '',
+      excerpt: '',
+      seoTitle: '',
+      seoDescription: '',
+      contentJson: '',
+    }]),
+  ) as Partial<Record<SupportedLanguage, LocalizedCmsPageFields>>
+);
+
+const buildLocalizedCmsPageFields = (entry?: Partial<Record<string, any>> | null): Partial<Record<SupportedLanguage, LocalizedCmsPageFields>> => {
+  const next = buildEmptyLocalizedCmsPageFields();
+  EDITABLE_LOCALES.forEach((language) => {
+    next[language] = {
+      title: typeof entry?.titleByLocale?.[language] === 'string' ? entry.titleByLocale[language] : '',
+      excerpt: typeof entry?.excerptByLocale?.[language] === 'string' ? entry.excerptByLocale[language] : '',
+      seoTitle: typeof entry?.seoTitleByLocale?.[language] === 'string' ? entry.seoTitleByLocale[language] : '',
+      seoDescription: typeof entry?.seoDescriptionByLocale?.[language] === 'string' ? entry.seoDescriptionByLocale[language] : '',
+      contentJson: typeof entry?.contentJsonByLocale?.[language] === 'string' ? entry.contentJsonByLocale[language] : '',
+    };
+  });
+  return next;
+};
+
+const toLocalizedCmsStringMap = (
+  localizedFields: Partial<Record<SupportedLanguage, LocalizedCmsPageFields>>,
+  key: keyof LocalizedCmsPageFields,
+) => {
+  return EDITABLE_LOCALES.reduce<Record<string, string>>((acc, language) => {
+    const value = localizedFields[language]?.[key]?.trim();
+    if (value) acc[language] = value;
+    return acc;
+  }, {});
+};
 
 const isPlainObject = (value: unknown): value is Record<string, JsonLike> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -156,6 +203,8 @@ export default function CmsPageEditorPage() {
   const [scheduledUnpublishAt, setScheduledUnpublishAt] = useState('');
   const [contentJson, setContentJson] = useState('');
   const [contentDraft, setContentDraft] = useState<JsonLike>({});
+  const [selectedLocale, setSelectedLocale] = useState<SupportedLanguage>('hi');
+  const [localizedFields, setLocalizedFields] = useState<Partial<Record<SupportedLanguage, LocalizedCmsPageFields>>>(buildEmptyLocalizedCmsPageFields);
   const [revisionHistory, setRevisionHistory] = useState<RevisionEntry[]>([]);
   const [restoreDraftPayload, setRestoreDraftPayload] = useState<Record<string, unknown> | null>(null);
   const [activeSection, setActiveSection] = useState<string>('');
@@ -293,6 +342,7 @@ export default function CmsPageEditorPage() {
       setScheduledUnpublishAt('');
       setContentDraft({});
       setContentJson('{}');
+      setLocalizedFields(buildEmptyLocalizedCmsPageFields());
       setRevisionHistory([]);
       loadedUpdatedAtRef.current = null;
       setInitializedFor(hydrationKey);
@@ -321,6 +371,7 @@ export default function CmsPageEditorPage() {
     setReviewNotes(existing?.reviewNotes || '');
     setScheduledPublishAt(toDateTimeLocalValue(existing?.scheduledPublishAt));
     setScheduledUnpublishAt(toDateTimeLocalValue(existing?.scheduledUnpublishAt));
+    setLocalizedFields(buildLocalizedCmsPageFields(existing));
     const rawContentJson = typeof existing?.contentJson === 'string'
       ? existing.contentJson
       : JSON.stringify(
@@ -403,6 +454,7 @@ export default function CmsPageEditorPage() {
         scheduledUnpublishAt,
         contentJson,
         contentDraft,
+        localizedFields,
       };
       try {
         window.localStorage.setItem(draftStorageKey(draftScopeKey), JSON.stringify({ savedAt: Date.now(), values }));
@@ -435,11 +487,33 @@ export default function CmsPageEditorPage() {
     scheduledUnpublishAt,
     contentJson,
     contentDraft,
+    localizedFields,
   ]);
 
   const updateDraftAtPath = (path: JsonPath, nextValue: JsonLike) => {
     setIsDirty(true);
     setContentDraft((prev) => setAtPath(prev || {}, path, nextValue));
+  };
+
+  const updateLocalizedField = (
+    language: SupportedLanguage,
+    key: keyof LocalizedCmsPageFields,
+    value: string,
+  ) => {
+    setLocalizedFields((prev) => ({
+      ...prev,
+      [language]: {
+        ...(prev[language] || {
+          title: '',
+          excerpt: '',
+          seoTitle: '',
+          seoDescription: '',
+          contentJson: '',
+        }),
+        [key]: value,
+      },
+    }));
+    setIsDirty(true);
   };
 
   const removeDraftArrayItem = (path: JsonPath, index: number) => {
@@ -641,6 +715,19 @@ export default function CmsPageEditorPage() {
     }
 
     const normalizedContentJson = JSON.stringify(contentDraft || {}, null, 2);
+    for (const language of EDITABLE_LOCALES) {
+      const localizedContentJson = localizedFields[language]?.contentJson?.trim() || '';
+      if (!localizedContentJson) continue;
+      if (!parseJsonObject(localizedContentJson)) {
+        notify.error(`${getLanguageNativeLabel(language)} localized content must be valid JSON.`);
+        return;
+      }
+    }
+    const titleByLocale = toLocalizedCmsStringMap(localizedFields, 'title');
+    const excerptByLocale = toLocalizedCmsStringMap(localizedFields, 'excerpt');
+    const contentJsonByLocale = toLocalizedCmsStringMap(localizedFields, 'contentJson');
+    const seoTitleByLocale = toLocalizedCmsStringMap(localizedFields, 'seoTitle');
+    const seoDescriptionByLocale = toLocalizedCmsStringMap(localizedFields, 'seoDescription');
 
     if (normalizedContentJson.length > CMS_LIMITS.contentJson) {
       notify.error(`Content JSON exceeds ${CMS_LIMITS.contentJson} characters.`);
@@ -729,6 +816,11 @@ export default function CmsPageEditorPage() {
         scheduledUnpublishAt: parsedScheduledUnpublishAt,
         version: nextVersion,
         contentJson: normalizedContentJson || null,
+        titleByLocale: Object.keys(titleByLocale).length ? titleByLocale : null,
+        excerptByLocale: Object.keys(excerptByLocale).length ? excerptByLocale : null,
+        contentJsonByLocale: Object.keys(contentJsonByLocale).length ? contentJsonByLocale : null,
+        seoTitleByLocale: Object.keys(seoTitleByLocale).length ? seoTitleByLocale : null,
+        seoDescriptionByLocale: Object.keys(seoDescriptionByLocale).length ? seoDescriptionByLocale : null,
         publishedAt,
         createdBy,
         updatedBy: user?.uid || 'admin',
@@ -761,6 +853,11 @@ export default function CmsPageEditorPage() {
           scheduledUnpublishAt: parsedScheduledUnpublishAt,
           version: nextVersion,
           contentJson: normalizedContentJson || null,
+          titleByLocale: Object.keys(titleByLocale).length ? titleByLocale : null,
+          excerptByLocale: Object.keys(excerptByLocale).length ? excerptByLocale : null,
+          contentJsonByLocale: Object.keys(contentJsonByLocale).length ? contentJsonByLocale : null,
+          seoTitleByLocale: Object.keys(seoTitleByLocale).length ? seoTitleByLocale : null,
+          seoDescriptionByLocale: Object.keys(seoDescriptionByLocale).length ? seoDescriptionByLocale : null,
           publishedAt,
           createdBy,
           updatedBy: user?.uid || 'admin',
@@ -901,6 +998,9 @@ export default function CmsPageEditorPage() {
                   setReviewNotes(typeof v.reviewNotes === 'string' ? v.reviewNotes : reviewNotes);
                   setScheduledPublishAt(typeof v.scheduledPublishAt === 'string' ? v.scheduledPublishAt : scheduledPublishAt);
                   setScheduledUnpublishAt(typeof v.scheduledUnpublishAt === 'string' ? v.scheduledUnpublishAt : scheduledUnpublishAt);
+                  if (v.localizedFields && typeof v.localizedFields === 'object') {
+                    setLocalizedFields(v.localizedFields as Partial<Record<SupportedLanguage, LocalizedCmsPageFields>>);
+                  }
                   if (v.contentDraft && typeof v.contentDraft === 'object' && !Array.isArray(v.contentDraft)) {
                     setContentDraft(v.contentDraft as JsonLike);
                     setContentJson(JSON.stringify(v.contentDraft, null, 2));
@@ -978,6 +1078,7 @@ export default function CmsPageEditorPage() {
                   setOgDescription(selected.ogDescription || '');
                   setOgImageUrl(selected.ogImageUrl || '');
                   setTwitterImageUrl(selected.twitterImageUrl || '');
+                  setLocalizedFields(buildLocalizedCmsPageFields(selected));
                   const parsed = parseJsonObject(selected.contentJson || '{}') || {};
                   setContentDraft(parsed as JsonLike);
                   setContentJson(JSON.stringify(parsed, null, 2));
@@ -1158,6 +1259,71 @@ export default function CmsPageEditorPage() {
                 </div>
               )}
             </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">Localized frontend page content</p>
+              <p className="text-xs text-indigo-800/80 dark:text-indigo-200/80">
+                Manage non-English public page values here. Frontend pages read these localized fields before falling back to the English base page.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {EDITABLE_LOCALES.map((language) => (
+                <button
+                  key={language}
+                  type="button"
+                  onClick={() => setSelectedLocale(language)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                    selectedLocale === language
+                      ? 'border-indigo-600 bg-indigo-600 text-white'
+                      : 'border-indigo-200 text-indigo-800 hover:bg-indigo-100 dark:border-indigo-900/40 dark:text-indigo-200 dark:hover:bg-indigo-950/40'
+                  }`}
+                >
+                  {getLanguageNativeLabel(language)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <input
+              value={localizedFields[selectedLocale]?.title || ''}
+              onChange={(event) => updateLocalizedField(selectedLocale, 'title', event.target.value)}
+              placeholder={`Localized title (${getLanguageNativeLabel(selectedLocale)})`}
+              className="rounded-xl border border-indigo-200 px-3 py-2 text-sm dark:border-indigo-900/40 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <input
+              value={localizedFields[selectedLocale]?.excerpt || ''}
+              onChange={(event) => updateLocalizedField(selectedLocale, 'excerpt', event.target.value)}
+              placeholder={`Localized summary (${getLanguageNativeLabel(selectedLocale)})`}
+              className="rounded-xl border border-indigo-200 px-3 py-2 text-sm dark:border-indigo-900/40 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <input
+              value={localizedFields[selectedLocale]?.seoTitle || ''}
+              onChange={(event) => updateLocalizedField(selectedLocale, 'seoTitle', event.target.value)}
+              placeholder={`Localized SEO title (${getLanguageNativeLabel(selectedLocale)})`}
+              className="rounded-xl border border-indigo-200 px-3 py-2 text-sm dark:border-indigo-900/40 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <input
+              value={localizedFields[selectedLocale]?.seoDescription || ''}
+              onChange={(event) => updateLocalizedField(selectedLocale, 'seoDescription', event.target.value)}
+              placeholder={`Localized SEO description (${getLanguageNativeLabel(selectedLocale)})`}
+              className="rounded-xl border border-indigo-200 px-3 py-2 text-sm dark:border-indigo-900/40 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <label className="block md:col-span-2">
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-indigo-900 dark:text-indigo-100">
+                Localized content JSON
+              </span>
+              <textarea
+                value={localizedFields[selectedLocale]?.contentJson || ''}
+                onChange={(event) => updateLocalizedField(selectedLocale, 'contentJson', event.target.value)}
+                rows={10}
+                placeholder={`Localized contentJson for ${getLanguageNativeLabel(selectedLocale)}. Use valid JSON matching the page schema.`}
+                className="w-full rounded-xl border border-indigo-200 px-3 py-2 font-mono text-xs dark:border-indigo-900/40 dark:bg-slate-900 dark:text-slate-100"
+              />
+            </label>
+          </div>
         </div>
 
         <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-slate-700 dark:bg-slate-950/70">

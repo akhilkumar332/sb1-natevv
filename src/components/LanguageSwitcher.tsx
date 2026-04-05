@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Languages } from 'lucide-react';
+import { Globe2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   getLanguageNativeLabel,
@@ -51,7 +51,7 @@ function LanguageSwitcher({ className = '', menuAlign = 'right' }: LanguageSwitc
         aria-haspopup="menu"
         aria-expanded={isOpen}
       >
-        <Languages className="h-4 w-4" />
+        <Globe2 className="h-4 w-4" />
       </button>
 
       {isOpen && (

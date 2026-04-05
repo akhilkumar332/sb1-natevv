@@ -13,6 +13,7 @@ import * as serviceWorkerRegistration from './utils/serviceWorkerRegistration';
 import { initPerformanceMonitoring } from './utils/performanceMonitoring';
 import { initGlobalErrorLogging } from './utils/errorLoggingBootstrap';
 import { initializeFirestoreOfflinePersistence } from './firebase';
+import { loadTranslationOverridesIntoI18n } from './services/translationRuntime.service';
 import '../index.css';
 
 // Initialize performance monitoring
@@ -20,6 +21,7 @@ const initRuntimeOptimizations = () => {
   initPerformanceMonitoring();
   initGlobalErrorLogging();
   void initializeFirestoreOfflinePersistence();
+  void loadTranslationOverridesIntoI18n();
 };
 
 if (typeof window !== 'undefined') {

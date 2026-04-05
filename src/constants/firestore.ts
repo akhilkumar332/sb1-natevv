@@ -42,6 +42,7 @@ export const COLLECTIONS = {
   POINT_TRANSACTIONS: 'pointTransactions',
   DONATION_FEEDBACK: 'DonationFeedback',
   OFFLINE_SYNC_HEALTH_RECORDS: 'offlineSyncHealthRecords',
+  TRANSLATION_OVERRIDES: 'translationOverrides',
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

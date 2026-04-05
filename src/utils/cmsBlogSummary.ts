@@ -3,8 +3,11 @@ import type { CmsBlogPost } from '../types/database.types';
 type CmsBlogPostLike = {
   slug: string;
   title: string;
+  titleByLocale?: Record<string, string> | null;
   status: CmsBlogPost['status'];
   excerpt?: string | null;
+  excerptByLocale?: Record<string, string> | null;
+  contentJsonByLocale?: Record<string, string> | null;
   categorySlug?: string | null;
   tags?: string[];
   coverImageUrl?: string | null;
@@ -14,7 +17,9 @@ type CmsBlogPostLike = {
   featuredUntil?: unknown;
   featured?: boolean;
   seoTitle?: string | null;
+  seoTitleByLocale?: Record<string, string> | null;
   seoDescription?: string | null;
+  seoDescriptionByLocale?: Record<string, string> | null;
   seoCanonicalUrl?: string | null;
   seoNoIndex?: boolean;
   seoNoFollow?: boolean;
@@ -39,7 +44,10 @@ type CmsBlogPostLike = {
 export const toCmsBlogSummaryPayload = (post: CmsBlogPostLike) => ({
   slug: post.slug,
   title: post.title,
+  titleByLocale: post.titleByLocale ?? null,
   excerpt: post.excerpt ?? null,
+  excerptByLocale: post.excerptByLocale ?? null,
+  contentJsonByLocale: post.contentJsonByLocale ?? null,
   categorySlug: post.categorySlug ?? null,
   tags: post.tags || [],
   coverImageUrl: post.coverImageUrl ?? null,
@@ -50,7 +58,9 @@ export const toCmsBlogSummaryPayload = (post: CmsBlogPostLike) => ({
   status: post.status,
   featured: post.featured === true,
   seoTitle: post.seoTitle ?? null,
+  seoTitleByLocale: post.seoTitleByLocale ?? null,
   seoDescription: post.seoDescription ?? null,
+  seoDescriptionByLocale: post.seoDescriptionByLocale ?? null,
   seoCanonicalUrl: post.seoCanonicalUrl ?? null,
   seoNoIndex: post.seoNoIndex === true,
   seoNoFollow: post.seoNoFollow === true,

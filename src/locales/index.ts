@@ -21,6 +21,15 @@ export const localeResources = {
   ml: { translation: ml },
 } as const;
 
+export const bundledLocaleDictionaries = {
+  en,
+  hi,
+  te,
+  ta,
+  kn,
+  ml,
+} as const;
+
 export const isSupportedLanguage = (value: string | null | undefined): value is SupportedLanguage =>
   Boolean(value && SUPPORTED_LANGUAGES.includes(value as SupportedLanguage));
 

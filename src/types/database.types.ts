@@ -852,6 +852,9 @@ export interface NpsPromptOverride {
 export type CmsStatus = 'draft' | 'scheduled' | 'published' | 'archived';
 export type CmsPageKind = 'generic' | 'home_section' | 'about_section' | 'contact_section';
 export type CmsMenuLocation = 'header' | 'footer_resources' | 'footer_legal';
+export interface TranslationOverrideMap {
+  [key: string]: string | TranslationOverrideMap;
+}
 
 export interface CmsPage {
   id?: string;
@@ -1038,6 +1041,15 @@ export interface CmsSettings {
   updatedBy: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+export interface TranslationOverrideDocument {
+  id?: string;
+  language: string;
+  translations: TranslationOverrideMap;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+  updatedBy?: string | null;
 }
 
 // ============================================================================

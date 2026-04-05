@@ -979,6 +979,15 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // COLLECTION: translationOverrides
+    // ========================================================================
+
+    match /translationOverrides/{languageId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ========================================================================
     // COLLECTION: contactSubmissions
     // ========================================================================
 

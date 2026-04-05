@@ -47,11 +47,13 @@ import type {
   ContactSubmission,
   NpsPromptOverride,
   NpsResponse,
+  TranslationOverrideDocument,
   User,
   VerificationRequest
 } from '../../types/database.types';
 import { toDateValue } from '../../utils/dateValue';
 import type { OfflineSyncHealthActor, OfflineSyncHealthDeadLetterSample, OfflineSyncHealthRecord } from '../../utils/offlineSyncHealth';
+import { getTranslationOverrideDocuments } from '../../services/translationOverrides.service';
 
 type PlatformStatsResponse = Awaited<ReturnType<typeof getPlatformStats>>;
 type AdminEntity = Record<string, any> & { id?: string };
@@ -100,6 +102,7 @@ export type AdminNpsActiveUserProfile = {
   lastLoginAt: Date | null;
 };
 export type AdminOfflineSyncHealthRecord = OfflineSyncHealthRecord;
+export type AdminTranslationOverride = TranslationOverrideDocument;
 
 const useCachedAdminQuery = <T,>(
   queryKey: readonly unknown[],
@@ -260,6 +263,10 @@ const fetchContactSubmissions = async (limitCount: number): Promise<ContactSubmi
     } as ContactSubmission;
   });
 };
+
+const fetchTranslationOverrides = async (): Promise<TranslationOverrideDocument[]> => (
+  getTranslationOverrideDocuments()
+);
 
 const fetchCmsPages = async (limitCount: number): Promise<CmsPage[]> => {
   const snapshot = await getDocs(query(
@@ -960,6 +967,20 @@ export const useAdminCmsSettings = () =>
       staleTime: ADMIN_QUERY_TIMINGS.cms.staleTime,
       gcTime: ADMIN_QUERY_TIMINGS.cms.gcTime,
       refetchInterval: ADMIN_QUERY_TIMINGS.cms.refetchInterval,
+      refetchIntervalInBackground: false,
+    },
+  );
+
+export const useAdminTranslationOverrides = () =>
+  useCachedAdminQuery<TranslationOverrideDocument[]>(
+    adminQueryKeys.translationOverrides(),
+    ADMIN_QUERY_TIMINGS.cms.ttl,
+    ['createdAt', 'updatedAt'],
+    fetchTranslationOverrides,
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.cms.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.cms.gcTime,
+      refetchInterval: false,
       refetchIntervalInBackground: false,
     },
   );
