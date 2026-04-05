@@ -3,7 +3,7 @@ import { notify } from 'services/notify.service';
 import { authStorage } from './authStorage';
 import type { NavigateFunction } from 'react-router-dom';
 import { captureHandledError } from '../services/errorLog.service';
-import { authFlowMessages } from './authInputValidation';
+import { notifyGoogleSignInFailure } from './authNotifications';
 
 type GoogleLoginResponse = {
   user: {
@@ -98,6 +98,6 @@ export async function handleRoleGoogleLogin({
         expectedRoles,
       },
     });
-    notify.error(authFlowMessages.googleSignInFailed);
+    notifyGoogleSignInFailure(error);
   }
 }

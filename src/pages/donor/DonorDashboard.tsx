@@ -2386,7 +2386,7 @@ function DonorDashboard() {
     return badge;
   });
   const menuItems = [
-    { id: 'overview', label: t('dashboard.overview'), to: 'overview', icon: Activity },
+    { id: 'overview', label: t('common.overview'), to: 'overview', icon: Activity },
     { id: 'readiness', label: t('dashboard.readiness'), to: 'readiness', icon: CheckCircle },
     { id: 'requests', label: t('dashboard.requests'), to: 'requests', icon: AlertCircle },
     { id: 'blood-drives', label: t('dashboard.bloodDrives'), to: 'blood-drives', icon: MapPinned },

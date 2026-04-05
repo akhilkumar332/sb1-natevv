@@ -10,6 +10,9 @@ export const useBloodBankRegister = () => {
   const navigate = useNavigate();
 
   const handleGoogleRegister = async () => {
+    if (googleLoading) {
+      return;
+    }
     try {
       setGoogleLoading(true);
       await registerWithGoogleRole({
@@ -19,6 +22,7 @@ export const useBloodBankRegister = () => {
         scope: 'auth',
         kind: 'auth.register.bloodbank.google',
         navigate,
+        persistToken: true,
       });
     } finally {
       setGoogleLoading(false);

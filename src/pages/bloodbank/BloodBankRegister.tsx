@@ -1,5 +1,5 @@
 // src/pages/bloodbank/BloodBankRegister.tsx
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Building2, Activity, MapPin, Shield } from 'lucide-react';
 import { useBloodBankRegister } from '../../hooks/useBloodBankRegister';
@@ -10,20 +10,30 @@ import { readRegistrationIntent } from '../../utils/registrationIntent';
 
 export function BloodBankRegister() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profileResolved } = useAuth();
+  const hasNavigated = useRef(false);
   const {
     handleGoogleRegister,
     googleLoading,
   } = useBloodBankRegister();
 
   useEffect(() => {
+    if (!user || !profileResolved || hasNavigated.current) {
+      return;
+    }
     if (readRegistrationIntent()) {
       return;
     }
-    if (user && user.role === 'bloodbank') {
-      navigate(ROUTES.portal.bloodbank.dashboard.root);
+    if (user.role !== 'bloodbank' && user.role !== 'hospital') {
+      return;
     }
-  }, [user, navigate]);
+    hasNavigated.current = true;
+    if (!user.onboardingCompleted) {
+      navigate(ROUTES.portal.bloodbank.onboarding);
+      return;
+    }
+    navigate(ROUTES.portal.bloodbank.dashboard.root);
+  }, [navigate, profileResolved, user]);
 
   return (
     <div className="min-h-screen flex">

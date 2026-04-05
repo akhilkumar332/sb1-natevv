@@ -104,132 +104,132 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.setDoc.contexts/AuthContext.tsx:634",
+    "id": "USERS.setDoc.contexts/AuthContext.tsx:646",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 634,
+    "line": 646,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:782",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:802",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 782,
+    "line": 802,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:823",
+    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:843",
     "method": "setDoc",
     "collectionKey": "PUBLIC_DONORS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 823,
+    "line": 843,
     "area": "PUBLIC_DONORS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:876",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:896",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 876,
+    "line": 896,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:1488",
+    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:1508",
     "method": "setDoc",
     "collectionKey": "PUBLIC_DONORS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 1488,
+    "line": 1508,
     "area": "PUBLIC_DONORS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:1986",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2025",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 1986,
+    "line": 2025,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2111",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2152",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2111,
+    "line": 2152,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2190",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2236",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2190,
+    "line": 2236,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2213",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2262",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2213,
+    "line": 2262,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2308",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2357",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2308,
+    "line": 2357,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2506",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2558",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2506,
+    "line": 2558,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.setDoc.contexts/AuthContext.tsx:2731",
+    "id": "USERS.setDoc.contexts/AuthContext.tsx:2780",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2731,
+    "line": 2780,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:2772",
+    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:2821",
     "method": "setDoc",
     "collectionKey": "PUBLIC_DONORS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2772,
+    "line": 2821,
     "area": "PUBLIC_DONORS setDoc",
     "mode": "queue_safe"
   },
@@ -284,12 +284,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "USERS.setDoc.hooks/useNgoRegister.ts:100",
+    "id": "USERS.setDoc.hooks/useNgoRegister.ts:212",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "hooks",
     "path": "hooks/useNgoRegister.ts",
-    "line": 100,
+    "line": 212,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },
@@ -304,12 +304,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.setDoc.hooks/useRegister.ts:187",
+    "id": "USERS.setDoc.hooks/useRegister.ts:220",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "hooks",
     "path": "hooks/useRegister.ts",
-    "line": 187,
+    "line": 220,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },
@@ -2264,12 +2264,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "TRANSLATION_OVERRIDES.setDoc.services/translationOverrides.service.ts:64",
+    "id": "TRANSLATION_OVERRIDES.setDoc.services/translationOverrides.service.ts:65",
     "method": "setDoc",
     "collectionKey": "TRANSLATION_OVERRIDES",
     "module": "services",
     "path": "services/translationOverrides.service.ts",
-    "line": 64,
+    "line": 65,
     "area": "TRANSLATION_OVERRIDES setDoc",
     "mode": "queue_safe"
   },

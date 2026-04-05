@@ -77,6 +77,9 @@ export function NgoLogin() {
   ]);
 
   const handleGoogleLogin = async () => {
+    if (googleLoading) {
+      return;
+    }
     setGoogleLoading(true);
     try {
       await handleRoleGoogleLogin({

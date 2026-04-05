@@ -11,6 +11,7 @@ import 'react-phone-number-input/style.css';
 import LogoMark from '../../components/LogoMark';
 import { ROUTES } from '../../constants/routes';
 import { readRegistrationIntent } from '../../utils/registrationIntent';
+import { validateGeneralPhoneInput } from '../../utils/authInputValidation';
 
 export function DonorRegister() {
   const { t } = useTranslation();
@@ -31,6 +32,7 @@ export function DonorRegister() {
     handleResendOTP,
     handleGoogleRegister
   } = useRegister();
+  const donorIdentifierError = validateGeneralPhoneInput(formData.identifier).error;
 
   useEffect(() => {
     if (!user || !profileResolved || hasNavigated.current) {
@@ -72,8 +74,7 @@ export function DonorRegister() {
       <button
         type="button"
         onClick={handlePhoneNumberSubmit}
-        disabled={authLoading || formData.identifier.replace(/\D/g, '').length !== 10 &&
-                 formData.identifier.replace(/\D/g, '').length !== 12}
+        disabled={authLoading || Boolean(donorIdentifierError)}
         className="w-full py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
       >
         {authLoading ? (

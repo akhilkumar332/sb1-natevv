@@ -2,6 +2,12 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { DEFAULT_LANGUAGE, isSupportedLanguage, LANGUAGE_STORAGE_KEY, localeResources } from './locales';
 
+const syncDocumentLanguage = (language: string) => {
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = language;
+  }
+};
+
 const resolveInitialLanguage = () => {
   if (typeof window === 'undefined') return DEFAULT_LANGUAGE;
   try {
@@ -22,6 +28,10 @@ i18n
     lng: resolveInitialLanguage(),
     fallbackLng: DEFAULT_LANGUAGE,
     supportedLngs: Object.keys(localeResources),
+    react: {
+      bindI18n: 'languageChanged loaded',
+      bindI18nStore: 'added removed',
+    },
     debug: false,
     interpolation: {
       escapeValue: false,
@@ -30,9 +40,7 @@ i18n
   });
 
 i18n.on('languageChanged', (language) => {
-  if (typeof document !== 'undefined') {
-    document.documentElement.lang = language;
-  }
+  syncDocumentLanguage(language);
   if (typeof window !== 'undefined') {
     try {
       window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
@@ -41,5 +49,7 @@ i18n.on('languageChanged', (language) => {
     }
   }
 });
+
+syncDocumentLanguage(i18n.resolvedLanguage || i18n.language || DEFAULT_LANGUAGE);
 
 export default i18n;

@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, orderBy, query, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, orderBy, query, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { COLLECTIONS } from '../constants/firestore';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from '../locales';
@@ -61,12 +61,12 @@ export const saveTranslationOverrideBundle = async (
   updatedBy?: string | null,
 ) => {
   const ref = doc(db, COLLECTIONS.TRANSLATION_OVERRIDES, language);
+  const snapshot = await getDoc(ref);
   await setDoc(ref, {
     language,
     translations,
     updatedBy: updatedBy || null,
     updatedAt: getServerTimestamp(),
-    createdAt: getServerTimestamp(),
+    ...(!snapshot.exists() ? { createdAt: getServerTimestamp() } : {}),
   }, { merge: true });
 };
-

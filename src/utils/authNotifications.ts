@@ -16,6 +16,10 @@ export const notifyRoleMismatch = (role: AppRole) => {
   notify.error(config.message, { id: config.id });
 };
 
-export const notifyGoogleSignInFailure = () => {
-  notify.error(authFlowMessages.googleSignInFailed);
+export const notifyGoogleSignInFailure = (error?: unknown) => {
+  const rawMessage = error instanceof Error ? error.message.trim() : '';
+  const message = rawMessage && !rawMessage.startsWith('Firebase: Error')
+    ? rawMessage
+    : authFlowMessages.googleSignInFailed;
+  notify.error(message);
 };

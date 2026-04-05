@@ -77,6 +77,9 @@ export function BloodBankLogin() {
   ]);
 
   const handleGoogleLogin = async () => {
+    if (googleLoading) {
+      return;
+    }
     setGoogleLoading(true);
     try {
       await handleRoleGoogleLogin({
@@ -91,6 +94,7 @@ export function BloodBankLogin() {
         successMessage: 'Successfully logged in as BloodBank!',
         dashboardPath: ROUTES.portal.bloodbank.dashboard.root,
         onboardingPath: ROUTES.portal.bloodbank.onboarding,
+        persistTokenOnSuccess: true,
         scope: 'bloodbank',
         page: 'BloodBankLogin',
       });

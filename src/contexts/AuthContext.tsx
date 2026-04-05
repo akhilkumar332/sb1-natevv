@@ -267,7 +267,7 @@ interface LoginResponse {
   user: User;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+export const AuthContext = createContext<AuthContextType | null>(null);
 
 const pendingPhoneLinkKey = 'pendingPhoneLink';
 const portalRoleStorageKey = 'bh_superadmin_portal_role';
@@ -517,6 +517,7 @@ const readPendingPhoneLink = () => {
     return parsed;
   } catch (error) {
     reportAuthContextError(error, 'auth.pending_phone_link.parse');
+    clearPendingPhoneLink();
     return null;
   }
 };
@@ -553,7 +554,12 @@ type UserFetchResult = {
   missing: boolean;
 };
 
-const waitForFirestoreAuthUser = async (expectedUid?: string | null, timeoutMs: number = 3000): Promise<void> => {
+const isAuthBootstrapPermissionError = (error: unknown) => {
+  const code = String((error as { code?: string })?.code || '').toLowerCase();
+  return code === 'permission-denied' || code === 'unauthenticated';
+};
+
+const waitForFirestoreAuthUser = async (expectedUid?: string | null, timeoutMs: number = 5000): Promise<void> => {
   if (typeof (auth as any).authStateReady === 'function') {
     try {
       await (auth as any).authStateReady();
@@ -578,7 +584,7 @@ const getUserDocSnapshot = async (userRef: DocumentReference): Promise<DocumentS
   let attempts = 0;
   let lastError: unknown = null;
 
-  while (attempts < 3) {
+  while (attempts < 5) {
     try {
       return await getDoc(userRef);
     } catch (error: any) {
@@ -586,19 +592,25 @@ const getUserDocSnapshot = async (userRef: DocumentReference): Promise<DocumentS
       const message = String(error?.message || '');
       const isTargetCollision = error?.code === 'already-exists' || message.includes('Target ID already exists');
       const currentUid = auth.currentUser?.uid || null;
-      const authNotReadyForOwnerRead = error?.code === 'permission-denied' && (!currentUid || currentUid !== userRef.id);
+      const authNotReadyForOwnerRead = isAuthBootstrapPermissionError(error) && (!currentUid || currentUid !== userRef.id);
 
       if (!isTargetCollision && !authNotReadyForOwnerRead) {
         throw error;
       }
 
       attempts += 1;
-      if (attempts >= 3) {
+      if (attempts >= 5) {
         throw error;
       }
 
+      try {
+        await auth.currentUser?.getIdToken(true);
+      } catch {
+        // ignore token refresh failures while waiting for Firestore auth to settle
+      }
+
       await new Promise((resolve) => setTimeout(resolve, 250 * attempts));
-      await waitForFirestoreAuthUser(userRef.id, 1000);
+      await waitForFirestoreAuthUser(userRef.id, 1500);
     }
   }
 
@@ -731,16 +743,24 @@ const updateUserInFirestore = async (
     try {
       userDoc = await getUserDocSnapshot(userRef);
     } catch (userReadError) {
-      await captureFirestoreOperationError(userReadError, {
-        scope: 'auth',
-        kind: 'auth.user_doc.read',
-        operation: 'getDoc',
-        collection: COLLECTIONS.USERS,
-        docId: firebaseUser.uid,
-        blocking: true,
-        phase: 'auth_bootstrap',
-        portalRole: additionalData?.role || null,
-      });
+      const currentUid = auth.currentUser?.uid || null;
+      const shouldReportUserReadError = !(
+        isAuthBootstrapPermissionError(userReadError)
+        && currentUid !== firebaseUser.uid
+      );
+
+      if (shouldReportUserReadError) {
+        await captureFirestoreOperationError(userReadError, {
+          scope: 'auth',
+          kind: 'auth.user_doc.read',
+          operation: 'getDoc',
+          collection: COLLECTIONS.USERS,
+          docId: firebaseUser.uid,
+          blocking: true,
+          phase: 'auth_bootstrap',
+          portalRole: additionalData?.role || null,
+        });
+      }
       throw userReadError;
     }
 
@@ -1900,7 +1920,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userRef = doc(db, COLLECTIONS.USERS, userCredential.user.uid);
 
       // Fetch user data first
-      const userDoc = await getDoc(userRef);
+      let userDoc: DocumentSnapshot;
+      try {
+        userDoc = await getUserDocSnapshot(userRef);
+      } catch (userReadError) {
+        await captureFirestoreOperationError(userReadError, {
+          scope: 'auth',
+          kind: 'auth.phone_login.user_doc_read',
+          operation: 'getDoc',
+          collection: COLLECTIONS.USERS,
+          docId: userCredential.user.uid,
+          blocking: true,
+          phase: 'otp_verify',
+          portalRole: 'donor',
+        });
+        throw userReadError;
+      }
 
       if (!userDoc.exists()) {
         const matches = await findUsersByPhone(normalizedPhone);
@@ -1958,6 +1993,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (userData.role === 'superadmin') {
         await signOut(auth);
         throw new PhoneAuthError(authMessages.superadminGoogleOnly, 'superadmin_google_only');
+      }
+      if (userData.role && userData.role !== 'donor') {
+        await signOut(auth);
+        throw new PhoneAuthError(authMessages.roleMismatch.donor, 'role_mismatch');
       }
       const existingDob = convertTimestampToDate(userData?.dateOfBirth);
       const existingBhId = userData?.bhId;
@@ -2108,7 +2147,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (Object.keys(updatePayload).length > 0) {
-        await updateDoc(doc(db, COLLECTIONS.USERS, auth.currentUser.uid), updatePayload);
+        await runOwnerUserWriteWithRetry({
+          uid: auth.currentUser.uid,
+          write: () => updateDoc(doc(db, COLLECTIONS.USERS, auth.currentUser!.uid), updatePayload),
+          restFallbackPatch: updatePayload,
+          restFallbackMode: 'patch',
+        });
         setUser(prev => prev ? {
           ...prev,
           phoneNumber: updatePayload.phoneNumber || prev.phoneNumber,
@@ -2187,7 +2231,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (Object.keys(updatePayload).length > 0) {
-        await updateDoc(doc(db, COLLECTIONS.USERS, auth.currentUser.uid), updatePayload);
+        await runOwnerUserWriteWithRetry({
+          uid: auth.currentUser.uid,
+          write: () => updateDoc(doc(db, COLLECTIONS.USERS, auth.currentUser!.uid), updatePayload),
+          restFallbackPatch: updatePayload,
+          restFallbackMode: 'patch',
+        });
         setUser(prev => prev ? {
           ...prev,
           phoneNumber: updatePayload.phoneNumber || prev.phoneNumber,
@@ -2445,7 +2494,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else if (linkError?.code === 'auth/credential-already-in-use') {
             clearPendingPhoneLink();
             throw new Error('Phone number is already linked to another account. Please contact support.');
-          } else if (linkError?.code === 'auth/invalid-verification-code') {
+          } else if (
+            linkError?.code === 'auth/invalid-verification-code'
+            || linkError?.code === 'auth/code-expired'
+          ) {
             clearPendingPhoneLink();
             throw new Error('Verification code expired. Please retry phone login.');
           } else {
@@ -2517,9 +2569,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     } catch (error) {
       reportAuthContextError(error, 'auth.google_login');
-      if (error instanceof Error) {
-        notify.error(error.message);
-      }
       throw error;
     }
   };

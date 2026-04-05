@@ -65,6 +65,38 @@ export const useRegister = () => {
     }
   };
 
+  const getUserDocWithBootstrapRetry = async (uid: string) => {
+    const userRef = doc(db, COLLECTIONS.USERS, uid);
+    let attempts = 0;
+
+    while (attempts < 5) {
+      try {
+        await waitForFirestoreAuthUser(uid, 1500);
+        return await getDoc(userRef);
+      } catch (error) {
+        const code = String((error as { code?: string })?.code || '').toLowerCase();
+        const currentUid = auth.currentUser?.uid || null;
+        const shouldRetry = (code === 'permission-denied' || code === 'unauthenticated')
+          && currentUid !== uid;
+
+        attempts += 1;
+        if (!shouldRetry || attempts >= 5) {
+          throw error;
+        }
+
+        try {
+          await auth.currentUser?.getIdToken(true);
+        } catch {
+          // ignore token refresh failures during bootstrap retry
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 250 * attempts));
+      }
+    }
+
+    throw new Error('Failed to read user document during registration bootstrap.');
+  };
+
   const handleIdentifierChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -133,10 +165,9 @@ export const useRegister = () => {
       await waitForFirestoreAuthUser(userCredential.user.uid);
 
       // Check if user already registered by uid as a fallback
-      const userRef = doc(db, COLLECTIONS.USERS, userCredential.user.uid);
       let userDoc;
       try {
-        userDoc = await getDoc(userRef);
+        userDoc = await getUserDocWithBootstrapRetry(userCredential.user.uid);
       } catch (userReadError) {
         await captureFirestoreOperationError(userReadError, {
           scope: 'auth',
@@ -150,6 +181,8 @@ export const useRegister = () => {
         });
         throw userReadError;
       }
+
+      const userRef = doc(db, COLLECTIONS.USERS, userCredential.user.uid);
 
       if (userDoc.exists()) {
         const existingData = userDoc.data() as { role?: string; onboardingCompleted?: boolean };
@@ -315,6 +348,8 @@ export const useRegister = () => {
 
       if (error.code === 'auth/invalid-verification-code') {
         notify.error(authFlowMessages.otpInvalid);
+      } else if (error.code === 'auth/code-expired') {
+        notify.error(authFlowMessages.otpExpired);
       } else {
         notify.error(authFlowMessages.verificationFailed);
       }

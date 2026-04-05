@@ -73,6 +73,9 @@ export const useLogin = () => {
   };
 
   const handlePhoneNumberSubmit = async () => {
+    if (authLoading || otpLoading || googleLoading) {
+      return;
+    }
     const { normalized: formattedNumber, error } = validateGeneralPhoneInput(formData.identifier);
     if (!requireValue(!error, error || authInputMessages.invalidIndiaPhone)) {
       return;
@@ -90,6 +93,9 @@ export const useLogin = () => {
   };
 
   const handleOTPSubmit = async () => {
+    if (otpLoading || googleLoading) {
+      return;
+    }
     if (!requireValue(Boolean(confirmationResult), authInputMessages.requestOtpFirst)) {
       return;
     }
@@ -166,6 +172,9 @@ export const useLogin = () => {
   };
 
   const handleResendOTP = async () => {
+    if (authLoading || otpLoading || googleLoading) {
+      return;
+    }
     const { normalized, error } = validateGeneralPhoneInput(formData.identifier);
     if (!requireValue(!error, error || authInputMessages.invalidIndiaPhone)) {
       return;
@@ -186,6 +195,9 @@ export const useLogin = () => {
   };
 
   const handleGoogleLogin = async () => {
+    if (authLoading || googleLoading || otpLoading) {
+      return;
+    }
     try {
       setGoogleLoading(true);
       const result = await loginWithGoogle();
@@ -212,7 +224,7 @@ export const useLogin = () => {
       }
     } catch (error) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.google' } });
-      notifyGoogleSignInFailure();
+      notifyGoogleSignInFailure(error);
     } finally {
       setGoogleLoading(false);
     }

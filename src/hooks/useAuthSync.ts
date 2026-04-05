@@ -2,16 +2,18 @@
 
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { AuthContext, useAuth } from '../contexts/AuthContext';
 import { auth } from '../firebase';
 import { authStorage } from '../utils/authStorage';
 import { captureHandledError } from '../services/errorLog.service';
 import { FIVE_MINUTES_MS, ONE_DAY_MS } from '../constants/time';
+import { useContext } from 'react';
 
 const CHECK_INTERVAL = FIVE_MINUTES_MS; // Check every 5 minutes instead of every minute
 const SESSION_DURATION = ONE_DAY_MS; // 24 hours
 
 export const useAuthSync = () => {
+  const authContext = useContext(AuthContext);
   const { user, logout, impersonationSession } = useAuth();
   const navigate = useNavigate();
   const lastCheckRef = useRef(Date.now());
@@ -27,6 +29,10 @@ export const useAuthSync = () => {
   };
 
   useEffect(() => {
+    if (!authContext) {
+      return undefined;
+    }
+
     const checkAuthStatus = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
         return;
@@ -97,5 +103,5 @@ export const useAuthSync = () => {
       clearInterval(intervalId);
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [user, navigate, logout, impersonationSession]);
+  }, [authContext, user, navigate, logout, impersonationSession]);
 };
