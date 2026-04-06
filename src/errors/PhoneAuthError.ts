@@ -3,7 +3,8 @@ export type PhoneAuthErrorCode =
   | 'multiple_accounts'
   | 'role_mismatch'
   | 'link_required'
-  | 'superadmin_google_only';
+  | 'superadmin_google_only'
+  | 'temp_user_delete_failed';
 
 export class PhoneAuthError extends Error {
   code: PhoneAuthErrorCode;

@@ -950,6 +950,8 @@ const updateSessionMetadata = async (firebaseUser: FirebaseUser, knownUser?: Use
   }
 };
 
+let isRecaptchaSettingUp = false;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const initialCachedUser = readCachedUser();
   const [user, setUser] = useState<User | null>(initialCachedUser);
@@ -1930,9 +1932,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const loginWithPhone = async (phoneNumber: string): Promise<ConfirmationResult> => {
+    if (isRecaptchaSettingUp) {
+      throw new Error('Please wait, a previous request is still processing.');
+    }
     setLoginLoading(true);
     try {
       setAuthLoading(true);
+      isRecaptchaSettingUp = true;
 
       // Clear existing verifier first
       if (window.recaptchaVerifier) {
@@ -1977,6 +1983,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       reportAuthContextError(error, 'auth.phone_login');
       throw error;
     } finally {
+      isRecaptchaSettingUp = false;
       setLoginLoading(false);
       setAuthLoading(false);
     }
@@ -2081,6 +2088,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await userCredential.user.delete();
           } catch (deleteError) {
             reportAuthContextError(deleteError, 'auth.phone_login.temp_user_delete');
+            await cleanupAuthSession({
+              scope: 'auth',
+              kind: 'auth.phone_login.temp_user_delete_failed_cleanup',
+              metadata: { page: 'AuthContext' },
+              extraCleanup: () => {
+                localStorage.removeItem(userCacheKey);
+                localStorage.removeItem(userCacheAtKey);
+                clearAuthOwnedSessionStorage();
+              },
+            });
+            throw new PhoneAuthError(
+              'Failed to clear temporary login. Please contact support.',
+              'temp_user_delete_failed'
+            );
           }
 
           await cleanupAuthSession({
@@ -2113,6 +2134,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const userData = userDoc.data() as User;
+
+      const existingMatchesForExistingUser = await findUsersByPhone(normalizedPhone);
+      const conflictUser = existingMatchesForExistingUser.find(match => {
+        const matchUid = match.uid || match.id;
+        return matchUid !== userCredential.user.uid;
+      });
+
+      if (conflictUser) {
+        await cleanupAuthSession({
+          scope: 'auth',
+          kind: 'auth.phone_login.multiple_accounts_existing_cleanup',
+          metadata: { page: 'AuthContext' },
+          extraCleanup: () => {
+            localStorage.removeItem(userCacheKey);
+            localStorage.removeItem(userCacheAtKey);
+            clearAuthOwnedSessionStorage();
+          },
+        });
+        throw new PhoneAuthError('Phone number linked to multiple accounts', 'multiple_accounts');
+      }
+
       if (userData.role === 'superadmin') {
         await cleanupAuthSession({
           scope: 'auth',
@@ -2228,40 +2270,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('No user logged in');
     }
 
-    if (window.recaptchaVerifier) {
-      try {
-        window.recaptchaVerifier.clear();
-      } catch (e) {
-        reportAuthContextError(e, 'auth.recaptcha.clear_start_phone_link');
+    if (isRecaptchaSettingUp) {
+      throw new Error('Please wait, a previous request is still processing.');
+    }
+    
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (normalizedPhone) {
+      const existingMatches = await findUsersByPhone(normalizedPhone);
+      const conflictUser = existingMatches.find(match => {
+        const matchUid = match.uid || match.id;
+        return matchUid !== auth.currentUser!.uid;
+      });
+      if (conflictUser) {
+        throw new PhoneAuthError('This phone number is already registered to another account.', 'multiple_accounts');
       }
-      window.recaptchaVerifier = undefined;
     }
 
-    const existingContainer = document.getElementById('recaptcha-container');
-    if (existingContainer) {
-      existingContainer.remove();
-    }
-
-    const container = document.createElement('div');
-    container.id = 'recaptcha-container';
-    document.body.appendChild(container);
-
-    const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-      'size': 'invisible',
-      'callback': () => {},
-      'expired-callback': () => {
-        notify.error(authMessages.recaptchaExpired);
-      }
-    });
-
-    window.recaptchaVerifier = recaptchaVerifier;
+    isRecaptchaSettingUp = true;
 
     try {
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (e) {
+          reportAuthContextError(e, 'auth.recaptcha.clear_start_phone_link');
+        }
+        window.recaptchaVerifier = undefined;
+      }
+
+      const existingContainer = document.getElementById('recaptcha-container');
+      if (existingContainer) {
+        existingContainer.remove();
+      }
+
+      const container = document.createElement('div');
+      container.id = 'recaptcha-container';
+      document.body.appendChild(container);
+
+      const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'invisible',
+        'callback': () => {},
+        'expired-callback': () => {
+          notify.error(authMessages.recaptchaExpired);
+        }
+      });
+
+      window.recaptchaVerifier = recaptchaVerifier;
+
       const confirmation = await linkWithPhoneNumber(auth.currentUser, phoneNumber, recaptchaVerifier);
       return confirmation;
     } catch (error) {
       cleanupRecaptcha();
       throw error;
+    } finally {
+      isRecaptchaSettingUp = false;
     }
   };
 
@@ -2279,6 +2341,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const phoneNumber = userCredential.user.phoneNumber || auth.currentUser.phoneNumber || '';
       const normalizedPhone = normalizePhoneNumber(phoneNumber);
+
+      if (normalizedPhone) {
+        const existingMatches = await findUsersByPhone(normalizedPhone);
+        const conflictUser = existingMatches.find(match => {
+          const matchUid = match.uid || match.id;
+          return matchUid !== auth.currentUser!.uid;
+        });
+        if (conflictUser) {
+          try {
+            await unlink(auth.currentUser!, 'phone');
+          } catch (e) {
+            reportAuthContextError(e, 'auth.phone_link.rollback_unlink');
+          }
+          throw new PhoneAuthError('This phone number is already registered to another account.', 'multiple_accounts');
+        }
+      }
+
       const updatePayload: Record<string, any> = {};
       if (phoneNumber) {
         updatePayload.phoneNumber = phoneNumber;
@@ -2311,40 +2390,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('No user logged in');
     }
 
-    if (window.recaptchaVerifier) {
-      try {
-        window.recaptchaVerifier.clear();
-      } catch (e) {
-        reportAuthContextError(e, 'auth.recaptcha.clear_start_phone_update');
+    if (isRecaptchaSettingUp) {
+      throw new Error('Please wait, a previous request is still processing.');
+    }
+    
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (normalizedPhone) {
+      const existingMatches = await findUsersByPhone(normalizedPhone);
+      const conflictUser = existingMatches.find(match => {
+        const matchUid = match.uid || match.id;
+        return matchUid !== auth.currentUser!.uid;
+      });
+      if (conflictUser) {
+        throw new PhoneAuthError('This phone number is already registered to another account.', 'multiple_accounts');
       }
-      window.recaptchaVerifier = undefined;
     }
 
-    const existingContainer = document.getElementById('recaptcha-container');
-    if (existingContainer) {
-      existingContainer.remove();
-    }
-
-    const container = document.createElement('div');
-    container.id = 'recaptcha-container';
-    document.body.appendChild(container);
-
-    const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-      'size': 'invisible',
-      'callback': () => {},
-      'expired-callback': () => {
-        notify.error(authMessages.recaptchaExpired);
-      }
-    });
-
-    window.recaptchaVerifier = recaptchaVerifier;
+    isRecaptchaSettingUp = true;
 
     try {
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (e) {
+          reportAuthContextError(e, 'auth.recaptcha.clear_start_phone_update');
+        }
+        window.recaptchaVerifier = undefined;
+      }
+
+      const existingContainer = document.getElementById('recaptcha-container');
+      if (existingContainer) {
+        existingContainer.remove();
+      }
+
+      const container = document.createElement('div');
+      container.id = 'recaptcha-container';
+      document.body.appendChild(container);
+
+      const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'invisible',
+        'callback': () => {},
+        'expired-callback': () => {
+          notify.error(authMessages.recaptchaExpired);
+        }
+      });
+
+      window.recaptchaVerifier = recaptchaVerifier;
+
       const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
       return confirmation;
     } catch (error) {
       cleanupRecaptcha();
       throw error;
+    } finally {
+      isRecaptchaSettingUp = false;
     }
   };
 
@@ -2358,6 +2457,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      const normalizedPhoneForCheck = normalizePhoneNumber(phoneNumber);
+      if (normalizedPhoneForCheck) {
+        const existingMatches = await findUsersByPhone(normalizedPhoneForCheck);
+        const conflictUser = existingMatches.find(match => {
+          const matchUid = match.uid || match.id;
+          return matchUid !== auth.currentUser!.uid;
+        });
+        if (conflictUser) {
+          throw new PhoneAuthError('This phone number is already registered to another account.', 'multiple_accounts');
+        }
+      }
+
       const credential = PhoneAuthProvider.credential(confirmationResult.verificationId, otp);
       await updatePhoneNumber(auth.currentUser, credential);
       cleanupRecaptcha();

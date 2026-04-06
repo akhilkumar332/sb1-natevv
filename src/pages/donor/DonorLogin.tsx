@@ -10,6 +10,7 @@ import type { ImpersonationUser } from '../../services/admin.service';
 import { notify } from 'services/notify.service';
 import PhoneInput from 'react-phone-number-input';
 import { useLogin } from '../../hooks/useLogin';
+import { PhoneAuthError } from '../../errors/PhoneAuthError';
 import { useOtpResendTimer } from '../../hooks/useOtpResendTimer';
 import 'react-phone-number-input/style.css';
 import LogoMark from '../../components/LogoMark';
@@ -105,8 +106,18 @@ export function DonorLogin() {
       finalizePhoneLinkContinuation();
       return;
     }
+    if (error instanceof FirebaseError && error.code === 'auth/credential-already-in-use') {
+      clearPendingPhoneLinkContinuation();
+      notify.error('This phone number is already linked to another account.');
+      return;
+    }
+    if (error instanceof PhoneAuthError && error.code === 'multiple_accounts') {
+      clearPendingPhoneLinkContinuation();
+      notify.error('This phone number is already registered to another account.');
+      return;
+    }
     notify.fromError(error, fallbackMessage, { id: toastId });
-  }, [finalizePhoneLinkContinuation]);
+  }, [finalizePhoneLinkContinuation, clearPendingPhoneLinkContinuation]);
 
   useEffect(() => {
     if (!user || hasNavigated.current) {
