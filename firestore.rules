@@ -314,6 +314,11 @@ service cloud.firestore {
 
       // Only admins can delete users
       allow delete: if isAdmin();
+
+      // WebAuthn credentials subcollection — owner only
+      match /webauthnCredentials/{credId} {
+        allow read, write: if isAuthenticated() && isOwner(userId);
+      }
     }
 
     // ========================================================================

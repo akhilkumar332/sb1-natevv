@@ -1,4 +1,3 @@
-// src/pages/auth/DonorLogin.tsx
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
@@ -20,6 +19,9 @@ import AuthStatusScreen from '../../components/auth/AuthStatusScreen';
 import { navigateToPortalDashboard, resolveImpersonationRole, resolvePortalRole } from '../../utils/portalNavigation';
 import { ROUTES } from '../../constants/routes';
 import { authFlowMessages, authInputMessages, validateGeneralPhoneInput, getOtpValidationError, sanitizeOtp } from '../../utils/authInputValidation';
+import { useWebAuthn } from '../../hooks/useWebAuthn';
+import { BiometricLoginButton } from '../../components/auth/BiometricLoginButton';
+import { BiometricEnrollPrompt } from '../../components/auth/BiometricEnrollPrompt';
 
 export function DonorLogin() {
   const { t } = useTranslation();
@@ -39,10 +41,12 @@ export function DonorLogin() {
     confirmPhoneLink,
     pendingPhoneLinkContinuation,
     clearPendingPhoneLinkContinuation,
+    loginWithBiometric,
   } = useAuth();
   const hasNavigated = useRef(false);
   const autoSendKeyRef = useRef<string | null>(null);
   const [showPortalModal, setShowPortalModal] = useState(false);
+  const [showEnrollPrompt, setShowEnrollPrompt] = useState(false);
   const [linkConfirmation, setLinkConfirmation] = useState<any>(null);
   const [linkOtp, setLinkOtp] = useState('');
   const [linkPhoneLoading, setLinkPhoneLoading] = useState(false);
@@ -62,6 +66,7 @@ export function DonorLogin() {
   } = useLogin();
   const { otpResendTimer: linkOtpResendTimer, startResendTimer: startLinkResendTimer } = useOtpResendTimer();
   const donorIdentifierError = validateGeneralPhoneInput(formData.identifier).error;
+
   const hasPendingPhoneLinkContinuation = Boolean(
     user?.uid
     && user.role === 'donor'
@@ -90,6 +95,38 @@ export function DonorLogin() {
       : ROUTES.portal.donor.onboarding;
     navigate(onboardingTarget);
   }, [location.search, navigate]);
+
+  // Biometric login
+  const {
+    isSupported: biometricSupported,
+    isRegistered: biometricRegistered,
+    loading: biometricLoading,
+    error: biometricError,
+    register: registerBiometric,
+    authenticate: authenticateBiometric,
+    dismissEnrollPrompt,
+    canShowEnrollPrompt,
+  } = useWebAuthn(user?.uid ?? null);
+
+  const handleBiometricLogin = useCallback(async () => {
+    const customToken = await authenticateBiometric();
+    if (!customToken) return;
+    try {
+      const loggedInUser = await loginWithBiometric(customToken);
+      navigateAfterAuthenticatedDonor(loggedInUser);
+      notify.success(t('auth.loginSuccessful'));
+    } catch {
+      notify.error('Biometric login failed. Please use OTP or Google.');
+    }
+  }, [authenticateBiometric, loginWithBiometric, navigateAfterAuthenticatedDonor, t]);
+
+  const handleEnrollBiometric = useCallback(async () => {
+    const ok = await registerBiometric();
+    if (ok) {
+      setShowEnrollPrompt(false);
+      notify.success('Biometric login enabled!');
+    }
+  }, [registerBiometric]);
 
   const finalizePhoneLinkContinuation = useCallback(() => {
     clearPendingPhoneLinkContinuation();
@@ -213,6 +250,16 @@ export function DonorLogin() {
       clearPendingPhoneLinkContinuation();
     }
   }, [clearPendingPhoneLinkContinuation, hasPendingPhoneLinkContinuation, pendingPhoneLinkContinuation, user?.uid]);
+
+  // Show biometric enroll prompt after successful login (donor only, not superadmin)
+  // Guard: only show if we haven't navigated away yet (avoids flash on dashboard)
+  useEffect(() => {
+    if (!user?.uid || user.role !== 'donor') return;
+    if (hasNavigated.current) return;
+    if (canShowEnrollPrompt) {
+      setShowEnrollPrompt(true);
+    }
+  }, [user?.uid, user?.role, canShowEnrollPrompt]);
 
   if (user && isSuperAdmin && !profileResolved) {
     return <AuthStatusScreen message={t('common.checkingAccount')} />;
@@ -501,6 +548,14 @@ export function DonorLogin() {
 
   return (
     <div className="min-h-screen flex">
+      {showEnrollPrompt && biometricSupported && (
+        <BiometricEnrollPrompt
+          loading={biometricLoading}
+          onEnable={handleEnrollBiometric}
+          onNotNow={() => { dismissEnrollPrompt(false); setShowEnrollPrompt(false); }}
+          onNever={() => { dismissEnrollPrompt(true); setShowEnrollPrompt(false); }}
+        />
+      )}
       <SuperAdminPortalModal
         isOpen={showPortalModal && Boolean(user) && isSuperAdmin}
         currentPortal="donor"
@@ -611,6 +666,15 @@ export function DonorLogin() {
                       <span className="px-4 bg-white text-gray-500 font-medium">{t('auth.orContinueWith')}</span>
                     </div>
                   </div>
+
+                  {biometricSupported && biometricRegistered && (
+                    <BiometricLoginButton
+                      loading={biometricLoading}
+                      error={biometricError}
+                      onLogin={handleBiometricLogin}
+                    />
+                  )}
+
                   <button
                     type="button"
                     onClick={handleGoogleLogin}

@@ -236,6 +236,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<LoginResponse>;
   loginWithPhone: (phoneNumber: string) => Promise<ConfirmationResult>;
   loginWithEmail: (email: string, password: string) => Promise<LoginResponse>;
+  loginWithBiometric: (customToken: string) => Promise<User>;
   registerWithEmail: (email: string, password: string, displayName: string) => Promise<FirebaseUser>;
   resetPassword: (email: string) => Promise<void>;
   logout: (navigate: NavigateFunction, options?: { redirectTo?: string; showToast?: boolean }) => Promise<void>;
@@ -1989,6 +1990,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginWithBiometric = async (customToken: string): Promise<User> => {
+    try {
+      setAuthLoading(true);
+      const userCredential = await signInWithCustomToken(auth, customToken);
+      const userRef = doc(db, COLLECTIONS.USERS, userCredential.user.uid);
+      const userDoc = await getDoc(userRef);
+      if (!userDoc.exists()) throw new Error('User profile not found');
+      const userData = userDoc.data() as User;
+      await updateDoc(userRef, { lastLoginAt: serverTimestamp() });
+      return userData;
+    } catch (error) {
+      reportAuthContextError(error, 'auth.biometric_login');
+      throw error;
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   const verifyOTP = async (confirmationResult: ConfirmationResult, otp: string): Promise<User> => {
     try {
       const userCredential = await confirmationResult.confirm(otp);
@@ -3195,6 +3214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loginWithGoogle,
       loginWithPhone,
       loginWithEmail,
+      loginWithBiometric,
       registerWithEmail,
       resetPassword,
       logout,

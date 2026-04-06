@@ -20,6 +20,21 @@ export type DonorLevel = 'New Donor' | 'Rookie' | 'Regular' | 'Super' | 'Hero' |
 export type StaffRole = 'viewer' | 'editor' | 'manager';
 
 // ============================================================================
+// COLLECTION: users/{uid}/webauthnCredentials
+// ============================================================================
+
+export interface WebAuthnCredential {
+  credentialId: string;       // base64url
+  publicKey: string;          // base64url COSE key
+  counter: number;
+  deviceType: 'platform' | 'cross-platform';
+  transports: string[];
+  createdAt: Timestamp;
+  lastUsedAt: Timestamp;
+  userAgent: string;
+}
+
+// ============================================================================
 // COLLECTION: users
 // ============================================================================
 

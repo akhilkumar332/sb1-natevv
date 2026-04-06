@@ -94,7 +94,7 @@ export default {
     about: 'About',
     contact: 'Contact',
     blog: 'Blog',
-    signIn: 'Sign In',
+    signIn: 'Signing in',
     donorMenu: 'Donor Menu',
     ngoMenu: 'NGO Menu',
     bloodbankMenu: 'BloodBank Menu',
