@@ -101,6 +101,7 @@ export function DonorLogin() {
   const {
     isSupported: biometricSupported,
     isRegistered: biometricRegistered,
+    isReady: biometricReady,
     loading: biometricLoading,
     error: biometricError,
     register: registerBiometric,
@@ -191,6 +192,11 @@ export function DonorLogin() {
       return;
     }
 
+    // Wait for biometric support check to complete before deciding to show prompt
+    if (!biometricReady) {
+      return;
+    }
+
     // Show biometric enroll prompt before navigating away — donor only, once per session
     if (canShowEnrollPrompt && !enrollPromptShownRef.current) {
       enrollPromptShownRef.current = true;
@@ -200,6 +206,7 @@ export function DonorLogin() {
 
     navigateAfterAuthenticatedDonor(user);
   }, [
+    biometricReady,
     canShowEnrollPrompt,
     effectiveRole,
     hasPendingPhoneLinkContinuation,

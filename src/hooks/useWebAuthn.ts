@@ -16,17 +16,19 @@ import { captureHandledError } from '../services/errorLog.service';
 
 export const useWebAuthn = (userId?: string | null) => {
   const [isSupported, setIsSupported] = useState(false);
+  const [isReady, setIsReady] = useState(false); // true once async platform check completes
   const [isRegistered, setIsRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // When userId is null (pre-login), fall back to last enrolled uid from localStorage.
-  // Memoize so it doesn't change on every render.
   const effectiveUserId = userId ?? getLastEnrolledUserId();
 
   useEffect(() => {
-    if (!isWebAuthnSupported()) return;
-    isPlatformAuthenticatorAvailable().then(setIsSupported).catch(() => setIsSupported(false));
+    if (!isWebAuthnSupported()) { setIsReady(true); return; }
+    isPlatformAuthenticatorAvailable()
+      .then((available) => { setIsSupported(available); })
+      .catch(() => { setIsSupported(false); })
+      .finally(() => { setIsReady(true); });
   }, []);
 
   useEffect(() => {
@@ -94,8 +96,8 @@ export const useWebAuthn = (userId?: string | null) => {
     if (userId && never) setNeverAsk(userId);
   }, [userId]);
 
-  // Stable boolean — avoids re-renders from calling a function in effects
-  const canShowEnrollPrompt = Boolean(userId && isSupported && !isRegistered && !getNeverAsk(userId ?? ''));
+  // Stable boolean — only true once async platform check has completed
+  const canShowEnrollPrompt = isReady && Boolean(userId && isSupported && !isRegistered && !getNeverAsk(userId ?? ''));
 
   const forceRemoveLocal = useCallback(() => {
     if (effectiveUserId) { clearCredentialId(effectiveUserId); setIsRegistered(false); }
@@ -103,6 +105,7 @@ export const useWebAuthn = (userId?: string | null) => {
 
   return {
     isSupported,
+    isReady,
     isRegistered,
     loading,
     error,
