@@ -44,6 +44,7 @@ export function DonorLogin() {
     loginWithBiometric,
   } = useAuth();
   const hasNavigated = useRef(false);
+  const enrollPromptShownRef = useRef(false);
   const autoSendKeyRef = useRef<string | null>(null);
   const [showPortalModal, setShowPortalModal] = useState(false);
   const [showEnrollPrompt, setShowEnrollPrompt] = useState(false);
@@ -122,11 +123,10 @@ export function DonorLogin() {
 
   const handleEnrollBiometric = useCallback(async () => {
     const ok = await registerBiometric();
-    if (ok) {
-      setShowEnrollPrompt(false);
-      notify.success('Biometric login enabled!');
-    }
-  }, [registerBiometric]);
+    setShowEnrollPrompt(false);
+    if (ok) notify.success('Biometric login enabled!');
+    if (user) navigateAfterAuthenticatedDonor(user);
+  }, [registerBiometric, user, navigateAfterAuthenticatedDonor]);
 
   const finalizePhoneLinkContinuation = useCallback(() => {
     clearPendingPhoneLinkContinuation();
@@ -191,8 +191,16 @@ export function DonorLogin() {
       return;
     }
 
+    // Show biometric enroll prompt before navigating away — donor only, once per session
+    if (canShowEnrollPrompt && !enrollPromptShownRef.current) {
+      enrollPromptShownRef.current = true;
+      setShowEnrollPrompt(true);
+      return;
+    }
+
     navigateAfterAuthenticatedDonor(user);
   }, [
+    canShowEnrollPrompt,
     effectiveRole,
     hasPendingPhoneLinkContinuation,
     impersonationSession?.targetRole,
@@ -250,16 +258,6 @@ export function DonorLogin() {
       clearPendingPhoneLinkContinuation();
     }
   }, [clearPendingPhoneLinkContinuation, hasPendingPhoneLinkContinuation, pendingPhoneLinkContinuation, user?.uid]);
-
-  // Show biometric enroll prompt after successful login (donor only, not superadmin)
-  // Guard: only show if we haven't navigated away yet (avoids flash on dashboard)
-  useEffect(() => {
-    if (!user?.uid || user.role !== 'donor') return;
-    if (hasNavigated.current) return;
-    if (canShowEnrollPrompt) {
-      setShowEnrollPrompt(true);
-    }
-  }, [user?.uid, user?.role, canShowEnrollPrompt]);
 
   if (user && isSuperAdmin && !profileResolved) {
     return <AuthStatusScreen message={t('common.checkingAccount')} />;
@@ -552,8 +550,8 @@ export function DonorLogin() {
         <BiometricEnrollPrompt
           loading={biometricLoading}
           onEnable={handleEnrollBiometric}
-          onNotNow={() => { dismissEnrollPrompt(false); setShowEnrollPrompt(false); }}
-          onNever={() => { dismissEnrollPrompt(true); setShowEnrollPrompt(false); }}
+          onNotNow={() => { dismissEnrollPrompt(false); setShowEnrollPrompt(false); if (user) navigateAfterAuthenticatedDonor(user); }}
+          onNever={() => { dismissEnrollPrompt(true); setShowEnrollPrompt(false); if (user) navigateAfterAuthenticatedDonor(user); }}
         />
       )}
       <SuperAdminPortalModal
