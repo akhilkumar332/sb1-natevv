@@ -22,6 +22,8 @@ export const authMessages = {
   get mobileNotRegistered() { return i18n.t('auth.mobileNotRegistered'); },
   get mobileLinkedMultiple() { return i18n.t('auth.mobileLinkedMultiple'); },
   get phoneAlreadyRegisteredLinkGoogle() { return i18n.t('auth.phoneAlreadyRegisteredLinkGoogle'); },
+  get phoneLinkRetryAfterGoogle() { return i18n.t('auth.phoneLinkRetryAfterGoogle'); },
+  get phoneLinkSuccessful() { return i18n.t('auth.phoneLinkSuccessful'); },
   get phoneRegisteredUseLogin() { return i18n.t('auth.phoneRegisteredUseLogin'); },
   get registrationSuccessful() { return i18n.t('auth.registrationSuccessful'); },
 };

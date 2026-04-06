@@ -215,7 +215,12 @@ export const useLogin = () => {
       }
       if (result?.token && result?.user) {
         handleLoginSuccess(result.token);
-        notify.success(t('auth.googleLoginSuccessful'));
+        if (result.phoneLinkRequiresFreshOtp) {
+          notify.success(authMessages.phoneLinkRetryAfterGoogle);
+          return;
+        } else {
+          notify.success(t('auth.googleLoginSuccessful'));
+        }
 
         // Navigate based on onboarding status - if not explicitly true, go to onboarding
         navigateAfterDonorLogin(result.user);

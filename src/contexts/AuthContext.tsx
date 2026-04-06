@@ -18,7 +18,6 @@ import {
   updateProfile,
   sendEmailVerification,
   PhoneAuthProvider,
-  linkWithCredential,
   linkWithPopup,
   linkWithPhoneNumber,
   updateEmail,
@@ -224,6 +223,12 @@ type ImpersonationSession = {
   status?: 'starting' | 'active' | 'stopping';
 };
 
+type PendingPhoneLinkContinuation = {
+  phoneNumber: string;
+  targetUid: string;
+  createdAt: number;
+};
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -260,16 +265,20 @@ interface AuthContextType {
   ) => Promise<ImpersonationTarget | null>;
   stopImpersonation: () => Promise<void>;
   profileResolved: boolean;
+  pendingPhoneLinkContinuation: PendingPhoneLinkContinuation | null;
+  clearPendingPhoneLinkContinuation: () => void;
 }
 
 interface LoginResponse {
   token: string;
   user: User;
+  phoneLinkRequiresFreshOtp?: boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);
 
 const pendingPhoneLinkKey = 'pendingPhoneLink';
+const pendingPhoneLinkContinuationKey = 'pendingPhoneLinkContinuation';
 const portalRoleStorageKey = 'bh_superadmin_portal_role';
 const impersonationStorageKey = 'bh_superadmin_impersonation';
 const userCacheKey = 'bh_user_cache';
@@ -278,6 +287,7 @@ const userCacheTtlMs = ONE_DAY_MS;
 const IMPERSONATION_TTL_MS = THIRTY_MINUTES_MS;
 const authOwnedSessionStorageKeys = [
   pendingPhoneLinkKey,
+  pendingPhoneLinkContinuationKey,
   portalRoleStorageKey,
   impersonationStorageKey,
   'bh_pending_portal_role',
@@ -466,8 +476,6 @@ const readCachedUser = (): User | null => {
 };
 
 const savePendingPhoneLink = (data: {
-  verificationId: string;
-  otp: string;
   phoneNumber: string;
   targetUid: string;
 }) => {
@@ -481,6 +489,19 @@ const savePendingPhoneLink = (data: {
 const clearPendingPhoneLink = () => {
   if (typeof window === 'undefined') return;
   sessionStorage.removeItem(pendingPhoneLinkKey);
+};
+
+const savePendingPhoneLinkContinuation = (data: Omit<PendingPhoneLinkContinuation, 'createdAt'>) => {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem(pendingPhoneLinkContinuationKey, JSON.stringify({
+    ...data,
+    createdAt: Date.now(),
+  }));
+};
+
+const clearPendingPhoneLinkContinuationStorage = () => {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem(pendingPhoneLinkContinuationKey);
 };
 
 const cleanupRecaptcha = () => {
@@ -504,8 +525,6 @@ const readPendingPhoneLink = () => {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as {
-      verificationId: string;
-      otp: string;
       phoneNumber: string;
       targetUid: string;
       createdAt: number;
@@ -518,6 +537,28 @@ const readPendingPhoneLink = () => {
   } catch (error) {
     reportAuthContextError(error, 'auth.pending_phone_link.parse');
     clearPendingPhoneLink();
+    return null;
+  }
+};
+
+const readPendingPhoneLinkContinuation = (): PendingPhoneLinkContinuation | null => {
+  if (typeof window === 'undefined') return null;
+  const raw = sessionStorage.getItem(pendingPhoneLinkContinuationKey);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as PendingPhoneLinkContinuation;
+    if (parsed.createdAt && Date.now() - parsed.createdAt > TEN_MINUTES_MS) {
+      clearPendingPhoneLinkContinuationStorage();
+      return null;
+    }
+    if (!parsed.phoneNumber || !parsed.targetUid) {
+      clearPendingPhoneLinkContinuationStorage();
+      return null;
+    }
+    return parsed;
+  } catch (error) {
+    reportAuthContextError(error, 'auth.pending_phone_link_continuation.parse');
+    clearPendingPhoneLinkContinuationStorage();
     return null;
   }
 };
@@ -921,6 +962,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
   const [impersonationTransition, setImpersonationTransition] = useState<'starting' | 'stopping' | null>(null);
   const [profileResolved, setProfileResolved] = useState(!initialCachedUser);
+  const [pendingPhoneLinkContinuation, setPendingPhoneLinkContinuation] = useState<PendingPhoneLinkContinuation | null>(
+    readPendingPhoneLinkContinuation
+  );
   const logoutChannelRef = useRef<BroadcastChannel | null>(null);
   const referralApplyAttemptedRef = useRef(false);
   const recentLoginRef = useRef<{ uid: string; at: number; user?: User } | null>(null);
@@ -934,6 +978,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateImpersonationSession = useCallback((session: ImpersonationSession | null) => {
     setImpersonationSession(session);
     persistImpersonationSession(session);
+  }, []);
+  const clearPendingPhoneLinkContinuation = useCallback(() => {
+    setPendingPhoneLinkContinuation(null);
+    clearPendingPhoneLinkContinuationStorage();
   }, []);
 
   const logProfileIssue = (label: string, error: unknown, context?: Record<string, unknown>) => {
@@ -954,6 +1002,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     impersonationSessionRef.current = impersonationSession;
   }, [impersonationSession]);
+
+  useEffect(() => {
+    const continuation = pendingPhoneLinkContinuation;
+    if (!continuation) return;
+    if (!user?.uid) {
+      clearPendingPhoneLinkContinuation();
+      return;
+    }
+    if (continuation.targetUid !== user.uid) {
+      clearPendingPhoneLinkContinuation();
+      return;
+    }
+    const currentAuthPhone = normalizePhoneNumber(auth.currentUser?.phoneNumber || '');
+    if (currentAuthPhone && currentAuthPhone === continuation.phoneNumber) {
+      clearPendingPhoneLinkContinuation();
+    }
+  }, [clearPendingPhoneLinkContinuation, pendingPhoneLinkContinuation, user?.uid]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
@@ -1963,14 +2028,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (matchedUid && matchedUid !== userCredential.user.uid) {
-          if (confirmationResult.verificationId) {
-            savePendingPhoneLink({
-              verificationId: confirmationResult.verificationId,
-              otp,
-              phoneNumber: normalizedPhone,
-              targetUid: matchedUid
-            });
-          }
+          savePendingPhoneLink({
+            phoneNumber: normalizedPhone,
+            targetUid: matchedUid
+          });
 
           try {
             await userCredential.user.delete();
@@ -2455,6 +2516,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithGoogle = async (): Promise<LoginResponse> => {
+    let shouldSignOutAfterFailure = false;
     try {
       auth.useDeviceLanguage();
 
@@ -2474,36 +2536,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const pendingLink = readPendingPhoneLink();
+      let phoneLinkRequiresFreshOtp = false;
+      let pendingPhoneNumber: string | null = null;
       if (pendingLink) {
+        shouldSignOutAfterFailure = true;
         if (pendingLink.targetUid && pendingLink.targetUid !== result.user.uid) {
+          clearPendingPhoneLink();
           await signOut(auth);
           throw new Error('Please sign in with the account linked to this phone number.');
         }
-
-        try {
-          const credential = PhoneAuthProvider.credential(
-            pendingLink.verificationId,
-            pendingLink.otp
-          );
-          await linkWithCredential(result.user, credential);
-          clearPendingPhoneLink();
-        } catch (linkError: any) {
-          reportAuthContextError(linkError, 'auth.google_login.phone_link');
-          if (linkError?.code === 'auth/provider-already-linked') {
-            clearPendingPhoneLink();
-          } else if (linkError?.code === 'auth/credential-already-in-use') {
-            clearPendingPhoneLink();
-            throw new Error('Phone number is already linked to another account. Please contact support.');
-          } else if (
-            linkError?.code === 'auth/invalid-verification-code'
-            || linkError?.code === 'auth/code-expired'
-          ) {
-            clearPendingPhoneLink();
-            throw new Error('Verification code expired. Please retry phone login.');
-          } else {
-            throw linkError;
-          }
-        }
+        pendingPhoneNumber = pendingLink.phoneNumber;
+        phoneLinkRequiresFreshOtp = true;
+        clearPendingPhoneLink();
       }
 
       // Check if user exists before proceeding
@@ -2562,12 +2606,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Update user state immediately for navigation
       setUser(userDataToReturn);
       recentLoginRef.current = { uid: userDataToReturn.uid, at: Date.now(), user: userDataToReturn };
+      if (phoneLinkRequiresFreshOtp && pendingPhoneNumber) {
+        const continuation = {
+          phoneNumber: pendingPhoneNumber,
+          targetUid: userDataToReturn.uid,
+        };
+        savePendingPhoneLinkContinuation(continuation);
+        setPendingPhoneLinkContinuation({
+          ...continuation,
+          createdAt: Date.now(),
+        });
+      }
 
       return {
         token,
-        user: userDataToReturn
+        user: userDataToReturn,
+        ...(phoneLinkRequiresFreshOtp ? {
+          phoneLinkRequiresFreshOtp: true,
+        } : {}),
       };
     } catch (error) {
+      if (shouldSignOutAfterFailure && auth.currentUser) {
+        try {
+          await signOut(auth);
+        } catch (signOutError) {
+          reportAuthContextError(signOutError, 'auth.google_login.rollback_signout');
+        }
+      }
       reportAuthContextError(error, 'auth.google_login');
       throw error;
     }
@@ -2924,6 +2989,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       startImpersonation,
       stopImpersonation,
       profileResolved,
+      pendingPhoneLinkContinuation,
+      clearPendingPhoneLinkContinuation,
     }}>
       {children}
     </AuthContext.Provider>
