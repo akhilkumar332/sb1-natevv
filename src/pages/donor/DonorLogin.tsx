@@ -202,6 +202,7 @@ export function DonorLogin() {
     const justLoggedIn = sessionStorage.getItem('bh_just_logged_in') === '1';
     if (canShowEnrollPrompt && !enrollPromptShownRef.current && justLoggedIn) {
       enrollPromptShownRef.current = true;
+      hasNavigated.current = true; // block effect from re-firing during enrollment
       sessionStorage.removeItem('bh_just_logged_in');
       setShowEnrollPrompt(true);
       return;

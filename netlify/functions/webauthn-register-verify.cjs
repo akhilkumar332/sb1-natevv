@@ -72,8 +72,8 @@ exports.handler = async (event) => {
 
     const { credential: cred, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
 
-    // Store credential
-    const credentialId = Buffer.from(cred.id).toString('base64url');
+    // cred.id is already a base64url string in @simplewebauthn/server v10+
+    const credentialId = cred.id;
     await db.collection('users').doc(userId).collection('webauthnCredentials').doc(credentialId).set({
       credentialId,
       publicKey: Buffer.from(cred.publicKey).toString('base64url'),
