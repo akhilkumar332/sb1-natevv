@@ -64,7 +64,7 @@ export function DonorLogin() {
     handleOTPSubmit,
     handleResendOTP,
     handleGoogleLogin
-  } = useLogin();
+  } = useLogin(() => { /* navigation handled by DonorLogin effect */ });
   const { otpResendTimer: linkOtpResendTimer, startResendTimer: startLinkResendTimer } = useOtpResendTimer();
   const donorIdentifierError = validateGeneralPhoneInput(formData.identifier).error;
 
@@ -198,8 +198,11 @@ export function DonorLogin() {
     }
 
     // Show biometric enroll prompt before navigating away — donor only, once per session
-    if (canShowEnrollPrompt && !enrollPromptShownRef.current) {
+    // Only show if user just logged in (not on page refresh)
+    const justLoggedIn = sessionStorage.getItem('bh_just_logged_in') === '1';
+    if (canShowEnrollPrompt && !enrollPromptShownRef.current && justLoggedIn) {
       enrollPromptShownRef.current = true;
+      sessionStorage.removeItem('bh_just_logged_in');
       setShowEnrollPrompt(true);
       return;
     }

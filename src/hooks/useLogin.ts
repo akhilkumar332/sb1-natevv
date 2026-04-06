@@ -21,7 +21,7 @@ interface LoginFormData {
   otp: string;
 }
 
-export const useLogin = () => {
+export const useLogin = (onLoginSuccess?: () => void) => {
   const { t } = useTranslation();
   const [googleLoading, setGoogleLoading] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
@@ -126,7 +126,12 @@ export const useLogin = () => {
         throw new Error('No token received');
       }
 
-      navigateAfterDonorLogin(verifiedUser);
+      if (onLoginSuccess) {
+        sessionStorage.setItem('bh_just_logged_in', '1');
+        onLoginSuccess();
+      } else {
+        navigateAfterDonorLogin(verifiedUser);
+      }
       notify.success(t('auth.loginSuccessful'));
     } catch (error) {
       void captureHandledError(error, { source: 'frontend', scope: 'auth', metadata: { kind: 'auth.login.otp.verify' } });
@@ -223,7 +228,12 @@ export const useLogin = () => {
         }
 
         // Navigate based on onboarding status - if not explicitly true, go to onboarding
-        navigateAfterDonorLogin(result.user);
+        if (onLoginSuccess) {
+          sessionStorage.setItem('bh_just_logged_in', '1');
+          onLoginSuccess();
+        } else {
+          navigateAfterDonorLogin(result.user);
+        }
       } else {
         throw new Error('No token received');
       }
