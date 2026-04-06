@@ -154,82 +154,82 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2086",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2166",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2086,
+    "line": 2166,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2213",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2293",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2213,
+    "line": 2293,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2297",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2377",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2297,
+    "line": 2377,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2323",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2403",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2323,
+    "line": 2403,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2418",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2516",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2418,
+    "line": 2516,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2602",
+    "id": "USERS.updateDoc.contexts/AuthContext.tsx:2718",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2602,
+    "line": 2718,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.setDoc.contexts/AuthContext.tsx:2845",
+    "id": "USERS.setDoc.contexts/AuthContext.tsx:2966",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2845,
+    "line": 2966,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:2886",
+    "id": "PUBLIC_DONORS.setDoc.contexts/AuthContext.tsx:3007",
     "method": "setDoc",
     "collectionKey": "PUBLIC_DONORS",
     "module": "contexts",
     "path": "contexts/AuthContext.tsx",
-    "line": 2886,
+    "line": 3007,
     "area": "PUBLIC_DONORS setDoc",
     "mode": "queue_safe"
   },
@@ -284,12 +284,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "USERS.setDoc.hooks/useNgoRegister.ts:212",
+    "id": "USERS.setDoc.hooks/useNgoRegister.ts:218",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "hooks",
     "path": "hooks/useNgoRegister.ts",
-    "line": 212,
+    "line": 218,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },
@@ -304,12 +304,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.setDoc.hooks/useRegister.ts:220",
+    "id": "USERS.setDoc.hooks/useRegister.ts:226",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "hooks",
     "path": "hooks/useRegister.ts",
-    "line": 220,
+    "line": 226,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },
@@ -2334,12 +2334,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "USERS.setDoc.utils/googleRegister.ts:57",
+    "id": "USERS.setDoc.utils/googleRegister.ts:58",
     "method": "setDoc",
     "collectionKey": "USERS",
     "module": "utils",
     "path": "utils/googleRegister.ts",
-    "line": 57,
+    "line": 58,
     "area": "USERS setDoc",
     "mode": "queue_safe"
   },

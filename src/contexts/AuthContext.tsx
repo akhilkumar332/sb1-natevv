@@ -5,7 +5,6 @@ import { NavigateFunction } from 'react-router-dom';
 import { notify } from 'services/notify.service';
 import {
   signInWithPopup,
-  signOut,
   onAuthStateChanged,
   User as FirebaseUser,
   RecaptchaVerifier,
@@ -51,6 +50,7 @@ import { clearReferralTracking, getReferralReferrerUid, getReferralTracking } fr
 import { buildPublicDonorPayload } from '../utils/publicDonor';
 import { PhoneAuthError } from '../errors/PhoneAuthError';
 import { authStorage } from '../utils/authStorage';
+import { cleanupAuthSession } from '../utils/authSessionCleanup';
 import { readFcmTokenMeta, readStoredFcmToken, writeFcmTokenMeta, writeStoredFcmToken } from '../utils/fcmStorage';
 import { authMessages } from '../constants/messages';
 import { ROUTES } from '../constants/routes';
@@ -1825,7 +1825,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         reportAuthContextError(error, 'auth.state_change');
-        setUser(null);
+        const currentFirebaseUser = auth.currentUser;
+        const fallbackUser = userRef.current || readCachedUser();
+        if (currentFirebaseUser && fallbackUser && fallbackUser.uid === currentFirebaseUser.uid) {
+          setUser(fallbackUser);
+        } else if (currentFirebaseUser && userRef.current?.uid === currentFirebaseUser.uid) {
+          setUser(userRef.current);
+        } else {
+          setUser(null);
+        }
         setProfileResolved(true);
       } finally {
         setLoading(false);
@@ -2006,12 +2014,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const matches = await findUsersByPhone(normalizedPhone);
 
         if (matches.length === 0) {
-          await signOut(auth);
+          await cleanupAuthSession({
+            scope: 'auth',
+            kind: 'auth.phone_login.not_registered_cleanup',
+            metadata: { page: 'AuthContext' },
+            extraCleanup: () => {
+              localStorage.removeItem(userCacheKey);
+              localStorage.removeItem(userCacheAtKey);
+              clearAuthOwnedSessionStorage();
+            },
+          });
           throw new PhoneAuthError('User not registered', 'not_registered');
         }
 
         if (matches.length > 1) {
-          await signOut(auth);
+          await cleanupAuthSession({
+            scope: 'auth',
+            kind: 'auth.phone_login.multiple_accounts_cleanup',
+            metadata: { page: 'AuthContext' },
+            extraCleanup: () => {
+              localStorage.removeItem(userCacheKey);
+              localStorage.removeItem(userCacheAtKey);
+              clearAuthOwnedSessionStorage();
+            },
+          });
           throw new PhoneAuthError('Phone number linked to multiple accounts', 'multiple_accounts');
         }
 
@@ -2019,11 +2045,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const matchedUid = matchedUser.uid || matchedUser.id;
 
         if (matchedUser.role === 'superadmin') {
-          await signOut(auth);
+          await cleanupAuthSession({
+            scope: 'auth',
+            kind: 'auth.phone_login.superadmin_google_only_cleanup',
+            metadata: { page: 'AuthContext' },
+            extraCleanup: () => {
+              localStorage.removeItem(userCacheKey);
+              localStorage.removeItem(userCacheAtKey);
+              clearAuthOwnedSessionStorage();
+            },
+          });
           throw new PhoneAuthError(authMessages.superadminGoogleOnly, 'superadmin_google_only');
         }
         if (matchedUser.role && matchedUser.role !== 'donor') {
-          await signOut(auth);
+          await cleanupAuthSession({
+            scope: 'auth',
+            kind: 'auth.phone_login.role_mismatch_cleanup',
+            metadata: { page: 'AuthContext' },
+            extraCleanup: () => {
+              localStorage.removeItem(userCacheKey);
+              localStorage.removeItem(userCacheAtKey);
+              clearAuthOwnedSessionStorage();
+            },
+          });
           throw new PhoneAuthError(authMessages.roleMismatch.donor, 'role_mismatch');
         }
 
@@ -2039,24 +2083,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             reportAuthContextError(deleteError, 'auth.phone_login.temp_user_delete');
           }
 
-          await signOut(auth);
+          await cleanupAuthSession({
+            scope: 'auth',
+            kind: 'auth.phone_login.link_required_cleanup',
+            metadata: { page: 'AuthContext' },
+            extraCleanup: () => {
+              localStorage.removeItem(userCacheKey);
+              localStorage.removeItem(userCacheAtKey);
+              clearAuthOwnedSessionStorage();
+            },
+          });
           throw new PhoneAuthError(
             authMessages.phoneAlreadyRegisteredLinkGoogle,
             'link_required'
           );
         }
 
-        await signOut(auth);
+        await cleanupAuthSession({
+          scope: 'auth',
+          kind: 'auth.phone_login.not_registered_fallback_cleanup',
+          metadata: { page: 'AuthContext' },
+          extraCleanup: () => {
+            localStorage.removeItem(userCacheKey);
+            localStorage.removeItem(userCacheAtKey);
+            clearAuthOwnedSessionStorage();
+          },
+        });
         throw new PhoneAuthError('User not registered', 'not_registered');
       }
 
       const userData = userDoc.data() as User;
       if (userData.role === 'superadmin') {
-        await signOut(auth);
+        await cleanupAuthSession({
+          scope: 'auth',
+          kind: 'auth.phone_login.superadmin_existing_cleanup',
+          metadata: { page: 'AuthContext' },
+          extraCleanup: () => {
+            localStorage.removeItem(userCacheKey);
+            localStorage.removeItem(userCacheAtKey);
+            clearAuthOwnedSessionStorage();
+          },
+        });
         throw new PhoneAuthError(authMessages.superadminGoogleOnly, 'superadmin_google_only');
       }
       if (userData.role && userData.role !== 'donor') {
-        await signOut(auth);
+        await cleanupAuthSession({
+          scope: 'auth',
+          kind: 'auth.phone_login.role_mismatch_existing_cleanup',
+          metadata: { page: 'AuthContext' },
+          extraCleanup: () => {
+            localStorage.removeItem(userCacheKey);
+            localStorage.removeItem(userCacheAtKey);
+            clearAuthOwnedSessionStorage();
+          },
+        });
         throw new PhoneAuthError(authMessages.roleMismatch.donor, 'role_mismatch');
       }
       const existingDob = convertTimestampToDate(userData?.dateOfBirth);
@@ -2366,7 +2446,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDoc = await getUserDocSnapshot(userRef);
 
       if (!userDoc.exists()) {
-        await signOut(auth);
+        await cleanupAuthSession({
+          scope: 'auth',
+          kind: 'auth.email_login.not_registered_cleanup',
+          metadata: { page: 'AuthContext' },
+          extraCleanup: () => {
+            localStorage.removeItem(userCacheKey);
+            localStorage.removeItem(userCacheAtKey);
+            clearAuthOwnedSessionStorage();
+          },
+        });
         throw new Error('User not registered. Please register first.');
       }
 
@@ -2375,7 +2464,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const userDocData = userDoc.data() as User;
       if (userDocData.role === 'superadmin') {
-        await signOut(auth);
+        await cleanupAuthSession({
+          scope: 'auth',
+          kind: 'auth.email_login.superadmin_google_only_cleanup',
+          metadata: { page: 'AuthContext' },
+          extraCleanup: () => {
+            localStorage.removeItem(userCacheKey);
+            localStorage.removeItem(userCacheAtKey);
+            clearAuthOwnedSessionStorage();
+          },
+        });
         throw new Error(authMessages.superadminGoogleOnly);
       }
       const existingDob = convertTimestampToDate(userDocData?.dateOfBirth);
@@ -2542,7 +2640,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         shouldSignOutAfterFailure = true;
         if (pendingLink.targetUid && pendingLink.targetUid !== result.user.uid) {
           clearPendingPhoneLink();
-          await signOut(auth);
+          await cleanupAuthSession({
+            scope: 'auth',
+            kind: 'auth.google_login.pending_link_target_mismatch_cleanup',
+            metadata: { page: 'AuthContext' },
+            extraCleanup: () => {
+              localStorage.removeItem(userCacheKey);
+              localStorage.removeItem(userCacheAtKey);
+              clearAuthOwnedSessionStorage();
+            },
+          });
           throw new Error('Please sign in with the account linked to this phone number.');
         }
         pendingPhoneNumber = pendingLink.phoneNumber;
@@ -2555,7 +2662,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDoc = await getUserDocSnapshot(userRef);
 
       if (!userDoc.exists()) {
-        await signOut(auth);
+        await cleanupAuthSession({
+          scope: 'auth',
+          kind: 'auth.google_login.not_registered_cleanup',
+          metadata: { page: 'AuthContext' },
+          extraCleanup: () => {
+            localStorage.removeItem(userCacheKey);
+            localStorage.removeItem(userCacheAtKey);
+            clearAuthOwnedSessionStorage();
+          },
+        });
         throw new Error('User not registered. Please register first.');
       }
 
@@ -2627,11 +2743,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     } catch (error) {
       if (shouldSignOutAfterFailure && auth.currentUser) {
-        try {
-          await signOut(auth);
-        } catch (signOutError) {
-          reportAuthContextError(signOutError, 'auth.google_login.rollback_signout');
-        }
+        await cleanupAuthSession({
+          scope: 'auth',
+          kind: 'auth.google_login.rollback_signout',
+          metadata: { page: 'AuthContext' },
+          extraCleanup: () => {
+            localStorage.removeItem(userCacheKey);
+            localStorage.removeItem(userCacheAtKey);
+            clearAuthOwnedSessionStorage();
+          },
+        });
       }
       reportAuthContextError(error, 'auth.google_login');
       throw error;

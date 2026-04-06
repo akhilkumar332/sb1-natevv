@@ -14,9 +14,10 @@ const SESSION_DURATION = ONE_DAY_MS; // 24 hours
 
 export const useAuthSync = () => {
   const authContext = useContext(AuthContext);
-  const { user, logout, impersonationSession } = useAuth();
+  const { user, logout, impersonationSession, authLoading, profileResolved } = useAuth();
   const navigate = useNavigate();
   const lastCheckRef = useRef(Date.now());
+  const missingTokenGraceStartedAtRef = useRef<number | null>(null);
   const reportAuthSyncError = (error: unknown, kind: string) => {
     void captureHandledError(error, {
       source: 'frontend',
@@ -37,6 +38,9 @@ export const useAuthSync = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
         return;
       }
+      if (authLoading || !profileResolved) {
+        return;
+      }
       const now = Date.now();
       
       // Only perform check if enough time has passed since last check
@@ -50,30 +54,36 @@ export const useAuthSync = () => {
       const authToken = localStorage.getItem('authToken');
 
       if (!authToken && user) {
+        if (!auth.currentUser) {
+          if (missingTokenGraceStartedAtRef.current === null) {
+            missingTokenGraceStartedAtRef.current = now;
+            return;
+          }
+          if (now - missingTokenGraceStartedAtRef.current < CHECK_INTERVAL * 2) {
+            return;
+          }
+          return;
+        }
+        missingTokenGraceStartedAtRef.current = null;
         // Token is missing but user is logged in - try to recover token first
         const tokenPromise = auth.currentUser?.getIdToken();
         if (!tokenPromise) {
-          if (!impersonationSession) {
-            logout(navigate);
-          }
           return;
         }
         tokenPromise
           .then((token) => {
             if (token) {
               authStorage.setAuthToken(token);
-            } else if (!impersonationSession) {
-              logout(navigate);
+              missingTokenGraceStartedAtRef.current = null;
             }
           })
           .catch((error) => {
             reportAuthSyncError(error, 'auth.sync.token_refresh');
-            if (!impersonationSession) {
-              logout(navigate);
-            }
           });
         return;
       }
+
+      missingTokenGraceStartedAtRef.current = null;
 
       if (lastLoginTime) {
         const timeElapsed = now - parseInt(lastLoginTime);
@@ -103,5 +113,5 @@ export const useAuthSync = () => {
       clearInterval(intervalId);
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [authContext, user, navigate, logout, impersonationSession]);
+  }, [authContext, user, navigate, logout, impersonationSession, authLoading, profileResolved]);
 };

@@ -4,6 +4,7 @@ import { authStorage } from './authStorage';
 import type { NavigateFunction } from 'react-router-dom';
 import { captureHandledError } from '../services/errorLog.service';
 import { notifyGoogleSignInFailure } from './authNotifications';
+import { cleanupAuthSession } from './authSessionCleanup';
 
 type GoogleLoginResponse = {
   user: {
@@ -69,6 +70,16 @@ export async function handleRoleGoogleLogin({
           metadata: {
             page,
             kind: 'auth.role_google_login.logout_after_mismatch',
+            mismatchRedirectTo,
+            expectedRoles,
+            actualRole: response.user.role || 'unknown',
+          },
+        });
+        await cleanupAuthSession({
+          scope,
+          kind: 'auth.role_google_login.logout_after_mismatch_cleanup',
+          metadata: {
+            page,
             mismatchRedirectTo,
             expectedRoles,
             actualRole: response.user.role || 'unknown',

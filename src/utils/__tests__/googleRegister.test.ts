@@ -145,6 +145,19 @@ describe('registerWithGoogleRole', () => {
     expect(window.sessionStorage.getItem('bh_pending_portal_role')).toBeNull();
   });
 
+  it('still redirects existing users to login when cleanup sign-out fails', async () => {
+    mockSignInWithPopup.mockResolvedValue(popupResult);
+    mockGetAdditionalUserInfo.mockReturnValue({ isNewUser: false });
+    mockSignOut.mockRejectedValue(new Error('signout failed'));
+
+    await registerWithGoogleRole(baseArgs);
+
+    expect(mockNotifyError).toHaveBeenCalledWith('email-registered');
+    expect(navigate).toHaveBeenCalledWith(ROUTES.portal.donor.login);
+    expect(window.sessionStorage.getItem('bh_registration_intent')).toBeNull();
+    expect(window.sessionStorage.getItem('bh_pending_portal_role')).toBeNull();
+  });
+
   it('signs out on non-recoverable profile creation failure', async () => {
     const fatalError = new Error('write failed');
 

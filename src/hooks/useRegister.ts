@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import { notify } from 'services/notify.service';
 import { doc, enableNetwork, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { signOut } from 'firebase/auth';
 import { authStorage } from '../utils/authStorage';
 import { findUsersByPhone } from '../utils/userLookup';
 import { applyReferralTrackingForUser, resolveReferralContext } from '../services/referral.service';
@@ -27,6 +26,7 @@ import {
   markRegistrationIntent,
 } from '../utils/registrationIntent';
 import { createUserDocumentViaRest, patchUserDocumentViaRest } from '../utils/firestoreRestUserWrite';
+import { cleanupAuthSession } from '../utils/authSessionCleanup';
 
 interface RegisterFormData {
   identifier: string;
@@ -193,7 +193,10 @@ export const useRegister = () => {
           return;
         }
         clearPendingPortalRole();
-        await signOut(auth);
+        await cleanupAuthSession({
+          scope: 'auth',
+          kind: 'auth.register.phone.existing_user_cleanup',
+        });
         notifyMobileAlreadyRegistered();
         navigate(ROUTES.portal.donor.login);
         return;
@@ -208,7 +211,10 @@ export const useRegister = () => {
       if (otherMatch) {
         clearRegistrationIntent();
         clearPendingPortalRole();
-        await signOut(auth);
+        await cleanupAuthSession({
+          scope: 'auth',
+          kind: 'auth.register.phone.other_match_cleanup',
+        });
         notifyMobileAlreadyRegistered();
         navigate(ROUTES.portal.donor.login);
         return;

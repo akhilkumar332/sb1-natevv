@@ -1,5 +1,5 @@
 import { doc, enableNetwork, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { getAdditionalUserInfo, signInWithPopup, signOut } from 'firebase/auth';
+import { getAdditionalUserInfo, signInWithPopup } from 'firebase/auth';
 import { auth, db, googleProvider } from '../firebase';
 import { notify } from 'services/notify.service';
 import { applyReferralTrackingForUser } from '../services/referral.service';
@@ -15,6 +15,7 @@ import {
   markRegistrationIntent,
 } from './registrationIntent';
 import { createUserDocumentViaRest, patchUserDocumentViaRest } from './firestoreRestUserWrite';
+import { cleanupAuthSession } from './authSessionCleanup';
 
 type GoogleRegisterRole = 'donor' | 'ngo' | 'bloodbank';
 let activeGoogleRegisterPromise: Promise<void> | null = null;
@@ -196,7 +197,10 @@ export const registerWithGoogleRole = async ({
       if (!isNewGoogleUser) {
         clearRegistrationIntent();
         clearPendingPortalRole();
-        await signOut(auth);
+        await cleanupAuthSession({
+          scope,
+          kind: `${kind}.existing_user_cleanup`,
+        });
         notify.error(authFlowMessages.emailRegistered);
         navigate(loginPath);
         return;
@@ -294,15 +298,10 @@ export const registerWithGoogleRole = async ({
     } catch (error) {
       clearRegistrationIntent();
       if (signedInUid && auth.currentUser?.uid === signedInUid) {
-        try {
-          await signOut(auth);
-        } catch (signOutError) {
-          void captureHandledError(signOutError, {
-            source: 'frontend',
-            scope,
-            metadata: { kind: `${kind}.signout_after_failed_register` },
-          });
-        }
+        await cleanupAuthSession({
+          scope,
+          kind: `${kind}.signout_after_failed_register`,
+        });
       }
       clearPendingPortalRole();
       void captureHandledError(error, { source: 'frontend', scope, metadata: { kind } });
