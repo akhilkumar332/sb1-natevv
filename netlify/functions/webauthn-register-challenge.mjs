@@ -8,9 +8,9 @@ const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 
 const initAdmin = () => {
   if (admin.apps.length) return;
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || process.env.VITE_FIREBASE_CLIENT_EMAIL;
+  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || process.env.VITE_FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
   if (!projectId || !clientEmail || !privateKey) throw new Error('Missing Firebase Admin credentials.');
   admin.initializeApp({ credential: admin.credential.cert({ projectId, clientEmail, privateKey }) });
 };
