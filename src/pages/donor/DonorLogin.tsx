@@ -104,6 +104,8 @@ export function DonorLogin() {
     isReady: biometricReady,
     loading: biometricLoading,
     error: biometricError,
+    needsReenroll: biometricNeedsReenroll,
+    biometricLabel,
     register: registerBiometric,
     authenticate: authenticateBiometric,
     dismissEnrollPrompt,
@@ -125,9 +127,9 @@ export function DonorLogin() {
   const handleEnrollBiometric = useCallback(async () => {
     const ok = await registerBiometric();
     setShowEnrollPrompt(false);
-    if (ok) notify.success('Biometric login enabled!');
+    if (ok) notify.success(`${biometricLabel} login enabled!`);
     if (user) navigateAfterAuthenticatedDonor(user);
-  }, [registerBiometric, user, navigateAfterAuthenticatedDonor]);
+  }, [registerBiometric, biometricLabel, user, navigateAfterAuthenticatedDonor]);
 
   const finalizePhoneLinkContinuation = useCallback(() => {
     clearPendingPhoneLinkContinuation();
@@ -560,6 +562,7 @@ export function DonorLogin() {
       {showEnrollPrompt && biometricSupported && (
         <BiometricEnrollPrompt
           loading={biometricLoading}
+          label={biometricLabel}
           onEnable={handleEnrollBiometric}
           onNotNow={() => { dismissEnrollPrompt(false); setShowEnrollPrompt(false); if (user) navigateAfterAuthenticatedDonor(user); }}
           onNever={() => { dismissEnrollPrompt(true); setShowEnrollPrompt(false); if (user) navigateAfterAuthenticatedDonor(user); }}
@@ -680,6 +683,8 @@ export function DonorLogin() {
                     <BiometricLoginButton
                       loading={biometricLoading}
                       error={biometricError}
+                      label={biometricLabel}
+                      needsReenroll={biometricNeedsReenroll}
                       onLogin={handleBiometricLogin}
                     />
                   )}

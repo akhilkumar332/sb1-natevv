@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Chrome, Phone, Trash2, MapPin, Locate, Loader } from 'lucide-react';
+import { Chrome, Phone, Trash2, MapPin, Locate, Loader, Fingerprint } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { MapContainer, TileLayer } from 'react-leaflet';
@@ -32,6 +32,7 @@ import {
 } from '../../../utils/locationFeedback';
 import { buildGeocodeLocationPatch, buildSuggestionLocationUpdate } from '../../../utils/locationController';
 import { updateUserNotificationPreferences } from '../../../services/offlineMutationOutbox.service';
+import { useWebAuthn } from '../../../hooks/useWebAuthn';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -150,6 +151,30 @@ const DonorAccount = () => {
     requestPermission,
     unsubscribe,
   } = usePushNotifications();
+
+  const {
+    isSupported: biometricSupported,
+    isRegistered: biometricRegistered,
+    isReady: biometricReady,
+    credentials: biometricCredentials,
+    credentialsLoading: biometricCredentialsLoading,
+    loading: biometricLoading,
+    needsReenroll: biometricNeedsReenroll,
+    biometricLabel,
+    register: registerBiometric,
+    removeCredential: removeBiometric,
+    removeCredentialById: removeBiometricById,
+  } = useWebAuthn(user?.uid ?? null);
+
+  const handleBiometricEnable = async () => {
+    const ok = await registerBiometric();
+    if (ok) notify.success(`${biometricLabel} login enabled!`);
+  };
+
+  const handleBiometricDisable = async () => {
+    await removeBiometric();
+    notify.success(`${biometricLabel} login disabled.`);
+  };
 
   const emailTarget = user?.email?.trim().toLowerCase() || '';
   const phoneTarget = user?.phoneNumber ? normalizePhoneNumber(user.phoneNumber) || user.phoneNumber : '';
@@ -1259,6 +1284,94 @@ const DonorAccount = () => {
             </div>
           )}
         </div>
+
+        {/* Biometric Login */}
+        {biometricReady && biometricSupported && (
+          <div className="bg-white rounded-2xl shadow-xl p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-800">{biometricLabel} Login</h2>
+                <p className="text-xs text-gray-500">Manage biometric login across your devices.</p>
+              </div>
+              <div className="rounded-full bg-red-50 p-2">
+                <Fingerprint className="h-5 w-5 text-red-600" />
+              </div>
+            </div>
+
+            {biometricNeedsReenroll && (
+              <div className="mb-4 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3">
+                <p className="text-xs font-semibold text-yellow-800">
+                  Biometric data was removed from this device. Enable it again below to re-enroll.
+                </p>
+              </div>
+            )}
+
+            {biometricCredentialsLoading ? (
+              <div className="space-y-2">
+                <div className="h-14 rounded-xl bg-gray-100 animate-pulse" />
+                <div className="h-14 rounded-xl bg-gray-100 animate-pulse" />
+              </div>
+            ) : biometricCredentials.length > 0 ? (
+              <div className="space-y-2">
+                {biometricCredentials.map((cred) => (
+                  <div key={cred.credentialId} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-gray-800">{cred.deviceName}</p>
+                        {cred.isCurrentDevice && (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">This device</span>
+                        )}
+                        {cred.backedUp && (
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">Synced</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {cred.createdAt ? `Enrolled ${cred.createdAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Enrolled recently'}
+                        {cred.lastUsedAt ? ` · Last used ${cred.lastUsedAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeBiometricById(cred.credentialId)}
+                      disabled={biometricLoading}
+                      className="ml-3 shrink-0 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                {biometricCredentials.some((c) => c.backedUp) && (
+                  <p className="text-[11px] text-gray-400 px-1">
+                    Synced credentials work across your devices via Google Password Manager or iCloud Keychain.
+                  </p>
+                )}
+              </div>
+            ) : null}
+
+            {!biometricRegistered && (
+              <button
+                type="button"
+                onClick={handleBiometricEnable}
+                disabled={biometricLoading}
+                className="mt-3 w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                <Fingerprint className="h-4 w-4" />
+                {biometricLoading ? 'Setting up…' : `Enable ${biometricLabel}`}
+              </button>
+            )}
+
+            {biometricRegistered && (
+              <button
+                type="button"
+                onClick={handleBiometricDisable}
+                disabled={biometricLoading}
+                className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                {biometricLoading ? 'Removing…' : `Disable on this device`}
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <h2 className="text-lg font-bold text-gray-800 mb-4">Linked Accounts</h2>

@@ -1114,12 +1114,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.pages/donor/dashboard/Account.tsx:624",
+    "id": "USERS.updateDoc.pages/donor/dashboard/Account.tsx:649",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "pages/donor",
     "path": "pages/donor/dashboard/Account.tsx",
-    "line": 624,
+    "line": 649,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
@@ -2284,12 +2284,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.deleteDoc.services/webauthn.service.ts:109",
+    "id": "USERS.deleteDoc.services/webauthn.service.ts:124",
     "method": "deleteDoc",
     "collectionKey": "USERS",
     "module": "services",
     "path": "services/webauthn.service.ts",
-    "line": 109,
+    "line": 124,
     "area": "USERS deleteDoc",
     "mode": "online_only"
   },

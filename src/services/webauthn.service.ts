@@ -5,7 +5,8 @@ import {
   browserSupportsWebAuthn,
   platformAuthenticatorIsAvailable,
 } from '@simplewebauthn/browser';
-import { auth } from '../firebase';
+import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 import { COLLECTIONS } from '../constants/firestore';
 
 const BASE = '/.netlify/functions';
@@ -46,7 +47,6 @@ export const clearCredentialId = (uid: string): void => {
   }
 };
 
-/** Returns the last enrolled userId — used on login page before auth */
 export const getLastEnrolledUserId = (): string | null =>
   localStorage.getItem(LAST_USER_KEY);
 
@@ -64,49 +64,94 @@ export const isWebAuthnSupported = (): boolean =>
 export const isPlatformAuthenticatorAvailable = (): Promise<boolean> =>
   platformAuthenticatorIsAvailable();
 
+// ── Platform-aware label ──────────────────────────────────────────────────────
+
+export const getBiometricLabel = (): string => {
+  if (typeof navigator === 'undefined') return 'Biometrics';
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/i.test(ua)) return 'Face ID / Touch ID';
+  if (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return 'Touch ID';
+  if (/Android/i.test(ua)) return 'Fingerprint';
+  return 'Biometrics';
+};
+
+// ── Device name from userAgent ────────────────────────────────────────────────
+
+export const getDeviceName = (userAgent: string): string => {
+  if (!userAgent) return 'Unknown Device';
+  if (/iPhone/i.test(userAgent)) return 'iPhone';
+  if (/iPad/i.test(userAgent)) return 'iPad';
+  const androidModel = userAgent.match(/;\s*([^;)]+)\s+Build\//);
+  if (androidModel) return androidModel[1].trim();
+  if (/Android/i.test(userAgent)) return 'Android Device';
+  if (/Windows/i.test(userAgent)) return 'Windows Device';
+  if (/Macintosh/i.test(userAgent)) return 'Mac';
+  return 'Unknown Device';
+};
+
+// ── Credential types ──────────────────────────────────────────────────────────
+
+export interface StoredCredential {
+  credentialId: string;
+  deviceName: string;
+  deviceType: string;
+  backedUp: boolean;
+  createdAt: Date | null;
+  lastUsedAt: Date | null;
+  isCurrentDevice: boolean;
+}
+
+// ── Multi-device credential list ──────────────────────────────────────────────
+
+export const fetchCredentials = async (userId: string): Promise<StoredCredential[]> => {
+  const currentCredentialId = getStoredCredentialId(userId);
+  const snap = await getDocs(collection(db, COLLECTIONS.USERS, userId, COLLECTIONS.WEBAUTHN_CREDENTIALS));
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      credentialId: data.credentialId,
+      deviceName: getDeviceName(data.userAgent || ''),
+      deviceType: data.deviceType || 'platform',
+      backedUp: Boolean(data.backedUp),
+      createdAt: data.createdAt?.toDate?.() ?? null,
+      lastUsedAt: data.lastUsedAt?.toDate?.() ?? null,
+      isCurrentDevice: data.credentialId === currentCredentialId,
+    };
+  });
+};
+
+export const removeCredentialById = async (userId: string, credentialId: string): Promise<void> => {
+  await deleteDoc(doc(db, COLLECTIONS.USERS, userId, COLLECTIONS.WEBAUTHN_CREDENTIALS, credentialId));
+  if (getStoredCredentialId(userId) === credentialId) {
+    clearCredentialId(userId);
+  }
+};
+
 // ── Registration ──────────────────────────────────────────────────────────────
 
 export const registerBiometric = async (userId: string): Promise<string> => {
   const idToken = await getIdToken();
-
-  // 1. Get challenge from server
   const options = await post('webauthn-register-challenge', { userId }, idToken);
-
-  // 2. Prompt device biometric
   const credential = await startRegistration({ optionsJSON: options });
-
-  // 3. Verify with server
   const result = await post('webauthn-register-verify', { userId, credential }, idToken);
-
-  // 4. Persist credentialId locally
   storeCredentialId(userId, result.credentialId);
-
   return result.credentialId;
 };
 
 // ── Authentication ────────────────────────────────────────────────────────────
 
 export const authenticateWithBiometric = async (userId: string): Promise<string> => {
-  // 1. Get challenge from server (no auth token — pre-login)
   const options = await post('webauthn-auth-challenge', { userId });
-
-  // 2. Prompt device biometric
   const credential = await startAuthentication({ optionsJSON: options });
-
-  // 3. Verify with server → get custom token
   const result = await post('webauthn-auth-verify', { userId, credential });
-
   return result.customToken;
 };
 
 // ── Remove credential ─────────────────────────────────────────────────────────
 
 export const removeBiometricCredential = async (userId: string): Promise<void> => {
-  const { doc, deleteDoc } = await import('firebase/firestore');
-  const { db } = await import('../firebase');
   const credentialId = getStoredCredentialId(userId);
   if (credentialId) {
-    await deleteDoc(doc(db, COLLECTIONS.USERS, userId, COLLECTIONS.WEBAUTHN_CREDENTIALS, credentialId));
-    clearCredentialId(userId);
+    await removeCredentialById(userId, credentialId);
   }
 };
