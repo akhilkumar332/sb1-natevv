@@ -1,7 +1,6 @@
-// netlify/functions/webauthn-auth-verify.cjs
-// Verifies a WebAuthn authentication assertion and returns a Firebase custom token.
-const admin = require('firebase-admin');
-const { verifyAuthenticationResponse } = require('@simplewebauthn/server');
+// netlify/functions/webauthn-auth-verify.mjs
+import admin from 'firebase-admin';
+import { verifyAuthenticationResponse } from '@simplewebauthn/server';
 
 const RP_ID = 'bloodhub.in';
 const EXPECTED_ORIGINS = ['https://bloodhub.in', 'https://beta.bloodhub.in', 'https://www.bloodhub.in'];
@@ -10,8 +9,7 @@ const initAdmin = () => {
   if (admin.apps.length) return;
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const rawKey = process.env.FIREBASE_PRIVATE_KEY;
-  const privateKey = rawKey ? rawKey.replace(/\\n/g, '\n') : undefined;
+  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
   if (!projectId || !clientEmail || !privateKey) throw new Error('Missing Firebase Admin credentials.');
   admin.initializeApp({ credential: admin.credential.cert({ projectId, clientEmail, privateKey }) });
 };
@@ -22,7 +20,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: corsHeaders, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
 
@@ -37,7 +35,6 @@ exports.handler = async (event) => {
     initAdmin();
     const db = admin.firestore();
 
-    // Retrieve and validate challenge
     const challengeDoc = await db.collection('users').doc(userId).collection('webauthnChallenges').doc('authentication').get();
     if (!challengeDoc.exists) return { statusCode: 400, body: JSON.stringify({ error: 'No pending challenge' }) };
     const { challenge, expiresAt } = challengeDoc.data();
@@ -46,7 +43,6 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'Challenge expired' }) };
     }
 
-    // Find the matching stored credential
     const credentialId = credential.id;
     const credDoc = await db.collection('users').doc(userId).collection('webauthnCredentials').doc(credentialId).get();
     if (!credDoc.exists) return { statusCode: 404, body: JSON.stringify({ error: 'Credential not found' }) };
@@ -70,16 +66,13 @@ exports.handler = async (event) => {
       return { statusCode: 401, body: JSON.stringify({ error: 'Authentication failed' }) };
     }
 
-    // Update counter and lastUsedAt
     await credDoc.ref.update({
       counter: verification.authenticationInfo.newCounter,
       lastUsedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // Delete challenge before minting token — prevents reuse if token mint fails
     await challengeDoc.ref.delete();
 
-    // Mint Firebase custom token
     const customToken = await admin.auth().createCustomToken(userId, { biometric: true });
 
     return {
@@ -89,6 +82,6 @@ exports.handler = async (event) => {
     };
   } catch (err) {
     console.error('webauthn-auth-verify error:', err);
-    return { statusCode: 500, body: JSON.stringify({ error: 'Internal error' }) };
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: err.message || 'Internal error' }) };
   }
 };

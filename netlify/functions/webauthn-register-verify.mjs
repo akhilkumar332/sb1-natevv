@@ -1,7 +1,6 @@
-// netlify/functions/webauthn-register-verify.cjs
-// Verifies a WebAuthn registration response and stores the credential.
-const admin = require('firebase-admin');
-const { verifyRegistrationResponse } = require('@simplewebauthn/server');
+// netlify/functions/webauthn-register-verify.mjs
+import admin from 'firebase-admin';
+import { verifyRegistrationResponse } from '@simplewebauthn/server';
 
 const RP_ID = 'bloodhub.in';
 const EXPECTED_ORIGINS = ['https://bloodhub.in', 'https://beta.bloodhub.in', 'https://www.bloodhub.in'];
@@ -10,8 +9,7 @@ const initAdmin = () => {
   if (admin.apps.length) return;
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const rawKey = process.env.FIREBASE_PRIVATE_KEY;
-  const privateKey = rawKey ? rawKey.replace(/\\n/g, '\n') : undefined;
+  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
   if (!projectId || !clientEmail || !privateKey) throw new Error('Missing Firebase Admin credentials.');
   admin.initializeApp({ credential: admin.credential.cert({ projectId, clientEmail, privateKey }) });
 };
@@ -28,7 +26,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: corsHeaders, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
 
@@ -49,7 +47,6 @@ exports.handler = async (event) => {
 
     const db = admin.firestore();
 
-    // Retrieve and validate challenge
     const challengeDoc = await db.collection('users').doc(userId).collection('webauthnChallenges').doc('registration').get();
     if (!challengeDoc.exists) return { statusCode: 400, body: JSON.stringify({ error: 'No pending challenge' }) };
     const { challenge, expiresAt } = challengeDoc.data();
@@ -86,7 +83,6 @@ exports.handler = async (event) => {
       userAgent: (event.headers?.['user-agent'] || '').slice(0, 300),
     });
 
-    // Clean up challenge
     await challengeDoc.ref.delete();
 
     return {
@@ -96,6 +92,6 @@ exports.handler = async (event) => {
     };
   } catch (err) {
     console.error('webauthn-register-verify error:', err);
-    return { statusCode: 500, body: JSON.stringify({ error: 'Internal error' }) };
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: err.message || 'Internal error' }) };
   }
 };
