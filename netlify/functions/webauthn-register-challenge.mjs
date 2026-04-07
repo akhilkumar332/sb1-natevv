@@ -1,4 +1,6 @@
 // netlify/functions/webauthn-register-challenge.mjs
+import { webcrypto } from 'crypto';
+if (!globalThis.crypto) globalThis.crypto = webcrypto;
 import admin from 'firebase-admin';
 import { generateRegistrationOptions } from '@simplewebauthn/server';
 

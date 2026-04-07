@@ -1,4 +1,6 @@
 // netlify/functions/webauthn-register-verify.mjs
+import { webcrypto } from 'crypto';
+if (!globalThis.crypto) globalThis.crypto = webcrypto;
 import admin from 'firebase-admin';
 import { verifyRegistrationResponse } from '@simplewebauthn/server';
 
