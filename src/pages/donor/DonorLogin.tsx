@@ -116,13 +116,13 @@ export function DonorLogin() {
     const customToken = await authenticateBiometric();
     if (!customToken) return;
     try {
-      const loggedInUser = await loginWithBiometric(customToken);
-      navigateAfterAuthenticatedDonor(loggedInUser);
+      await loginWithBiometric(customToken);
+      // Navigation handled by the useEffect that watches `user` — same as OTP/Google login
       notify.success(t('auth.loginSuccessful'));
     } catch {
       notify.error('Biometric login failed. Please use OTP or Google.');
     }
-  }, [authenticateBiometric, loginWithBiometric, navigateAfterAuthenticatedDonor, t]);
+  }, [authenticateBiometric, loginWithBiometric, t]);
 
   const finalizePhoneLinkContinuation = useCallback(() => {
     clearPendingPhoneLinkContinuation();

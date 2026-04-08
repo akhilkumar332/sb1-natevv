@@ -236,7 +236,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<LoginResponse>;
   loginWithPhone: (phoneNumber: string) => Promise<ConfirmationResult>;
   loginWithEmail: (email: string, password: string) => Promise<LoginResponse>;
-  loginWithBiometric: (customToken: string) => Promise<User>;
+  loginWithBiometric: (customToken: string) => Promise<void>;
   registerWithEmail: (email: string, password: string, displayName: string) => Promise<FirebaseUser>;
   resetPassword: (email: string) => Promise<void>;
   logout: (navigate: NavigateFunction, options?: { redirectTo?: string; showToast?: boolean }) => Promise<void>;
@@ -1990,17 +1990,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loginWithBiometric = async (customToken: string): Promise<User> => {
+  const loginWithBiometric = async (customToken: string): Promise<void> => {
     try {
       setAuthLoading(true);
       const userCredential = await signInWithCustomToken(auth, customToken);
+      // Fire-and-forget lastLoginAt — don't block on Firestore read after logout
       const userRef = doc(db, COLLECTIONS.USERS, userCredential.user.uid);
-      const userDoc = await getDoc(userRef);
-      if (!userDoc.exists()) throw new Error('User profile not found');
-      const userData = userDoc.data() as User;
-      // Fire-and-forget — don't block login on this write
       updateDoc(userRef, { lastLoginAt: serverTimestamp() }).catch(() => {});
-      return userData;
+      // onAuthStateChanged will populate user state and trigger navigation
     } catch (error) {
       reportAuthContextError(error, 'auth.biometric_login');
       throw error;
