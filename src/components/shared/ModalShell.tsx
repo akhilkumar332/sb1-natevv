@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 export function ModalShell({
   children,
@@ -7,9 +8,10 @@ export function ModalShell({
   children: ReactNode;
   containerClassName?: string;
 }) {
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className={containerClassName}>{children}</div>
-    </div>
+    </div>,
+    document.body
   );
 }
