@@ -5,12 +5,13 @@ import { ModalShell } from '../shared/ModalShell';
 interface Props {
   loading: boolean;
   label: string;
+  error?: string | null;
   onEnable: () => void;
   onNotNow: () => void;
   onNever: () => void;
 }
 
-export function BiometricEnrollPrompt({ loading, label, onEnable, onNotNow, onNever }: Props) {
+export function BiometricEnrollPrompt({ loading, label, error, onEnable, onNotNow, onNever }: Props) {
   return (
     <ModalShell containerClassName="w-full max-w-sm rounded-[24px] bg-white p-6 shadow-2xl relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-2 bg-red-600" />
@@ -37,6 +38,9 @@ export function BiometricEnrollPrompt({ loading, label, onEnable, onNotNow, onNe
         </div>
 
         <div className="w-full space-y-2 pt-1">
+          {error && (
+            <p className="text-xs text-red-600 text-center rounded-lg bg-red-50 px-3 py-2">{error}</p>
+          )}
           <button
             type="button"
             onClick={onEnable}

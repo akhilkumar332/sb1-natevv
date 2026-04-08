@@ -29,19 +29,26 @@ const post = async (path: string, body: object, idToken?: string) => {
 // ── localStorage helpers ──────────────────────────────────────────────────────
 
 const enrolledKey = (uid: string) => `bh_wauthn_enrolled_${uid}`;
+const transportsKey = (uid: string) => `bh_wauthn_transports_${uid}`;
 const neverKey = (uid: string) => `bh_wauthn_never_${uid}`;
 const LAST_USER_KEY = 'bh_wauthn_last_uid';
 
 export const getStoredCredentialId = (uid: string): string | null =>
   localStorage.getItem(enrolledKey(uid));
 
-export const storeCredentialId = (uid: string, credentialId: string): void => {
+export const storeCredentialId = (uid: string, credentialId: string, transports?: string[]): void => {
   localStorage.setItem(enrolledKey(uid), credentialId);
   localStorage.setItem(LAST_USER_KEY, uid);
+  if (transports?.length) localStorage.setItem(transportsKey(uid), JSON.stringify(transports));
+};
+
+export const getStoredTransports = (uid: string): string[] => {
+  try { return JSON.parse(localStorage.getItem(transportsKey(uid)) || '[]'); } catch { return []; }
 };
 
 export const clearCredentialId = (uid: string): void => {
   localStorage.removeItem(enrolledKey(uid));
+  localStorage.removeItem(transportsKey(uid));
   if (localStorage.getItem(LAST_USER_KEY) === uid) {
     localStorage.removeItem(LAST_USER_KEY);
   }
@@ -94,6 +101,7 @@ export const getDeviceName = (userAgent: string): string => {
 export interface StoredCredential {
   credentialId: string;
   deviceName: string;
+  deviceDetails: string;
   deviceType: string;
   backedUp: boolean;
   createdAt: Date | null;
@@ -108,9 +116,11 @@ export const fetchCredentials = async (userId: string): Promise<StoredCredential
   const snap = await getDocs(collection(db, COLLECTIONS.USERS, userId, COLLECTIONS.WEBAUTHN_CREDENTIALS));
   return snap.docs.map((d) => {
     const data = d.data();
+    const ua = data.userAgent || '';
     return {
       credentialId: data.credentialId,
-      deviceName: getDeviceName(data.userAgent || ''),
+      deviceName: getDeviceName(ua),
+      deviceDetails: getDeviceDetails(ua),
       deviceType: data.deviceType || 'platform',
       backedUp: Boolean(data.backedUp),
       createdAt: data.createdAt?.toDate?.() ?? null,
@@ -134,14 +144,17 @@ export const registerBiometric = async (userId: string): Promise<string> => {
   const options = await post('webauthn-register-challenge', { userId }, idToken);
   const credential = await startRegistration({ optionsJSON: options });
   const result = await post('webauthn-register-verify', { userId, credential }, idToken);
-  storeCredentialId(userId, result.credentialId);
+  const transports = credential.response?.transports ?? [];
+  storeCredentialId(userId, result.credentialId, transports);
   return result.credentialId;
 };
 
 // ── Authentication ────────────────────────────────────────────────────────────
 
 export const authenticateWithBiometric = async (userId: string): Promise<string> => {
-  const options = await post('webauthn-auth-challenge', { userId });
+  const credentialId = getStoredCredentialId(userId) ?? undefined;
+  const transports = credentialId ? getStoredTransports(userId) : undefined;
+  const options = await post('webauthn-auth-challenge', { userId, credentialId, transports });
   const credential = await startAuthentication({ optionsJSON: options });
   const result = await post('webauthn-auth-verify', { userId, credential });
   return result.customToken;
@@ -154,4 +167,33 @@ export const removeBiometricCredential = async (userId: string): Promise<void> =
   if (credentialId) {
     await removeCredentialById(userId, credentialId);
   }
+};
+
+// ── Pre-warm Netlify functions (fire-and-forget OPTIONS ping) ─────────────────
+
+export const warmupBiometricFunctions = (): void => {
+  const ping = (path: string) => fetch(`${BASE}/${path}`, { method: 'OPTIONS' }).catch(() => {});
+  void ping('webauthn-auth-challenge');
+  void ping('webauthn-auth-verify');
+};
+
+// ── Device details from userAgent ─────────────────────────────────────────────
+
+export const getDeviceDetails = (userAgent: string): string => {
+  if (!userAgent) return '';
+  let browser = '';
+  if (/Edg\//i.test(userAgent)) browser = 'Edge';
+  else if (/OPR\//i.test(userAgent)) browser = 'Opera';
+  else if (/Chrome\//i.test(userAgent) && !/Chromium/i.test(userAgent)) browser = 'Chrome';
+  else if (/Firefox\//i.test(userAgent)) browser = 'Firefox';
+  else if (/Safari\//i.test(userAgent)) browser = 'Safari';
+  let os = '';
+  const androidVer = userAgent.match(/Android\s([\d.]+)/i);
+  const iosVer = userAgent.match(/OS\s([\d_]+)/i);
+  const winVer = userAgent.match(/Windows NT\s([\d.]+)/i);
+  if (androidVer) os = `Android ${androidVer[1]}`;
+  else if (iosVer) os = `iOS ${iosVer[1].replace(/_/g, '.')}`;
+  else if (winVer) os = `Windows ${winVer[1]}`;
+  else if (/Macintosh/i.test(userAgent)) os = 'macOS';
+  return [os, browser].filter(Boolean).join(' · ');
 };

@@ -36,13 +36,20 @@ export const handler = async (event) => {
     initAdmin();
     const db = admin.firestore();
 
-    const credsSnap = await db.collection('users').doc(userId).collection('webauthnCredentials').get();
+    const providedCredentialId = typeof payload?.credentialId === 'string' ? payload.credentialId.trim() : null;
+    const providedTransports = Array.isArray(payload?.transports) ? payload.transports : [];
 
-    const allowCredentials = credsSnap.docs.map((d) => ({
-      id: d.data().credentialId,
-      type: 'public-key',
-      transports: d.data().transports || [],
-    }));
+    let allowCredentials;
+    if (providedCredentialId) {
+      allowCredentials = [{ id: providedCredentialId, type: 'public-key', transports: providedTransports }];
+    } else {
+      const credsSnap = await db.collection('users').doc(userId).collection('webauthnCredentials').get();
+      allowCredentials = credsSnap.docs.map((d) => ({
+        id: d.data().credentialId,
+        type: 'public-key',
+        transports: d.data().transports || [],
+      }));
+    }
 
     const options = await generateAuthenticationOptions({
       rpID: RP_ID,

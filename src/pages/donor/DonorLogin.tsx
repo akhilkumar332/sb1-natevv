@@ -21,7 +21,7 @@ import { ROUTES } from '../../constants/routes';
 import { authFlowMessages, authInputMessages, validateGeneralPhoneInput, getOtpValidationError, sanitizeOtp } from '../../utils/authInputValidation';
 import { useWebAuthn } from '../../hooks/useWebAuthn';
 import { BiometricLoginButton } from '../../components/auth/BiometricLoginButton';
-import { BiometricEnrollPrompt } from '../../components/auth/BiometricEnrollPrompt';
+import { warmupBiometricFunctions } from '../../services/webauthn.service';
 
 export function DonorLogin() {
   const { t } = useTranslation();
@@ -44,10 +44,8 @@ export function DonorLogin() {
     loginWithBiometric,
   } = useAuth();
   const hasNavigated = useRef(false);
-  const enrollPromptShownRef = useRef(false);
   const autoSendKeyRef = useRef<string | null>(null);
   const [showPortalModal, setShowPortalModal] = useState(false);
-  const [showEnrollPrompt, setShowEnrollPrompt] = useState(false);
   const [linkConfirmation, setLinkConfirmation] = useState<any>(null);
   const [linkOtp, setLinkOtp] = useState('');
   const [linkPhoneLoading, setLinkPhoneLoading] = useState(false);
@@ -106,11 +104,13 @@ export function DonorLogin() {
     error: biometricError,
     needsReenroll: biometricNeedsReenroll,
     biometricLabel,
-    register: registerBiometric,
     authenticate: authenticateBiometric,
-    dismissEnrollPrompt,
-    canShowEnrollPrompt,
   } = useWebAuthn(user?.uid ?? null);
+
+  // Pre-warm Netlify functions to reduce cold-start latency
+  useEffect(() => {
+    if (biometricReady && biometricRegistered) warmupBiometricFunctions();
+  }, [biometricReady, biometricRegistered]);
 
   const handleBiometricLogin = useCallback(async () => {
     const customToken = await authenticateBiometric();
@@ -123,13 +123,6 @@ export function DonorLogin() {
       notify.error('Biometric login failed. Please use OTP or Google.');
     }
   }, [authenticateBiometric, loginWithBiometric, navigateAfterAuthenticatedDonor, t]);
-
-  const handleEnrollBiometric = useCallback(async () => {
-    const ok = await registerBiometric();
-    setShowEnrollPrompt(false);
-    if (ok) notify.success(`${biometricLabel} login enabled!`);
-    if (user) navigateAfterAuthenticatedDonor(user);
-  }, [registerBiometric, biometricLabel, user, navigateAfterAuthenticatedDonor]);
 
   const finalizePhoneLinkContinuation = useCallback(() => {
     clearPendingPhoneLinkContinuation();
@@ -194,26 +187,8 @@ export function DonorLogin() {
       return;
     }
 
-    // Wait for biometric support check to complete before deciding to show prompt
-    if (!biometricReady) {
-      return;
-    }
-
-    // Show biometric enroll prompt before navigating away — donor only, once per session
-    // Only show if user just logged in (not on page refresh)
-    const justLoggedIn = sessionStorage.getItem('bh_just_logged_in') === '1';
-    if (canShowEnrollPrompt && !enrollPromptShownRef.current && justLoggedIn) {
-      enrollPromptShownRef.current = true;
-      hasNavigated.current = true; // block effect from re-firing during enrollment
-      sessionStorage.removeItem('bh_just_logged_in');
-      setShowEnrollPrompt(true);
-      return;
-    }
-
     navigateAfterAuthenticatedDonor(user);
   }, [
-    biometricReady,
-    canShowEnrollPrompt,
     effectiveRole,
     hasPendingPhoneLinkContinuation,
     impersonationSession?.targetRole,
@@ -559,15 +534,6 @@ export function DonorLogin() {
 
   return (
     <div className="min-h-screen flex">
-      {showEnrollPrompt && biometricSupported && (
-        <BiometricEnrollPrompt
-          loading={biometricLoading}
-          label={biometricLabel}
-          onEnable={handleEnrollBiometric}
-          onNotNow={() => { dismissEnrollPrompt(false); setShowEnrollPrompt(false); if (user) navigateAfterAuthenticatedDonor(user); }}
-          onNever={() => { dismissEnrollPrompt(true); setShowEnrollPrompt(false); if (user) navigateAfterAuthenticatedDonor(user); }}
-        />
-      )}
       <SuperAdminPortalModal
         isOpen={showPortalModal && Boolean(user) && isSuperAdmin}
         currentPortal="donor"
@@ -681,7 +647,7 @@ export function DonorLogin() {
 
                   {biometricSupported && biometricRegistered && (
                     <BiometricLoginButton
-                      loading={biometricLoading}
+                      loading={biometricLoading || authLoading}
                       error={biometricError}
                       label={biometricLabel}
                       needsReenroll={biometricNeedsReenroll}

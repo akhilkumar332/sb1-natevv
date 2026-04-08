@@ -1326,6 +1326,7 @@ const DonorAccount = () => {
                         )}
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">
+                        {cred.deviceDetails && <span>{cred.deviceDetails} · </span>}
                         {cred.createdAt ? `Enrolled ${cred.createdAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Enrolled recently'}
                         {cred.lastUsedAt ? ` · Last used ${cred.lastUsedAt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
                       </p>

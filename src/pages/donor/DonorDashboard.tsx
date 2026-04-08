@@ -1,6 +1,6 @@
 import { FIVE_MINUTES_MS, ONE_DAY_MS, TWELVE_HUNDRED_MS, TWO_POINT_FIVE_SECONDS_MS } from '../../constants/time';
 // src/pages/donor/DonorDashboard.tsx
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   User as LucideUser,
@@ -47,6 +47,9 @@ import { authInputMessages, getOtpValidationError, sanitizeOtp, validateGeneralP
 import AdminRefreshButton from '../../components/admin/AdminRefreshButton';
 import PendingActionsPanel from '../../components/shared/PendingActionsPanel';
 import NpsFeedbackPrompt from '../../components/shared/NpsFeedbackPrompt';
+import { useWebAuthn } from '../../hooks/useWebAuthn';
+import { BiometricEnrollPrompt } from '../../components/auth/BiometricEnrollPrompt';
+import { isWebAuthnSupported } from '../../services/webauthn.service';
 import { notifyKeepOneLoginMethod, notifySelfRequestBlocked } from '../../utils/validationFeedback';
 import { useScopedErrorReporter } from '../../hooks/useScopedErrorReporter';
 import { usePageVisibility } from '../../hooks/usePageVisibility';
@@ -95,6 +98,38 @@ function DonorDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const isPageVisible = usePageVisibility();
+
+  // Biometric enroll prompt — shown once after login on dashboard
+  const {
+    isReady: biometricReady,
+    loading: biometricLoading,
+    error: biometricError,
+    biometricLabel,
+    register: registerBiometric,
+    dismissEnrollPrompt,
+  } = useWebAuthn(user?.uid ?? null);
+  const [showEnrollPrompt, setShowEnrollPrompt] = useState(false);
+  const enrollPromptShownRef = useRef(false);
+
+  // Show prompt once biometric readiness check completes, device supports WebAuthn, and user just logged in
+  useEffect(() => {
+    if (!biometricReady) return;
+    if (!isWebAuthnSupported()) return;
+    if (enrollPromptShownRef.current) return;
+    if (sessionStorage.getItem('bh_just_logged_in') !== '1') return;
+    enrollPromptShownRef.current = true;
+    sessionStorage.removeItem('bh_just_logged_in');
+    setShowEnrollPrompt(true);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [biometricReady]);
+
+  const handleEnrollBiometric = useCallback(async () => {
+    const ok = await registerBiometric();
+    if (ok) {
+      setShowEnrollPrompt(false);
+      notify.success(`${biometricLabel} login enabled!`);
+    }
+  }, [registerBiometric, biometricLabel]);
 
   // State for modals and UI
   const [showAllRequests, setShowAllRequests] = useState(false);
@@ -2563,6 +2598,16 @@ function DonorDashboard() {
             </div>
           </aside>
           <main className="min-w-0 flex-1">
+            {showEnrollPrompt && (
+              <BiometricEnrollPrompt
+                loading={biometricLoading}
+                label={biometricLabel}
+                error={biometricError}
+                onEnable={handleEnrollBiometric}
+                onNotNow={() => { dismissEnrollPrompt(false); setShowEnrollPrompt(false); }}
+                onNever={() => { dismissEnrollPrompt(true); setShowEnrollPrompt(false); }}
+              />
+            )}
             <PortalNotificationBridge disabled={user?.notificationPreferences?.push === false} />
             <PendingActionsPanel />
             <NpsFeedbackPrompt userId={user?.uid} userRole={user?.role} className="mb-4" promptLabel={t('dashboard.feedbackLabel')} />

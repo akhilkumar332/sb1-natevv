@@ -89,6 +89,12 @@ export const useWebAuthn = (userId?: string | null) => {
         setError('Biometric prompt was cancelled.');
         return false;
       }
+      if (err?.name === 'InvalidStateError') {
+        // Credential already exists on device (e.g. synced via passkey manager) — treat as enrolled
+        setIsRegistered(true);
+        await refreshCredentials().catch(() => {});
+        return true;
+      }
       void captureHandledError(err, { source: 'frontend', scope: 'auth', metadata: { kind: 'webauthn.register' } });
       setError(err?.message || 'Registration failed.');
       return false;

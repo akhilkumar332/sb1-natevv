@@ -1998,7 +1998,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDoc = await getDoc(userRef);
       if (!userDoc.exists()) throw new Error('User profile not found');
       const userData = userDoc.data() as User;
-      await updateDoc(userRef, { lastLoginAt: serverTimestamp() });
+      // Fire-and-forget — don't block login on this write
+      updateDoc(userRef, { lastLoginAt: serverTimestamp() }).catch(() => {});
       return userData;
     } catch (error) {
       reportAuthContextError(error, 'auth.biometric_login');
