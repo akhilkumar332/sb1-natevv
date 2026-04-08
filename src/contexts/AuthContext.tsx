@@ -1995,6 +1995,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAuthLoading(true);
       const userCredential = await signInWithCustomToken(auth, customToken);
       const uid = userCredential.user.uid;
+      // Store auth token so readCachedUser works on subsequent logins
+      try {
+        const idToken = await userCredential.user.getIdToken();
+        if (idToken) authStorage.setAuthToken(idToken);
+      } catch { /* ignore */ }
       // Set recentLoginRef so onAuthStateChanged takes the fast path (no Firestore read)
       const cachedUser = readCachedUser();
       const userForCache = (cachedUser?.uid === uid ? cachedUser : null) ?? userRef.current ?? null;

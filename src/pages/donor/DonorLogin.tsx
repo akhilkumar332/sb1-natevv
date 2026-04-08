@@ -45,6 +45,7 @@ export function DonorLogin() {
     loginWithBiometric,
   } = useAuth();
   const hasNavigated = useRef(false);
+  const showLoginSuccessToastRef = useRef(false);
   const autoSendKeyRef = useRef<string | null>(null);
   const [showPortalModal, setShowPortalModal] = useState(false);
   const [linkConfirmation, setLinkConfirmation] = useState<any>(null);
@@ -82,6 +83,10 @@ export function DonorLogin() {
     params.delete('returnTo');
     const pendingSearch = params.toString();
     const hasPendingRequest = params.has('pendingRequest') || params.has('pendingRequestKey');
+    if (showLoginSuccessToastRef.current) {
+      showLoginSuccessToastRef.current = false;
+      notify.success(t('auth.loginSuccessful'));
+    }
     if (loggedInUser.onboardingCompleted === true) {
       const destination = returnTo || (hasPendingRequest ? ROUTES.portal.donor.dashboard.requests : ROUTES.portal.donor.dashboard.root);
       const target = pendingSearch
@@ -94,7 +99,7 @@ export function DonorLogin() {
       ? `${ROUTES.portal.donor.onboarding}?${pendingSearch}`
       : ROUTES.portal.donor.onboarding;
     navigate(onboardingTarget);
-  }, [location.search, navigate]);
+  }, [location.search, navigate, t]);
 
   const { isMobileOrTablet } = useViewport();
 
@@ -120,12 +125,12 @@ export function DonorLogin() {
     if (!customToken) return;
     try {
       await loginWithBiometric(customToken);
-      // Navigation handled by the useEffect that watches `user` — same as OTP/Google login
-      notify.success(t('auth.loginSuccessful'));
+      showLoginSuccessToastRef.current = true;
+      // Navigation + toast handled by the useEffect that watches `user`
     } catch {
       notify.error('Biometric login failed. Please use OTP or Google.');
     }
-  }, [authenticateBiometric, loginWithBiometric, t]);
+  }, [authenticateBiometric, loginWithBiometric]);
 
   const finalizePhoneLinkContinuation = useCallback(() => {
     clearPendingPhoneLinkContinuation();
