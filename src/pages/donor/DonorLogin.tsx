@@ -48,6 +48,7 @@ export function DonorLogin() {
   const showLoginSuccessToastRef = useRef(false);
   const autoSendKeyRef = useRef<string | null>(null);
   const [showPortalModal, setShowPortalModal] = useState(false);
+  const [biometricNavigating, setBiometricNavigating] = useState(false);
   const [linkConfirmation, setLinkConfirmation] = useState<any>(null);
   const [linkOtp, setLinkOtp] = useState('');
   const [linkPhoneLoading, setLinkPhoneLoading] = useState(false);
@@ -120,14 +121,19 @@ export function DonorLogin() {
     if (isMobileOrTablet && biometricReady && biometricRegistered) warmupBiometricFunctions();
   }, [isMobileOrTablet, biometricReady, biometricRegistered]);
 
+  const biometricNavigatingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleBiometricLogin = useCallback(async () => {
     const customToken = await authenticateBiometric();
     if (!customToken) return;
     try {
+      setBiometricNavigating(true);
       await loginWithBiometric(customToken);
       showLoginSuccessToastRef.current = true;
-      // Navigation + toast handled by the useEffect that watches `user`
+      // Safety timeout — reset if navigation doesn't fire within 10s
+      biometricNavigatingTimerRef.current = setTimeout(() => setBiometricNavigating(false), 10000);
     } catch {
+      setBiometricNavigating(false);
       notify.error('Biometric login failed. Please use OTP or Google.');
     }
   }, [authenticateBiometric, loginWithBiometric]);
@@ -188,6 +194,7 @@ export function DonorLogin() {
     }
 
     if (user.role !== 'donor') {
+      if (biometricNavigating) setBiometricNavigating(false);
       return;
     }
 
@@ -197,6 +204,7 @@ export function DonorLogin() {
 
     navigateAfterAuthenticatedDonor(user);
   }, [
+    biometricNavigating,
     effectiveRole,
     hasPendingPhoneLinkContinuation,
     impersonationSession?.targetRole,
@@ -245,6 +253,12 @@ export function DonorLogin() {
     startLinkResendTimer,
     startPhoneLink,
   ]);
+
+  useEffect(() => {
+    return () => {
+      if (biometricNavigatingTimerRef.current) clearTimeout(biometricNavigatingTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!hasPendingPhoneLinkContinuation || !pendingPhoneLinkContinuation || !user?.uid) {
@@ -360,7 +374,7 @@ export function DonorLogin() {
       <button
         type="button"
         onClick={handlePhoneNumberSubmit}
-        disabled={authLoading || Boolean(donorIdentifierError)}
+        disabled={authLoading || biometricNavigating || Boolean(donorIdentifierError)}
         className="w-full py-4 px-6 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
       >
         {authLoading ? (
@@ -655,7 +669,7 @@ export function DonorLogin() {
 
                   {isMobileOrTablet && biometricSupported && biometricRegistered && (
                     <BiometricLoginButton
-                      loading={biometricLoading || authLoading}
+                      loading={biometricLoading || authLoading || biometricNavigating}
                       error={biometricError}
                       label={biometricLabel}
                       needsReenroll={biometricNeedsReenroll}
@@ -666,7 +680,7 @@ export function DonorLogin() {
                   <button
                     type="button"
                     onClick={handleGoogleLogin}
-                    disabled={authLoading || googleLoading || otpLoading}
+                    disabled={authLoading || googleLoading || otpLoading || biometricNavigating}
                     className="w-full flex items-center justify-center px-6 py-4 border-2 border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     {googleLoading || otpLoading ? (
