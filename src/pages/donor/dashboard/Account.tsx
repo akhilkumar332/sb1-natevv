@@ -33,6 +33,7 @@ import {
 import { buildGeocodeLocationPatch, buildSuggestionLocationUpdate } from '../../../utils/locationController';
 import { updateUserNotificationPreferences } from '../../../services/offlineMutationOutbox.service';
 import { useWebAuthn } from '../../../hooks/useWebAuthn';
+import { useViewport } from '../../../hooks/useViewport';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -152,6 +153,7 @@ const DonorAccount = () => {
     unsubscribe,
   } = usePushNotifications();
 
+  const { isMobileOrTablet } = useViewport();
   const {
     isSupported: biometricSupported,
     isRegistered: biometricRegistered,
@@ -1285,8 +1287,8 @@ const DonorAccount = () => {
           )}
         </div>
 
-        {/* Biometric Login */}
-        {biometricReady && biometricSupported && (
+        {/* Biometric Login — mobile/tablet only */}
+        {isMobileOrTablet && biometricReady && biometricSupported && (
           <div className="bg-white rounded-2xl shadow-xl p-6">
             <div className="flex items-start justify-between mb-4">
               <div>

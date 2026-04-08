@@ -22,6 +22,7 @@ import { authFlowMessages, authInputMessages, validateGeneralPhoneInput, getOtpV
 import { useWebAuthn } from '../../hooks/useWebAuthn';
 import { BiometricLoginButton } from '../../components/auth/BiometricLoginButton';
 import { warmupBiometricFunctions } from '../../services/webauthn.service';
+import { useViewport } from '../../hooks/useViewport';
 
 export function DonorLogin() {
   const { t } = useTranslation();
@@ -95,7 +96,9 @@ export function DonorLogin() {
     navigate(onboardingTarget);
   }, [location.search, navigate]);
 
-  // Biometric login
+  const { isMobileOrTablet } = useViewport();
+
+  // Biometric login — mobile/tablet only
   const {
     isSupported: biometricSupported,
     isRegistered: biometricRegistered,
@@ -107,10 +110,10 @@ export function DonorLogin() {
     authenticate: authenticateBiometric,
   } = useWebAuthn(user?.uid ?? null);
 
-  // Pre-warm Netlify functions to reduce cold-start latency
+  // Pre-warm Netlify functions to reduce cold-start latency (mobile/tablet only)
   useEffect(() => {
-    if (biometricReady && biometricRegistered) warmupBiometricFunctions();
-  }, [biometricReady, biometricRegistered]);
+    if (isMobileOrTablet && biometricReady && biometricRegistered) warmupBiometricFunctions();
+  }, [isMobileOrTablet, biometricReady, biometricRegistered]);
 
   const handleBiometricLogin = useCallback(async () => {
     const customToken = await authenticateBiometric();
@@ -645,7 +648,7 @@ export function DonorLogin() {
                     </div>
                   </div>
 
-                  {biometricSupported && biometricRegistered && (
+                  {isMobileOrTablet && biometricSupported && biometricRegistered && (
                     <BiometricLoginButton
                       loading={biometricLoading || authLoading}
                       error={biometricError}
