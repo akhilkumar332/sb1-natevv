@@ -1994,10 +1994,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setAuthLoading(true);
       const userCredential = await signInWithCustomToken(auth, customToken);
-      // Fire-and-forget lastLoginAt — don't block on Firestore read after logout
-      const userRef = doc(db, COLLECTIONS.USERS, userCredential.user.uid);
-      updateDoc(userRef, { lastLoginAt: serverTimestamp() }).catch(() => {});
-      // onAuthStateChanged will populate user state and trigger navigation
+      const uid = userCredential.user.uid;
+      // Set recentLoginRef so onAuthStateChanged takes the fast path (no Firestore read)
+      const cachedUser = readCachedUser();
+      const userForCache = (cachedUser?.uid === uid ? cachedUser : null) ?? userRef.current ?? null;
+      if (userForCache) {
+        recentLoginRef.current = { uid, at: Date.now(), user: userForCache };
+      }
+      // Fire-and-forget lastLoginAt
+      const firestoreRef = doc(db, COLLECTIONS.USERS, uid);
+      updateDoc(firestoreRef, { lastLoginAt: serverTimestamp() }).catch(() => {});
     } catch (error) {
       reportAuthContextError(error, 'auth.biometric_login');
       throw error;
