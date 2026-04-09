@@ -17,13 +17,20 @@ const getIdToken = async (): Promise<string> => {
   return token;
 };
 
-const post = async (path: string, body: object, idToken?: string) => {
+const post = async (path: string, body: object, idToken?: string, retry = true): Promise<any> => {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
   const res = await fetch(`${BASE}/${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
   let data: any = null;
   try { data = await res.json(); } catch { /* empty or non-JSON body */ }
-  if (!res.ok) throw new Error(data?.error || `Request failed: ${res.status}`);
+  if (!res.ok) {
+    // Retry once on 500 (transient cold-start failure)
+    if (res.status === 500 && retry) {
+      await new Promise((r) => setTimeout(r, 600));
+      return post(path, body, idToken, false);
+    }
+    throw new Error(data?.error || `Request failed: ${res.status}`);
+  }
   if (!data) throw new Error(`Empty response from ${path}`);
   return data;
 };
@@ -151,17 +158,74 @@ export const registerBiometric = async (userId: string): Promise<string> => {
   return result.credentialId;
 };
 
+// ── Challenge prefetch cache ──────────────────────────────────────────────────
+
+const CHALLENGE_CACHE_TTL_MS = 4 * 60 * 1000; // 4 min (server TTL is 5 min)
+const challengeCacheKey = (uid: string) => `bh_wauthn_challenge_${uid}`;
+
+const storeCachedChallenge = (uid: string, options: object): void => {
+  try {
+    sessionStorage.setItem(challengeCacheKey(uid), JSON.stringify({ options, at: Date.now() }));
+  } catch { /* sessionStorage full or unavailable */ }
+};
+
+const getCachedChallenge = (uid: string): object | null => {
+  try {
+    const raw = sessionStorage.getItem(challengeCacheKey(uid));
+    if (!raw) return null;
+    const { options, at } = JSON.parse(raw);
+    if (Date.now() - at > CHALLENGE_CACHE_TTL_MS) {
+      sessionStorage.removeItem(challengeCacheKey(uid));
+      return null;
+    }
+    return options;
+  } catch { return null; }
+};
+
+export const clearCachedChallenge = (uid: string): void => {
+  try { sessionStorage.removeItem(challengeCacheKey(uid)); } catch { /* ignore */ }
+};
+
+export const prefetchAuthChallenge = async (userId: string): Promise<void> => {
+  try {
+    const credentialId = getStoredCredentialId(userId) ?? undefined;
+    const transports = credentialId ? getStoredTransports(userId) : undefined;
+    const options = await post('webauthn-auth-challenge', { userId, credentialId, transports });
+    if (options.staleCredential && credentialId) clearCredentialId(userId);
+    storeCachedChallenge(userId, options);
+  } catch { /* prefetch failure is non-critical — login will fetch fresh */ }
+};
+
 // ── Authentication ────────────────────────────────────────────────────────────
 
 export const authenticateWithBiometric = async (userId: string): Promise<string> => {
+  // Use prefetched challenge if available — eliminates one network round-trip
+  let options = getCachedChallenge(userId);
+  if (options) {
+    clearCachedChallenge(userId); // single-use
+  } else {
+    const credentialId = getStoredCredentialId(userId) ?? undefined;
+    const transports = credentialId ? getStoredTransports(userId) : undefined;
+    options = await post('webauthn-auth-challenge', { userId, credentialId, transports });
+    if ((options as any).staleCredential && credentialId) clearCredentialId(userId);
+  }
+  const credential = await startAuthentication({ optionsJSON: options as any });
+  const result = await post('webauthn-auth-verify', { userId, credential });
+  return result.customToken;
+};
+
+// ── Passkey autofill authentication ──────────────────────────────────────────
+
+export const authenticateWithBiometricAutofill = async (
+  userId: string,
+  signal: AbortSignal,
+): Promise<string> => {
   const credentialId = getStoredCredentialId(userId) ?? undefined;
   const transports = credentialId ? getStoredTransports(userId) : undefined;
   const options = await post('webauthn-auth-challenge', { userId, credentialId, transports });
-  // Server detected stale localStorage entry — clear it
-  if (options.staleCredential && credentialId) {
-    clearCredentialId(userId);
-  }
-  const credential = await startAuthentication({ optionsJSON: options });
+  if (options.staleCredential && credentialId) clearCredentialId(userId);
+  storeCachedChallenge(userId, options); // also cache for button tap path
+  const credential = await startAuthentication({ optionsJSON: options, useBrowserAutofill: true, signal } as any);
   const result = await post('webauthn-auth-verify', { userId, credential });
   return result.customToken;
 };

@@ -21,7 +21,7 @@ import { ROUTES } from '../../constants/routes';
 import { authFlowMessages, authInputMessages, validateGeneralPhoneInput, getOtpValidationError, sanitizeOtp } from '../../utils/authInputValidation';
 import { useWebAuthn } from '../../hooks/useWebAuthn';
 import { BiometricLoginButton } from '../../components/auth/BiometricLoginButton';
-import { warmupBiometricFunctions } from '../../services/webauthn.service';
+import { warmupBiometricFunctions, prefetchAuthChallenge, clearCachedChallenge, authenticateWithBiometricAutofill } from '../../services/webauthn.service';
 import { useViewport } from '../../hooks/useViewport';
 
 export function DonorLogin() {
@@ -116,14 +116,51 @@ export function DonorLogin() {
     authenticate: authenticateBiometric,
   } = useWebAuthn(user?.uid ?? null);
 
-  // Pre-warm Netlify functions to reduce cold-start latency (mobile/tablet only)
-  useEffect(() => {
-    if (isMobileOrTablet && biometricReady && biometricRegistered) warmupBiometricFunctions();
-  }, [isMobileOrTablet, biometricReady, biometricRegistered]);
-
+  // Prefetch auth challenge + pre-warm functions when biometric is ready (mobile/tablet only)
+  const autofillAbortRef = useRef<AbortController | null>(null);
   const biometricNavigatingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prefetchedRef = useRef(false); // only prefetch once per mount
+
+  useEffect(() => {
+    if (!isMobileOrTablet || !biometricReady || !biometricRegistered) return;
+    const effectiveUid = user?.uid ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('bh_wauthn_last_uid') : null);
+    if (!effectiveUid) return;
+
+    if (!prefetchedRef.current) {
+      prefetchedRef.current = true;
+      void prefetchAuthChallenge(effectiveUid);
+      warmupBiometricFunctions();
+    }
+
+    // Start passkey autofill in background (Chrome 108+ / Safari 16+)
+    if (typeof window !== 'undefined' && 'PublicKeyCredential' in window && !autofillAbortRef.current) {
+      autofillAbortRef.current = new AbortController();
+      authenticateWithBiometricAutofill(effectiveUid, autofillAbortRef.current.signal)
+        .then(async (customToken) => {
+          clearCachedChallenge(effectiveUid);
+          setBiometricNavigating(true);
+          showLoginSuccessToastRef.current = true;
+          try {
+            await loginWithBiometric(customToken);
+            biometricNavigatingTimerRef.current = setTimeout(() => setBiometricNavigating(false), 10000);
+          } catch {
+            setBiometricNavigating(false);
+            notify.error('Biometric login failed. Please use OTP or Google.');
+          }
+        })
+        .catch(() => { /* autofill cancelled or unsupported — silent */ });
+    }
+
+    return () => {
+      autofillAbortRef.current?.abort();
+      autofillAbortRef.current = null;
+    };
+  }, [isMobileOrTablet, biometricReady, biometricRegistered, user?.uid, loginWithBiometric]);
 
   const handleBiometricLogin = useCallback(async () => {
+    // Abort any background autofill before starting explicit login
+    autofillAbortRef.current?.abort();
+    autofillAbortRef.current = null;
     const customToken = await authenticateBiometric();
     if (!customToken) return;
     try {
@@ -365,6 +402,7 @@ export function DonorLogin() {
             countryCallingCodeEditable={false}
             value={formData.identifier}
             onChange={(value) => handleIdentifierChange(value || '')}
+            inputProps={{ autoComplete: 'webauthn' }}
             className="block w-full rounded-xl border-2 border-gray-200 px-4 py-3 transition-colors focus:border-red-500 focus:outline-none [&_.PhoneInputInput]:bg-white [&_.PhoneInputInput]:text-gray-900 [&_.PhoneInputInput]:outline-none [&_.PhoneInputInput]:placeholder:text-gray-400 dark:[&_.PhoneInputInput]:bg-white dark:[&_.PhoneInputInput]:text-gray-900"
           />
           <Phone className="absolute right-4 top-3.5 h-5 w-5 text-gray-400" />
