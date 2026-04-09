@@ -21,8 +21,10 @@ const post = async (path: string, body: object, idToken?: string) => {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
   const res = await fetch(`${BASE}/${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
-  const data = await res.json();
+  let data: any = null;
+  try { data = await res.json(); } catch { /* empty or non-JSON body */ }
   if (!res.ok) throw new Error(data?.error || `Request failed: ${res.status}`);
+  if (!data) throw new Error(`Empty response from ${path}`);
   return data;
 };
 

@@ -2284,12 +2284,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.deleteDoc.services/webauthn.service.ts:134",
+    "id": "USERS.deleteDoc.services/webauthn.service.ts:136",
     "method": "deleteDoc",
     "collectionKey": "USERS",
     "module": "services",
     "path": "services/webauthn.service.ts",
-    "line": 134,
+    "line": 136,
     "area": "USERS deleteDoc",
     "mode": "online_only"
   },
