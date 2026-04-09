@@ -21,7 +21,7 @@ import { ROUTES } from '../../constants/routes';
 import { authFlowMessages, authInputMessages, validateGeneralPhoneInput, getOtpValidationError, sanitizeOtp } from '../../utils/authInputValidation';
 import { useWebAuthn } from '../../hooks/useWebAuthn';
 import { BiometricLoginButton } from '../../components/auth/BiometricLoginButton';
-import { warmupBiometricFunctions, prefetchAuthChallenge, clearCachedChallenge, authenticateWithBiometricAutofill } from '../../services/webauthn.service';
+import { warmupBiometricFunctions, prefetchAuthChallenge } from '../../services/webauthn.service';
 import { useViewport } from '../../hooks/useViewport';
 
 export function DonorLogin() {
@@ -117,9 +117,8 @@ export function DonorLogin() {
   } = useWebAuthn(user?.uid ?? null);
 
   // Prefetch auth challenge + pre-warm functions when biometric is ready (mobile/tablet only)
-  const autofillAbortRef = useRef<AbortController | null>(null);
   const biometricNavigatingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prefetchedRef = useRef(false); // only prefetch once per mount
+  const prefetchedRef = useRef(false);
 
   useEffect(() => {
     if (!isMobileOrTablet || !biometricReady || !biometricRegistered) return;
@@ -131,36 +130,9 @@ export function DonorLogin() {
       void prefetchAuthChallenge(effectiveUid);
       warmupBiometricFunctions();
     }
-
-    // Start passkey autofill in background (Chrome 108+ / Safari 16+)
-    if (typeof window !== 'undefined' && 'PublicKeyCredential' in window && !autofillAbortRef.current) {
-      autofillAbortRef.current = new AbortController();
-      authenticateWithBiometricAutofill(effectiveUid, autofillAbortRef.current.signal)
-        .then(async (customToken) => {
-          clearCachedChallenge(effectiveUid);
-          setBiometricNavigating(true);
-          showLoginSuccessToastRef.current = true;
-          try {
-            await loginWithBiometric(customToken);
-            biometricNavigatingTimerRef.current = setTimeout(() => setBiometricNavigating(false), 10000);
-          } catch {
-            setBiometricNavigating(false);
-            notify.error('Biometric login failed. Please use OTP or Google.');
-          }
-        })
-        .catch(() => { /* autofill cancelled or unsupported — silent */ });
-    }
-
-    return () => {
-      autofillAbortRef.current?.abort();
-      autofillAbortRef.current = null;
-    };
-  }, [isMobileOrTablet, biometricReady, biometricRegistered, user?.uid, loginWithBiometric]);
+  }, [isMobileOrTablet, biometricReady, biometricRegistered, user?.uid]);
 
   const handleBiometricLogin = useCallback(async () => {
-    // Abort any background autofill before starting explicit login
-    autofillAbortRef.current?.abort();
-    autofillAbortRef.current = null;
     const customToken = await authenticateBiometric();
     if (!customToken) return;
     try {

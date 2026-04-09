@@ -214,22 +214,6 @@ export const authenticateWithBiometric = async (userId: string): Promise<string>
   return result.customToken;
 };
 
-// ── Passkey autofill authentication ──────────────────────────────────────────
-
-export const authenticateWithBiometricAutofill = async (
-  userId: string,
-  signal: AbortSignal,
-): Promise<string> => {
-  const credentialId = getStoredCredentialId(userId) ?? undefined;
-  const transports = credentialId ? getStoredTransports(userId) : undefined;
-  const options = await post('webauthn-auth-challenge', { userId, credentialId, transports });
-  if (options.staleCredential && credentialId) clearCredentialId(userId);
-  storeCachedChallenge(userId, options); // also cache for button tap path
-  const credential = await startAuthentication({ optionsJSON: options, useBrowserAutofill: true, signal } as any);
-  const result = await post('webauthn-auth-verify', { userId, credential });
-  return result.customToken;
-};
-
 // ── Remove credential ─────────────────────────────────────────────────────────
 
 export const removeBiometricCredential = async (userId: string): Promise<void> => {
