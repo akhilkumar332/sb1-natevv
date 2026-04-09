@@ -121,6 +121,15 @@ export const useWebAuthn = (userId?: string | null) => {
         return null;
       }
       void captureHandledError(err, { source: 'frontend', scope: 'auth', metadata: { kind: 'webauthn.authenticate' } });
+      // If credential not found in Firestore (stale localStorage from old enrollment),
+      // clear local state so user can re-enroll
+      if (err?.message?.includes('Credential not found') || err?.message?.includes('404')) {
+        if (effectiveUserId) clearCredentialId(effectiveUserId);
+        setIsRegistered(false);
+        setNeedsReenroll(true);
+        setError('Biometric credential is outdated. Please re-enroll in Account settings or log in again.');
+        return null;
+      }
       setError(err?.message || 'Authentication failed.');
       return null;
     } finally {

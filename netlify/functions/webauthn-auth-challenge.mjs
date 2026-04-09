@@ -41,7 +41,30 @@ export const handler = async (event) => {
 
     let allowCredentials;
     if (providedCredentialId) {
-      allowCredentials = [{ id: providedCredentialId, type: 'public-key', transports: providedTransports }];
+      // Verify the provided credentialId actually exists in Firestore before using it
+      const credDoc = await db.collection('users').doc(userId).collection('webauthnCredentials').doc(providedCredentialId).get();
+      if (credDoc.exists) {
+        allowCredentials = [{ id: providedCredentialId, type: 'public-key', transports: providedTransports }];
+      } else {
+        // Stale localStorage — fall back to reading all credentials and signal client to clear
+        const credsSnap = await db.collection('users').doc(userId).collection('webauthnCredentials').get();
+        allowCredentials = credsSnap.docs.map((d) => ({
+          id: d.data().credentialId,
+          type: 'public-key',
+          transports: d.data().transports || [],
+        }));
+        // staleCredential flag tells client to clear its localStorage entry
+        const options = await generateAuthenticationOptions({ rpID: RP_ID, userVerification: 'required', allowCredentials });
+        await db.collection('users').doc(userId).collection('webauthnChallenges').doc('authentication').set({
+          challenge: options.challenge,
+          expiresAt: Date.now() + CHALLENGE_TTL_MS,
+        });
+        return {
+          statusCode: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...options, staleCredential: true }),
+        };
+      }
     } else {
       const credsSnap = await db.collection('users').doc(userId).collection('webauthnCredentials').get();
       allowCredentials = credsSnap.docs.map((d) => ({

@@ -155,6 +155,10 @@ export const authenticateWithBiometric = async (userId: string): Promise<string>
   const credentialId = getStoredCredentialId(userId) ?? undefined;
   const transports = credentialId ? getStoredTransports(userId) : undefined;
   const options = await post('webauthn-auth-challenge', { userId, credentialId, transports });
+  // Server detected stale localStorage entry — clear it
+  if (options.staleCredential && credentialId) {
+    clearCredentialId(userId);
+  }
   const credential = await startAuthentication({ optionsJSON: options });
   const result = await post('webauthn-auth-verify', { userId, credential });
   return result.customToken;
