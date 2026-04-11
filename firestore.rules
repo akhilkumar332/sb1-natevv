@@ -333,6 +333,10 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /webauthnChallenges/{challengeId} {
+      allow read, write: if false;
+    }
+
     // ========================================================================
     // COLLECTION: errorLogs
     // ========================================================================

@@ -2002,7 +2002,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch { /* ignore */ }
       // Set recentLoginRef so onAuthStateChanged takes the fast path (no Firestore read)
       const cachedUser = readCachedUser();
-      const userForCache = (cachedUser?.uid === uid ? cachedUser : null) ?? userRef.current ?? null;
+      const currentUser = userRef.current;
+      const userForCache = (cachedUser?.uid === uid ? cachedUser : null)
+        ?? (currentUser?.uid === uid ? currentUser : null);
       if (userForCache) {
         recentLoginRef.current = { uid, at: Date.now(), user: userForCache };
       }

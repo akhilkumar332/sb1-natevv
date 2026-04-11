@@ -28,10 +28,23 @@ export interface WebAuthnCredential {
   publicKey: string;          // base64url COSE key
   counter: number;
   deviceType: 'platform' | 'cross-platform';
+  backedUp?: boolean;
   transports: string[];
   createdAt: Timestamp;
   lastUsedAt: Timestamp;
   userAgent: string;
+}
+
+export interface WebAuthnChallenge {
+  challenge: string;
+  type: 'registration' | 'authentication';
+  userId?: string | null;
+  rpId: string;
+  origin?: string | null;
+  credentialId?: string | null;
+  createdAt: number;
+  expiresAt: number;
+  metadata?: Record<string, unknown> | null;
 }
 
 // ============================================================================

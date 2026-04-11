@@ -7,6 +7,7 @@ import DonorLogin from '../DonorLogin';
 const {
   useAuthMock,
   useLoginMock,
+  useWebAuthnMock,
   notifySuccessMock,
   notifyFromErrorMock,
   navigateMock,
@@ -14,6 +15,7 @@ const {
 } = vi.hoisted(() => ({
   useAuthMock: vi.fn(),
   useLoginMock: vi.fn(),
+  useWebAuthnMock: vi.fn(),
   notifySuccessMock: vi.fn(),
   notifyFromErrorMock: vi.fn(),
   navigateMock: vi.fn(),
@@ -35,6 +37,10 @@ vi.mock('../../../contexts/AuthContext', () => ({
 
 vi.mock('../../../hooks/useLogin', () => ({
   useLogin: () => useLoginMock(),
+}));
+
+vi.mock('../../../hooks/useWebAuthn', () => ({
+  useWebAuthn: () => useWebAuthnMock(),
 }));
 
 vi.mock('../../../hooks/useOtpResendTimer', () => ({
@@ -107,6 +113,17 @@ describe('DonorLogin', () => {
       handleOTPSubmit: vi.fn(),
       handleResendOTP: vi.fn(),
       handleGoogleLogin: vi.fn(),
+    });
+    useWebAuthnMock.mockReturnValue({
+      isSupported: false,
+      supportsAutofill: false,
+      canAuthenticate: false,
+      isReady: true,
+      loading: false,
+      error: null,
+      needsReenroll: false,
+      biometricLabel: 'Fingerprint',
+      authenticate: vi.fn(),
     });
   });
 
@@ -183,5 +200,81 @@ describe('DonorLogin', () => {
 
     expect(clearPendingContinuationMock).toHaveBeenCalledTimes(1);
     expect(navigateMock).toHaveBeenCalledWith('/donor/dashboard/requests?pendingRequest=1');
+  });
+
+  it('shows biometric login when capability is available without viewport gating', () => {
+    useAuthMock.mockReturnValue({
+      user: null,
+      isSuperAdmin: false,
+      setPortalRole: vi.fn(),
+      startImpersonation: vi.fn(),
+      impersonationSession: null,
+      isImpersonating: false,
+      impersonationTransition: null,
+      effectiveRole: null,
+      profileResolved: true,
+      startPhoneLink: vi.fn(),
+      confirmPhoneLink: vi.fn(),
+      pendingPhoneLinkContinuation: null,
+      clearPendingPhoneLinkContinuation: vi.fn(),
+      loginWithBiometric: vi.fn(),
+    });
+    useWebAuthnMock.mockReturnValue({
+      isSupported: true,
+      supportsAutofill: false,
+      canAuthenticate: true,
+      isReady: true,
+      loading: false,
+      error: null,
+      needsReenroll: false,
+      biometricLabel: 'Touch ID',
+      authenticate: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter>
+        <DonorLogin />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('button', { name: 'Login with Touch ID' })).toBeInTheDocument();
+  });
+
+  it('shows biometric login when browser autofill support exists without platform authenticator support', () => {
+    useAuthMock.mockReturnValue({
+      user: null,
+      isSuperAdmin: false,
+      setPortalRole: vi.fn(),
+      startImpersonation: vi.fn(),
+      impersonationSession: null,
+      isImpersonating: false,
+      impersonationTransition: null,
+      effectiveRole: null,
+      profileResolved: true,
+      startPhoneLink: vi.fn(),
+      confirmPhoneLink: vi.fn(),
+      pendingPhoneLinkContinuation: null,
+      clearPendingPhoneLinkContinuation: vi.fn(),
+      loginWithBiometric: vi.fn(),
+    });
+    useWebAuthnMock.mockReturnValue({
+      isSupported: false,
+      supportsAutofill: true,
+      canAuthenticate: true,
+      isReady: true,
+      loading: false,
+      error: null,
+      needsReenroll: false,
+      biometricLabel: 'Biometrics',
+      authenticate: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter>
+        <DonorLogin />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('button', { name: 'Login with Biometrics' })).toBeInTheDocument();
   });
 });

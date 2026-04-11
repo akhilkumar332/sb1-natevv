@@ -33,7 +33,6 @@ import {
 import { buildGeocodeLocationPatch, buildSuggestionLocationUpdate } from '../../../utils/locationController';
 import { updateUserNotificationPreferences } from '../../../services/offlineMutationOutbox.service';
 import { useWebAuthn } from '../../../hooks/useWebAuthn';
-import { useViewport } from '../../../hooks/useViewport';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -153,7 +152,6 @@ const DonorAccount = () => {
     unsubscribe,
   } = usePushNotifications();
 
-  const { isMobileOrTablet } = useViewport();
   const {
     isSupported: biometricSupported,
     isRegistered: biometricRegistered,
@@ -168,14 +166,23 @@ const DonorAccount = () => {
     removeCredentialById: removeBiometricById,
   } = useWebAuthn(user?.uid ?? null);
 
+  const currentBiometricCredential = biometricCredentials.find((cred) => cred.isCurrentDevice) ?? null;
+  const isCurrentCredentialSynced = Boolean(currentBiometricCredential?.backedUp);
+
   const handleBiometricEnable = async () => {
     const ok = await registerBiometric();
     if (ok) notify.success(`${biometricLabel} login enabled!`);
   };
 
   const handleBiometricDisable = async () => {
-    await removeBiometric();
-    notify.success(`${biometricLabel} login disabled.`);
+    const ok = await removeBiometric();
+    if (ok) {
+      notify.success(
+        isCurrentCredentialSynced
+          ? `${biometricLabel} passkey removed.`
+          : `${biometricLabel} login disabled.`,
+      );
+    }
   };
 
   const emailTarget = user?.email?.trim().toLowerCase() || '';
@@ -1287,8 +1294,8 @@ const DonorAccount = () => {
           )}
         </div>
 
-        {/* Biometric Login — mobile/tablet only */}
-        {isMobileOrTablet && biometricReady && biometricSupported && (
+        {/* Biometric Login */}
+        {biometricReady && biometricSupported && (
           <div className="bg-white rounded-2xl shadow-xl p-6">
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -1348,6 +1355,11 @@ const DonorAccount = () => {
                     Synced credentials work across your devices via Google Password Manager or iCloud Keychain.
                   </p>
                 )}
+                {isCurrentCredentialSynced && (
+                  <p className="text-[11px] text-amber-600 px-1">
+                    Removing the current synced passkey will also stop login on other devices using the same passkey.
+                  </p>
+                )}
               </div>
             ) : null}
 
@@ -1370,7 +1382,11 @@ const DonorAccount = () => {
                 disabled={biometricLoading}
                 className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
-                {biometricLoading ? 'Removing…' : `Disable on this device`}
+                {biometricLoading
+                  ? 'Removing…'
+                  : isCurrentCredentialSynced
+                    ? `Remove this ${biometricLabel} passkey`
+                    : 'Disable on this device'}
               </button>
             )}
           </div>

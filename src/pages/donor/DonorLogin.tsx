@@ -22,7 +22,6 @@ import { authFlowMessages, authInputMessages, validateGeneralPhoneInput, getOtpV
 import { useWebAuthn } from '../../hooks/useWebAuthn';
 import { BiometricLoginButton } from '../../components/auth/BiometricLoginButton';
 import { warmupBiometricFunctions, prefetchAuthChallenge } from '../../services/webauthn.service';
-import { useViewport } from '../../hooks/useViewport';
 
 export function DonorLogin() {
   const { t } = useTranslation();
@@ -102,12 +101,11 @@ export function DonorLogin() {
     navigate(onboardingTarget);
   }, [location.search, navigate, t]);
 
-  const { isMobileOrTablet } = useViewport();
-
-  // Biometric login — mobile/tablet only
+  // Biometric login
   const {
     isSupported: biometricSupported,
-    isRegistered: biometricRegistered,
+    supportsAutofill: biometricSupportsAutofill,
+    canAuthenticate: biometricCanAuthenticate,
     isReady: biometricReady,
     loading: biometricLoading,
     error: biometricError,
@@ -116,28 +114,60 @@ export function DonorLogin() {
     authenticate: authenticateBiometric,
   } = useWebAuthn(user?.uid ?? null);
 
-  // Prefetch auth challenge + pre-warm functions when biometric is ready (mobile/tablet only)
+  // Prefetch auth challenge + pre-warm functions when biometric is ready
   const biometricNavigatingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prefetchedRef = useRef(false);
+  const prefetchedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isMobileOrTablet || !biometricReady || !biometricRegistered) return;
+    if (!biometricReady || !biometricCanAuthenticate) return;
     const effectiveUid = user?.uid ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('bh_wauthn_last_uid') : null);
-    if (!effectiveUid) return;
+    const cacheKey = effectiveUid || 'usernameless';
 
-    if (!prefetchedRef.current) {
-      prefetchedRef.current = true;
+    if (prefetchedKeyRef.current !== cacheKey) {
+      prefetchedKeyRef.current = cacheKey;
       void prefetchAuthChallenge(effectiveUid);
       warmupBiometricFunctions();
     }
-  }, [isMobileOrTablet, biometricReady, biometricRegistered, user?.uid]);
+  }, [biometricCanAuthenticate, biometricReady, user?.uid]);
+
+  // Handle Conditional UI (autofill)
+  const autofillTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (!biometricReady || !biometricSupportsAutofill || autofillTriggeredRef.current) return;
+    if (biometricLoading || authLoading || biometricNavigating) return;
+
+    autofillTriggeredRef.current = true;
+    void authenticateBiometric({ mediation: 'conditional' }).then(async (result) => {
+      if (result?.customToken) {
+        try {
+          setBiometricNavigating(true);
+          await loginWithBiometric(result.customToken);
+          showLoginSuccessToastRef.current = true;
+          biometricNavigatingTimerRef.current = setTimeout(() => setBiometricNavigating(false), 10000);
+        } catch {
+          setBiometricNavigating(false);
+          autofillTriggeredRef.current = false;
+        }
+      } else {
+        autofillTriggeredRef.current = false;
+      }
+    });
+  }, [
+    biometricReady,
+    biometricSupportsAutofill,
+    biometricLoading,
+    authLoading,
+    biometricNavigating,
+    authenticateBiometric,
+    loginWithBiometric,
+  ]);
 
   const handleBiometricLogin = useCallback(async () => {
-    const customToken = await authenticateBiometric();
-    if (!customToken) return;
+    const result = await authenticateBiometric();
+    if (!result?.customToken) return;
     try {
       setBiometricNavigating(true);
-      await loginWithBiometric(customToken);
+      await loginWithBiometric(result.customToken);
       showLoginSuccessToastRef.current = true;
       // Safety timeout — reset if navigation doesn't fire within 10s
       biometricNavigatingTimerRef.current = setTimeout(() => setBiometricNavigating(false), 10000);
@@ -374,7 +404,11 @@ export function DonorLogin() {
             countryCallingCodeEditable={false}
             value={formData.identifier}
             onChange={(value) => handleIdentifierChange(value || '')}
-            inputProps={{ autoComplete: 'webauthn' }}
+            inputProps={{
+              id: 'identifier',
+              name: 'identifier',
+              autoComplete: 'username webauthn',
+            }}
             className="block w-full rounded-xl border-2 border-gray-200 px-4 py-3 transition-colors focus:border-red-500 focus:outline-none [&_.PhoneInputInput]:bg-white [&_.PhoneInputInput]:text-gray-900 [&_.PhoneInputInput]:outline-none [&_.PhoneInputInput]:placeholder:text-gray-400 dark:[&_.PhoneInputInput]:bg-white dark:[&_.PhoneInputInput]:text-gray-900"
           />
           <Phone className="absolute right-4 top-3.5 h-5 w-5 text-gray-400" />
@@ -677,7 +711,7 @@ export function DonorLogin() {
                     </div>
                   </div>
 
-                  {isMobileOrTablet && biometricSupported && biometricRegistered && (
+                  {(biometricSupported || biometricSupportsAutofill) && biometricCanAuthenticate && (
                     <BiometricLoginButton
                       loading={biometricLoading || authLoading || biometricNavigating}
                       error={biometricError}

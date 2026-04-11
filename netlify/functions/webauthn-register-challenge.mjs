@@ -1,67 +1,72 @@
-// netlify/functions/webauthn-register-challenge.mjs
-import { webcrypto } from 'crypto';
-if (!globalThis.crypto) globalThis.crypto = webcrypto;
 import admin from 'firebase-admin';
 import { generateRegistrationOptions } from '@simplewebauthn/server';
-
-const RP_NAME = 'BloodHub';
-const RP_ID = 'bloodhub.in';
-const CHALLENGE_TTL_MS = 5 * 60 * 1000;
-
-const initAdmin = () => {
-  if (admin.apps.length) return;
-  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || process.env.VITE_FIREBASE_CLIENT_EMAIL;
-  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || process.env.VITE_FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
-  if (!projectId || !clientEmail || !privateKey) throw new Error('Missing Firebase Admin credentials.');
-  admin.initializeApp({ credential: admin.credential.cert({ projectId, clientEmail, privateKey }) });
-};
-
-const getAuthToken = (headers) => {
-  const h = headers?.authorization || headers?.Authorization || '';
-  const m = String(h).match(/^Bearer\s+(.+)$/i);
-  return m ? m[1] : null;
-};
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+import {
+  RP_NAME,
+  initAdmin,
+  getBearerToken,
+  parseJsonBody,
+  baseCorsHeaders,
+  jsonResponse,
+  createChallengeRecord,
+  resolveRequestOrigin,
+  resolveRpId,
+} from './_webauthn.mjs';
 
 export const handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: corsHeaders, body: '' };
-  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: baseCorsHeaders, body: '' };
+  }
 
-  const idToken = getAuthToken(event.headers || {});
-  if (!idToken) return { statusCode: 401, body: JSON.stringify({ error: 'Missing auth token' }) };
+  if (event.httpMethod !== 'POST') {
+    return jsonResponse(405, { error: 'Method Not Allowed' });
+  }
 
-  let payload;
-  try { payload = JSON.parse(event.body || '{}'); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
+  const idToken = getBearerToken(event.headers || {});
+  if (!idToken) {
+    return jsonResponse(401, { error: 'Missing auth token' });
+  }
 
-  const userId = typeof payload?.userId === 'string' ? payload.userId.trim() : '';
-  if (!userId) return { statusCode: 400, body: JSON.stringify({ error: 'Missing userId' }) };
+  const payload = parseJsonBody(event.body);
+  if (!payload) {
+    return jsonResponse(400, { error: 'Invalid JSON' });
+  }
+
+  const userId = typeof payload.userId === 'string' ? payload.userId.trim() : '';
+  if (!userId) {
+    return jsonResponse(400, { error: 'Missing userId' });
+  }
 
   try {
     initAdmin();
     const decoded = await admin.auth().verifyIdToken(idToken);
-    if (decoded.uid !== userId) return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
+    if (decoded.uid !== userId) {
+      return jsonResponse(403, { error: 'Forbidden' });
+    }
 
     const db = admin.firestore();
+    const origin = resolveRequestOrigin(event.headers || {});
+    const rpId = resolveRpId(origin);
     const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) return { statusCode: 404, body: JSON.stringify({ error: 'User not found' }) };
-    const userData = userDoc.data() || {};
+    if (!userDoc.exists) {
+      return jsonResponse(404, { error: 'User not found' });
+    }
 
-    const existingSnap = await db.collection('users').doc(userId).collection('webauthnCredentials').get();
-    const excludeCredentials = existingSnap.docs.map((d) => ({
-      id: d.data().credentialId,
+    const userData = userDoc.data() || {};
+    const existingSnap = await db
+      .collection('users')
+      .doc(userId)
+      .collection('webauthnCredentials')
+      .get();
+
+    const excludeCredentials = existingSnap.docs.map((docSnapshot) => ({
+      id: docSnapshot.data().credentialId,
       type: 'public-key',
-      transports: d.data().transports || [],
+      transports: docSnapshot.data().transports || [],
     }));
 
     const options = await generateRegistrationOptions({
       rpName: RP_NAME,
-      rpID: RP_ID,
+      rpID: rpId,
       userID: new TextEncoder().encode(userId),
       userName: userData.phoneNumber || userData.email || userId,
       userDisplayName: userData.displayName || userData.phoneNumber || userId,
@@ -74,18 +79,21 @@ export const handler = async (event) => {
       excludeCredentials,
     });
 
-    await db.collection('users').doc(userId).collection('webauthnChallenges').doc('registration').set({
+    const challengeId = await createChallengeRecord({
+      db,
+      type: 'registration',
+      userId,
       challenge: options.challenge,
-      expiresAt: Date.now() + CHALLENGE_TTL_MS,
+      rpId,
+      origin,
+      metadata: {
+        route: 'webauthn-register-challenge',
+      },
     });
 
-    return {
-      statusCode: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify(options),
-    };
+    return jsonResponse(200, { challengeId, options });
   } catch (err) {
     console.error('webauthn-register-challenge error:', err);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: err.message || 'Internal error' }) };
+    return jsonResponse(500, { error: err?.message || 'Internal error' });
   }
 };

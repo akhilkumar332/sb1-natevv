@@ -1,97 +1,112 @@
-// netlify/functions/webauthn-auth-challenge.mjs
-import { webcrypto } from 'crypto';
-if (!globalThis.crypto) globalThis.crypto = webcrypto;
 import admin from 'firebase-admin';
 import { generateAuthenticationOptions } from '@simplewebauthn/server';
+import {
+  initAdmin,
+  parseJsonBody,
+  baseCorsHeaders,
+  jsonResponse,
+  createChallengeRecord,
+  resolveRequestOrigin,
+  resolveRpId,
+} from './_webauthn.mjs';
 
-const RP_ID = 'bloodhub.in';
-const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+const normalizeTransports = (value) => (
+  Array.isArray(value)
+    ? value.filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim())
+    : []
+);
 
-const initAdmin = () => {
-  if (admin.apps.length) return;
-  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || process.env.VITE_FIREBASE_CLIENT_EMAIL;
-  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || process.env.VITE_FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
-  if (!projectId || !clientEmail || !privateKey) throw new Error('Missing Firebase Admin credentials.');
-  admin.initializeApp({ credential: admin.credential.cert({ projectId, clientEmail, privateKey }) });
-};
+const resolveCredentialOwner = async (db, credentialId) => {
+  const matches = await db
+    .collectionGroup('webauthnCredentials')
+    .where('credentialId', '==', credentialId)
+    .limit(2)
+    .get();
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  if (matches.empty) {
+    return null;
+  }
+
+  if (matches.size > 1) {
+    throw new Error('Duplicate credentialId detected');
+  }
+
+  const credentialDoc = matches.docs[0];
+  const resolvedUserId = credentialDoc.ref.parent.parent?.id || null;
+  if (!resolvedUserId) {
+    throw new Error('Unable to resolve credential owner');
+  }
+
+  return {
+    userId: resolvedUserId,
+    data: credentialDoc.data() || {},
+  };
 };
 
 export const handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: corsHeaders, body: '' };
-  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method Not Allowed' }) };
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers: baseCorsHeaders, body: '' };
+  }
 
-  let payload;
-  try { payload = JSON.parse(event.body || '{}'); } catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
+  if (event.httpMethod !== 'POST') {
+    return jsonResponse(405, { error: 'Method Not Allowed' });
+  }
 
-  const userId = typeof payload?.userId === 'string' ? payload.userId.trim() : '';
-  if (!userId) return { statusCode: 400, body: JSON.stringify({ error: 'Missing userId' }) };
+  const payload = parseJsonBody(event.body);
+  if (!payload) {
+    return jsonResponse(400, { error: 'Invalid JSON' });
+  }
+
+  const providedCredentialId = typeof payload.credentialId === 'string' ? payload.credentialId.trim() : '';
+  const providedTransports = normalizeTransports(payload.transports);
 
   try {
     initAdmin();
     const db = admin.firestore();
+    const origin = resolveRequestOrigin(event.headers || {});
+    const rpId = resolveRpId(origin);
 
-    const providedCredentialId = typeof payload?.credentialId === 'string' ? payload.credentialId.trim() : null;
-    const providedTransports = Array.isArray(payload?.transports) ? payload.transports : [];
-
+    let resolvedUserId = null;
     let allowCredentials;
+    let staleCredential = false;
+
     if (providedCredentialId) {
-      // Verify the provided credentialId actually exists in Firestore before using it
-      const credDoc = await db.collection('users').doc(userId).collection('webauthnCredentials').doc(providedCredentialId).get();
-      if (credDoc.exists) {
-        allowCredentials = [{ id: providedCredentialId, type: 'public-key', transports: providedTransports }];
-      } else {
-        // Stale localStorage — fall back to reading all credentials and signal client to clear
-        const credsSnap = await db.collection('users').doc(userId).collection('webauthnCredentials').get();
-        allowCredentials = credsSnap.docs.map((d) => ({
-          id: d.data().credentialId,
+      const owner = await resolveCredentialOwner(db, providedCredentialId);
+      if (owner) {
+        resolvedUserId = owner.userId;
+        allowCredentials = [{
+          id: providedCredentialId,
           type: 'public-key',
-          transports: d.data().transports || [],
-        }));
-        // staleCredential flag tells client to clear its localStorage entry
-        const options = await generateAuthenticationOptions({ rpID: RP_ID, userVerification: 'required', allowCredentials });
-        await db.collection('users').doc(userId).collection('webauthnChallenges').doc('authentication').set({
-          challenge: options.challenge,
-          expiresAt: Date.now() + CHALLENGE_TTL_MS,
-        });
-        return {
-          statusCode: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...options, staleCredential: true }),
-        };
+          transports: providedTransports,
+        }];
+      } else {
+        staleCredential = true;
       }
-    } else {
-      const credsSnap = await db.collection('users').doc(userId).collection('webauthnCredentials').get();
-      allowCredentials = credsSnap.docs.map((d) => ({
-        id: d.data().credentialId,
-        type: 'public-key',
-        transports: d.data().transports || [],
-      }));
     }
 
     const options = await generateAuthenticationOptions({
-      rpID: RP_ID,
+      rpID: rpId,
       userVerification: 'required',
-      allowCredentials,
+      ...(allowCredentials && allowCredentials.length ? { allowCredentials } : {}),
     });
 
-    await db.collection('users').doc(userId).collection('webauthnChallenges').doc('authentication').set({
+    const challengeId = await createChallengeRecord({
+      db,
+      type: 'authentication',
+      userId: resolvedUserId,
       challenge: options.challenge,
-      expiresAt: Date.now() + CHALLENGE_TTL_MS,
+      rpId,
+      origin,
+      credentialId: providedCredentialId || null,
+      metadata: {
+        route: 'webauthn-auth-challenge',
+        usernameless: !resolvedUserId,
+      },
     });
 
-    return {
-      statusCode: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify(options),
-    };
+    return jsonResponse(200, { challengeId, options, staleCredential });
   } catch (err) {
     console.error('webauthn-auth-challenge error:', err);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: err.message || 'Internal error' }) };
+    return jsonResponse(500, { error: err?.message || 'Internal error' });
   }
 };

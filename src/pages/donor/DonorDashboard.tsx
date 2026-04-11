@@ -50,7 +50,6 @@ import NpsFeedbackPrompt from '../../components/shared/NpsFeedbackPrompt';
 import { useWebAuthn } from '../../hooks/useWebAuthn';
 import { BiometricEnrollPrompt } from '../../components/auth/BiometricEnrollPrompt';
 import { isWebAuthnSupported, getStoredCredentialId, getLastEnrolledUserId } from '../../services/webauthn.service';
-import { useViewport } from '../../hooks/useViewport';
 import { notifyKeepOneLoginMethod, notifySelfRequestBlocked } from '../../utils/validationFeedback';
 import { useScopedErrorReporter } from '../../hooks/useScopedErrorReporter';
 import { usePageVisibility } from '../../hooks/usePageVisibility';
@@ -99,9 +98,8 @@ function DonorDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const isPageVisible = usePageVisibility();
-  const { isMobileOrTablet } = useViewport();
 
-  // Biometric enroll prompt — shown once after login on dashboard (mobile/tablet only)
+  // Biometric enroll prompt — shown once after login on dashboard
   const {
     isReady: biometricReady,
     isRegistered: biometricRegistered,
@@ -110,6 +108,7 @@ function DonorDashboard() {
     biometricLabel,
     register: registerBiometric,
     dismissEnrollPrompt,
+    canShowEnrollPrompt,
   } = useWebAuthn(user?.uid ?? null);
   const [showEnrollPrompt, setShowEnrollPrompt] = useState(false);
   const enrollPromptShownRef = useRef(false);
@@ -118,8 +117,7 @@ function DonorDashboard() {
   // user just logged in, AND is not already registered on this device
   useEffect(() => {
     if (!biometricReady) return;
-    if (!isMobileOrTablet) return;
-    if (!isWebAuthnSupported()) return;
+    if (!canShowEnrollPrompt || !isWebAuthnSupported()) return;
     if (enrollPromptShownRef.current) return;
     if (sessionStorage.getItem('bh_just_logged_in') !== '1') return;
     const alreadyRegistered = biometricRegistered
@@ -132,7 +130,7 @@ function DonorDashboard() {
     sessionStorage.removeItem('bh_just_logged_in');
     setShowEnrollPrompt(true);
     window.scrollTo({ top: 0, behavior: 'instant' });
-  }, [biometricReady, biometricRegistered, isMobileOrTablet, user?.uid]);
+  }, [biometricReady, biometricRegistered, canShowEnrollPrompt, user?.uid]);
 
   const handleEnrollBiometric = useCallback(async () => {
     const ok = await registerBiometric();
@@ -2609,7 +2607,7 @@ function DonorDashboard() {
             </div>
           </aside>
           <main className="min-w-0 flex-1">
-            {showEnrollPrompt && isMobileOrTablet && (
+            {showEnrollPrompt && (
               <BiometricEnrollPrompt
                 loading={biometricLoading}
                 label={biometricLabel}

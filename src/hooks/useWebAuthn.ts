@@ -1,8 +1,8 @@
-// src/hooks/useWebAuthn.ts
 import { useState, useEffect, useCallback } from 'react';
 import {
   isWebAuthnSupported,
   isPlatformAuthenticatorAvailable,
+  isWebAuthnAutofillSupported,
   getBiometricLabel,
   getStoredCredentialId,
   getLastEnrolledUserId,
@@ -20,9 +20,28 @@ import { captureHandledError } from '../services/errorLog.service';
 
 export type { StoredCredential };
 
+const isLikelyCancellationError = (error: any): boolean => (
+  error?.name === 'NotAllowedError'
+  || error?.code === 'ERROR_CEREMONY_ABORTED'
+  || error?.message?.toLowerCase?.().includes('timed out')
+  || error?.message?.toLowerCase?.().includes('cancel')
+);
+
+const isStaleCredentialError = (error: any): boolean => {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('credential not found')
+    || message.includes('unknown credential')
+    || message.includes('no passkeys available')
+    || message.includes('404');
+};
+
 export const useWebAuthn = (userId?: string | null) => {
   const [isSupported, setIsSupported] = useState(false);
+  const [supportsAutofill, setSupportsAutofill] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [localEnrolledUserId, setLocalEnrolledUserId] = useState<string | null>(() => (
+    userId ?? getLastEnrolledUserId()
+  ));
   const [isRegistered, setIsRegistered] = useState(false);
   const [credentials, setCredentials] = useState<StoredCredential[]>([]);
   const [credentialsLoading, setCredentialsLoading] = useState(false);
@@ -30,19 +49,49 @@ export const useWebAuthn = (userId?: string | null) => {
   const [error, setError] = useState<string | null>(null);
   const [needsReenroll, setNeedsReenroll] = useState(false);
 
-  const effectiveUserId = userId ?? getLastEnrolledUserId();
+  const effectiveUserId = userId ?? localEnrolledUserId;
   const biometricLabel = getBiometricLabel();
 
   useEffect(() => {
-    if (!isWebAuthnSupported()) { setIsReady(true); return; }
-    isPlatformAuthenticatorAvailable()
-      .then((available) => { setIsSupported(available); })
-      .catch(() => { setIsSupported(false); })
-      .finally(() => { setIsReady(true); });
+    if (userId) {
+      setLocalEnrolledUserId(userId);
+      return;
+    }
+    setLocalEnrolledUserId(getLastEnrolledUserId());
+  }, [userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCapabilities = async () => {
+      if (!isWebAuthnSupported()) {
+        if (!cancelled) setIsReady(true);
+        return;
+      }
+
+      const [platformAvailable, autofillAvailable] = await Promise.all([
+        isPlatformAuthenticatorAvailable().catch(() => false),
+        isWebAuthnAutofillSupported().catch(() => false),
+      ]);
+
+      if (cancelled) return;
+      setIsSupported(platformAvailable);
+      setSupportsAutofill(autofillAvailable);
+      setIsReady(true);
+    };
+
+    void loadCapabilities();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (!effectiveUserId) { setIsRegistered(false); return; }
+    if (!effectiveUserId) {
+      setIsRegistered(false);
+      return;
+    }
     setIsRegistered(Boolean(getStoredCredentialId(effectiveUserId)));
   }, [effectiveUserId]);
 
@@ -52,26 +101,28 @@ export const useWebAuthn = (userId?: string | null) => {
     try {
       const list = await fetchCredentials(userId);
       setCredentials(list);
-      // Only sync localStorage if fetch succeeded — don't clear on network failure
+
       const currentId = getStoredCredentialId(userId);
       if (currentId) {
-        const stillExists = list.some((c) => c.credentialId === currentId);
+        const stillExists = list.some((credential) => credential.credentialId === currentId);
         if (!stillExists) {
           clearCredentialId(userId);
           setIsRegistered(false);
         }
       } else {
-        setIsRegistered(list.some((c) => c.isCurrentDevice));
+        setIsRegistered(list.some((credential) => credential.isCurrentDevice));
       }
     } catch {
-      // Silently ignore — don't clear localStorage on fetch failure (could be offline)
+      // keep local state intact on transient failures
     } finally {
       setCredentialsLoading(false);
     }
   }, [userId]);
 
   useEffect(() => {
-    if (userId) refreshCredentials();
+    if (userId) {
+      void refreshCredentials();
+    }
   }, [userId, refreshCredentials]);
 
   const register = useCallback(async (): Promise<boolean> => {
@@ -79,110 +130,168 @@ export const useWebAuthn = (userId?: string | null) => {
     setLoading(true);
     setError(null);
     setNeedsReenroll(false);
+
     try {
       await registerBiometric(userId);
       setIsRegistered(true);
       await refreshCredentials();
       return true;
     } catch (err: any) {
-      if (err?.name === 'NotAllowedError') {
+      if (isLikelyCancellationError(err)) {
         setError('Biometric prompt was cancelled.');
         return false;
       }
+
       if (err?.name === 'InvalidStateError') {
-        // Credential already exists on device (e.g. synced via passkey manager) — treat as enrolled
         setIsRegistered(true);
         await refreshCredentials().catch(() => {});
         return true;
       }
-      void captureHandledError(err, { source: 'frontend', scope: 'auth', metadata: { kind: 'webauthn.register' } });
+
+      void captureHandledError(err, {
+        source: 'frontend',
+        scope: 'auth',
+        metadata: { kind: 'webauthn.register' },
+      });
       setError(err?.message || 'Registration failed.');
       return false;
     } finally {
       setLoading(false);
     }
-  }, [userId, refreshCredentials]);
+  }, [refreshCredentials, userId]);
 
-  const authenticate = useCallback(async (): Promise<string | null> => {
-    if (!effectiveUserId) return null;
+  const authenticate = useCallback(async (options?: {
+    mediation?: 'conditional' | 'required' | 'optional';
+  }): Promise<{ customToken: string; userId: string | null } | null> => {
     setLoading(true);
     setError(null);
+
     try {
-      const customToken = await authenticateWithBiometric(effectiveUserId);
+      const result = await authenticateWithBiometric(effectiveUserId, options?.mediation);
+      const resolvedUserId = result.userId ?? effectiveUserId;
+      if (!userId) {
+        setLocalEnrolledUserId(resolvedUserId ?? getLastEnrolledUserId());
+      }
+      if (resolvedUserId) {
+        setIsRegistered(Boolean(getStoredCredentialId(resolvedUserId)));
+      }
       setNeedsReenroll(false);
-      return customToken;
+      return result;
     } catch (err: any) {
-      if (err?.name === 'NotAllowedError') {
-        // If registered but NotAllowedError → credential likely deleted from device
-        if (isRegistered) setNeedsReenroll(true);
-        setError(isRegistered
-          ? 'Biometric data was removed from this device. Re-enroll in Account settings.'
-          : 'Biometric prompt was cancelled.');
+      if (isLikelyCancellationError(err)) {
+        // Only show error for non-conditional mediation
+        if (options?.mediation !== 'conditional') {
+          setError('Biometric prompt was cancelled.');
+        }
         return null;
       }
-      void captureHandledError(err, { source: 'frontend', scope: 'auth', metadata: { kind: 'webauthn.authenticate' } });
-      // If credential not found in Firestore (stale localStorage from old enrollment),
-      // clear local state so user can re-enroll
-      if (err?.message?.includes('Credential not found') || err?.message?.includes('404')) {
-        if (effectiveUserId) clearCredentialId(effectiveUserId);
+
+      if (isStaleCredentialError(err)) {
+        if (effectiveUserId) {
+          clearCredentialId(effectiveUserId);
+        }
+        if (!userId) {
+          setLocalEnrolledUserId(getLastEnrolledUserId());
+        }
         setIsRegistered(false);
         setNeedsReenroll(true);
         setError('Biometric credential is outdated. Please re-enroll in Account settings or log in again.');
         return null;
       }
+
+      void captureHandledError(err, {
+        source: 'frontend',
+        scope: 'auth',
+        metadata: {
+          kind: 'webauthn.authenticate',
+          mediation: options?.mediation,
+        },
+      });
       setError(err?.message || 'Authentication failed.');
       return null;
     } finally {
       setLoading(false);
     }
-  }, [effectiveUserId, isRegistered]);
+  }, [effectiveUserId, userId]);
 
-  const removeCredential = useCallback(async (): Promise<void> => {
-    if (!effectiveUserId) return;
+  const removeCredential = useCallback(async (): Promise<boolean> => {
+    if (!effectiveUserId) return false;
     setLoading(true);
     setError(null);
+
     try {
       await removeBiometricCredential(effectiveUserId);
+      if (!userId) {
+        setLocalEnrolledUserId(getLastEnrolledUserId());
+      }
       setIsRegistered(false);
       setNeedsReenroll(false);
       await refreshCredentials();
+      return true;
     } catch (err: any) {
-      void captureHandledError(err, { source: 'frontend', scope: 'auth', metadata: { kind: 'webauthn.remove' } });
+      void captureHandledError(err, {
+        source: 'frontend',
+        scope: 'auth',
+        metadata: { kind: 'webauthn.remove' },
+      });
       setError(err?.message || 'Failed to remove credential.');
+      return false;
     } finally {
       setLoading(false);
     }
   }, [effectiveUserId, refreshCredentials]);
 
-  const removeCredentialByIdFn = useCallback(async (credentialId: string): Promise<void> => {
-    if (!userId) return;
+  const removeCredentialByIdFn = useCallback(async (credentialId: string): Promise<boolean> => {
+    if (!userId) return false;
     setLoading(true);
     setError(null);
+
     try {
       await removeCredentialById(userId, credentialId);
       await refreshCredentials();
+      return true;
     } catch (err: any) {
-      void captureHandledError(err, { source: 'frontend', scope: 'auth', metadata: { kind: 'webauthn.remove' } });
+      void captureHandledError(err, {
+        source: 'frontend',
+        scope: 'auth',
+        metadata: { kind: 'webauthn.remove' },
+      });
       setError(err?.message || 'Failed to remove credential.');
+      return false;
     } finally {
       setLoading(false);
     }
-  }, [userId, refreshCredentials]);
+  }, [refreshCredentials, userId]);
 
   const dismissEnrollPrompt = useCallback((never = false) => {
-    if (userId && never) setNeverAsk(userId);
+    if (userId && never) {
+      setNeverAsk(userId);
+    }
   }, [userId]);
 
-  const canShowEnrollPrompt = isReady && Boolean(userId && isSupported && !isRegistered && !getNeverAsk(userId ?? ''));
+  const canShowEnrollPrompt = isReady
+    && Boolean(userId && isSupported && !isRegistered && !getNeverAsk(userId ?? ''));
+
+  const canAuthenticate = isReady
+    && Boolean(isSupported || supportsAutofill)
+    && Boolean(isRegistered || supportsAutofill || effectiveUserId);
 
   const forceRemoveLocal = useCallback(() => {
-    if (effectiveUserId) { clearCredentialId(effectiveUserId); setIsRegistered(false); }
-  }, [effectiveUserId]);
+    if (effectiveUserId) {
+      clearCredentialId(effectiveUserId);
+      if (!userId) {
+        setLocalEnrolledUserId(getLastEnrolledUserId());
+      }
+      setIsRegistered(false);
+    }
+  }, [effectiveUserId, userId]);
 
   return {
     isSupported,
+    supportsAutofill,
     isReady,
     isRegistered,
+    canAuthenticate,
     credentials,
     credentialsLoading,
     loading,
