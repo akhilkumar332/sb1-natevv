@@ -1244,22 +1244,22 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.services/adminUserDetail.service.ts:717",
+    "id": "USERS.updateDoc.services/adminUserDetail.service.ts:822",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "services",
     "path": "services/adminUserDetail.service.ts",
-    "line": 717,
+    "line": 822,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.services/adminUserDetail.service.ts:734",
+    "id": "USERS.updateDoc.services/adminUserDetail.service.ts:839",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "services",
     "path": "services/adminUserDetail.service.ts",
-    "line": 734,
+    "line": 839,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },

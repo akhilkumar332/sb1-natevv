@@ -12,13 +12,18 @@ import {
 import { type AdminKpiRange } from '../../../constants/adminQueryKeys';
 import {
   useAdminUserDetail,
+  useAdminUserBiometrics,
   useAdminUserKpis,
   useAdminUserReferrals,
   useAdminUserSecurity,
   useAdminUserTimeline,
 } from '../../../hooks/admin/useAdminQueries';
 import { monitoringService } from '../../../services/monitoring.service';
-import { revokeAllUserFcmTokens, revokeUserFcmToken } from '../../../services/adminUserDetail.service';
+import {
+  removeAdminUserBiometricCredential,
+  revokeAllUserFcmTokens,
+  revokeUserFcmToken,
+} from '../../../services/adminUserDetail.service';
 import type { UserStatus } from '../../../types/database.types';
 import ActionReasonModal from '../../../components/admin/ActionReasonModal';
 import UserDetailQuickActions from '../../../components/admin/UserDetailQuickActions';
@@ -35,13 +40,13 @@ import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { refetchQuery } from '../../../utils/queryRefetch';
 
-type DetailTab = 'profile' | 'security' | 'kpis' | 'referrals' | 'timeline';
-type PendingActionType = 'verify' | 'active' | 'suspended' | 'inactive' | 'revokeToken' | 'revokeAllTokens';
-type PendingAction = { type: PendingActionType; token?: string } | null;
+type DetailTab = 'profile' | 'security' | 'biometrics' | 'kpis' | 'referrals' | 'timeline';
+type PendingActionType = 'verify' | 'active' | 'suspended' | 'inactive' | 'revokeToken' | 'revokeAllTokens' | 'removeBiometric';
+type PendingAction = { type: PendingActionType; token?: string; credentialId?: string } | null;
 
 const PAGE_SIZE = 10;
 
-const tabs: Array<{ id: DetailTab; label: string }> = [
+const baseTabs: Array<{ id: DetailTab; label: string }> = [
   { id: 'profile', label: 'Profile' },
   { id: 'security', label: 'Security' },
   { id: 'kpis', label: 'KPI & Graphs' },
@@ -101,7 +106,14 @@ const actionConfig: Record<PendingActionType, { title: string; label: string; de
     label: 'Revoke All Tokens',
     description: 'This will revoke all active FCM tokens for this user.',
   },
+  removeBiometric: {
+    title: 'Confirm Remove Biometrics',
+    label: 'Remove Biometrics',
+    description: 'This will remove the selected biometric credential for this user.',
+  },
 };
+
+const formatListValue = (items: string[]) => (items.length > 0 ? items.join(', ') : 'N/A');
 
 function UserDetailPage() {
   const { uid } = useParams<{ uid: string }>();
@@ -112,9 +124,6 @@ function UserDetailPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const tabParam = searchParams.get('tab');
-  const activeTab: DetailTab = tabs.some((tab) => tab.id === tabParam)
-    ? (tabParam as DetailTab)
-    : 'profile';
   const [kpiRange, setKpiRange] = useState<AdminKpiRange>('90d');
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [executingAction, setExecutingAction] = useState(false);
@@ -133,6 +142,25 @@ function UserDetailPage() {
   const [timelinePage, setTimelinePage] = useState(1);
 
   const userQuery = useAdminUserDetail(safeUid);
+  const invalidRoute = !uid;
+  const user = userQuery.data;
+  const role = formatRole(user?.role);
+  const showBiometricsTab = role === 'donor';
+  const tabs = useMemo<Array<{ id: DetailTab; label: string }>>(
+    () => (
+      showBiometricsTab
+        ? [
+            baseTabs[0],
+            { id: 'biometrics', label: 'Biometrics' },
+            ...baseTabs.slice(1),
+          ]
+        : baseTabs
+    ),
+    [showBiometricsTab],
+  );
+  const activeTab: DetailTab = tabs.some((tab) => tab.id === tabParam)
+    ? (tabParam as DetailTab)
+    : 'profile';
   const securityQuery = useAdminUserSecurity(safeUid, {
     enabled: Boolean(safeUid) && activeTab === 'security',
   });
@@ -153,9 +181,12 @@ function UserDetailPage() {
     enabled: Boolean(safeUid) && activeTab === 'timeline',
   });
 
-  const invalidRoute = !uid;
-  const user = userQuery.data;
-  const role = formatRole(user?.role);
+  const biometricsQuery = useAdminUserBiometrics(safeUid, {
+    enabled: Boolean(safeUid) && activeTab === 'biometrics' && showBiometricsTab,
+  });
+  const waitingForBiometricsTabRoleResolution = tabParam === 'biometrics'
+    && !user?.role
+    && (userQuery.isLoading || userQuery.isFetching);
 
   const setActiveTab = (tab: DetailTab) => {
     const next = new URLSearchParams(searchParams);
@@ -172,17 +203,24 @@ function UserDetailPage() {
   }, [activeTab]);
 
   useEffect(() => {
+    if (waitingForBiometricsTabRoleResolution) return;
     if (!tabParam || tabs.some((tab) => tab.id === tabParam)) return;
     const next = new URLSearchParams(searchParams);
     next.set('tab', 'profile');
     setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams, tabParam]);
+  }, [searchParams, setSearchParams, tabParam, tabs, waitingForBiometricsTabRoleResolution]);
 
   useEffect(() => {
     if (activeTab !== 'security') return;
     refetchQuery(userQuery);
     refetchQuery(securityQuery);
   }, [activeTab, safeUid]);
+
+  useEffect(() => {
+    if (activeTab !== 'biometrics' || !showBiometricsTab) return;
+    refetchQuery(userQuery);
+    refetchQuery(biometricsQuery);
+  }, [activeTab, safeUid, showBiometricsTab]);
 
   const canModify = useMemo(() => {
     if (!authUser?.uid || !user?.uid) return false;
@@ -282,6 +320,14 @@ function UserDetailPage() {
   const referrals = referralsQuery.data || [];
   const referralTotalPages = Math.max(1, Math.ceil(referrals.length / PAGE_SIZE));
   const pagedReferrals = referrals.slice((referralPage - 1) * PAGE_SIZE, referralPage * PAGE_SIZE);
+  const biometricCredentials = biometricsQuery.data || [];
+  const syncedCredentialCount = biometricCredentials.filter((entry) => entry.backedUp).length;
+  const deviceBoundCredentialCount = biometricCredentials.length - syncedCredentialCount;
+  const biometricLatestUsedAt = biometricCredentials.reduce<Date | null>((latest, entry) => {
+    if (!entry.lastUsedAt) return latest;
+    if (!latest || entry.lastUsedAt.getTime() > latest.getTime()) return entry.lastUsedAt;
+    return latest;
+  }, null);
 
   useEffect(() => {
     setIpPage(1);
@@ -298,6 +344,7 @@ function UserDetailPage() {
   const refreshAll = () => {
     refetchQuery(userQuery);
     if (activeTab === 'security') refetchQuery(securityQuery);
+    if (activeTab === 'biometrics') refetchQuery(biometricsQuery);
     if (activeTab === 'kpis') refetchQuery(kpiQuery);
     if (activeTab === 'referrals') refetchQuery(referralsQuery);
     if (activeTab === 'timeline') refetchQuery(timelineQuery);
@@ -320,6 +367,9 @@ function UserDetailPage() {
         await revokeUserFcmToken(user.uid, pendingAction.token, authUser.uid, reason);
       } else if (pendingAction.type === 'revokeAllTokens') {
         await revokeAllUserFcmTokens(user.uid, authUser.uid, reason);
+      } else if (pendingAction.type === 'removeBiometric') {
+        if (!pendingAction.credentialId) throw new Error('Missing biometric credential');
+        await removeAdminUserBiometricCredential(user.uid, pendingAction.credentialId, authUser.uid, reason);
       }
 
       await invalidateAdminRecipe(queryClient, 'userDetailActionUpdated');
@@ -342,6 +392,7 @@ function UserDetailPage() {
   const loadingBanner = userQuery.isLoading || userQuery.isFetching;
   const isRefreshingAny = userQuery.isFetching
     || securityQuery.isFetching
+    || biometricsQuery.isFetching
     || kpiQuery.isFetching
     || referralsQuery.isFetching
     || timelineQuery.isFetching;
@@ -552,6 +603,85 @@ function UserDetailPage() {
                   </button>
                 </div>
               </>
+            )}
+          </section>
+        </div>
+      )}
+
+      {activeTab === 'biometrics' && (
+        <div className="space-y-4">
+          <section className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total Credentials</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">{biometricCredentials.length}</p>
+            </div>
+            <div className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Synced Passkeys</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">{syncedCredentialCount}</p>
+              <p className="mt-1 text-xs text-gray-500">Credentials backed up across supported devices.</p>
+            </div>
+            <div className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Device-Bound Credentials</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">{deviceBoundCredentialCount}</p>
+              <p className="mt-1 text-xs text-gray-500">Last biometric use: {formatDateTime(biometricLatestUsedAt)}</p>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Registered Biometrics</h3>
+                <p className="mt-1 text-sm text-gray-500">Support-facing view of this donor&apos;s biometric credentials and passkeys.</p>
+              </div>
+              {biometricsQuery.isFetching && <span className="text-xs text-gray-500">Refreshing...</span>}
+            </div>
+
+            {biometricsQuery.error && (
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {biometricsQuery.error instanceof Error ? biometricsQuery.error.message : 'Failed to load biometric credentials'}
+              </div>
+            )}
+
+            {biometricsQuery.isLoading && !biometricsQuery.data ? (
+              <div className="mt-4">
+                <UserDetailTabSkeleton />
+              </div>
+            ) : biometricCredentials.length === 0 ? (
+              <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">
+                No biometrics enrolled for this donor.
+              </div>
+            ) : (
+              <div className="mt-4 space-y-4">
+                {biometricCredentials.map((credential) => (
+                  <article key={credential.credentialId} className="rounded-2xl border border-gray-100 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h4 className="text-base font-semibold text-gray-900">{credential.deviceName}</h4>
+                        <p className="mt-1 text-sm text-gray-600">{credential.deviceDetails || credential.userAgent || 'Unknown client details'}</p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!canModify}
+                        onClick={() => setPendingAction({ type: 'removeBiometric', credentialId: credential.credentialId })}
+                        className="rounded-md border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-60"
+                      >
+                        Remove Biometrics
+                      </button>
+                    </div>
+
+                    <div className="mt-4 grid gap-2 text-sm text-gray-700 md:grid-cols-2">
+                      <p><span className="font-semibold">Credential ID:</span> <span className="break-all font-mono text-xs">{credential.credentialId}</span></p>
+                      <p><span className="font-semibold">Device Type:</span> {credential.deviceType}</p>
+                      <p><span className="font-semibold">Synced / Backed Up:</span> {credential.backedUp ? 'Yes' : 'No'}</p>
+                      <p><span className="font-semibold">Transports:</span> {formatListValue(credential.transports)}</p>
+                      <p><span className="font-semibold">Counter:</span> {credential.counter ?? 'N/A'}</p>
+                      <p><span className="font-semibold">Created At:</span> {formatDateTime(credential.createdAt)}</p>
+                      <p><span className="font-semibold">Last Used:</span> {formatDateTime(credential.lastUsedAt)}</p>
+                      <p><span className="font-semibold">User Agent:</span> <span className="break-all">{credential.userAgent || 'N/A'}</span></p>
+                    </div>
+                  </article>
+                ))}
+              </div>
             )}
           </section>
         </div>

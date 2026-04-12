@@ -12,6 +12,8 @@ export const adminQueryKeys = {
   userDetailRoot: ['admin', 'userDetail'] as const,
   userDetail: (uid: string) => ['admin', 'userDetail', uid] as const,
   userSecurity: (uid: string) => ['admin', 'userSecurity', uid] as const,
+  userBiometricsRoot: ['admin', 'userBiometrics'] as const,
+  userBiometrics: (uid: string) => ['admin', 'userBiometrics', uid] as const,
   userKpis: (uid: string, range: AdminKpiRange = '90d') => ['admin', 'userKpis', uid, { range }] as const,
   userReferrals: (uid: string, filters?: { role?: string; status?: string; search?: string }) =>
     ['admin', 'userReferrals', uid, filters || {}] as const,

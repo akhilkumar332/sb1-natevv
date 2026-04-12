@@ -12,7 +12,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { auth, db } from '../firebase';
 import type { User } from '../types/database.types';
 import { DatabaseError, NotFoundError } from '../utils/errorHandler';
 import { runDedupedRequest } from '../utils/requestDedupe';
@@ -80,6 +80,19 @@ export type AdminUserTimelineItem = {
   description?: string;
   createdAt?: Date;
   metadata?: JsonRecord;
+};
+
+export type AdminUserBiometricCredential = {
+  credentialId: string;
+  deviceName: string;
+  deviceDetails: string;
+  deviceType: string;
+  backedUp: boolean;
+  transports: string[];
+  counter: number | null;
+  createdAt: Date | null;
+  lastUsedAt: Date | null;
+  userAgent: string;
 };
 
 type ReferralTrackingEntry = {
@@ -154,6 +167,71 @@ const safeOrderedQuery = async (q: ReturnType<typeof query>, fallbackQ: ReturnTy
 const asRecord = (value: any): JsonRecord => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   return value as JsonRecord;
+};
+
+const getBiometricDeviceName = (userAgent: string) => {
+  if (!userAgent) return 'Unknown Device';
+  if (/iPhone/i.test(userAgent)) return 'iPhone';
+  if (/iPad/i.test(userAgent)) return 'iPad';
+  const androidModel = userAgent.match(/;\s*([^;)]+)\s+Build\//);
+  if (androidModel) return androidModel[1].trim();
+  if (/Android/i.test(userAgent)) return 'Android Device';
+  if (/Windows/i.test(userAgent)) return 'Windows Device';
+  if (/Macintosh/i.test(userAgent)) return 'Mac';
+  return 'Unknown Device';
+};
+
+const getBiometricDeviceDetails = (userAgent: string) => {
+  if (!userAgent) return '';
+  let browser = '';
+  if (/Edg\//i.test(userAgent)) browser = 'Edge';
+  else if (/OPR\//i.test(userAgent)) browser = 'Opera';
+  else if (/Chrome\//i.test(userAgent) && !/Chromium/i.test(userAgent)) browser = 'Chrome';
+  else if (/Firefox\//i.test(userAgent)) browser = 'Firefox';
+  else if (/Safari\//i.test(userAgent)) browser = 'Safari';
+
+  let os = '';
+  const androidVersion = userAgent.match(/Android\s([\d.]+)/i);
+  const iosVersion = userAgent.match(/OS\s([\d_]+)/i);
+  const windowsVersion = userAgent.match(/Windows NT\s([\d.]+)/i);
+
+  if (androidVersion) os = `Android ${androidVersion[1]}`;
+  else if (iosVersion) os = `iOS ${iosVersion[1].replace(/_/g, '.')}`;
+  else if (windowsVersion) os = `Windows ${windowsVersion[1]}`;
+  else if (/Macintosh/i.test(userAgent)) os = 'macOS';
+
+  return [os, browser].filter(Boolean).join(' · ');
+};
+
+const getAdminBiometricsIdToken = async () => {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Not authenticated');
+  return token;
+};
+
+const postAdminBiometrics = async (body: Record<string, unknown>) => {
+  const idToken = await getAdminBiometricsIdToken();
+  const response = await fetch('/.netlify/functions/admin-user-biometrics', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  let data: any = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || `Request failed: ${response.status}`);
+  }
+
+  return data;
 };
 
 const extractFieldMap = (data: JsonRecord, rootKey: string): JsonRecord => {
@@ -673,6 +751,33 @@ export const getAdminUserTimeline = async (
   }
 };
 
+export const getAdminUserBiometrics = async (uid: string): Promise<AdminUserBiometricCredential[]> => {
+  try {
+    const result = await postAdminBiometrics({ uid, action: 'list' });
+    const credentials = Array.isArray(result?.credentials) ? result.credentials : [];
+
+    return credentials.map((entry: any) => {
+      const userAgent = typeof entry?.userAgent === 'string' ? entry.userAgent : '';
+      return {
+        credentialId: typeof entry?.credentialId === 'string' ? entry.credentialId : '',
+        deviceName: getBiometricDeviceName(userAgent),
+        deviceDetails: getBiometricDeviceDetails(userAgent),
+        deviceType: typeof entry?.deviceType === 'string' ? entry.deviceType : 'platform',
+        backedUp: Boolean(entry?.backedUp),
+        transports: Array.isArray(entry?.transports)
+          ? entry.transports.filter((item: unknown) => typeof item === 'string' && item.trim()).map((item: string) => item.trim())
+          : [],
+        counter: typeof entry?.counter === 'number' ? entry.counter : null,
+        createdAt: entry?.createdAtMs ? new Date(entry.createdAtMs) : null,
+        lastUsedAt: entry?.lastUsedAtMs ? new Date(entry.lastUsedAtMs) : null,
+        userAgent,
+      };
+    });
+  } catch (error) {
+    throw new DatabaseError('Failed to load biometric credentials');
+  }
+};
+
 export const revokeUserFcmToken = async (
   uid: string,
   token: string,
@@ -748,5 +853,23 @@ export const revokeAllUserFcmTokens = async (uid: string, adminUid: string, reas
     });
   } catch (error) {
     throw new DatabaseError('Failed to revoke all FCM tokens');
+  }
+};
+
+export const removeAdminUserBiometricCredential = async (
+  uid: string,
+  credentialId: string,
+  _adminUid: string,
+  reason: string,
+) => {
+  try {
+    await postAdminBiometrics({
+      uid,
+      action: 'remove',
+      credentialId,
+      reason,
+    });
+  } catch (error) {
+    throw new DatabaseError('Failed to remove biometric credential');
   }
 };

@@ -94,6 +94,11 @@ export const ADMIN_QUERY_TIMINGS = {
     gcTime: FIVE_MINUTES_MS,
     refetchInterval: ONE_MINUTE_MS,
   },
+  userBiometrics: {
+    staleTime: ONE_MINUTE_MS,
+    gcTime: FIVE_MINUTES_MS,
+    refetchInterval: ONE_MINUTE_MS,
+  },
   userKpis: {
     staleTime: TWO_MINUTES_MS,
     gcTime: TEN_MINUTES_MS,

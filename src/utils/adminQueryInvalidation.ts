@@ -39,6 +39,7 @@ const recipes = {
   userDetailActionUpdated: [
     adminQueryKeys.usersRoot,
     adminQueryKeys.userDetailRoot,
+    adminQueryKeys.userBiometricsRoot,
     adminQueryKeys.verificationRoot,
     adminQueryKeys.overviewRoot,
     adminQueryKeys.platformStatsRoot,

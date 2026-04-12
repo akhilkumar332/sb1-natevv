@@ -26,10 +26,12 @@ import {
 } from '../../services/admin.service';
 import {
   getAdminUserDetail,
+  getAdminUserBiometrics,
   getAdminUserKpis,
   getAdminUserReferrals,
   getAdminUserSecurity,
   getAdminUserTimeline,
+  type AdminUserBiometricCredential,
   type AdminUserKpis,
   type AdminUserReferral,
   type AdminUserSecurity,
@@ -1111,6 +1113,23 @@ export const useAdminUserSecurity = (uid: string, options?: { enabled?: boolean 
     {
       staleTime: ADMIN_QUERY_TIMINGS.userSecurity.staleTime,
       gcTime: ADMIN_QUERY_TIMINGS.userSecurity.gcTime,
+      refetchInterval: false,
+      refetchIntervalInBackground: false,
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: true,
+      enabled: options?.enabled ?? Boolean(uid),
+    },
+  );
+
+export const useAdminUserBiometrics = (uid: string, options?: { enabled?: boolean }) =>
+  useCachedAdminQuery<AdminUserBiometricCredential[]>(
+    adminQueryKeys.userBiometrics(uid),
+    0,
+    ['createdAt', 'lastUsedAt'],
+    () => getAdminUserBiometrics(uid),
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.userBiometrics.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.userBiometrics.gcTime,
       refetchInterval: false,
       refetchIntervalInBackground: false,
       refetchOnMount: 'always',
