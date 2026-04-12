@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNetworkStatus } from '../contexts/NetworkStatusContext';
 import {
   isWebAuthnSupported,
   isPlatformAuthenticatorAvailable,
@@ -20,29 +21,42 @@ import { captureHandledError } from '../services/errorLog.service';
 
 export type { StoredCredential };
 
-const isLikelyCancellationError = (error: any): boolean => (
-  error?.name === 'NotAllowedError'
-  || error?.code === 'ERROR_CEREMONY_ABORTED'
-  || error?.message?.toLowerCase?.().includes('timed out')
-  || error?.message?.toLowerCase?.().includes('cancel')
-);
+const isLikelyCancellationError = (error: any): boolean => {
+  const name = String(error?.name || '');
+  const message = String(error?.message || '').toLowerCase();
+  const code = String(error?.code || '');
+
+  return name === 'NotAllowedError'
+    || name === 'AbortError'
+    || name === 'SecurityError'
+    || code === 'ERROR_CEREMONY_ABORTED'
+    || message.includes('timed out')
+    || message.includes('cancel')
+    || message.includes('abort')
+    || message.includes('not supported')
+    || message.includes('autofill');
+};
 
 const isStaleCredentialError = (error: any): boolean => {
   const message = String(error?.message || '').toLowerCase();
   return message.includes('credential not found')
     || message.includes('unknown credential')
     || message.includes('no passkeys available')
+    || message.includes('no credentials')
     || message.includes('404');
 };
 
 export const useWebAuthn = (userId?: string | null) => {
+  const { isOnline } = useNetworkStatus();
   const [isSupported, setIsSupported] = useState(false);
   const [supportsAutofill, setSupportsAutofill] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [localEnrolledUserId, setLocalEnrolledUserId] = useState<string | null>(() => (
     userId ?? getLastEnrolledUserId()
   ));
-  const [isRegistered, setIsRegistered] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(() => (
+    Boolean((userId || getLastEnrolledUserId()) && getStoredCredentialId(userId || getLastEnrolledUserId() || ''))
+  ));
   const [credentials, setCredentials] = useState<StoredCredential[]>([]);
   const [credentialsLoading, setCredentialsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -163,11 +177,17 @@ export const useWebAuthn = (userId?: string | null) => {
   const authenticate = useCallback(async (options?: {
     mediation?: 'conditional' | 'required' | 'optional';
   }): Promise<{ customToken: string; userId: string | null } | null> => {
-    setLoading(true);
+    const isConditional = options?.mediation === 'conditional';
+    if (!isConditional) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
-      const result = await authenticateWithBiometric(effectiveUserId, options?.mediation);
+      const result = await authenticateWithBiometric(
+        effectiveUserId,
+        options?.mediation
+      );
       const resolvedUserId = result.userId ?? effectiveUserId;
       if (!userId) {
         setLocalEnrolledUserId(resolvedUserId ?? getLastEnrolledUserId());
@@ -178,15 +198,26 @@ export const useWebAuthn = (userId?: string | null) => {
       setNeedsReenroll(false);
       return result;
     } catch (err: any) {
-      if (isLikelyCancellationError(err)) {
+      if (err?.name === 'SecurityError') {
+        setError('Security error: Please ensure you are using a secure connection (HTTPS) and matching domain.');
+        return null;
+      }
+
+      if (err?.name === 'NotSupportedError') {
+        // Device doesn't support the requested operation or user verification
+        return null;
+      }
+
+      if (err?.name === 'AbortError' || isLikelyCancellationError(err)) {
         // Only show error for non-conditional mediation
-        if (options?.mediation !== 'conditional') {
+        if (!isConditional && err?.name !== 'AbortError') {
           setError('Biometric prompt was cancelled.');
         }
         return null;
       }
 
-      if (isStaleCredentialError(err)) {
+      const stale = isStaleCredentialError(err);
+      if (stale) {
         if (effectiveUserId) {
           clearCredentialId(effectiveUserId);
         }
@@ -194,8 +225,13 @@ export const useWebAuthn = (userId?: string | null) => {
           setLocalEnrolledUserId(getLastEnrolledUserId());
         }
         setIsRegistered(false);
-        setNeedsReenroll(true);
-        setError('Biometric credential is outdated. Please re-enroll in Account settings or log in again.');
+
+        // If it's conditional and we didn't hint a user, don't say "Outdated"
+        // as it might just be the user tried a wrong passkey or no passkeys found.
+        if (effectiveUserId || !isConditional) {
+          setNeedsReenroll(true);
+          setError('Biometric credential is outdated. Please re-enroll in Account settings or log in again.');
+        }
         return null;
       }
 
@@ -210,7 +246,9 @@ export const useWebAuthn = (userId?: string | null) => {
       setError(err?.message || 'Authentication failed.');
       return null;
     } finally {
-      setLoading(false);
+      if (!isConditional) {
+        setLoading(false);
+      }
     }
   }, [effectiveUserId, userId]);
 
@@ -270,9 +308,11 @@ export const useWebAuthn = (userId?: string | null) => {
   }, [userId]);
 
   const canShowEnrollPrompt = isReady
+    && isOnline
     && Boolean(userId && isSupported && !isRegistered && !getNeverAsk(userId ?? ''));
 
   const canAuthenticate = isReady
+    && isOnline
     && Boolean(isSupported || supportsAutofill)
     && Boolean(isRegistered || supportsAutofill || effectiveUserId);
 

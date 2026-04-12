@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNetworkStatus } from '../../../contexts/NetworkStatusContext';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Chrome, Phone, Trash2, MapPin, Locate, Loader, Fingerprint } from 'lucide-react';
+import { Chrome, Phone, Trash2, MapPin, Locate, Loader, Fingerprint, WifiOff } from 'lucide-react';
 import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { MapContainer, TileLayer } from 'react-leaflet';
@@ -43,6 +44,7 @@ L.Icon.Default.mergeOptions({
 });
 
 const DonorAccount = () => {
+  const { isOnline } = useNetworkStatus();
   const { t } = useTranslation();
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -159,6 +161,7 @@ const DonorAccount = () => {
     credentials: biometricCredentials,
     credentialsLoading: biometricCredentialsLoading,
     loading: biometricLoading,
+    error: biometricError,
     needsReenroll: biometricNeedsReenroll,
     biometricLabel,
     register: registerBiometric,
@@ -1307,6 +1310,12 @@ const DonorAccount = () => {
               </div>
             </div>
 
+            {biometricError && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                <p className="text-xs font-semibold text-red-800">{biometricError}</p>
+              </div>
+            )}
+
             {biometricNeedsReenroll && (
               <div className="mb-4 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3">
                 <p className="text-xs font-semibold text-yellow-800">
@@ -1343,10 +1352,10 @@ const DonorAccount = () => {
                     <button
                       type="button"
                       onClick={() => removeBiometricById(cred.credentialId)}
-                      disabled={biometricLoading}
+                      disabled={biometricLoading || !isOnline}
                       className="ml-3 shrink-0 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors disabled:opacity-50"
                     >
-                      Remove
+                      {!isOnline ? 'Offline' : 'Remove'}
                     </button>
                   </div>
                 ))}
@@ -1367,11 +1376,11 @@ const DonorAccount = () => {
               <button
                 type="button"
                 onClick={handleBiometricEnable}
-                disabled={biometricLoading}
+                disabled={biometricLoading || !isOnline}
                 className="mt-3 w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors disabled:opacity-50"
               >
-                <Fingerprint className="h-4 w-4" />
-                {biometricLoading ? 'Setting up…' : `Enable ${biometricLabel}`}
+                {isOnline ? <Fingerprint className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
+                {biometricLoading ? 'Setting up…' : !isOnline ? 'Network Required to Enable' : `Enable ${biometricLabel}`}
               </button>
             )}
 
@@ -1379,14 +1388,17 @@ const DonorAccount = () => {
               <button
                 type="button"
                 onClick={handleBiometricDisable}
-                disabled={biometricLoading}
+                disabled={biometricLoading || !isOnline}
                 className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
+                {!isOnline && <WifiOff className="h-4 w-4" />}
                 {biometricLoading
                   ? 'Removing…'
-                  : isCurrentCredentialSynced
-                    ? `Remove this ${biometricLabel} passkey`
-                    : 'Disable on this device'}
+                  : !isOnline
+                    ? 'Network Required to Disable'
+                    : isCurrentCredentialSynced
+                      ? `Remove this ${biometricLabel} passkey`
+                      : 'Disable on this device'}
               </button>
             )}
           </div>

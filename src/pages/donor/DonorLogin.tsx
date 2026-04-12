@@ -20,10 +20,12 @@ import { navigateToPortalDashboard, resolveImpersonationRole, resolvePortalRole 
 import { ROUTES } from '../../constants/routes';
 import { authFlowMessages, authInputMessages, validateGeneralPhoneInput, getOtpValidationError, sanitizeOtp } from '../../utils/authInputValidation';
 import { useWebAuthn } from '../../hooks/useWebAuthn';
+import { useNetworkStatus } from '../../contexts/NetworkStatusContext';
 import { BiometricLoginButton } from '../../components/auth/BiometricLoginButton';
-import { warmupBiometricFunctions, prefetchAuthChallenge } from '../../services/webauthn.service';
+import { warmupBiometricFunctions, prefetchAuthChallenge, LAST_USER_KEY } from '../../services/webauthn.service';
 
 export function DonorLogin() {
+  const { isOnline } = useNetworkStatus();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -119,8 +121,16 @@ export function DonorLogin() {
   const prefetchedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    return () => {
+      if (biometricNavigatingTimerRef.current) {
+        clearTimeout(biometricNavigatingTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!biometricReady || !biometricCanAuthenticate) return;
-    const effectiveUid = user?.uid ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('bh_wauthn_last_uid') : null);
+    const effectiveUid = user?.uid ?? (typeof localStorage !== 'undefined' ? localStorage.getItem(LAST_USER_KEY) : null);
     const cacheKey = effectiveUid || 'usernameless';
 
     if (prefetchedKeyRef.current !== cacheKey) {
@@ -151,6 +161,8 @@ export function DonorLogin() {
       } else {
         autofillTriggeredRef.current = false;
       }
+    }).catch(() => {
+      autofillTriggeredRef.current = false;
     });
   }, [
     biometricReady,
@@ -404,11 +416,10 @@ export function DonorLogin() {
             countryCallingCodeEditable={false}
             value={formData.identifier}
             onChange={(value) => handleIdentifierChange(value || '')}
-            inputProps={{
-              id: 'identifier',
-              name: 'identifier',
-              autoComplete: 'username webauthn',
-            }}
+            id="identifier"
+            name="identifier"
+            autoComplete="username webauthn"
+            autoFocus={true}
             className="block w-full rounded-xl border-2 border-gray-200 px-4 py-3 transition-colors focus:border-red-500 focus:outline-none [&_.PhoneInputInput]:bg-white [&_.PhoneInputInput]:text-gray-900 [&_.PhoneInputInput]:outline-none [&_.PhoneInputInput]:placeholder:text-gray-400 dark:[&_.PhoneInputInput]:bg-white dark:[&_.PhoneInputInput]:text-gray-900"
           />
           <Phone className="absolute right-4 top-3.5 h-5 w-5 text-gray-400" />
@@ -717,6 +728,7 @@ export function DonorLogin() {
                       error={biometricError}
                       label={biometricLabel}
                       needsReenroll={biometricNeedsReenroll}
+                      isOnline={isOnline}
                       onLogin={handleBiometricLogin}
                     />
                   )}

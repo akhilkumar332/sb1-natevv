@@ -392,6 +392,11 @@ const hydrateCachedUser = (raw: any): User => ({
     : undefined,
 });
 
+export const matchUserToUid = (candidate: User | null | undefined, uid: string | null | undefined): User | null => {
+  if (!candidate || !uid) return null;
+  return candidate.uid === uid ? candidate : null;
+};
+
 const readImpersonationSession = (): ImpersonationSession | null => {
   if (typeof window === 'undefined') return null;
   try {
@@ -1630,6 +1635,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const recentLogin = recentLoginRef.current;
           const currentUser = userRef.current;
           const cachedUser = readCachedUser();
+          const matchingCurrentUser = matchUserToUid(currentUser, firebaseUser.uid);
           const matchingCachedUser = cachedUser?.uid === firebaseUser.uid ? cachedUser : null;
           const pendingPortalRole = readPendingPortalRole();
           const registrationIntentRole = readRegistrationIntent();
@@ -1642,19 +1648,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
 
           if (recentLogin && recentLogin.uid === firebaseUser.uid && now - recentLogin.at < 15000) {
-            if (!currentUser || currentUser.uid !== firebaseUser.uid) {
-              setUser(recentLogin.user || matchingCachedUser || currentUser || null);
+            if (!matchingCurrentUser) {
+              setUser(recentLogin.user || matchingCachedUser || matchingCurrentUser || null);
             }
             setProfileResolved(true);
             setLoading(false);
-            void updateSessionMetadata(firebaseUser, recentLogin.user || matchingCachedUser || currentUser || undefined);
+            void updateSessionMetadata(firebaseUser, recentLogin.user || matchingCachedUser || matchingCurrentUser || undefined);
             return;
           }
 
-          if (currentUser && currentUser.uid === firebaseUser.uid) {
+          if (matchingCurrentUser) {
             setProfileResolved(true);
             setLoading(false);
-            void updateSessionMetadata(firebaseUser, currentUser);
+            void updateSessionMetadata(firebaseUser, matchingCurrentUser);
             return;
           }
 
@@ -1806,7 +1812,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   });
               }, 7000);
             }
-            const fallbackUser = currentUser || cachedUser;
+            const fallbackUser = matchingCurrentUser || matchingCachedUser;
             if (fallbackUser) {
               setUser(fallbackUser);
             } else {

@@ -12,7 +12,7 @@ import { COLLECTIONS } from '../constants/firestore';
 const BASE = '/.netlify/functions';
 const ANONYMOUS_CACHE_KEY = 'anonymous';
 const CHALLENGE_CACHE_TTL_MS = 4 * 60 * 1000;
-const LAST_USER_KEY = 'bh_wauthn_last_uid';
+export const LAST_USER_KEY = 'bh_wauthn_last_uid';
 
 type ChallengeResponse = {
   challengeId: string;
@@ -144,8 +144,12 @@ export const getBiometricLabel = (): string => {
   if (typeof navigator === 'undefined') return 'Biometrics';
   const ua = navigator.userAgent;
   if (/iPhone|iPad|iPod/i.test(ua)) return 'Face ID / Touch ID';
-  if (/Macintosh|Mac OS X/i.test(ua)) return 'Touch ID';
+  if (/Macintosh|Mac OS X/i.test(ua)) {
+    // If it's a Mac, it might be Touch ID or just generic biometrics
+    return 'Touch ID';
+  }
   if (/Android/i.test(ua)) return 'Fingerprint';
+  if (/Windows/i.test(ua)) return 'Windows Hello';
   return 'Biometrics';
 };
 
@@ -305,7 +309,7 @@ export const authenticateWithBiometric = async (
   const normalizedUserId = userId ?? null;
   let cached = getCachedChallenge(normalizedUserId);
 
-  if (!cached) {
+  if (!cached || (Date.now() - cached.at > CHALLENGE_CACHE_TTL_MS)) {
     const response = await requestAuthChallenge(normalizedUserId);
     if (response.staleCredential && normalizedUserId && getStoredCredentialId(normalizedUserId)) {
       clearCredentialId(normalizedUserId);
@@ -316,12 +320,7 @@ export const authenticateWithBiometric = async (
       at: Date.now(),
       userId: normalizedUserId,
     };
-  }
-
-  // Do not clear cached challenge if we are using conditional mediation,
-  // as the user might not select a passkey immediately.
-  if (mediation !== 'conditional') {
-    clearCachedChallenge(normalizedUserId);
+    storeCachedChallenge(normalizedUserId, response);
   }
 
   const useBrowserAutofill = mediation === 'conditional';
@@ -329,6 +328,10 @@ export const authenticateWithBiometric = async (
     optionsJSON: cached.options as any,
     useBrowserAutofill,
   });
+
+  // Once the browser returns a credential, that challenge attempt is consumed.
+  clearCachedChallenge(normalizedUserId);
+
   const result = await post('webauthn-auth-verify', {
     challengeId: cached.challengeId,
     credential,

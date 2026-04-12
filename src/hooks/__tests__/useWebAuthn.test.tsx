@@ -150,4 +150,32 @@ describe('useWebAuthn', () => {
 
     expect(result.current.isRegistered).toBe(true);
   });
+
+  it('does not set loading state during conditional mediation', async () => {
+    isPlatformAuthenticatorAvailableMock.mockResolvedValue(true);
+    isWebAuthnAutofillSupportedMock.mockResolvedValue(true);
+    authenticateWithBiometricMock.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      return { customToken: 'token-1', userId: 'donor-1' };
+    });
+
+    const { result } = renderHook(() => useWebAuthn('donor-1'));
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    let authPromise: Promise<any>;
+    await act(async () => {
+      authPromise = result.current.authenticate({ mediation: 'conditional' });
+    });
+
+    expect(result.current.loading).toBe(false);
+
+    await act(async () => {
+      await authPromise;
+    });
+
+    expect(result.current.loading).toBe(false);
+  });
 });

@@ -123,7 +123,7 @@ describe('DonorLogin', () => {
       error: null,
       needsReenroll: false,
       biometricLabel: 'Fingerprint',
-      authenticate: vi.fn(),
+      authenticate: vi.fn().mockResolvedValue(null),
     });
   });
 
@@ -228,7 +228,7 @@ describe('DonorLogin', () => {
       error: null,
       needsReenroll: false,
       biometricLabel: 'Touch ID',
-      authenticate: vi.fn(),
+      authenticate: vi.fn().mockResolvedValue(null),
     });
 
     render(
@@ -266,7 +266,7 @@ describe('DonorLogin', () => {
       error: null,
       needsReenroll: false,
       biometricLabel: 'Biometrics',
-      authenticate: vi.fn(),
+      authenticate: vi.fn().mockResolvedValue(null),
     });
 
     render(
