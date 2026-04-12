@@ -115,6 +115,7 @@ export function DonorLogin() {
     needsReenroll: biometricNeedsReenroll,
     biometricLabel,
     authenticate: authenticateBiometric,
+    effectiveUserId,
   } = useWebAuthn(user?.uid ?? null);
 
   // Prefetch auth challenge + pre-warm functions when biometric is ready
@@ -131,7 +132,7 @@ export function DonorLogin() {
 
   useEffect(() => {
     if (!biometricReady || !biometricCanAuthenticate || !biometricRegistered) return;
-    const challengeUserId = user?.uid ?? null;
+    const challengeUserId = effectiveUserId ?? null;
     const cacheKey = challengeUserId || 'usernameless';
 
     if (prefetchedKeyRef.current !== cacheKey) {
@@ -139,7 +140,7 @@ export function DonorLogin() {
       void prefetchAuthChallenge(challengeUserId);
       warmupBiometricFunctions();
     }
-  }, [biometricCanAuthenticate, biometricReady, biometricRegistered, user?.uid]);
+  }, [biometricCanAuthenticate, biometricReady, biometricRegistered, effectiveUserId]);
 
   // Handle Conditional UI (autofill)
   const autofillTriggeredRef = useRef(false);

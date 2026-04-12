@@ -273,7 +273,12 @@ export const useWebAuthn = (userId?: string | null) => {
     mediation?: 'conditional' | 'required' | 'optional';
   }): Promise<{ customToken: string; userId: string | null } | null> => {
     const isConditional = options?.mediation === 'conditional';
-    const authChallengeUserId = userId ?? null;
+    // Use the explicitly provided userId for challenges.
+    // If not provided, but we are explicitly clicking the login button (!isConditional),
+    // fall back to the last locally enrolled user to ensure maximum compatibility
+    // with non-discoverable credentials (e.g. older Android authenticators).
+    const authChallengeUserId = userId ?? (isConditional ? null : localEnrolledUserId);
+    
     if (!isConditional) {
       setLoading(true);
     }
@@ -314,19 +319,32 @@ export const useWebAuthn = (userId?: string | null) => {
 
       const stale = isStaleCredentialError(err);
       if (stale) {
-        if (effectiveUserId) {
-          clearCredentialId(effectiveUserId);
-        }
-        if (!userId) {
-          setLocalEnrolledUserId(getLastEnrolledUserId());
-        }
-        setIsRegistered(false);
+        const attemptedCredentialId = err.attemptedCredentialId;
+        const currentCredentialId = effectiveUserId ? getStoredCredentialId(effectiveUserId) : null;
 
-        // If it's conditional and we didn't hint a user, don't say "Outdated"
-        // as it might just be the user tried a wrong passkey or no passkeys found.
-        if (effectiveUserId || !isConditional) {
-          setNeedsReenroll(true);
-          setError('Biometric credential is outdated. Please re-enroll in Account settings or log in again.');
+        // If the server reported a specific credential as stale, only clear local state
+        // if it matches what we have stored. If it's a client-side error (no attemptedCredentialId),
+        // it means the authenticator couldn't find our requested credential, so it IS stale.
+        if (!attemptedCredentialId || attemptedCredentialId === currentCredentialId) {
+          if (effectiveUserId) {
+            clearCredentialId(effectiveUserId);
+          }
+          if (!userId) {
+            setLocalEnrolledUserId(getLastEnrolledUserId());
+          }
+          setIsRegistered(false);
+
+          // If it's conditional and we didn't hint a user, don't say "Outdated"
+          // as it might just be the user tried a wrong passkey or no passkeys found.
+          if (effectiveUserId || !isConditional) {
+            setNeedsReenroll(true);
+            setError('Biometric credential is outdated. Please re-enroll in Account settings or log in again.');
+          }
+        } else {
+          // A different credential was used and failed. Do not clear our valid local state.
+          if (!isConditional) {
+            setError('The selected passkey is no longer valid. Please try again.');
+          }
         }
         return null;
       }
@@ -451,5 +469,6 @@ export const useWebAuthn = (userId?: string | null) => {
     dismissEnrollPrompt,
     canShowEnrollPrompt,
     forceRemoveLocal,
+    effectiveUserId,
   };
 };

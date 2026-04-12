@@ -425,10 +425,18 @@ export const authenticateWithBiometric = async (
   // Once the browser returns a credential, that challenge attempt is consumed.
   clearCachedChallenge(normalizedUserId);
 
-  const result = await post('webauthn-auth-verify', {
-    challengeId: cached.challengeId,
-    credential,
-  });
+  let result;
+  try {
+    result = await post('webauthn-auth-verify', {
+      challengeId: cached.challengeId,
+      credential,
+    });
+  } catch (error: any) {
+    if (typeof credential?.id === 'string') {
+      error.attemptedCredentialId = credential.id;
+    }
+    throw error;
+  }
 
   const resolvedUserId = typeof result.userId === 'string' ? result.userId : normalizedUserId;
   if (resolvedUserId && typeof credential.id === 'string' && credential.id) {
