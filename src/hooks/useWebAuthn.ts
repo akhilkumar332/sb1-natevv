@@ -71,6 +71,7 @@ export const useWebAuthn = (userId?: string | null) => {
   ));
   const [credentials, setCredentials] = useState<StoredCredential[]>([]);
   const [credentialsLoading, setCredentialsLoading] = useState(false);
+  const [credentialsError, setCredentialsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsReenroll, setNeedsReenroll] = useState(false);
@@ -124,6 +125,7 @@ export const useWebAuthn = (userId?: string | null) => {
   const refreshCredentials = useCallback(async () => {
     if (!userId) return;
     setCredentialsLoading(true);
+    setCredentialsError(null);
     try {
       const list = await fetchCredentials(userId);
       setCredentials(list);
@@ -139,7 +141,7 @@ export const useWebAuthn = (userId?: string | null) => {
         setIsRegistered(list.some((credential) => credential.isCurrentDevice));
       }
     } catch {
-      // keep local state intact on transient failures
+      setCredentialsError('Could not load biometric devices right now. Please retry.');
     } finally {
       setCredentialsLoading(false);
     }
@@ -354,6 +356,7 @@ export const useWebAuthn = (userId?: string | null) => {
     canAuthenticate,
     credentials,
     credentialsLoading,
+    credentialsError,
     loading,
     error,
     needsReenroll,

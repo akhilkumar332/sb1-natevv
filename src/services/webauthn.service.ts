@@ -27,6 +27,22 @@ type CachedChallenge = {
   userId: string | null;
 };
 
+const nowMs = (): number => (
+  typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now()
+);
+
+const emitBiometricEvent = (eventName: string, params?: Record<string, unknown>): void => {
+  void import('./monitoring.service')
+    .then(({ monitoringService }) => {
+      monitoringService.trackEvent(eventName, params);
+    })
+    .catch(() => {
+      // ignore monitoring failures
+    });
+};
+
 const getIdToken = async (): Promise<string> => {
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error('Not authenticated');
@@ -39,14 +55,24 @@ const post = async (
   idToken?: string,
   retry = true,
 ): Promise<any> => {
+  const startedAt = nowMs();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
 
-  const response = await fetch(`${BASE}/${path}`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${BASE}/${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    emitBiometricEvent('biometric_api_network_error', {
+      path,
+      durationMs: Math.round(nowMs() - startedAt),
+    });
+    throw error;
+  }
 
   let data: any = null;
   try {
@@ -56,12 +82,23 @@ const post = async (
   }
 
   if (!response.ok) {
+    emitBiometricEvent('biometric_api_failed', {
+      path,
+      status: response.status,
+      durationMs: Math.round(nowMs() - startedAt),
+    });
     if (response.status === 500 && retry) {
       await new Promise((resolve) => setTimeout(resolve, 600));
       return post(path, body, idToken, false);
     }
     throw new Error(data?.error || `Request failed: ${response.status}`);
   }
+
+  emitBiometricEvent('biometric_api_ok', {
+    path,
+    status: response.status,
+    durationMs: Math.round(nowMs() - startedAt),
+  });
 
   if (!data) {
     throw new Error(`Empty response from ${path}`);
@@ -277,6 +314,7 @@ const requestAuthChallenge = async (userId?: string | null): Promise<ChallengeRe
 };
 
 export const registerBiometric = async (userId: string): Promise<string> => {
+  const startedAt = nowMs();
   const idToken = await getIdToken();
   const challenge = await post('webauthn-register-challenge', { userId }, idToken);
   const credential = await startRegistration({ optionsJSON: challenge.options });
@@ -288,6 +326,9 @@ export const registerBiometric = async (userId: string): Promise<string> => {
   const transports = credential.response?.transports ?? [];
   storeCredentialId(userId, result.credentialId, transports);
   clearCachedChallenge(userId);
+  emitBiometricEvent('biometric_register_success', {
+    durationMs: Math.round(nowMs() - startedAt),
+  });
   return result.credentialId;
 };
 
@@ -307,6 +348,7 @@ export const authenticateWithBiometric = async (
   userId?: string | null,
   mediation?: 'conditional' | 'required' | 'optional',
 ): Promise<{ customToken: string; userId: string | null }> => {
+  const startedAt = nowMs();
   const normalizedUserId = userId ?? null;
   let cached = getCachedChallenge(normalizedUserId);
 
@@ -342,6 +384,12 @@ export const authenticateWithBiometric = async (
   if (resolvedUserId && typeof credential.id === 'string' && credential.id) {
     storeCredentialId(resolvedUserId, credential.id);
   }
+
+  emitBiometricEvent('biometric_auth_success', {
+    mediation: mediation || 'required',
+    usedCachedChallenge: Boolean(cached),
+    durationMs: Math.round(nowMs() - startedAt),
+  });
 
   return {
     customToken: result.customToken,

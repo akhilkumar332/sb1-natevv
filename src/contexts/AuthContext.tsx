@@ -73,6 +73,16 @@ const trackImpersonationEvent = (eventName: string, params?: Record<string, any>
     });
 };
 
+const trackAuthEvent = (eventName: string, params?: Record<string, any>) => {
+  void import('../services/monitoring.service')
+    .then(({ monitoringService }) => {
+      monitoringService.trackEvent(eventName, params);
+    })
+    .catch(() => {
+      // ignore analytics failures
+    });
+};
+
 // Define window recaptcha type
 declare global {
   interface Window {
@@ -1997,6 +2007,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithBiometric = async (customToken: string): Promise<void> => {
+    const startedAt = Date.now();
     try {
       setAuthLoading(true);
       const userCredential = await signInWithCustomToken(auth, customToken);
@@ -2017,7 +2028,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Fire-and-forget lastLoginAt
       const firestoreRef = doc(db, COLLECTIONS.USERS, uid);
       updateDoc(firestoreRef, { lastLoginAt: serverTimestamp() }).catch(() => {});
+      trackAuthEvent('biometric_custom_token_signin_success', {
+        uid,
+        durationMs: Math.max(0, Date.now() - startedAt),
+      });
     } catch (error) {
+      trackAuthEvent('biometric_custom_token_signin_failed', {
+        durationMs: Math.max(0, Date.now() - startedAt),
+      });
       reportAuthContextError(error, 'auth.biometric_login');
       throw error;
     } finally {

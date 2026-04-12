@@ -160,6 +160,7 @@ const DonorAccount = () => {
     isReady: biometricReady,
     credentials: biometricCredentials,
     credentialsLoading: biometricCredentialsLoading,
+    credentialsError: biometricCredentialsError,
     loading: biometricLoading,
     error: biometricError,
     needsReenroll: biometricNeedsReenroll,
@@ -167,6 +168,7 @@ const DonorAccount = () => {
     register: registerBiometric,
     removeCredential: removeBiometric,
     removeCredentialById: removeBiometricById,
+    refreshCredentials: refreshBiometricCredentials,
   } = useWebAuthn(user?.uid ?? null);
 
   const currentBiometricCredential = biometricCredentials.find((cred) => cred.isCurrentDevice) ?? null;
@@ -1321,6 +1323,22 @@ const DonorAccount = () => {
                 <p className="text-xs font-semibold text-yellow-800">
                   Biometric data was removed from this device. Enable it again below to re-enroll.
                 </p>
+              </div>
+            )}
+
+            {biometricCredentialsError && (
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold text-amber-800">{biometricCredentialsError}</p>
+                  <button
+                    type="button"
+                    onClick={() => void refreshBiometricCredentials()}
+                    disabled={biometricCredentialsLoading}
+                    className="shrink-0 rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    Retry
+                  </button>
+                </div>
               </div>
             )}
 
