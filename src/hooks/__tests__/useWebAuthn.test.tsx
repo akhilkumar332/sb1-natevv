@@ -9,9 +9,11 @@ const {
   getStoredCredentialIdMock,
   getLastEnrolledUserIdMock,
   getNeverAskMock,
+  storeCredentialIdMock,
   registerBiometricMock,
   authenticateWithBiometricMock,
   fetchCredentialsMock,
+  waitForCredentialEnrollmentMock,
   clearCredentialIdMock,
 } = vi.hoisted(() => ({
   isWebAuthnSupportedMock: vi.fn(),
@@ -20,9 +22,11 @@ const {
   getStoredCredentialIdMock: vi.fn(),
   getLastEnrolledUserIdMock: vi.fn(),
   getNeverAskMock: vi.fn(),
+  storeCredentialIdMock: vi.fn(),
   registerBiometricMock: vi.fn(),
   authenticateWithBiometricMock: vi.fn(),
   fetchCredentialsMock: vi.fn(),
+  waitForCredentialEnrollmentMock: vi.fn(),
   clearCredentialIdMock: vi.fn(),
 }));
 
@@ -34,12 +38,14 @@ vi.mock('../../services/webauthn.service', () => ({
   getStoredCredentialId: getStoredCredentialIdMock,
   getLastEnrolledUserId: getLastEnrolledUserIdMock,
   getNeverAsk: getNeverAskMock,
+  storeCredentialId: storeCredentialIdMock,
   setNeverAsk: vi.fn(),
   registerBiometric: registerBiometricMock,
   authenticateWithBiometric: authenticateWithBiometricMock,
   removeBiometricCredential: vi.fn(),
   removeCredentialById: vi.fn(),
   fetchCredentials: fetchCredentialsMock,
+  waitForCredentialEnrollment: waitForCredentialEnrollmentMock,
   clearCredentialId: clearCredentialIdMock,
 }));
 
@@ -56,6 +62,19 @@ describe('useWebAuthn', () => {
     getStoredCredentialIdMock.mockReturnValue('cred-1');
     getLastEnrolledUserIdMock.mockReturnValue('donor-1');
     getNeverAskMock.mockReturnValue(false);
+    waitForCredentialEnrollmentMock.mockResolvedValue([
+      {
+        credentialId: 'cred-1',
+        deviceName: 'iPhone',
+        deviceDetails: 'iOS · Safari',
+        deviceType: 'platform',
+        backedUp: false,
+        createdAt: null,
+        lastUsedAt: null,
+        isCurrentDevice: true,
+        matchesCurrentClient: true,
+      },
+    ]);
     fetchCredentialsMock.mockResolvedValue([
       {
         credentialId: 'cred-1',
@@ -66,6 +85,7 @@ describe('useWebAuthn', () => {
         createdAt: null,
         lastUsedAt: null,
         isCurrentDevice: true,
+        matchesCurrentClient: true,
       },
     ]);
   });
@@ -151,6 +171,67 @@ describe('useWebAuthn', () => {
     expect(result.current.isRegistered).toBe(true);
   });
 
+  it('confirms registration only after the credential is visible in the account list path', async () => {
+    registerBiometricMock.mockResolvedValue('cred-2');
+    getStoredCredentialIdMock.mockReturnValue('cred-2');
+    waitForCredentialEnrollmentMock.mockResolvedValue([
+      {
+        credentialId: 'cred-2',
+        deviceName: 'Mac',
+        deviceDetails: 'macOS · Safari',
+        deviceType: 'platform',
+        backedUp: true,
+        createdAt: null,
+        lastUsedAt: null,
+        isCurrentDevice: true,
+        matchesCurrentClient: true,
+      },
+    ]);
+
+    const { result } = renderHook(() => useWebAuthn('donor-1'));
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    let registered = false;
+    await act(async () => {
+      registered = await result.current.register();
+    });
+
+    expect(waitForCredentialEnrollmentMock).toHaveBeenCalledWith('donor-1', 'cred-2');
+    expect(registered).toBe(true);
+    expect(result.current.isRegistered).toBe(true);
+    expect(result.current.credentials[0]?.credentialId).toBe('cred-2');
+  });
+
+  it('repairs missing local current-device state from a unique matching server credential', async () => {
+    getStoredCredentialIdMock.mockReturnValue(null);
+    fetchCredentialsMock.mockResolvedValue([
+      {
+        credentialId: 'cred-9',
+        deviceName: 'Mac',
+        deviceDetails: 'macOS · Safari',
+        deviceType: 'platform',
+        backedUp: true,
+        createdAt: null,
+        lastUsedAt: null,
+        isCurrentDevice: false,
+        matchesCurrentClient: true,
+      },
+    ]);
+
+    const { result } = renderHook(() => useWebAuthn('donor-1'));
+
+    await waitFor(() => {
+      expect(result.current.credentialsLoading).toBe(false);
+    });
+
+    expect(storeCredentialIdMock).toHaveBeenCalledWith('donor-1', 'cred-9');
+    expect(result.current.isRegistered).toBe(true);
+    expect(result.current.credentials[0]?.isCurrentDevice).toBe(true);
+  });
+
   it('does not set loading state during conditional mediation', async () => {
     isPlatformAuthenticatorAvailableMock.mockResolvedValue(true);
     isWebAuthnAutofillSupportedMock.mockResolvedValue(true);
@@ -230,5 +311,26 @@ describe('useWebAuthn', () => {
     });
 
     expect(result.current.error).toBe('Biometric login is temporarily unavailable. Please use OTP or Google.');
+  });
+
+  it('does not treat InvalidStateError as success when enrollment cannot be verified', async () => {
+    registerBiometricMock.mockRejectedValue({ name: 'InvalidStateError' });
+    getStoredCredentialIdMock.mockReturnValue(null);
+    fetchCredentialsMock.mockResolvedValue([]);
+
+    const { result } = renderHook(() => useWebAuthn('donor-1'));
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    let registered = true;
+    await act(async () => {
+      registered = await result.current.register();
+    });
+
+    expect(registered).toBe(false);
+    expect(result.current.isRegistered).toBe(false);
+    expect(result.current.error).toContain('could not be verified');
   });
 });

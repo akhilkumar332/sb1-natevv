@@ -5,13 +5,14 @@ import {
   browserSupportsWebAuthnAutofill,
   platformAuthenticatorIsAvailable,
 } from '@simplewebauthn/browser';
-import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, getDocsFromServer, doc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { COLLECTIONS } from '../constants/firestore';
 
 const BASE = '/.netlify/functions';
 const ANONYMOUS_CACHE_KEY = 'anonymous';
 const CHALLENGE_CACHE_TTL_MS = 4 * 60 * 1000;
+const ENROLLMENT_SYNC_RETRY_DELAYS_MS = [0, 250, 800];
 export const LAST_USER_KEY = 'bh_wauthn_last_uid';
 
 type ChallengeResponse = {
@@ -233,29 +234,68 @@ export interface StoredCredential {
   createdAt: Date | null;
   lastUsedAt: Date | null;
   isCurrentDevice: boolean;
+  matchesCurrentClient: boolean;
 }
 
-export const fetchCredentials = async (userId: string): Promise<StoredCredential[]> => {
+const mapStoredCredential = (
+  data: Record<string, any>,
+  currentCredentialId: string | null,
+): StoredCredential => {
+  const userAgent = String(data.userAgent || '');
+  const currentUserAgent = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+
+  return {
+    credentialId: data.credentialId,
+    deviceName: getDeviceName(userAgent),
+    deviceDetails: getDeviceDetails(userAgent),
+    deviceType: data.deviceType || 'platform',
+    backedUp: Boolean(data.backedUp),
+    createdAt: data.createdAt?.toDate?.() ?? null,
+    lastUsedAt: data.lastUsedAt?.toDate?.() ?? null,
+    isCurrentDevice: data.credentialId === currentCredentialId,
+    matchesCurrentClient: Boolean(userAgent && currentUserAgent && userAgent === currentUserAgent),
+  };
+};
+
+export const fetchCredentials = async (
+  userId: string,
+  options?: { preferServer?: boolean },
+): Promise<StoredCredential[]> => {
   const currentCredentialId = getStoredCredentialId(userId);
-  const snapshot = await getDocs(
-    collection(db, COLLECTIONS.USERS, userId, COLLECTIONS.WEBAUTHN_CREDENTIALS),
-  );
+  const credentialsCollection = collection(db, COLLECTIONS.USERS, userId, COLLECTIONS.WEBAUTHN_CREDENTIALS);
 
-  return snapshot.docs.map((docSnapshot) => {
-    const data = docSnapshot.data();
-    const userAgent = data.userAgent || '';
+  let snapshot;
+  if (options?.preferServer !== false) {
+    try {
+      snapshot = await getDocsFromServer(credentialsCollection);
+    } catch {
+      snapshot = await getDocs(credentialsCollection);
+    }
+  } else {
+    snapshot = await getDocs(credentialsCollection);
+  }
 
-    return {
-      credentialId: data.credentialId,
-      deviceName: getDeviceName(userAgent),
-      deviceDetails: getDeviceDetails(userAgent),
-      deviceType: data.deviceType || 'platform',
-      backedUp: Boolean(data.backedUp),
-      createdAt: data.createdAt?.toDate?.() ?? null,
-      lastUsedAt: data.lastUsedAt?.toDate?.() ?? null,
-      isCurrentDevice: data.credentialId === currentCredentialId,
-    };
-  });
+  return snapshot.docs.map((docSnapshot) => mapStoredCredential(docSnapshot.data(), currentCredentialId));
+};
+
+export const waitForCredentialEnrollment = async (
+  userId: string,
+  credentialId: string,
+): Promise<StoredCredential[]> => {
+  let latest: StoredCredential[] = [];
+
+  for (const delayMs of ENROLLMENT_SYNC_RETRY_DELAYS_MS) {
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
+    latest = await fetchCredentials(userId, { preferServer: true });
+    if (latest.some((credential) => credential.credentialId === credentialId)) {
+      return latest;
+    }
+  }
+
+  return latest;
 };
 
 export const removeCredentialById = async (userId: string, credentialId: string): Promise<boolean> => {

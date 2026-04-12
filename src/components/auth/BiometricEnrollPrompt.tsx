@@ -31,9 +31,9 @@ export function BiometricEnrollPrompt({ loading, label, error, onEnable, onNotNo
         </div>
 
         <div className="space-y-1">
-          <h3 className="text-lg font-bold text-gray-900">Enable {label} Login</h3>
+          <h3 className="text-lg font-bold text-gray-900">Biometrics enrollment</h3>
           <p className="text-sm text-gray-500">
-            Log in faster next time using {label} — no OTP needed.
+            Set up {label} login on this device so you can sign in without OTP next time.
           </p>
         </div>
 
@@ -47,7 +47,7 @@ export function BiometricEnrollPrompt({ loading, label, error, onEnable, onNotNo
             disabled={loading}
             className="w-full py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors disabled:opacity-50"
           >
-            {loading ? 'Setting up…' : `Enable ${label}`}
+            {loading ? 'Setting up…' : 'Enable biometrics'}
           </button>
           <button
             type="button"

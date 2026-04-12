@@ -9,11 +9,13 @@ import {
   getLastEnrolledUserId,
   getNeverAsk,
   setNeverAsk,
+  storeCredentialId,
   registerBiometric,
   authenticateWithBiometric,
   removeBiometricCredential,
   removeCredentialById,
   fetchCredentials,
+  waitForCredentialEnrollment,
   clearCredentialId,
 } from '../services/webauthn.service';
 import type { StoredCredential } from '../services/webauthn.service';
@@ -79,6 +81,27 @@ export const useWebAuthn = (userId?: string | null) => {
   const effectiveUserId = userId ?? localEnrolledUserId;
   const biometricLabel = getBiometricLabel();
 
+  const reconcileCredentials = useCallback((list: StoredCredential[], currentId: string | null): StoredCredential[] => {
+    if (currentId) {
+      return list.map((credential) => ({
+        ...credential,
+        isCurrentDevice: credential.credentialId === currentId,
+      }));
+    }
+
+    const matchingCurrentClient = list.filter((credential) => credential.matchesCurrentClient);
+    if (matchingCurrentClient.length === 1 && userId) {
+      const repairedCredentialId = matchingCurrentClient[0].credentialId;
+      storeCredentialId(userId, repairedCredentialId);
+      return list.map((credential) => ({
+        ...credential,
+        isCurrentDevice: credential.credentialId === repairedCredentialId,
+      }));
+    }
+
+    return list;
+  }, [userId]);
+
   useEffect(() => {
     if (userId) {
       setLocalEnrolledUserId(userId);
@@ -122,30 +145,38 @@ export const useWebAuthn = (userId?: string | null) => {
     setIsRegistered(Boolean(getStoredCredentialId(effectiveUserId)));
   }, [effectiveUserId]);
 
-  const refreshCredentials = useCallback(async () => {
+  const refreshCredentials = useCallback(async (options?: { expectedCredentialId?: string }) => {
     if (!userId) return;
     setCredentialsLoading(true);
     setCredentialsError(null);
     try {
-      const list = await fetchCredentials(userId);
-      setCredentials(list);
+      const expectedCredentialId = options?.expectedCredentialId;
+      const list = expectedCredentialId
+        ? await waitForCredentialEnrollment(userId, expectedCredentialId)
+        : await fetchCredentials(userId, { preferServer: true });
 
       const currentId = getStoredCredentialId(userId);
-      if (currentId) {
-        const stillExists = list.some((credential) => credential.credentialId === currentId);
+      const reconciled = reconcileCredentials(list, currentId);
+      setCredentials(reconciled);
+
+      const resolvedCurrentId = getStoredCredentialId(userId);
+      if (resolvedCurrentId) {
+        const stillExists = reconciled.some((credential) => credential.credentialId === resolvedCurrentId);
         if (!stillExists) {
           clearCredentialId(userId);
           setIsRegistered(false);
+        } else {
+          setIsRegistered(true);
         }
       } else {
-        setIsRegistered(list.some((credential) => credential.isCurrentDevice));
+        setIsRegistered(reconciled.some((credential) => credential.isCurrentDevice));
       }
     } catch {
       setCredentialsError('Could not load biometric devices right now. Please retry.');
     } finally {
       setCredentialsLoading(false);
     }
-  }, [userId]);
+  }, [reconcileCredentials, userId]);
 
   useEffect(() => {
     if (userId) {
@@ -160,9 +191,16 @@ export const useWebAuthn = (userId?: string | null) => {
     setNeedsReenroll(false);
 
     try {
-      await registerBiometric(userId);
+      const credentialId = await registerBiometric(userId);
       setIsRegistered(true);
-      await refreshCredentials();
+      await refreshCredentials({ expectedCredentialId: credentialId });
+
+      const confirmedCredentialId = getStoredCredentialId(userId);
+      if (!confirmedCredentialId) {
+        setIsRegistered(false);
+        setError('Biometrics enrollment could not be confirmed. Please try again.');
+        return false;
+      }
       return true;
     } catch (err: any) {
       if (isLikelyCancellationError(err)) {
@@ -171,9 +209,13 @@ export const useWebAuthn = (userId?: string | null) => {
       }
 
       if (err?.name === 'InvalidStateError') {
-        setIsRegistered(true);
         await refreshCredentials().catch(() => {});
-        return true;
+        if (getStoredCredentialId(userId)) {
+          setIsRegistered(true);
+          return true;
+        }
+        setError('Biometrics are already enrolled on this device, but enrollment could not be verified. Please refresh and try again.');
+        return false;
       }
 
       void captureHandledError(err, {

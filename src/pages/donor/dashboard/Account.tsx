@@ -1304,8 +1304,8 @@ const DonorAccount = () => {
           <div className="bg-white rounded-2xl shadow-xl p-6">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h2 className="text-lg font-bold text-gray-800">{biometricLabel} Login</h2>
-                <p className="text-xs text-gray-500">Manage biometric login across your devices.</p>
+                <h2 className="text-lg font-bold text-gray-800">Biometrics enrollment</h2>
+                <p className="text-xs text-gray-500">Manage enrolled biometric devices for faster donor login.</p>
               </div>
               <div className="rounded-full bg-red-50 p-2">
                 <Fingerprint className="h-5 w-5 text-red-600" />
@@ -1398,7 +1398,7 @@ const DonorAccount = () => {
                 className="mt-3 w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors disabled:opacity-50"
               >
                 {isOnline ? <Fingerprint className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
-                {biometricLoading ? 'Setting up…' : !isOnline ? 'Network Required to Enable' : `Enable ${biometricLabel}`}
+                {biometricLoading ? 'Setting up…' : !isOnline ? 'Network Required to Enable' : 'Enable biometrics'}
               </button>
             )}
 
