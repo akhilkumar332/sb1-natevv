@@ -271,6 +271,7 @@ const requestAuthChallenge = async (userId?: string | null): Promise<ChallengeRe
   const credentialId = userId ? getStoredCredentialId(userId) ?? undefined : undefined;
   const transports = credentialId && userId ? getStoredTransports(userId) : undefined;
   return post('webauthn-auth-challenge', {
+    ...(userId ? { userId } : {}),
     ...(credentialId ? { credentialId, transports } : {}),
   });
 };

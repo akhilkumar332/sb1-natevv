@@ -233,6 +233,26 @@ describe('WebAuthn Netlify handlers', () => {
     expect(state.challenges.size).toBe(2);
   });
 
+  it('uses the hinted user path for known-user auth challenges without needing collection-group lookup', async () => {
+    state.users.set('donor-1', { uid: 'donor-1' });
+    state.userCredentials.set('donor-1', new Map([
+      ['cred-1', { credentialId: 'cred-1', transports: ['internal'] }],
+    ]));
+
+    const { handler } = await import('../webauthn-auth-challenge.mjs');
+
+    const response = await handler({
+      httpMethod: 'POST',
+      body: JSON.stringify({ userId: 'donor-1', credentialId: 'cred-1' }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(Array.from(state.challenges.values())[0]).toMatchObject({
+      userId: 'donor-1',
+      credentialId: 'cred-1',
+    });
+  });
+
   it('does not bind an unauthenticated auth challenge to a caller-supplied userId without a known credential hint', async () => {
     const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID');
     randomUuidSpy.mockReturnValueOnce('challenge-usernameless');

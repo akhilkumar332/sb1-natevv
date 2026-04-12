@@ -16,7 +16,23 @@ const normalizeTransports = (value) => (
     : []
 );
 
-const resolveCredentialOwner = async (db, credentialId) => {
+const resolveCredentialOwner = async (db, credentialId, hintedUserId = null) => {
+  if (hintedUserId) {
+    const credentialRef = db
+      .collection('users')
+      .doc(hintedUserId)
+      .collection('webauthnCredentials')
+      .doc(credentialId);
+    const credentialDoc = await credentialRef.get();
+    if (!credentialDoc.exists) {
+      return null;
+    }
+    return {
+      userId: hintedUserId,
+      data: credentialDoc.data() || {},
+    };
+  }
+
   const matches = await db
     .collectionGroup('webauthnCredentials')
     .where('credentialId', '==', credentialId)
@@ -58,6 +74,7 @@ export const handler = async (event) => {
   }
 
   const providedCredentialId = typeof payload.credentialId === 'string' ? payload.credentialId.trim() : '';
+  const providedUserId = typeof payload.userId === 'string' ? payload.userId.trim() : '';
   const providedTransports = normalizeTransports(payload.transports);
 
   try {
@@ -71,7 +88,7 @@ export const handler = async (event) => {
     let staleCredential = false;
 
     if (providedCredentialId) {
-      const owner = await resolveCredentialOwner(db, providedCredentialId);
+      const owner = await resolveCredentialOwner(db, providedCredentialId, providedUserId || null);
       if (owner) {
         resolvedUserId = owner.userId;
         allowCredentials = [{

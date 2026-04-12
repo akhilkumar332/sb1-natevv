@@ -48,10 +48,14 @@ const isStaleCredentialError = (error: any): boolean => {
 
 const isBackendInfrastructureError = (error: any): boolean => {
   const message = String(error?.message || '').toLowerCase();
+  const code = String(error?.code || '').toLowerCase();
   return message.includes('missing firebase admin credentials')
     || message.includes('internal error')
     || message.includes('request failed: 500')
-    || message.includes('empty response');
+    || message.includes('empty response')
+    || message.includes('failed_precondition')
+    || message.includes('failed-precondition')
+    || code === 'failed-precondition';
 };
 
 export const useWebAuthn = (userId?: string | null) => {

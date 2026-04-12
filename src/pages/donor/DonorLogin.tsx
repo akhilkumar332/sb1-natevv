@@ -106,6 +106,7 @@ export function DonorLogin() {
   // Biometric login
   const {
     isSupported: biometricSupported,
+    isRegistered: biometricRegistered,
     supportsAutofill: biometricSupportsAutofill,
     canAuthenticate: biometricCanAuthenticate,
     isReady: biometricReady,
@@ -129,7 +130,7 @@ export function DonorLogin() {
   }, []);
 
   useEffect(() => {
-    if (!biometricReady || !biometricCanAuthenticate) return;
+    if (!biometricReady || !biometricCanAuthenticate || !biometricRegistered) return;
     const effectiveUid = user?.uid ?? (typeof localStorage !== 'undefined' ? localStorage.getItem(LAST_USER_KEY) : null);
     const cacheKey = effectiveUid || 'usernameless';
 
@@ -138,12 +139,12 @@ export function DonorLogin() {
       void prefetchAuthChallenge(effectiveUid);
       warmupBiometricFunctions();
     }
-  }, [biometricCanAuthenticate, biometricReady, user?.uid]);
+  }, [biometricCanAuthenticate, biometricReady, biometricRegistered, user?.uid]);
 
   // Handle Conditional UI (autofill)
   const autofillTriggeredRef = useRef(false);
   useEffect(() => {
-    if (!biometricReady || !biometricSupportsAutofill || autofillTriggeredRef.current) return;
+    if (!biometricReady || !biometricRegistered || !biometricSupportsAutofill || autofillTriggeredRef.current) return;
     if (biometricLoading || authLoading || biometricNavigating) return;
 
     autofillTriggeredRef.current = true;
@@ -166,6 +167,7 @@ export function DonorLogin() {
     });
   }, [
     biometricReady,
+    biometricRegistered,
     biometricSupportsAutofill,
     biometricLoading,
     authLoading,
@@ -722,7 +724,7 @@ export function DonorLogin() {
                     </div>
                   </div>
 
-                  {(biometricSupported || biometricSupportsAutofill) && biometricCanAuthenticate && (
+                  {biometricRegistered && (biometricSupported || biometricSupportsAutofill) && biometricCanAuthenticate && (
                     <BiometricLoginButton
                       loading={biometricLoading || authLoading || biometricNavigating}
                       error={biometricError}

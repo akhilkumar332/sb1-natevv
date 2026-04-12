@@ -116,6 +116,7 @@ describe('DonorLogin', () => {
     });
     useWebAuthnMock.mockReturnValue({
       isSupported: false,
+      isRegistered: false,
       supportsAutofill: false,
       canAuthenticate: false,
       isReady: true,
@@ -221,6 +222,7 @@ describe('DonorLogin', () => {
     });
     useWebAuthnMock.mockReturnValue({
       isSupported: true,
+      isRegistered: true,
       supportsAutofill: false,
       canAuthenticate: true,
       isReady: true,
@@ -259,6 +261,7 @@ describe('DonorLogin', () => {
     });
     useWebAuthnMock.mockReturnValue({
       isSupported: false,
+      isRegistered: false,
       supportsAutofill: true,
       canAuthenticate: true,
       isReady: true,
@@ -275,6 +278,6 @@ describe('DonorLogin', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('button', { name: 'Login with Biometrics' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Login with Biometrics' })).not.toBeInTheDocument();
   });
 });

@@ -212,4 +212,23 @@ describe('useWebAuthn', () => {
 
     expect(result.current.error).toBe('Biometric login is temporarily unavailable. Please use OTP or Google.');
   });
+
+  it('shows a generic message for failed-precondition errors during manual login', async () => {
+    authenticateWithBiometricMock.mockRejectedValue({
+      code: 'failed-precondition',
+      message: '9 FAILED_PRECONDITION: missing index',
+    });
+
+    const { result } = renderHook(() => useWebAuthn('donor-1'));
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.authenticate();
+    });
+
+    expect(result.current.error).toBe('Biometric login is temporarily unavailable. Please use OTP or Google.');
+  });
 });
