@@ -88,7 +88,8 @@ export const handler = async (event) => {
       authenticatorSelection: {
         authenticatorAttachment: 'platform',
         userVerification: 'required',
-        residentKey: 'preferred',
+        residentKey: 'required',
+        requireResidentKey: true,
       },
       excludeCredentials,
     });
