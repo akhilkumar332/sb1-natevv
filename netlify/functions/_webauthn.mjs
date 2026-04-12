@@ -201,6 +201,11 @@ export const getChallengeRecord = async (db, challengeId, expectedType) => {
 
 export const classifyWebAuthnVerificationError = (error, fallbackMessage) => {
   const message = String(error?.message || '').toLowerCase();
+  
+  if (message.includes('failed_precondition') || message.includes('failed-precondition')) {
+    return null;
+  }
+
   const likelyClientError = [
     'challenge',
     'origin',
