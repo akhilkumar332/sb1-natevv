@@ -22,7 +22,7 @@ import { authFlowMessages, authInputMessages, validateGeneralPhoneInput, getOtpV
 import { useWebAuthn } from '../../hooks/useWebAuthn';
 import { useNetworkStatus } from '../../contexts/NetworkStatusContext';
 import { BiometricLoginButton } from '../../components/auth/BiometricLoginButton';
-import { warmupBiometricFunctions, prefetchAuthChallenge, LAST_USER_KEY } from '../../services/webauthn.service';
+import { warmupBiometricFunctions, prefetchAuthChallenge } from '../../services/webauthn.service';
 
 export function DonorLogin() {
   const { isOnline } = useNetworkStatus();
@@ -131,12 +131,12 @@ export function DonorLogin() {
 
   useEffect(() => {
     if (!biometricReady || !biometricCanAuthenticate || !biometricRegistered) return;
-    const effectiveUid = user?.uid ?? (typeof localStorage !== 'undefined' ? localStorage.getItem(LAST_USER_KEY) : null);
-    const cacheKey = effectiveUid || 'usernameless';
+    const challengeUserId = user?.uid ?? null;
+    const cacheKey = challengeUserId || 'usernameless';
 
     if (prefetchedKeyRef.current !== cacheKey) {
       prefetchedKeyRef.current = cacheKey;
-      void prefetchAuthChallenge(effectiveUid);
+      void prefetchAuthChallenge(challengeUserId);
       warmupBiometricFunctions();
     }
   }, [biometricCanAuthenticate, biometricReady, biometricRegistered, user?.uid]);

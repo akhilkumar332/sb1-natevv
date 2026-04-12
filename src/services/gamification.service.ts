@@ -20,7 +20,7 @@ import {
   serverTimestamp,
   writeBatch
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { auth, db } from '../firebase';
 import type { User } from '../types/database.types';
 import { captureHandledError } from './errorLog.service';
 
@@ -186,6 +186,10 @@ class GamificationService {
       nextLevelPoints: 500,
       ...overrides,
     };
+  }
+
+  private canWriteOwnerGamificationData(userId: string): boolean {
+    return auth.currentUser?.uid === userId;
   }
 
   private async getUserProfile(userId: string): Promise<User | null> {
@@ -395,15 +399,17 @@ class GamificationService {
       }
 
       const initialStats = this.buildDefaultStats(userId);
-      try {
-        await setDoc(userStatsRef, {
-          ...initialStats,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-      } catch (error) {
-        if (!this.isOfflineFirestoreError(error)) {
-          this.reportError(error, 'gamification.user_stats.create_default');
+      if (this.canWriteOwnerGamificationData(userId)) {
+        try {
+          await setDoc(userStatsRef, {
+            ...initialStats,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        } catch (error) {
+          if (!this.isOfflineFirestoreError(error) && !this.isAuthPermissionError(error)) {
+            this.reportError(error, 'gamification.user_stats.create_default');
+          }
         }
       }
 
@@ -440,7 +446,7 @@ class GamificationService {
       const badges = computed;
 
       const missingEarned = computed.filter((badge) => badge.earned && !earnedBadgeIds.has(badge.id));
-      if (missingEarned.length > 0) {
+      if (missingEarned.length > 0 && this.canWriteOwnerGamificationData(userId)) {
         const batch = writeBatch(db);
         missingEarned.forEach((badge) => {
           const userBadgeRef = doc(collection(db, COLLECTIONS.USER_BADGES));
@@ -453,13 +459,13 @@ class GamificationService {
         try {
           await batch.commit();
         } catch (error) {
-          if (!this.isOfflineFirestoreError(error)) {
+          if (!this.isOfflineFirestoreError(error) && !this.isAuthPermissionError(error)) {
             this.reportError(error, 'gamification.badges.backfill');
           }
         }
       }
 
-      if (derivedStats !== stats && derivedStats) {
+      if (derivedStats !== stats && derivedStats && this.canWriteOwnerGamificationData(userId)) {
         try {
           const userStatsRef = doc(db, COLLECTIONS.USER_STATS, userId);
           await setDoc(
@@ -474,7 +480,7 @@ class GamificationService {
             { merge: true }
           );
         } catch (error) {
-          if (!this.isOfflineFirestoreError(error)) {
+          if (!this.isOfflineFirestoreError(error) && !this.isAuthPermissionError(error)) {
             this.reportError(error, 'gamification.user_stats.backfill');
           }
         }

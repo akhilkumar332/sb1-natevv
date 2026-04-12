@@ -178,6 +178,25 @@ describe('useWebAuthn', () => {
     expect(result.current.isRegistered).toBe(true);
   });
 
+  it('does not pin unauthenticated biometric login to the last locally enrolled user challenge', async () => {
+    authenticateWithBiometricMock.mockResolvedValue({
+      customToken: 'token-1',
+      userId: 'donor-1',
+    });
+
+    const { result } = renderHook(() => useWebAuthn(null));
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.authenticate({ mediation: 'conditional' });
+    });
+
+    expect(authenticateWithBiometricMock).toHaveBeenCalledWith(null, 'conditional');
+  });
+
   it('confirms registration only after the credential is visible in the account list path', async () => {
     registerBiometricMock.mockResolvedValue('cred-2');
     getStoredCredentialIdMock.mockReturnValue('cred-2');

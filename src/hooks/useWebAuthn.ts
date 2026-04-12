@@ -273,6 +273,7 @@ export const useWebAuthn = (userId?: string | null) => {
     mediation?: 'conditional' | 'required' | 'optional';
   }): Promise<{ customToken: string; userId: string | null } | null> => {
     const isConditional = options?.mediation === 'conditional';
+    const authChallengeUserId = userId ?? null;
     if (!isConditional) {
       setLoading(true);
     }
@@ -280,7 +281,7 @@ export const useWebAuthn = (userId?: string | null) => {
 
     try {
       const result = await authenticateWithBiometric(
-        effectiveUserId,
+        authChallengeUserId,
         options?.mediation
       );
       const resolvedUserId = result.userId ?? effectiveUserId;
