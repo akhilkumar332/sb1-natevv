@@ -144,4 +144,36 @@ describe('webauthn.service', () => {
       backedUp: false,
     });
   });
+
+  it('activates an existing biometric on the current device by reusing the authentication flow', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          challengeId: 'challenge-activate',
+          options: { challenge: 'challenge-activate-options' },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          customToken: 'token-activate',
+          userId: 'donor-1',
+        }),
+      });
+
+    vi.stubGlobal('fetch', fetchMock);
+    startAuthenticationMock.mockResolvedValue({ id: 'cred-activate' });
+
+    const { activateBiometricOnCurrentDevice, getStoredCredentialId } = await import('../webauthn.service');
+    const result = await activateBiometricOnCurrentDevice('donor-1');
+
+    expect(result).toEqual({
+      credentialId: 'cred-activate',
+      userId: 'donor-1',
+    });
+    expect(getStoredCredentialId('donor-1')).toBe('cred-activate');
+  });
 });

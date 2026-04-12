@@ -11,6 +11,7 @@ import {
   setNeverAsk,
   storeCredentialId,
   registerBiometric,
+  activateBiometricOnCurrentDevice,
   authenticateWithBiometric,
   removeBiometricCredential,
   removeCredentialById,
@@ -209,12 +210,27 @@ export const useWebAuthn = (userId?: string | null) => {
       }
 
       if (err?.name === 'InvalidStateError') {
+        try {
+          const activation = await activateBiometricOnCurrentDevice(userId);
+          if (activation.credentialId) {
+            await refreshCredentials({ expectedCredentialId: activation.credentialId }).catch(() => {});
+            setIsRegistered(true);
+            setError(null);
+            return true;
+          }
+        } catch (activationError: any) {
+          if (isLikelyCancellationError(activationError)) {
+            setError('Biometric prompt was cancelled.');
+            return false;
+          }
+        }
+
         await refreshCredentials().catch(() => {});
         if (getStoredCredentialId(userId)) {
           setIsRegistered(true);
           return true;
         }
-        setError('Biometrics are already enrolled on this device, but enrollment could not be verified. Please refresh and try again.');
+        setError('A synced biometric passkey already exists for this account, but this device could not activate it. Please try again.');
         return false;
       }
 

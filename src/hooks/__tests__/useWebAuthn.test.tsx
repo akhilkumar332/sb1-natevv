@@ -11,6 +11,7 @@ const {
   getNeverAskMock,
   storeCredentialIdMock,
   registerBiometricMock,
+  activateBiometricOnCurrentDeviceMock,
   authenticateWithBiometricMock,
   fetchCredentialsMock,
   waitForCredentialEnrollmentMock,
@@ -24,6 +25,7 @@ const {
   getNeverAskMock: vi.fn(),
   storeCredentialIdMock: vi.fn(),
   registerBiometricMock: vi.fn(),
+  activateBiometricOnCurrentDeviceMock: vi.fn(),
   authenticateWithBiometricMock: vi.fn(),
   fetchCredentialsMock: vi.fn(),
   waitForCredentialEnrollmentMock: vi.fn(),
@@ -41,6 +43,7 @@ vi.mock('../../services/webauthn.service', () => ({
   storeCredentialId: storeCredentialIdMock,
   setNeverAsk: vi.fn(),
   registerBiometric: registerBiometricMock,
+  activateBiometricOnCurrentDevice: activateBiometricOnCurrentDeviceMock,
   authenticateWithBiometric: authenticateWithBiometricMock,
   removeBiometricCredential: vi.fn(),
   removeCredentialById: vi.fn(),
@@ -62,6 +65,10 @@ describe('useWebAuthn', () => {
     getStoredCredentialIdMock.mockReturnValue('cred-1');
     getLastEnrolledUserIdMock.mockReturnValue('donor-1');
     getNeverAskMock.mockReturnValue(false);
+    activateBiometricOnCurrentDeviceMock.mockResolvedValue({
+      credentialId: 'cred-1',
+      userId: 'donor-1',
+    });
     waitForCredentialEnrollmentMock.mockResolvedValue([
       {
         credentialId: 'cred-1',
@@ -315,6 +322,7 @@ describe('useWebAuthn', () => {
 
   it('does not treat InvalidStateError as success when enrollment cannot be verified', async () => {
     registerBiometricMock.mockRejectedValue({ name: 'InvalidStateError' });
+    activateBiometricOnCurrentDeviceMock.mockRejectedValue(new Error('Activation failed'));
     getStoredCredentialIdMock.mockReturnValue(null);
     fetchCredentialsMock.mockResolvedValue([]);
 
@@ -331,6 +339,45 @@ describe('useWebAuthn', () => {
 
     expect(registered).toBe(false);
     expect(result.current.isRegistered).toBe(false);
-    expect(result.current.error).toContain('could not be verified');
+    expect(result.current.error).toContain('could not activate');
+  });
+
+  it('activates an existing synced passkey on a second device after InvalidStateError', async () => {
+    registerBiometricMock.mockRejectedValue({ name: 'InvalidStateError' });
+    activateBiometricOnCurrentDeviceMock.mockResolvedValue({
+      credentialId: 'cred-synced',
+      userId: 'donor-1',
+    });
+    getStoredCredentialIdMock.mockReturnValue('cred-synced');
+    waitForCredentialEnrollmentMock.mockResolvedValue([
+      {
+        credentialId: 'cred-synced',
+        deviceName: 'Android Device',
+        deviceDetails: 'Android 15 · Chrome',
+        deviceType: 'platform',
+        backedUp: true,
+        createdAt: null,
+        lastUsedAt: null,
+        isCurrentDevice: true,
+        matchesCurrentClient: false,
+      },
+    ]);
+
+    const { result } = renderHook(() => useWebAuthn('donor-1'));
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    let registered = false;
+    await act(async () => {
+      registered = await result.current.register();
+    });
+
+    expect(activateBiometricOnCurrentDeviceMock).toHaveBeenCalledWith('donor-1');
+    expect(waitForCredentialEnrollmentMock).toHaveBeenCalledWith('donor-1', 'cred-synced');
+    expect(registered).toBe(true);
+    expect(result.current.isRegistered).toBe(true);
+    expect(result.current.error).toBeNull();
   });
 });

@@ -372,6 +372,16 @@ export const registerBiometric = async (userId: string): Promise<string> => {
   return result.credentialId;
 };
 
+export const activateBiometricOnCurrentDevice = async (
+  userId: string,
+): Promise<{ credentialId: string | null; userId: string | null }> => {
+  const result = await authenticateWithBiometric(userId, 'required');
+  return {
+    credentialId: getStoredCredentialId(userId),
+    userId: result.userId,
+  };
+};
+
 export const prefetchAuthChallenge = async (userId?: string | null): Promise<void> => {
   try {
     const response = await requestAuthChallenge(userId);
