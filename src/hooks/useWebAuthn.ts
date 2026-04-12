@@ -46,6 +46,14 @@ const isStaleCredentialError = (error: any): boolean => {
     || message.includes('404');
 };
 
+const isBackendInfrastructureError = (error: any): boolean => {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('missing firebase admin credentials')
+    || message.includes('internal error')
+    || message.includes('request failed: 500')
+    || message.includes('empty response');
+};
+
 export const useWebAuthn = (userId?: string | null) => {
   const { isOnline } = useNetworkStatus();
   const [isSupported, setIsSupported] = useState(false);
@@ -243,6 +251,14 @@ export const useWebAuthn = (userId?: string | null) => {
           mediation: options?.mediation,
         },
       });
+
+      if (isBackendInfrastructureError(err)) {
+        if (!isConditional) {
+          setError('Biometric login is temporarily unavailable. Please use OTP or Google.');
+        }
+        return null;
+      }
+
       setError(err?.message || 'Authentication failed.');
       return null;
     } finally {

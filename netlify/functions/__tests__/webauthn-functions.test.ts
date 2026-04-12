@@ -183,6 +183,27 @@ describe('WebAuthn Netlify handlers', () => {
     process.env.FIREBASE_PROJECT_ID = 'project';
     process.env.FIREBASE_CLIENT_EMAIL = 'user@example.com';
     process.env.FIREBASE_PRIVATE_KEY = 'private-key';
+    delete process.env.VITE_FIREBASE_PROJECT_ID;
+    delete process.env.VITE_FIREBASE_CLIENT_EMAIL;
+    delete process.env.VITE_FIREBASE_PRIVATE_KEY;
+  });
+
+  it('accepts VITE-prefixed admin credentials when FIREBASE-prefixed vars are absent', async () => {
+    delete process.env.FIREBASE_PROJECT_ID;
+    delete process.env.FIREBASE_CLIENT_EMAIL;
+    delete process.env.FIREBASE_PRIVATE_KEY;
+    process.env.VITE_FIREBASE_PROJECT_ID = 'project';
+    process.env.VITE_FIREBASE_CLIENT_EMAIL = 'user@example.com';
+    process.env.VITE_FIREBASE_PRIVATE_KEY = 'private-key';
+
+    const { handler } = await import('../webauthn-auth-challenge.mjs');
+
+    const response = await handler({
+      httpMethod: 'POST',
+      body: JSON.stringify({}),
+    });
+
+    expect(response.statusCode).toBe(200);
   });
 
   it('creates unique auth challenge IDs for parallel attempts instead of overwriting a shared doc', async () => {

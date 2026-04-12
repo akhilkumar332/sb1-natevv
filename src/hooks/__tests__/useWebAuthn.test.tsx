@@ -178,4 +178,38 @@ describe('useWebAuthn', () => {
 
     expect(result.current.loading).toBe(false);
   });
+
+  it('suppresses backend infrastructure errors during conditional mediation', async () => {
+    isPlatformAuthenticatorAvailableMock.mockResolvedValue(true);
+    isWebAuthnAutofillSupportedMock.mockResolvedValue(true);
+    authenticateWithBiometricMock.mockRejectedValue(new Error('Missing Firebase Admin credentials.'));
+
+    const { result } = renderHook(() => useWebAuthn('donor-1'));
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.authenticate({ mediation: 'conditional' });
+    });
+
+    expect(result.current.error).toBeNull();
+  });
+
+  it('shows a generic message for backend infrastructure errors during manual login', async () => {
+    authenticateWithBiometricMock.mockRejectedValue(new Error('Missing Firebase Admin credentials.'));
+
+    const { result } = renderHook(() => useWebAuthn('donor-1'));
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.authenticate();
+    });
+
+    expect(result.current.error).toBe('Biometric login is temporarily unavailable. Please use OTP or Google.');
+  });
 });
