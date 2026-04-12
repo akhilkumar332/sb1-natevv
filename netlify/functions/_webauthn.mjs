@@ -143,6 +143,10 @@ export const baseCorsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+export const getRequestUserAgent = (headers = {}) => (
+  String(headers['user-agent'] || headers['User-Agent'] || '').trim().slice(0, 300)
+);
+
 export const jsonResponse = (statusCode, body, headers = {}) => ({
   statusCode,
   headers: { ...baseCorsHeaders, 'Content-Type': 'application/json', ...headers },

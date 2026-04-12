@@ -95,6 +95,11 @@ export const handler = async (event) => {
       return jsonResponse(400, { error: 'Missing credential id' });
     }
 
+    if (challengeData.credentialId && challengeData.credentialId !== credentialId) {
+      await challengeRef?.delete().catch(() => {});
+      return jsonResponse(400, { error: 'Credential mismatch for challenge' });
+    }
+
     const owner = await resolveCredentialOwner(db, credentialId, challengeData.userId || null);
     if (!owner) {
       await challengeRef?.delete().catch(() => {});

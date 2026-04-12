@@ -289,6 +289,46 @@ describe('WebAuthn Netlify handlers', () => {
     expect(JSON.parse(response.body)).toEqual({ error: 'Missing auth token' });
   });
 
+  it('does not exclude other-device credentials from registration challenge generation', async () => {
+    state.users.set('donor-1', {
+      uid: 'donor-1',
+      phoneNumber: '+911234567890',
+      displayName: 'Donor One',
+    });
+    state.userCredentials.set('donor-1', new Map([
+      ['cred-mac', {
+        credentialId: 'cred-mac',
+        transports: ['internal'],
+        backedUp: true,
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
+      }],
+      ['cred-android', {
+        credentialId: 'cred-android',
+        transports: ['internal'],
+        backedUp: false,
+        userAgent: 'Mozilla/5.0 (Linux; Android 15; CPH2447) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Mobile Safari/537.36',
+      }],
+    ]));
+
+    const { handler } = await import('../webauthn-register-challenge.mjs');
+
+    const response = await handler({
+      httpMethod: 'POST',
+      headers: {
+        authorization: 'Bearer token-1',
+        'user-agent': 'Mozilla/5.0 (Linux; Android 15; CPH2447) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Mobile Safari/537.36',
+      },
+      body: JSON.stringify({ userId: 'donor-1' }),
+    });
+
+    const webauthnServer = await import('@simplewebauthn/server');
+
+    expect(response.statusCode).toBe(200);
+    expect(webauthnServer.generateRegistrationOptions).toHaveBeenCalledWith(expect.objectContaining({
+      excludeCredentials: [],
+    }));
+  });
+
   it('returns a 400 when auth verification is attempted with a missing challenge', async () => {
     const { handler } = await import('../webauthn-auth-verify.mjs');
 
@@ -302,6 +342,32 @@ describe('WebAuthn Netlify handlers', () => {
 
     expect(response.statusCode).toBe(400);
     expect(JSON.parse(response.body)).toEqual({ error: 'No pending challenge' });
+  });
+
+  it('rejects auth verification when the credential does not match the hinted challenge credential', async () => {
+    state.challenges.set('challenge-hinted', {
+      type: 'authentication',
+      userId: 'donor-1',
+      credentialId: 'cred-expected',
+      challenge: 'challenge-value',
+      rpId: 'bloodhub.in',
+      origin: 'https://bloodhub.in',
+      expiresAt: Date.now() + 60_000,
+    });
+
+    const { handler } = await import('../webauthn-auth-verify.mjs');
+
+    const response = await handler({
+      httpMethod: 'POST',
+      body: JSON.stringify({
+        challengeId: 'challenge-hinted',
+        credential: { id: 'cred-other' },
+      }),
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body)).toEqual({ error: 'Credential mismatch for challenge' });
+    expect(state.challenges.has('challenge-hinted')).toBe(false);
   });
 
   it('consumes an auth challenge after a failed verification attempt', async () => {

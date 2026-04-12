@@ -103,6 +103,15 @@ export const useWebAuthn = (userId?: string | null) => {
     return list;
   }, [userId]);
 
+  const resolveActivatableCredentialId = useCallback((list: StoredCredential[]): string | null => {
+    const syncedCredentials = list.filter((credential) => credential.backedUp);
+    if (syncedCredentials.length === 1) {
+      return syncedCredentials[0].credentialId;
+    }
+
+    return null;
+  }, []);
+
   useEffect(() => {
     if (userId) {
       setLocalEnrolledUserId(userId);
@@ -225,6 +234,20 @@ export const useWebAuthn = (userId?: string | null) => {
           }
         }
 
+        try {
+          const serverCredentials = await fetchCredentials(userId, { preferServer: true });
+          const activatableCredentialId = resolveActivatableCredentialId(serverCredentials);
+          if (activatableCredentialId) {
+            storeCredentialId(userId, activatableCredentialId);
+            await refreshCredentials({ expectedCredentialId: activatableCredentialId }).catch(() => {});
+            setIsRegistered(true);
+            setError(null);
+            return true;
+          }
+        } catch {
+          // Fall through to the final recovery message below.
+        }
+
         await refreshCredentials().catch(() => {});
         if (getStoredCredentialId(userId)) {
           setIsRegistered(true);
@@ -244,7 +267,7 @@ export const useWebAuthn = (userId?: string | null) => {
     } finally {
       setLoading(false);
     }
-  }, [refreshCredentials, userId]);
+  }, [activateBiometricOnCurrentDevice, fetchCredentials, refreshCredentials, resolveActivatableCredentialId, userId]);
 
   const authenticate = useCallback(async (options?: {
     mediation?: 'conditional' | 'required' | 'optional';

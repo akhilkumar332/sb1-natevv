@@ -4,6 +4,7 @@ import {
   RP_NAME,
   initAdmin,
   getBearerToken,
+  getRequestUserAgent,
   parseJsonBody,
   baseCorsHeaders,
   jsonResponse,
@@ -11,6 +12,15 @@ import {
   resolveRequestOrigin,
   resolveRpId,
 } from './_webauthn.mjs';
+
+const shouldExcludeExistingCredential = (credentialData, currentUserAgent) => {
+  const storedUserAgent = String(credentialData?.userAgent || '').trim();
+  if (storedUserAgent && currentUserAgent) {
+    return storedUserAgent === currentUserAgent;
+  }
+
+  return Boolean(!credentialData?.backedUp);
+};
 
 export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
@@ -52,17 +62,21 @@ export const handler = async (event) => {
     }
 
     const userData = userDoc.data() || {};
+    const currentUserAgent = getRequestUserAgent(event.headers || {});
     const existingSnap = await db
       .collection('users')
       .doc(userId)
       .collection('webauthnCredentials')
       .get();
 
-    const excludeCredentials = existingSnap.docs.map((docSnapshot) => ({
-      id: docSnapshot.data().credentialId,
-      type: 'public-key',
-      transports: docSnapshot.data().transports || [],
-    }));
+    const excludeCredentials = existingSnap.docs
+      .map((docSnapshot) => docSnapshot.data() || {})
+      .filter((credentialData) => shouldExcludeExistingCredential(credentialData, currentUserAgent))
+      .map((credentialData) => ({
+        id: credentialData.credentialId,
+        type: 'public-key',
+        transports: credentialData.transports || [],
+      }));
 
     const options = await generateRegistrationOptions({
       rpName: RP_NAME,

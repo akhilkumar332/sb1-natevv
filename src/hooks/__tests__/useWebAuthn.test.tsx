@@ -380,4 +380,91 @@ describe('useWebAuthn', () => {
     expect(result.current.isRegistered).toBe(true);
     expect(result.current.error).toBeNull();
   });
+
+  it('adopts a single existing synced credential when activation cannot complete but account state is unambiguous', async () => {
+    let storedCredentialId: string | null = null;
+    registerBiometricMock.mockRejectedValue({ name: 'InvalidStateError' });
+    activateBiometricOnCurrentDeviceMock.mockRejectedValue(new Error('Activation failed'));
+    getStoredCredentialIdMock.mockImplementation(() => storedCredentialId);
+    storeCredentialIdMock.mockImplementation((_userId: string, credentialId: string) => {
+      storedCredentialId = credentialId;
+    });
+    fetchCredentialsMock.mockResolvedValue([
+      {
+        credentialId: 'cred-backed-up',
+        deviceName: 'Mac',
+        deviceDetails: 'macOS · Chrome',
+        deviceType: 'platform',
+        backedUp: true,
+        createdAt: null,
+        lastUsedAt: null,
+        isCurrentDevice: false,
+        matchesCurrentClient: false,
+      },
+    ]);
+    waitForCredentialEnrollmentMock.mockResolvedValue([
+      {
+        credentialId: 'cred-backed-up',
+        deviceName: 'Mac',
+        deviceDetails: 'macOS · Chrome',
+        deviceType: 'platform',
+        backedUp: true,
+        createdAt: null,
+        lastUsedAt: null,
+        isCurrentDevice: true,
+        matchesCurrentClient: false,
+      },
+    ]);
+
+    const { result } = renderHook(() => useWebAuthn('donor-1'));
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    let registered = false;
+    await act(async () => {
+      registered = await result.current.register();
+    });
+
+    expect(storeCredentialIdMock).toHaveBeenCalledWith('donor-1', 'cred-backed-up');
+    expect(waitForCredentialEnrollmentMock).toHaveBeenCalledWith('donor-1', 'cred-backed-up');
+    expect(registered).toBe(true);
+    expect(result.current.isRegistered).toBe(true);
+    expect(result.current.error).toBeNull();
+  });
+
+  it('does not auto-adopt a single non-synced credential from another device', async () => {
+    registerBiometricMock.mockRejectedValue({ name: 'InvalidStateError' });
+    activateBiometricOnCurrentDeviceMock.mockRejectedValue(new Error('Activation failed'));
+    getStoredCredentialIdMock.mockReturnValue(null);
+    fetchCredentialsMock.mockResolvedValue([
+      {
+        credentialId: 'cred-mac-only',
+        deviceName: 'Mac',
+        deviceDetails: 'macOS · Chrome',
+        deviceType: 'platform',
+        backedUp: false,
+        createdAt: null,
+        lastUsedAt: null,
+        isCurrentDevice: false,
+        matchesCurrentClient: false,
+      },
+    ]);
+
+    const { result } = renderHook(() => useWebAuthn('donor-1'));
+
+    await waitFor(() => {
+      expect(result.current.isReady).toBe(true);
+    });
+
+    let registered = true;
+    await act(async () => {
+      registered = await result.current.register();
+    });
+
+    expect(storeCredentialIdMock).not.toHaveBeenCalledWith('donor-1', 'cred-mac-only');
+    expect(registered).toBe(false);
+    expect(result.current.error).toContain('could not activate');
+  });
 });
