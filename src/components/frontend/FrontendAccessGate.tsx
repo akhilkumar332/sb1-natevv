@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Droplets, Lock, ShieldAlert } from 'lucide-react';
 import Loading from '../Loading';
+import LogoMark from '../LogoMark';
 import SeoHead from '../SeoHead';
 import { CMS_DEFAULTS, CMS_FRONTEND_ACCESS_MODE } from '../../constants/cms';
 import { useLocation } from 'react-router-dom';
@@ -43,6 +44,13 @@ function AccessShell({ eyebrow, title, description, supportingText, icon, childr
       <div className="relative mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
         <div className="grid w-full gap-6 lg:grid-cols-[1.2fr_0.9fr]">
           <section className="rounded-[2rem] border border-red-100/80 bg-white/85 p-8 shadow-[0_30px_80px_rgba(127,29,29,0.12)] backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-950/70">
+            <div className="inline-flex items-center gap-3 rounded-full border border-white/70 bg-white/85 px-4 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
+              <LogoMark className="h-10 w-10" title="BloodHub India" />
+              <div>
+                <p className="text-sm font-black tracking-[0.16em] text-slate-900 dark:text-slate-50">BLOODHUB INDIA</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Donate blood, save lives.</p>
+              </div>
+            </div>
             <div className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
               <Droplets className="h-3.5 w-3.5" />
               {eyebrow}
@@ -154,12 +162,12 @@ function PasswordScreen({
   return (
     <>
       <SeoHead
-        title="Protected Frontend | BloodHub India"
+        title="Security Gate | BloodHub India"
         description={message}
         robots="noindex,nofollow"
       />
       <AccessShell
-        eyebrow="Protected Frontend"
+        eyebrow="Security Gate"
         title={title}
         description={message}
         supportingText={
