@@ -39,16 +39,16 @@ type AccessShellProps = {
 function AccessShell({ eyebrow, title, description, supportingText, icon, children }: AccessShellProps) {
   const { t } = useTranslation();
   return (
-    <div className="min-h-[100dvh] overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.22),_transparent_35%),linear-gradient(135deg,_#fff7f7_0%,_#fff1f2_28%,_#ffffff_60%,_#fef2f2_100%)] dark:bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.18),_transparent_35%),linear-gradient(135deg,_#12090a_0%,_#1b0d10_30%,_#0f172a_75%,_#111827_100%)]">
+    <div className="relative isolate w-full max-w-full min-h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.22),_transparent_35%),linear-gradient(135deg,_#fff7f7_0%,_#fff1f2_28%,_#ffffff_60%,_#fef2f2_100%)] dark:bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.18),_transparent_35%),linear-gradient(135deg,_#12090a_0%,_#1b0d10_30%,_#0f172a_75%,_#111827_100%)]">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -left-16 top-16 h-56 w-56 rounded-full bg-red-300/35 blur-3xl dark:bg-red-700/20" />
         <div className="absolute right-0 top-0 h-72 w-72 rounded-full bg-rose-300/30 blur-3xl dark:bg-rose-700/15" />
         <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-orange-200/20 blur-3xl dark:bg-orange-700/10" />
       </div>
 
-      <div className="relative mx-auto flex min-h-[100dvh] max-w-6xl items-start px-3 py-3 sm:items-center sm:px-6 sm:py-10 lg:px-8">
-        <div className="w-full">
-          <div className="mb-3 flex items-start justify-between gap-2 sm:mb-6 sm:flex-col sm:items-center sm:gap-3">
+      <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-6xl items-start overflow-x-hidden px-3 py-3 sm:items-center sm:px-6 sm:py-10 lg:px-8">
+        <div className="w-full min-w-0 max-w-full">
+          <div className="mb-3 flex min-w-0 items-start justify-between gap-2 sm:mb-6 sm:flex-col sm:items-center sm:gap-3">
             <div className="inline-flex max-w-full items-center rounded-full border border-white/70 bg-white/85 px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 sm:px-4">
               <div className="flex min-w-0 items-center space-x-2">
                 <LogoMark className="h-8 w-8 sm:h-9 sm:w-9" title="BloodHub India" />
@@ -66,9 +66,9 @@ function AccessShell({ eyebrow, title, description, supportingText, icon, childr
             </div>
           </div>
 
-          <div className="grid gap-3 sm:gap-6 lg:grid-cols-[1.2fr_0.9fr]">
-            <section className="rounded-[2rem] border border-red-100/80 bg-white/85 p-4 shadow-[0_30px_80px_rgba(127,29,29,0.12)] backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-950/70 sm:p-8">
-            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300 sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.16em]">
+          <div className="grid min-w-0 gap-3 sm:gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]">
+            <section className="min-w-0 max-w-full overflow-hidden rounded-[2rem] border border-red-100/80 bg-white/85 p-4 shadow-[0_30px_80px_rgba(127,29,29,0.12)] backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-950/70 sm:p-8">
+            <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300 sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.16em]">
               <Droplets className="h-3.5 w-3.5" />
               {eyebrow}
             </div>
@@ -77,16 +77,16 @@ function AccessShell({ eyebrow, title, description, supportingText, icon, childr
                 {icon}
               </div>
               <div className="min-w-0">
-                <h1 className="text-[1.85rem] font-black leading-[1.05] tracking-tight text-slate-900 dark:text-slate-50 sm:text-5xl">{title}</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:mt-4 sm:text-base sm:leading-7">{description}</p>
+                <h1 className="break-words text-[1.85rem] font-black leading-[1.05] tracking-tight text-slate-900 dark:text-slate-50 sm:text-5xl">{title}</h1>
+                <p className="mt-2 max-w-2xl break-words text-sm leading-6 text-slate-600 dark:text-slate-300 sm:mt-4 sm:text-base sm:leading-7">{description}</p>
                 {supportingText ? (
-                  <p className="mt-2 text-sm font-medium leading-5 text-red-700 dark:text-red-300 sm:mt-3 sm:leading-6">{supportingText}</p>
+                  <p className="mt-2 break-words text-sm font-medium leading-5 text-red-700 dark:text-red-300 sm:mt-3 sm:leading-6">{supportingText}</p>
                 ) : null}
               </div>
             </div>
             </section>
 
-            <aside className="rounded-[2rem] border border-red-100/80 bg-white/90 p-3.5 shadow-[0_20px_60px_rgba(127,29,29,0.14)] backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-950/80 sm:p-6">
+            <aside className="min-w-0 max-w-full overflow-hidden rounded-[2rem] border border-red-100/80 bg-white/90 p-3.5 shadow-[0_20px_60px_rgba(127,29,29,0.14)] backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-950/80 sm:p-6">
               {children}
             </aside>
           </div>
@@ -172,11 +172,11 @@ function MaintenanceScreen({
       >
         <div className="space-y-2.5 sm:space-y-4">
           {countdown ? (
-            <div className="rounded-2xl border border-red-200 bg-white/90 p-3.5 dark:border-red-900/40 dark:bg-slate-900 sm:p-5">
+            <div className="min-w-0 rounded-2xl border border-red-200 bg-white/90 p-3.5 dark:border-red-900/40 dark:bg-slate-900 sm:p-5">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold uppercase tracking-[0.14em] text-red-700 dark:text-red-300">{t('frontendAccess.maintenance.countdownTitle')}</p>
-                  <p className="mt-1 break-words text-sm leading-5 text-slate-600 dark:text-slate-300 sm:leading-6">
+                  <p className="mt-1 break-words [overflow-wrap:anywhere] text-sm leading-5 text-slate-600 dark:text-slate-300 sm:leading-6">
                     {countdown.expired
                       ? t('frontendAccess.maintenance.countdownExpired')
                       : formattedEndTime
@@ -185,7 +185,7 @@ function MaintenanceScreen({
                   </p>
                 </div>
                 {formattedEndTime ? (
-                  <div className="hidden max-w-full break-words rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 sm:block sm:max-w-[15rem]">
+                  <div className="hidden max-w-full break-words [overflow-wrap:anywhere] rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 sm:block sm:max-w-[15rem]">
                     {formattedEndTime}
                   </div>
                 ) : null}
@@ -205,19 +205,19 @@ function MaintenanceScreen({
               </div>
             </div>
           ) : null}
-          <div className="rounded-2xl border border-red-100 bg-red-50/80 p-4 dark:border-red-900/40 dark:bg-red-950/20 sm:hidden">
+          <div className="min-w-0 rounded-2xl border border-red-100 bg-red-50/80 p-4 dark:border-red-900/40 dark:bg-red-950/20 sm:hidden">
             <p className="text-sm font-semibold uppercase tracking-[0.14em] text-red-700 dark:text-red-300">{t('frontendAccess.maintenance.visitorInfoTitle')}</p>
             <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">
               {t('frontendAccess.maintenance.visitorInfoBody')}
             </p>
           </div>
-          <div className="hidden rounded-2xl border border-red-100 bg-red-50/80 p-5 dark:border-red-900/40 dark:bg-red-950/20 sm:block">
+          <div className="hidden min-w-0 rounded-2xl border border-red-100 bg-red-50/80 p-5 dark:border-red-900/40 dark:bg-red-950/20 sm:block">
             <p className="text-sm font-semibold uppercase tracking-[0.14em] text-red-700 dark:text-red-300">{t('frontendAccess.maintenance.visitorInfoTitle')}</p>
             <p className="mt-3 text-sm leading-7 text-slate-700 dark:text-slate-300">
               {t('frontendAccess.maintenance.visitorInfoBody')}
             </p>
           </div>
-          <div className="hidden rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 sm:block">
+          <div className="hidden min-w-0 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 sm:block">
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('frontendAccess.maintenance.donorFirstTitle')}</p>
             <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-400">
               {t('frontendAccess.maintenance.donorFirstBody')}
@@ -290,7 +290,7 @@ function PasswordScreen({
         icon={<Lock className="h-7 w-7" />}
       >
         <form onSubmit={(event) => void handleSubmit(event)} className="space-y-2.5 sm:space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900 sm:p-5">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900 sm:p-5">
             <label className="block">
               <span className="mb-2 block text-sm font-semibold text-slate-900 dark:text-slate-100">{t('frontendAccess.password.inputLabel')}</span>
               <input
@@ -299,7 +299,7 @@ function PasswordScreen({
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete="current-password"
                 disabled={!statusReady || !configured || statusError || submitting}
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-200 disabled:cursor-not-allowed disabled:bg-gray-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-900"
+                className="w-full min-w-0 rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-200 disabled:cursor-not-allowed disabled:bg-gray-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-900"
                 placeholder={t('frontendAccess.password.inputPlaceholder')}
               />
             </label>
@@ -313,24 +313,24 @@ function PasswordScreen({
           </div>
 
           {errorMessage ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300 sm:p-4">
+            <div className="min-w-0 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300 sm:p-4">
               {errorMessage}
             </div>
           ) : null}
 
           {statusError ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300 sm:p-4">
+            <div className="min-w-0 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300 sm:p-4">
               {t('frontendAccess.password.statusError')}
             </div>
           ) : null}
 
           {statusReady && !statusError && !configured ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300 sm:p-4">
+            <div className="min-w-0 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300 sm:p-4">
               {t('frontendAccess.password.notConfigured')}
             </div>
           ) : null}
 
-          <div className="hidden rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 sm:block">
+          <div className="hidden min-w-0 rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 sm:block">
             {t('frontendAccess.password.helperText')}
           </div>
         </form>
