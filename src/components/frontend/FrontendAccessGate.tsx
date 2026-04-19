@@ -46,47 +46,47 @@ function AccessShell({ eyebrow, title, description, supportingText, icon, childr
         <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-orange-200/20 blur-3xl dark:bg-orange-700/10" />
       </div>
 
-      <div className="relative mx-auto flex min-h-screen max-w-6xl items-center px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      <div className="relative mx-auto flex min-h-screen max-w-6xl items-start px-3 py-4 sm:items-center sm:px-6 sm:py-10 lg:px-8">
         <div className="w-full">
-          <div className="mb-6 flex flex-col items-center gap-3">
-            <div className="inline-flex max-w-full items-center rounded-full border border-white/70 bg-white/85 px-4 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
+          <div className="mb-4 flex items-start justify-between gap-3 sm:mb-6 sm:flex-col sm:items-center">
+            <div className="inline-flex max-w-full items-center rounded-full border border-white/70 bg-white/85 px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-950/80 sm:px-4">
               <div className="flex min-w-0 items-center space-x-2">
-                <LogoMark className="h-9 w-9" title="BloodHub India" />
+                <LogoMark className="h-8 w-8 sm:h-9 sm:w-9" title="BloodHub India" />
                 <div className="min-w-0">
-                  <span className="block truncate bg-gradient-to-r from-red-600 via-red-700 to-red-800 bg-clip-text text-2xl font-extrabold text-transparent">
+                  <span className="block truncate bg-gradient-to-r from-red-600 via-red-700 to-red-800 bg-clip-text text-xl font-extrabold text-transparent sm:text-2xl">
                     BloodHub
                   </span>
                   <p className="-mt-1 text-[10px] tracking-wider text-center text-gray-500 dark:text-slate-400">{t('brand.india')}</p>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <LanguageSwitcher menuAlign="left" />
               <ThemeToggle />
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.9fr]">
-            <section className="rounded-[2rem] border border-red-100/80 bg-white/85 p-8 shadow-[0_30px_80px_rgba(127,29,29,0.12)] backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-950/70">
-            <div className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-[1.2fr_0.9fr]">
+            <section className="rounded-[2rem] border border-red-100/80 bg-white/85 p-5 shadow-[0_30px_80px_rgba(127,29,29,0.12)] backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-950/70 sm:p-8">
+            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300 sm:px-4 sm:text-xs sm:tracking-[0.16em]">
               <Droplets className="h-3.5 w-3.5" />
               {eyebrow}
             </div>
-            <div className="mt-6 flex items-start gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 via-rose-600 to-red-900 text-white shadow-lg shadow-red-900/20">
+            <div className="mt-4 flex flex-col gap-4 sm:mt-6 sm:flex-row sm:items-start">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 via-rose-600 to-red-900 text-white shadow-lg shadow-red-900/20 sm:h-14 sm:w-14">
                 {icon}
               </div>
               <div className="min-w-0">
-                <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-50 sm:text-5xl">{title}</h1>
-                <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">{description}</p>
+                <h1 className="text-[2rem] font-black leading-tight tracking-tight text-slate-900 dark:text-slate-50 sm:text-5xl">{title}</h1>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:mt-4 sm:text-base sm:leading-7">{description}</p>
                 {supportingText ? (
-                  <p className="mt-3 text-sm font-medium text-red-700 dark:text-red-300">{supportingText}</p>
+                  <p className="mt-3 text-sm font-medium leading-6 text-red-700 dark:text-red-300">{supportingText}</p>
                 ) : null}
               </div>
             </div>
             </section>
 
-            <aside className="rounded-[2rem] border border-red-100/80 bg-white/90 p-6 shadow-[0_20px_60px_rgba(127,29,29,0.14)] backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-950/80">
+            <aside className="rounded-[2rem] border border-red-100/80 bg-white/90 p-4 shadow-[0_20px_60px_rgba(127,29,29,0.14)] backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-950/80 sm:p-6">
               {children}
             </aside>
           </div>
@@ -170,13 +170,13 @@ function MaintenanceScreen({
         }
         icon={<ShieldAlert className="h-7 w-7" />}
       >
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {countdown ? (
-            <div className="rounded-2xl border border-red-200 bg-white/90 p-5 dark:border-red-900/40 dark:bg-slate-900">
+            <div className="rounded-2xl border border-red-200 bg-white/90 p-4 dark:border-red-900/40 dark:bg-slate-900 sm:p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold uppercase tracking-[0.14em] text-red-700 dark:text-red-300">{t('frontendAccess.maintenance.countdownTitle')}</p>
-                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  <p className="mt-1 break-words text-sm leading-6 text-slate-600 dark:text-slate-300">
                     {countdown.expired
                       ? t('frontendAccess.maintenance.countdownExpired')
                       : formattedEndTime
@@ -190,28 +190,34 @@ function MaintenanceScreen({
                   </div>
                 ) : null}
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="mt-4 grid grid-cols-2 gap-2.5 sm:gap-3 sm:grid-cols-4">
                 {[
                   { label: t('frontendAccess.maintenance.countdownDays'), value: countdown.days },
                   { label: t('frontendAccess.maintenance.countdownHours'), value: countdown.hours },
                   { label: t('frontendAccess.maintenance.countdownMinutes'), value: countdown.minutes },
                   { label: t('frontendAccess.maintenance.countdownSeconds'), value: countdown.seconds },
                 ].map((entry) => (
-                  <div key={entry.label} className="min-w-0 rounded-2xl border border-red-100 bg-red-50/70 px-3 py-4 text-center dark:border-red-900/30 dark:bg-red-950/20">
+                  <div key={entry.label} className="min-w-0 rounded-2xl border border-red-100 bg-red-50/70 px-2.5 py-3 text-center dark:border-red-900/30 dark:bg-red-950/20 sm:px-3 sm:py-4">
                     <p className="text-2xl font-black text-slate-900 dark:text-slate-50">{`${entry.value}`.padStart(2, '0')}</p>
-                    <p className="mt-1 break-words text-[11px] font-semibold uppercase tracking-[0.12em] text-red-700 dark:text-red-300">{entry.label}</p>
+                    <p className="mt-1 break-words text-[10px] font-semibold uppercase tracking-[0.1em] text-red-700 dark:text-red-300 sm:text-[11px] sm:tracking-[0.12em]">{entry.label}</p>
                   </div>
                 ))}
               </div>
             </div>
           ) : null}
-          <div className="rounded-2xl border border-red-100 bg-red-50/80 p-5 dark:border-red-900/40 dark:bg-red-950/20">
+          <div className="rounded-2xl border border-red-100 bg-red-50/80 p-4 dark:border-red-900/40 dark:bg-red-950/20 sm:hidden">
+            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-red-700 dark:text-red-300">{t('frontendAccess.maintenance.visitorInfoTitle')}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">
+              {t('frontendAccess.maintenance.visitorInfoBody')}
+            </p>
+          </div>
+          <div className="hidden rounded-2xl border border-red-100 bg-red-50/80 p-5 dark:border-red-900/40 dark:bg-red-950/20 sm:block">
             <p className="text-sm font-semibold uppercase tracking-[0.14em] text-red-700 dark:text-red-300">{t('frontendAccess.maintenance.visitorInfoTitle')}</p>
             <p className="mt-3 text-sm leading-7 text-slate-700 dark:text-slate-300">
               {t('frontendAccess.maintenance.visitorInfoBody')}
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <div className="hidden rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 sm:block">
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('frontendAccess.maintenance.donorFirstTitle')}</p>
             <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-400">
               {t('frontendAccess.maintenance.donorFirstBody')}
@@ -283,8 +289,8 @@ function PasswordScreen({
         }
         icon={<Lock className="h-7 w-7" />}
       >
-        <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+        <form onSubmit={(event) => void handleSubmit(event)} className="space-y-3 sm:space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-5">
             <label className="block">
               <span className="mb-2 block text-sm font-semibold text-slate-900 dark:text-slate-100">{t('frontendAccess.password.inputLabel')}</span>
               <input
@@ -324,7 +330,7 @@ function PasswordScreen({
             </div>
           ) : null}
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
             {t('frontendAccess.password.helperText')}
           </div>
         </form>
