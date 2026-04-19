@@ -61,7 +61,7 @@ function AccessShell({ eyebrow, title, description, supportingText, icon, childr
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <LanguageSwitcher menuAlign="right" menuPlacement="top" />
+              <LanguageSwitcher menuAlign="right" menuPlacement="bottom" />
               <ThemeToggle />
             </div>
           </div>

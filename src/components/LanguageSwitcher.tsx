@@ -11,9 +11,14 @@ import {
 type LanguageSwitcherProps = {
   className?: string;
   menuAlign?: 'left' | 'right';
+  menuPlacement?: 'top' | 'bottom';
 };
 
-function LanguageSwitcher({ className = '', menuAlign = 'right' }: LanguageSwitcherProps) {
+function LanguageSwitcher({
+  className = '',
+  menuAlign = 'right',
+  menuPlacement = 'bottom',
+}: LanguageSwitcherProps) {
   const { i18n, t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -56,7 +61,9 @@ function LanguageSwitcher({ className = '', menuAlign = 'right' }: LanguageSwitc
 
       {isOpen && (
         <div
-          className={`absolute top-full z-50 mt-2 min-w-40 rounded-2xl border border-gray-200 bg-white/95 p-2 shadow-2xl backdrop-blur-xl dark:border-gray-700 dark:bg-[#0b1220]/95 ${
+          className={`absolute z-50 min-w-40 rounded-2xl border border-gray-200 bg-white/95 p-2 shadow-2xl backdrop-blur-xl dark:border-gray-700 dark:bg-[#0b1220]/95 ${
+            menuPlacement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+          } ${
             menuAlign === 'left' ? 'left-0' : 'right-0'
           }`}
           role="menu"
