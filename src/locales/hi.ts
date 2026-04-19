@@ -88,6 +88,46 @@ export default {
     switchToLight: "लाइट मोड पर जाएँ",
     switchToDark: "डार्क मोड पर जाएँ"
   },
+  frontendAccess: {
+    maintenance: {
+      seoTitle: "अनुसूचित रखरखाव | BloodHub India",
+      eyebrow: "अनुसूचित रखरखाव",
+      defaultTitle: "BloodHub निर्धारित रखरखाव के अंतर्गत है",
+      defaultMessage: "हम अधिक सुरक्षित और तेज दाता अनुभव तैयार कर रहे हैं। कृपया थोड़ी देर बाद फिर देखें।",
+      supportingText: "निर्धारित कार्य पूरा होते ही हम साइट फिर से खोल देंगे।",
+      expectedUpdate: "अपेक्षित अपडेट: {{eta}}",
+      supportingEndsAt: "{{dateTime}} तक साइट फिर से खुलने की अपेक्षा है",
+      visitorInfoTitle: "आगंतुकों को क्या जानना चाहिए",
+      visitorInfoBody: "साइट फिलहाल निर्धारित सुधारों के लिए रोकी गई है। हम जल्द से जल्द पहुंच बहाल करने पर काम कर रहे हैं।",
+      donorFirstTitle: "दाता-प्रथम रोलआउट",
+      donorFirstBody: "हम इस समय का उपयोग अधिक सुरक्षित वर्कफ़्लो, बेहतर विश्वसनीयता और दान यात्रा की सुरक्षा के लिए करते हैं।",
+      countdownTitle: "लाइव काउंटडाउन",
+      countdownEndsAt: "{{dateTime}} तक का काउंटडाउन",
+      countdownActive: "निर्धारित समाप्ति समय तक यह काउंटडाउन लगातार अपडेट होता रहेगा।",
+      countdownExpired: "निर्धारित समाप्ति समय बीत चुका है। साइट तब तक रखरखाव मोड में रहेगी जब तक कोई एडमिन इसे फिर से न खोले।",
+      countdownDays: "दिन",
+      countdownHours: "घंटे",
+      countdownMinutes: "मिनट",
+      countdownSeconds: "सेकंड"
+    },
+    password: {
+      seoTitle: "सुरक्षा द्वार | BloodHub India",
+      eyebrow: "सुरक्षा द्वार",
+      defaultTitle: "सुरक्षित पहुंच आवश्यक है",
+      defaultMessage: "BloodHub India पर आगे बढ़ने के लिए पासवर्ड दर्ज करें।",
+      statusChecking: "पहुंच उपलब्धता की जांच की जा रही है...",
+      statusReady: "एक्सेस सत्र {{ttlMinutes}} मिनट तक मान्य रहेगा।",
+      statusPreparing: "सुरक्षित पहुंच तैयार की जा रही है। कृपया थोड़ी देर बाद फिर प्रयास करें।",
+      inputLabel: "एक्सेस पासवर्ड",
+      inputPlaceholder: "पासवर्ड दर्ज करें",
+      submitIdle: "BloodHub फ्रंटएंड खोलें",
+      submitVerifying: "पहुंच सत्यापित की जा रही है...",
+      errorIncorrect: "गलत पासवर्ड। कृपया फिर प्रयास करें।",
+      statusError: "हम अभी पहुंच सत्यापित नहीं कर सके। कृपया थोड़ी देर बाद फिर प्रयास करें।",
+      notConfigured: "यह सुरक्षित पेज अभी पूरी तरह उपलब्ध नहीं है। कृपया थोड़ी देर बाद फिर प्रयास करें।",
+      helperText: "आगे बढ़ने के लिए एक्सेस पासवर्ड दर्ज करें।"
+    }
+  },
   nav: {
     findDonors: "डोनर खोजें",
     requestBlood: "रक्त का अनुरोध करें",

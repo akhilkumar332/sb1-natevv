@@ -5,6 +5,7 @@ import { useAdminCmsSettings } from '../../../hooks/admin/useAdminQueries';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { refetchQuery } from '../../../utils/queryRefetch';
 import { toDateValue } from '../../../utils/dateValue';
+import { normalizeFrontendAccess } from '../../../utils/frontendAccess';
 
 const displayValue = (value: string | null | undefined, fallback = 'Not set'): string => {
   const normalized = typeof value === 'string' ? value.trim() : '';
@@ -12,11 +13,18 @@ const displayValue = (value: string | null | undefined, fallback = 'Not set'): s
 };
 
 const displayBoolean = (value: boolean): string => value ? 'Enabled' : 'Disabled';
+const displayDateTime = (value: string | null | undefined): string => {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  if (!normalized) return 'Not set';
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return 'Not set';
+  return date.toLocaleString();
+};
 
 export default function CmsSettingsPage() {
   const settingsQuery = useAdminCmsSettings();
   const settings = settingsQuery.data;
-  const frontendAccess = settings?.frontendAccess || CMS_DEFAULTS.frontendAccess;
+  const frontendAccess = normalizeFrontendAccess(settings?.frontendAccess);
   const updatedAt = toDateValue(settings?.updatedAt);
   const socialLinks = settings?.socialLinks && typeof settings.socialLinks === 'object'
     ? settings.socialLinks
@@ -138,34 +146,68 @@ export default function CmsSettingsPage() {
 
         <section className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <h3 className="text-lg font-bold text-gray-900 dark:text-slate-100">Frontend Access</h3>
-          <div className="mt-4 grid gap-3 text-sm">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Mode</p>
-              <p className="font-semibold capitalize text-gray-900 dark:text-slate-100">{frontendAccess.mode.replace('_', ' ')}</p>
+          <div className="mt-4 grid gap-4 text-sm">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Mode And Operational State</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Mode</p>
+                  <p className="font-semibold capitalize text-gray-900 dark:text-slate-100">{frontendAccess.mode.replace('_', ' ')}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Password Session TTL</p>
+                  <p className="text-gray-800 dark:text-slate-200">{frontendAccess.passwordSessionTtlMinutes || CMS_DEFAULTS.frontendAccess.passwordSessionTtlMinutes} minutes</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Maintenance Title</p>
-              <p className="text-gray-800 dark:text-slate-200">{displayValue(frontendAccess.maintenanceTitle, CMS_DEFAULTS.frontendAccess.maintenanceTitle)}</p>
+
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Maintenance Schedule</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Structured End Time</p>
+                  <p className="text-gray-800 dark:text-slate-200">{displayDateTime(frontendAccess.maintenanceEndsAt)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Fallback ETA Text</p>
+                  <p className="text-gray-800 dark:text-slate-200">{displayValue(frontendAccess.maintenanceEta)}</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Maintenance Message</p>
-              <p className="text-gray-800 dark:text-slate-200">{displayValue(frontendAccess.maintenanceMessage, CMS_DEFAULTS.frontendAccess.maintenanceMessage)}</p>
+
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Maintenance Page Copy</p>
+              <div className="mt-3 grid gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Maintenance Title</p>
+                  <p className="text-gray-800 dark:text-slate-200">{displayValue(frontendAccess.maintenanceTitle, CMS_DEFAULTS.frontendAccess.maintenanceTitle)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Maintenance Message</p>
+                  <p className="text-gray-800 dark:text-slate-200">{displayValue(frontendAccess.maintenanceMessage, CMS_DEFAULTS.frontendAccess.maintenanceMessage)}</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Expected Return</p>
-              <p className="text-gray-800 dark:text-slate-200">{displayValue(frontendAccess.maintenanceEta)}</p>
+
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Password Page Copy</p>
+              <div className="mt-3 grid gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Password Prompt Title</p>
+                  <p className="text-gray-800 dark:text-slate-200">{displayValue(frontendAccess.passwordPromptTitle, CMS_DEFAULTS.frontendAccess.passwordPromptTitle)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Password Prompt Message</p>
+                  <p className="text-gray-800 dark:text-slate-200">{displayValue(frontendAccess.passwordPromptMessage, CMS_DEFAULTS.frontendAccess.passwordPromptMessage)}</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Password Prompt Title</p>
-              <p className="text-gray-800 dark:text-slate-200">{displayValue(frontendAccess.passwordPromptTitle, CMS_DEFAULTS.frontendAccess.passwordPromptTitle)}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Password Prompt Message</p>
-              <p className="text-gray-800 dark:text-slate-200">{displayValue(frontendAccess.passwordPromptMessage, CMS_DEFAULTS.frontendAccess.passwordPromptMessage)}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Password Session TTL</p>
-              <p className="text-gray-800 dark:text-slate-200">{frontendAccess.passwordSessionTtlMinutes || CMS_DEFAULTS.frontendAccess.passwordSessionTtlMinutes} minutes</p>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Translation Fallback Behavior</p>
+              <p className="mt-2 text-gray-800 dark:text-slate-200">
+                Frontend access defaults are aligned with the Translation Control Center through the bundled `frontendAccess.*` locale namespace. Custom CMS copy overrides the translated default, while blank/default values continue to use translated fallback text.
+              </p>
             </div>
           </div>
         </section>

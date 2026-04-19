@@ -1,4 +1,4 @@
-import { FIFTEEN_MINUTES_MS } from './time';
+import { FIFTEEN_MINUTES_MS, SECOND_MS } from './time';
 import { ROUTES } from './routes';
 
 export const CMS_STATUS = {
@@ -45,6 +45,7 @@ export const CMS_LIMITS = {
   frontendAccessTitle: 120,
   frontendAccessMessage: 600,
   frontendAccessEta: 120,
+  frontendAccessDateTime: 40,
   contentJson: 20000,
   tagsPerPost: 20,
   menuItemsPerMenu: 50,
@@ -87,6 +88,7 @@ export const CMS_DEFAULTS = {
     maintenanceTitle: 'BloodHub is under scheduled maintenance',
     maintenanceMessage: 'We are preparing a safer, faster donor experience. Please check back shortly.',
     maintenanceEta: '',
+    maintenanceEndsAt: null,
     passwordPromptTitle: 'Protected access',
     passwordPromptMessage: 'Enter the access password to continue to the BloodHub frontend.',
     passwordSessionTtlMinutes: 240,
@@ -100,6 +102,12 @@ export const CMS_FRONTEND_ACCESS_MODE = {
 } as const;
 
 export type CmsFrontendAccessMode = (typeof CMS_FRONTEND_ACCESS_MODE)[keyof typeof CMS_FRONTEND_ACCESS_MODE];
+
+export const CMS_FRONTEND_ACCESS = {
+  translationNamespace: 'frontendAccess',
+  countdownTickMs: SECOND_MS,
+  cacheMaxAgeMs: 5 * 60 * 1000,
+} as const;
 
 export const CMS_SEO_DEFAULTS = {
   locale: 'en_IN',

@@ -22,6 +22,69 @@ vi.mock('../../../services/errorLog.service', () => ({
   captureHandledError: vi.fn(),
 }));
 
+vi.mock('../../LanguageSwitcher', () => ({
+  default: () => <div>Language switcher</div>,
+}));
+
+vi.mock('../../ThemeToggle', () => ({
+  default: () => <button type="button">Theme toggle</button>,
+}));
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) => {
+      const translations: Record<string, string> = {
+        'frontendAccess.maintenance.seoTitle': 'Scheduled Maintenance | BloodHub India',
+        'frontendAccess.maintenance.eyebrow': 'Scheduled Maintenance',
+        'frontendAccess.maintenance.defaultTitle': 'BloodHub is under scheduled maintenance',
+        'frontendAccess.maintenance.defaultMessage': 'We are preparing a safer, faster donor experience. Please check back shortly.',
+        'frontendAccess.maintenance.supportingText': 'We will reopen the frontend as soon as the scheduled work is complete.',
+        'frontendAccess.maintenance.supportingEndsAt': 'Expected to reopen by {{dateTime}}',
+        'frontendAccess.maintenance.visitorInfoTitle': 'What visitors should know',
+        'frontendAccess.maintenance.visitorInfoBody': 'The site is temporarily paused for scheduled improvements. We are working to restore access as quickly as possible.',
+        'frontendAccess.maintenance.donorFirstTitle': 'Donor-first rollout',
+        'frontendAccess.maintenance.donorFirstBody': 'We use this window to ship safer workflows, improve reliability, and protect donation journeys before reopening access.',
+        'frontendAccess.maintenance.countdownTitle': 'Live countdown',
+        'frontendAccess.maintenance.countdownActive': 'The countdown will keep updating until the scheduled end time.',
+        'frontendAccess.maintenance.countdownExpired': 'The scheduled end time has passed. Maintenance mode will stay active until an admin reopens the site.',
+        'frontendAccess.maintenance.countdownDays': 'Days',
+        'frontendAccess.maintenance.countdownHours': 'Hours',
+        'frontendAccess.maintenance.countdownMinutes': 'Minutes',
+        'frontendAccess.maintenance.countdownSeconds': 'Seconds',
+        'frontendAccess.password.seoTitle': 'Security Gate | BloodHub India',
+        'frontendAccess.password.eyebrow': 'Security Gate',
+        'frontendAccess.password.defaultTitle': 'Secure access required',
+        'frontendAccess.password.defaultMessage': 'Enter the password to continue to BloodHub India.',
+        'frontendAccess.password.statusChecking': 'Checking access availability...',
+        'frontendAccess.password.statusPreparing': 'Protected access is being prepared. Please try again shortly.',
+        'frontendAccess.password.inputLabel': 'Access password',
+        'frontendAccess.password.inputPlaceholder': 'Enter password',
+        'frontendAccess.password.submitIdle': 'Open BloodHub frontend',
+        'frontendAccess.password.submitVerifying': 'Verifying access...',
+        'frontendAccess.password.errorIncorrect': 'Incorrect password. Please try again.',
+        'frontendAccess.password.statusError': 'We could not verify access right now. Please wait a moment and try again.',
+        'frontendAccess.password.notConfigured': 'This protected page is not fully available right now. Please try again shortly.',
+        'frontendAccess.password.helperText': 'Enter the access password to continue.',
+        'brand.india': 'INDIA',
+      };
+
+      if (key === 'frontendAccess.password.statusReady') {
+        return `Access sessions last up to ${options?.ttlMinutes as number} minutes.`;
+      }
+      if (key === 'frontendAccess.maintenance.expectedUpdate') {
+        return `Expected update: ${options?.eta as string}`;
+      }
+      if (key === 'frontendAccess.maintenance.supportingEndsAt') {
+        return `Expected to reopen by ${options?.dateTime as string}`;
+      }
+      if (key === 'frontendAccess.maintenance.countdownEndsAt') {
+        return `Countdown to ${options?.dateTime as string}`;
+      }
+      return translations[key] || key;
+    },
+  }),
+}));
+
 vi.mock('../../Loading', () => ({
   default: () => <div>Loading...</div>,
 }));
@@ -80,6 +143,31 @@ describe('FrontendAccessGate', () => {
 
     expect(await screen.findByRole('heading', { name: 'Maintenance window' })).toBeInTheDocument();
     expect(screen.queryByText('Public content')).not.toBeInTheDocument();
+  });
+
+  it('shows a live countdown when maintenance end time is configured', async () => {
+    getPublicCmsSettingsMock.mockResolvedValue({
+      frontendAccess: {
+        mode: 'maintenance',
+        maintenanceTitle: 'Maintenance window',
+        maintenanceMessage: 'We will be back soon.',
+        maintenanceEndsAt: new Date(Date.now() + (60 * 60 * 1000)).toISOString(),
+      },
+    });
+
+    render(
+      <QueryClientProvider client={createClient()}>
+        <MemoryRouter initialEntries={['/']}>
+          <FrontendAccessGate>
+            <div>Public content</div>
+          </FrontendAccessGate>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText('Live countdown')).toBeInTheDocument();
+    expect(screen.getByText('Days')).toBeInTheDocument();
+    expect(screen.getByText('Hours')).toBeInTheDocument();
   });
 
   it('renders the cached maintenance gate immediately before the refresh completes', () => {

@@ -1,10 +1,13 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Droplets, Lock, ShieldAlert } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import Loading from '../Loading';
+import LanguageSwitcher from '../LanguageSwitcher';
 import LogoMark from '../LogoMark';
 import SeoHead from '../SeoHead';
-import { CMS_DEFAULTS, CMS_FRONTEND_ACCESS_MODE } from '../../constants/cms';
+import ThemeToggle from '../ThemeToggle';
+import { CMS_DEFAULTS, CMS_FRONTEND_ACCESS, CMS_FRONTEND_ACCESS_MODE } from '../../constants/cms';
 import { useLocation } from 'react-router-dom';
 import { captureHandledError } from '../../services/errorLog.service';
 import {
@@ -13,6 +16,7 @@ import {
 } from '../../services/frontendAccess.service';
 import { getPublicCmsSettings } from '../../services/cms.service';
 import {
+  getFrontendAccessCountdown,
   isAdminRoutePath,
   normalizeFrontendAccess,
   readCachedFrontendAccess,
@@ -33,6 +37,7 @@ type AccessShellProps = {
 };
 
 function AccessShell({ eyebrow, title, description, supportingText, icon, children }: AccessShellProps) {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.22),_transparent_35%),linear-gradient(135deg,_#fff7f7_0%,_#fff1f2_28%,_#ffffff_60%,_#fef2f2_100%)] dark:bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.18),_transparent_35%),linear-gradient(135deg,_#12090a_0%,_#1b0d10_30%,_#0f172a_75%,_#111827_100%)]">
       <div className="absolute inset-0 pointer-events-none">
@@ -42,15 +47,27 @@ function AccessShell({ eyebrow, title, description, supportingText, icon, childr
       </div>
 
       <div className="relative mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
-        <div className="grid w-full gap-6 lg:grid-cols-[1.2fr_0.9fr]">
-          <section className="rounded-[2rem] border border-red-100/80 bg-white/85 p-8 shadow-[0_30px_80px_rgba(127,29,29,0.12)] backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-950/70">
-            <div className="inline-flex items-center gap-3 rounded-full border border-white/70 bg-white/85 px-4 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
-              <LogoMark className="h-10 w-10" title="BloodHub India" />
-              <div>
-                <p className="text-sm font-black tracking-[0.16em] text-slate-900 dark:text-slate-50">BLOODHUB INDIA</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Donate blood, save lives.</p>
+        <div className="w-full">
+          <div className="mb-6 flex flex-col items-center gap-3">
+            <div className="inline-flex items-center rounded-full border border-white/70 bg-white/85 px-4 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
+              <div className="flex items-center space-x-2">
+                <LogoMark className="h-9 w-9" title="BloodHub India" />
+                <div>
+                  <span className="bg-gradient-to-r from-red-600 via-red-700 to-red-800 bg-clip-text text-2xl font-extrabold text-transparent">
+                    BloodHub
+                  </span>
+                  <p className="-mt-1 text-[10px] tracking-wider text-gray-500 dark:text-slate-400">{t('brand.india')}</p>
+                </div>
               </div>
             </div>
+            <div className="flex items-center gap-2">
+              <LanguageSwitcher menuAlign="left" />
+              <ThemeToggle />
+            </div>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.9fr]">
+            <section className="rounded-[2rem] border border-red-100/80 bg-white/85 p-8 shadow-[0_30px_80px_rgba(127,29,29,0.12)] backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-950/70">
             <div className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
               <Droplets className="h-3.5 w-3.5" />
               {eyebrow}
@@ -67,51 +84,137 @@ function AccessShell({ eyebrow, title, description, supportingText, icon, childr
                 ) : null}
               </div>
             </div>
-          </section>
+            </section>
 
-          <aside className="rounded-[2rem] border border-red-100/80 bg-white/90 p-6 shadow-[0_20px_60px_rgba(127,29,29,0.14)] backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-950/80">
-            {children}
-          </aside>
+            <aside className="rounded-[2rem] border border-red-100/80 bg-white/90 p-6 shadow-[0_20px_60px_rgba(127,29,29,0.14)] backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-950/80">
+              {children}
+            </aside>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
+const resolveTranslatableSetting = (
+  value: string | null | undefined,
+  fallbackValue: string,
+  translatedFallback: string,
+): string => {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  if (!normalized || normalized === fallbackValue) {
+    return translatedFallback;
+  }
+  return normalized;
+};
+
+const formatMaintenanceDateTime = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+};
+
+function useCountdownNow(enabled: boolean) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    setNowMs(Date.now());
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, CMS_FRONTEND_ACCESS.countdownTickMs);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [enabled]);
+
+  return nowMs;
+}
+
 function MaintenanceScreen({
   title,
   message,
   eta,
+  maintenanceEndsAt,
 }: {
   title: string;
   message: string;
   eta?: string | null;
+  maintenanceEndsAt?: string | null;
 }) {
+  const { t } = useTranslation();
+  const nowMs = useCountdownNow(Boolean(maintenanceEndsAt));
+  const countdown = getFrontendAccessCountdown(maintenanceEndsAt, nowMs);
+  const formattedEndTime = formatMaintenanceDateTime(maintenanceEndsAt);
   return (
     <>
       <SeoHead
-        title="Scheduled Maintenance | BloodHub India"
+        title={t('frontendAccess.maintenance.seoTitle')}
         description={message}
         robots="noindex,nofollow"
       />
       <AccessShell
-        eyebrow="Scheduled Maintenance"
+        eyebrow={t('frontendAccess.maintenance.eyebrow')}
         title={title}
         description={message}
-        supportingText={eta ? `Expected update: ${eta}` : 'We will reopen the frontend as soon as the scheduled work is complete.'}
+        supportingText={
+          formattedEndTime
+            ? t('frontendAccess.maintenance.supportingEndsAt', { dateTime: formattedEndTime })
+            : eta
+              ? t('frontendAccess.maintenance.expectedUpdate', { eta })
+              : t('frontendAccess.maintenance.supportingText')
+        }
         icon={<ShieldAlert className="h-7 w-7" />}
       >
         <div className="space-y-4">
+          {countdown ? (
+            <div className="rounded-2xl border border-red-200 bg-white/90 p-5 dark:border-red-900/40 dark:bg-slate-900">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.14em] text-red-700 dark:text-red-300">{t('frontendAccess.maintenance.countdownTitle')}</p>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                    {countdown.expired
+                      ? t('frontendAccess.maintenance.countdownExpired')
+                      : formattedEndTime
+                        ? t('frontendAccess.maintenance.countdownEndsAt', { dateTime: formattedEndTime })
+                        : t('frontendAccess.maintenance.countdownActive')}
+                  </p>
+                </div>
+                {formattedEndTime ? (
+                  <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
+                    {formattedEndTime}
+                  </div>
+                ) : null}
+              </div>
+              <div className="mt-4 grid grid-cols-4 gap-3">
+                {[
+                  { label: t('frontendAccess.maintenance.countdownDays'), value: countdown.days },
+                  { label: t('frontendAccess.maintenance.countdownHours'), value: countdown.hours },
+                  { label: t('frontendAccess.maintenance.countdownMinutes'), value: countdown.minutes },
+                  { label: t('frontendAccess.maintenance.countdownSeconds'), value: countdown.seconds },
+                ].map((entry) => (
+                  <div key={entry.label} className="rounded-2xl border border-red-100 bg-red-50/70 px-3 py-4 text-center dark:border-red-900/30 dark:bg-red-950/20">
+                    <p className="text-2xl font-black text-slate-900 dark:text-slate-50">{`${entry.value}`.padStart(2, '0')}</p>
+                    <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-red-700 dark:text-red-300">{entry.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="rounded-2xl border border-red-100 bg-red-50/80 p-5 dark:border-red-900/40 dark:bg-red-950/20">
-            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-red-700 dark:text-red-300">What visitors should know</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-red-700 dark:text-red-300">{t('frontendAccess.maintenance.visitorInfoTitle')}</p>
             <p className="mt-3 text-sm leading-7 text-slate-700 dark:text-slate-300">
-              The site is temporarily paused for scheduled improvements. We are working to restore access as quickly as possible.
+              {t('frontendAccess.maintenance.visitorInfoBody')}
             </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Donor-first rollout</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('frontendAccess.maintenance.donorFirstTitle')}</p>
             <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-400">
-              We use this window to ship safer workflows, improve reliability, and protect donation journeys before reopening access.
+              {t('frontendAccess.maintenance.donorFirstBody')}
             </p>
           </div>
         </div>
@@ -137,6 +240,7 @@ function PasswordScreen({
   statusError: boolean;
   onUnlocked: () => void;
 }) {
+  const { t } = useTranslation();
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -153,7 +257,7 @@ function PasswordScreen({
         onUnlocked();
         return;
       }
-      setErrorMessage(result.error || 'Incorrect password. Please try again.');
+      setErrorMessage(result.error || t('frontendAccess.password.errorIncorrect'));
     } finally {
       setSubmitting(false);
     }
@@ -162,27 +266,27 @@ function PasswordScreen({
   return (
     <>
       <SeoHead
-        title="Security Gate | BloodHub India"
+        title={t('frontendAccess.password.seoTitle')}
         description={message}
         robots="noindex,nofollow"
       />
       <AccessShell
-        eyebrow="Security Gate"
+        eyebrow={t('frontendAccess.password.eyebrow')}
         title={title}
         description={message}
         supportingText={
           !statusReady
-            ? 'Checking access availability...'
+            ? t('frontendAccess.password.statusChecking')
             : configured
-              ? `Access sessions last up to ${ttlMinutes} minutes.`
-              : 'Protected access is being prepared. Please try again shortly.'
+              ? t('frontendAccess.password.statusReady', { ttlMinutes })
+              : t('frontendAccess.password.statusPreparing')
         }
         icon={<Lock className="h-7 w-7" />}
       >
         <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
             <label className="block">
-              <span className="mb-2 block text-sm font-semibold text-slate-900 dark:text-slate-100">Access password</span>
+              <span className="mb-2 block text-sm font-semibold text-slate-900 dark:text-slate-100">{t('frontendAccess.password.inputLabel')}</span>
               <input
                 type="password"
                 value={password}
@@ -190,7 +294,7 @@ function PasswordScreen({
                 autoComplete="current-password"
                 disabled={!statusReady || !configured || statusError || submitting}
                 className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-200 disabled:cursor-not-allowed disabled:bg-gray-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-900"
-                placeholder="Enter password"
+                placeholder={t('frontendAccess.password.inputPlaceholder')}
               />
             </label>
             <button
@@ -198,7 +302,7 @@ function PasswordScreen({
               disabled={!statusReady || !configured || statusError || submitting || !password.trim()}
               className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-700 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-red-900/20 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? 'Verifying access...' : 'Open BloodHub frontend'}
+              {submitting ? t('frontendAccess.password.submitVerifying') : t('frontendAccess.password.submitIdle')}
             </button>
           </div>
 
@@ -210,18 +314,18 @@ function PasswordScreen({
 
           {statusError ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-              We could not verify access right now. Please wait a moment and try again.
+              {t('frontendAccess.password.statusError')}
             </div>
           ) : null}
 
           {statusReady && !statusError && !configured ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
-              This protected page is not fully available right now. Please try again shortly.
+              {t('frontendAccess.password.notConfigured')}
             </div>
           ) : null}
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-            Enter the access password to continue.
+            {t('frontendAccess.password.helperText')}
           </div>
         </form>
       </AccessShell>
@@ -230,6 +334,7 @@ function PasswordScreen({
 }
 
 export default function FrontendAccessGate({ children }: FrontendAccessGateProps) {
+  const { t } = useTranslation();
   const location = useLocation();
   const queryClient = useQueryClient();
   const bypassGate = isAdminRoutePath(location.pathname);
@@ -295,9 +400,18 @@ export default function FrontendAccessGate({ children }: FrontendAccessGateProps
   if (frontendAccess.mode === CMS_FRONTEND_ACCESS_MODE.maintenance) {
     return (
       <MaintenanceScreen
-        title={frontendAccess.maintenanceTitle || CMS_DEFAULTS.frontendAccess.maintenanceTitle}
-        message={frontendAccess.maintenanceMessage || CMS_DEFAULTS.frontendAccess.maintenanceMessage}
+        title={resolveTranslatableSetting(
+          frontendAccess.maintenanceTitle,
+          CMS_DEFAULTS.frontendAccess.maintenanceTitle,
+          t('frontendAccess.maintenance.defaultTitle'),
+        )}
+        message={resolveTranslatableSetting(
+          frontendAccess.maintenanceMessage,
+          CMS_DEFAULTS.frontendAccess.maintenanceMessage,
+          t('frontendAccess.maintenance.defaultMessage'),
+        )}
         eta={frontendAccess.maintenanceEta}
+        maintenanceEndsAt={frontendAccess.maintenanceEndsAt}
       />
     );
   }
@@ -308,8 +422,16 @@ export default function FrontendAccessGate({ children }: FrontendAccessGateProps
 
   return (
     <PasswordScreen
-      title={frontendAccess.passwordPromptTitle || CMS_DEFAULTS.frontendAccess.passwordPromptTitle}
-      message={frontendAccess.passwordPromptMessage || CMS_DEFAULTS.frontendAccess.passwordPromptMessage}
+      title={resolveTranslatableSetting(
+        frontendAccess.passwordPromptTitle,
+        CMS_DEFAULTS.frontendAccess.passwordPromptTitle,
+        t('frontendAccess.password.defaultTitle'),
+      )}
+      message={resolveTranslatableSetting(
+        frontendAccess.passwordPromptMessage,
+        CMS_DEFAULTS.frontendAccess.passwordPromptMessage,
+        t('frontendAccess.password.defaultMessage'),
+      )}
       ttlMinutes={frontendAccess.passwordSessionTtlMinutes || CMS_DEFAULTS.frontendAccess.passwordSessionTtlMinutes}
       statusReady={statusQuery.isSuccess}
       configured={statusQuery.data?.configured === true}

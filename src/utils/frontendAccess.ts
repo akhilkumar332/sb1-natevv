@@ -1,16 +1,74 @@
-import { CMS_DEFAULTS, CMS_FRONTEND_ACCESS_MODE, CMS_LIMITS, type CmsFrontendAccessMode } from '../constants/cms';
+import { CMS_DEFAULTS, CMS_FRONTEND_ACCESS, CMS_FRONTEND_ACCESS_MODE, CMS_LIMITS, type CmsFrontendAccessMode } from '../constants/cms';
 import { ROUTES } from '../constants/routes';
 import type { CmsSettings } from '../types/database.types';
 
 export type FrontendAccessSettings = NonNullable<CmsSettings['frontendAccess']>;
 const FRONTEND_ACCESS_CACHE_KEY = 'bh_frontend_access_snapshot';
-const FRONTEND_ACCESS_CACHE_MAX_AGE_MS = 5 * 60 * 1000;
+
+export type FrontendAccessCountdown = {
+  expired: boolean;
+  totalMsRemaining: number;
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+};
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
 const truncate = (value: unknown, max: number, fallback: string): string => {
   const text = typeof value === 'string' ? value.trim() : '';
   return (text || fallback).slice(0, max);
+};
+
+export const normalizeFrontendAccessDateTime = (value: unknown): string | null => {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  if (!normalized) return null;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+};
+
+export const toDateTimeLocalValue = (value: string | null | undefined): string => {
+  const normalized = normalizeFrontendAccessDateTime(value);
+  if (!normalized) return '';
+  const date = new Date(normalized);
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  const hours = `${date.getHours()}`.padStart(2, '0');
+  const minutes = `${date.getMinutes()}`.padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+export const fromDateTimeLocalValue = (value: string): string | null => {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  if (!normalized) return null;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+};
+
+export const getFrontendAccessCountdown = (
+  value: string | null | undefined,
+  nowMs: number = Date.now(),
+): FrontendAccessCountdown | null => {
+  const normalized = normalizeFrontendAccessDateTime(value);
+  if (!normalized) return null;
+  const totalMsRemaining = Math.max(0, new Date(normalized).getTime() - nowMs);
+  const totalSecondsRemaining = Math.floor(totalMsRemaining / 1000);
+  const days = Math.floor(totalSecondsRemaining / 86400);
+  const hours = Math.floor((totalSecondsRemaining % 86400) / 3600);
+  const minutes = Math.floor((totalSecondsRemaining % 3600) / 60);
+  const seconds = totalSecondsRemaining % 60;
+  return {
+    expired: totalMsRemaining === 0,
+    totalMsRemaining,
+    days,
+    hours,
+    minutes,
+    seconds,
+  };
 };
 
 export const isFrontendAccessMode = (value: unknown): value is CmsFrontendAccessMode => (
@@ -35,6 +93,7 @@ export const normalizeFrontendAccess = (value: unknown): FrontendAccessSettings 
       CMS_DEFAULTS.frontendAccess.maintenanceMessage
     ),
     maintenanceEta: truncate(data.maintenanceEta, CMS_LIMITS.frontendAccessEta, ''),
+    maintenanceEndsAt: normalizeFrontendAccessDateTime(data.maintenanceEndsAt),
     passwordPromptTitle: truncate(
       data.passwordPromptTitle,
       CMS_LIMITS.frontendAccessTitle,
@@ -66,7 +125,7 @@ export const readCachedFrontendAccess = (): FrontendAccessSettings | null => {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { savedAt?: unknown; value?: unknown };
     const savedAt = Number(parsed?.savedAt);
-    if (!Number.isFinite(savedAt) || Date.now() - savedAt > FRONTEND_ACCESS_CACHE_MAX_AGE_MS) {
+    if (!Number.isFinite(savedAt) || Date.now() - savedAt > CMS_FRONTEND_ACCESS.cacheMaxAgeMs) {
       window.sessionStorage.removeItem(FRONTEND_ACCESS_CACHE_KEY);
       return null;
     }

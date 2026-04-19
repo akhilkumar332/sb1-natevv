@@ -1071,6 +1071,7 @@ export interface CmsSettings {
     maintenanceTitle?: string | null;
     maintenanceMessage?: string | null;
     maintenanceEta?: string | null;
+    maintenanceEndsAt?: string | null;
     passwordPromptTitle?: string | null;
     passwordPromptMessage?: string | null;
     passwordSessionTtlMinutes?: number | null;
