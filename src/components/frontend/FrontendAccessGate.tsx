@@ -46,17 +46,17 @@ function AccessShell({ eyebrow, title, description, supportingText, icon, childr
         <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-orange-200/20 blur-3xl dark:bg-orange-700/10" />
       </div>
 
-      <div className="relative mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
+      <div className="relative mx-auto flex min-h-screen max-w-6xl items-center px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
         <div className="w-full">
           <div className="mb-6 flex flex-col items-center gap-3">
-            <div className="inline-flex items-center rounded-full border border-white/70 bg-white/85 px-4 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
-              <div className="flex items-center space-x-2">
+            <div className="inline-flex max-w-full items-center rounded-full border border-white/70 bg-white/85 px-4 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
+              <div className="flex min-w-0 items-center space-x-2">
                 <LogoMark className="h-9 w-9" title="BloodHub India" />
-                <div>
-                  <span className="bg-gradient-to-r from-red-600 via-red-700 to-red-800 bg-clip-text text-2xl font-extrabold text-transparent">
+                <div className="min-w-0">
+                  <span className="block truncate bg-gradient-to-r from-red-600 via-red-700 to-red-800 bg-clip-text text-2xl font-extrabold text-transparent">
                     BloodHub
                   </span>
-                  <p className="-mt-1 text-[10px] tracking-wider text-gray-500 dark:text-slate-400">{t('brand.india')}</p>
+                  <p className="-mt-1 text-[10px] tracking-wider text-center text-gray-500 dark:text-slate-400">{t('brand.india')}</p>
                 </div>
               </div>
             </div>
@@ -76,8 +76,8 @@ function AccessShell({ eyebrow, title, description, supportingText, icon, childr
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 via-rose-600 to-red-900 text-white shadow-lg shadow-red-900/20">
                 {icon}
               </div>
-              <div>
-                <h1 className="text-4xl font-black tracking-tight text-slate-900 dark:text-slate-50 sm:text-5xl">{title}</h1>
+              <div className="min-w-0">
+                <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-50 sm:text-5xl">{title}</h1>
                 <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">{description}</p>
                 {supportingText ? (
                   <p className="mt-3 text-sm font-medium text-red-700 dark:text-red-300">{supportingText}</p>
@@ -173,8 +173,8 @@ function MaintenanceScreen({
         <div className="space-y-4">
           {countdown ? (
             <div className="rounded-2xl border border-red-200 bg-white/90 p-5 dark:border-red-900/40 dark:bg-slate-900">
-              <div className="flex items-center justify-between gap-3">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
                   <p className="text-sm font-semibold uppercase tracking-[0.14em] text-red-700 dark:text-red-300">{t('frontendAccess.maintenance.countdownTitle')}</p>
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                     {countdown.expired
@@ -185,21 +185,21 @@ function MaintenanceScreen({
                   </p>
                 </div>
                 {formattedEndTime ? (
-                  <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
+                  <div className="max-w-full break-words rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 sm:max-w-[15rem]">
                     {formattedEndTime}
                   </div>
                 ) : null}
               </div>
-              <div className="mt-4 grid grid-cols-4 gap-3">
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
                   { label: t('frontendAccess.maintenance.countdownDays'), value: countdown.days },
                   { label: t('frontendAccess.maintenance.countdownHours'), value: countdown.hours },
                   { label: t('frontendAccess.maintenance.countdownMinutes'), value: countdown.minutes },
                   { label: t('frontendAccess.maintenance.countdownSeconds'), value: countdown.seconds },
                 ].map((entry) => (
-                  <div key={entry.label} className="rounded-2xl border border-red-100 bg-red-50/70 px-3 py-4 text-center dark:border-red-900/30 dark:bg-red-950/20">
+                  <div key={entry.label} className="min-w-0 rounded-2xl border border-red-100 bg-red-50/70 px-3 py-4 text-center dark:border-red-900/30 dark:bg-red-950/20">
                     <p className="text-2xl font-black text-slate-900 dark:text-slate-50">{`${entry.value}`.padStart(2, '0')}</p>
-                    <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-red-700 dark:text-red-300">{entry.label}</p>
+                    <p className="mt-1 break-words text-[11px] font-semibold uppercase tracking-[0.12em] text-red-700 dark:text-red-300">{entry.label}</p>
                   </div>
                 ))}
               </div>
