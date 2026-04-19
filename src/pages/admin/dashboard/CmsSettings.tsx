@@ -8,6 +8,7 @@ import { refetchQuery } from '../../../utils/queryRefetch';
 export default function CmsSettingsPage() {
   const settingsQuery = useAdminCmsSettings();
   const settings = settingsQuery.data;
+  const frontendAccess = settings?.frontendAccess || CMS_DEFAULTS.frontendAccess;
 
   return (
     <div className="space-y-4">
@@ -47,6 +48,19 @@ export default function CmsSettingsPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Support Contact</p>
             <p className="text-gray-800 dark:text-slate-200">{settings?.supportEmail || CMS_DEFAULTS.supportEmail}</p>
             <p className="text-gray-800 dark:text-slate-200">{settings?.supportPhone || CMS_DEFAULTS.supportPhone}</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-slate-400">Frontend Access</p>
+            <p className="font-semibold text-gray-900 dark:text-slate-100">
+              {frontendAccess.mode.replace('_', ' ')}
+            </p>
+            <p className="text-gray-800 dark:text-slate-200">
+              {frontendAccess.mode === 'maintenance'
+                ? (frontendAccess.maintenanceTitle || CMS_DEFAULTS.frontendAccess.maintenanceTitle)
+                : frontendAccess.mode === 'password_protected'
+                  ? (frontendAccess.passwordPromptTitle || CMS_DEFAULTS.frontendAccess.passwordPromptTitle)
+                  : 'Public frontend is open.'}
+            </p>
           </div>
         </div>
       </div>

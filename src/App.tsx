@@ -21,6 +21,7 @@ import AppLaunchSplash from './components/mobile/AppLaunchSplash';
 import MobileRouteTransition from './components/mobile/MobileRouteTransition';
 import MobileBottomNav from './components/mobile/MobileBottomNav';
 import NetworkStatusBadge from './components/shared/NetworkStatusBadge';
+import FrontendAccessGate from './components/frontend/FrontendAccessGate';
 import { APP_ROUTE_PREFIXES_WITH_LEGACY, ROUTES } from './constants/routes';
 import { TOAST_THEME_TOKENS } from './constants/theme';
 import { FIVE_SECONDS_MS, ONE_MINUTE_MS, THREE_SECONDS_MS } from './constants/time';
@@ -137,21 +138,23 @@ function App() {
     <LoadingProvider>
       <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
         <AppLaunchSplash enabled={useMobileAppExperience} />
-        <Navbar />
-        <NetworkStatusBadge />
-        <Suspense fallback={<Loading />}>
-          <main className={mainClassName}>
-            <div className={appContentFrameClass}>
-              <MobileRouteTransition enabled={useMobileAppExperience}>
-                <AppRoutes />
-              </MobileRouteTransition>
-            </div>
-          </main>
-        </Suspense>
-        <MobileBottomNav enabled={isMobileOrTablet && isDashboardRoute} />
-        <div className={footerWrapperClass}>
-          <Footer />
-        </div>
+        <FrontendAccessGate>
+          <Navbar />
+          <NetworkStatusBadge />
+          <Suspense fallback={<Loading />}>
+            <main className={mainClassName}>
+              <div className={appContentFrameClass}>
+                <MobileRouteTransition enabled={useMobileAppExperience}>
+                  <AppRoutes />
+                </MobileRouteTransition>
+              </div>
+            </main>
+          </Suspense>
+          <MobileBottomNav enabled={isMobileOrTablet && isDashboardRoute} />
+          <div className={footerWrapperClass}>
+            <Footer />
+          </div>
+        </FrontendAccessGate>
         <Toaster
           position="top-right"
           toastOptions={{

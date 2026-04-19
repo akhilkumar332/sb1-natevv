@@ -644,12 +644,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "online_only"
   },
   {
-    "id": "CMS_SETTINGS.setDoc.pages/admin/dashboard/CmsSettingsEditor.tsx:151",
+    "id": "CMS_SETTINGS.setDoc.pages/admin/dashboard/CmsSettingsEditor.tsx:172",
     "method": "setDoc",
     "collectionKey": "CMS_SETTINGS",
     "module": "pages/admin",
     "path": "pages/admin/dashboard/CmsSettingsEditor.tsx",
-    "line": 151,
+    "line": 172,
     "area": "CMS_SETTINGS setDoc",
     "mode": "queue_safe"
   },

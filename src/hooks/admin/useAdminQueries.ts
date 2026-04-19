@@ -54,6 +54,7 @@ import type {
   VerificationRequest
 } from '../../types/database.types';
 import { toDateValue } from '../../utils/dateValue';
+import { normalizeFrontendAccess } from '../../utils/frontendAccess';
 import type { OfflineSyncHealthActor, OfflineSyncHealthDeadLetterSample, OfflineSyncHealthRecord } from '../../utils/offlineSyncHealth';
 import { getTranslationOverrideDocuments } from '../../services/translationOverrides.service';
 
@@ -460,6 +461,7 @@ const fetchCmsSettings = async (): Promise<CmsSettings | null> => {
     supportPhone: typeof data.supportPhone === 'string' ? data.supportPhone : null,
     officeCity: typeof data.officeCity === 'string' ? data.officeCity : null,
     socialLinks: data.socialLinks && typeof data.socialLinks === 'object' ? data.socialLinks : {},
+    frontendAccess: normalizeFrontendAccess(data.frontendAccess),
     updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
     createdAt: toDateValue(data.createdAt) as any,
     updatedAt: toDateValue(data.updatedAt) as any,

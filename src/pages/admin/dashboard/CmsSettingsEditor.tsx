@@ -7,6 +7,7 @@ import { COLLECTIONS } from '../../../constants/firestore';
 import {
   CMS_DEFAULTS,
   CMS_FEATURE_FLAGS,
+  CMS_FRONTEND_ACCESS_MODE,
   CMS_LIMITS,
   CMS_SEO_GUIDELINES,
   CMS_SETTINGS_DOC_ID,
@@ -19,6 +20,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { invalidateAdminRecipe } from '../../../utils/adminQueryInvalidation';
 import { toDateValue } from '../../../utils/dateValue';
 import SeoSnippetPreview from '../../../components/cms/SeoSnippetPreview';
+import { normalizeFrontendAccess, type FrontendAccessSettings } from '../../../utils/frontendAccess';
 
 type SocialLinksState = {
   facebook: string;
@@ -70,6 +72,13 @@ export default function CmsSettingsEditorPage() {
     linkedin: '',
     youtube: '',
   });
+  const [frontendAccessMode, setFrontendAccessMode] = useState<FrontendAccessSettings['mode']>(CMS_DEFAULTS.frontendAccess.mode);
+  const [maintenanceTitle, setMaintenanceTitle] = useState<string>(CMS_DEFAULTS.frontendAccess.maintenanceTitle);
+  const [maintenanceMessage, setMaintenanceMessage] = useState<string>(CMS_DEFAULTS.frontendAccess.maintenanceMessage);
+  const [maintenanceEta, setMaintenanceEta] = useState<string>(CMS_DEFAULTS.frontendAccess.maintenanceEta);
+  const [passwordPromptTitle, setPasswordPromptTitle] = useState<string>(CMS_DEFAULTS.frontendAccess.passwordPromptTitle);
+  const [passwordPromptMessage, setPasswordPromptMessage] = useState<string>(CMS_DEFAULTS.frontendAccess.passwordPromptMessage);
+  const [passwordSessionTtlMinutes, setPasswordSessionTtlMinutes] = useState<number>(CMS_DEFAULTS.frontendAccess.passwordSessionTtlMinutes);
   const [showAdvancedSeo, setShowAdvancedSeo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -110,6 +119,14 @@ export default function CmsSettingsEditorPage() {
     setSupportEmail(next.supportEmail || CMS_DEFAULTS.supportEmail);
     setSupportPhone(next.supportPhone || CMS_DEFAULTS.supportPhone);
     setOfficeCity(next.officeCity || CMS_DEFAULTS.officeCity);
+    const nextFrontendAccess = normalizeFrontendAccess(next.frontendAccess);
+    setFrontendAccessMode(nextFrontendAccess.mode);
+    setMaintenanceTitle(nextFrontendAccess.maintenanceTitle || CMS_DEFAULTS.frontendAccess.maintenanceTitle);
+    setMaintenanceMessage(nextFrontendAccess.maintenanceMessage || CMS_DEFAULTS.frontendAccess.maintenanceMessage);
+    setMaintenanceEta(nextFrontendAccess.maintenanceEta || CMS_DEFAULTS.frontendAccess.maintenanceEta);
+    setPasswordPromptTitle(nextFrontendAccess.passwordPromptTitle || CMS_DEFAULTS.frontendAccess.passwordPromptTitle);
+    setPasswordPromptMessage(nextFrontendAccess.passwordPromptMessage || CMS_DEFAULTS.frontendAccess.passwordPromptMessage);
+    setPasswordSessionTtlMinutes(nextFrontendAccess.passwordSessionTtlMinutes || CMS_DEFAULTS.frontendAccess.passwordSessionTtlMinutes);
 
     const nextSocial = next.socialLinks && typeof next.socialLinks === 'object' ? next.socialLinks as Record<string, unknown> : {};
     setSocialLinks({
@@ -140,6 +157,10 @@ export default function CmsSettingsEditorPage() {
       notify.error('Default social image must be an absolute URL or start with /.');
       return;
     }
+    if (frontendAccessMode === CMS_FRONTEND_ACCESS_MODE.passwordProtected && passwordSessionTtlMinutes < 5) {
+      notify.error('Password session duration must be at least 5 minutes.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -165,12 +186,24 @@ export default function CmsSettingsEditorPage() {
         supportPhone: supportPhone.trim() || null,
         officeCity: officeCity.trim() || null,
         socialLinks: cleanSocialLinks,
+        frontendAccess: {
+          mode: frontendAccessMode,
+          maintenanceTitle: maintenanceTitle.trim().slice(0, CMS_LIMITS.frontendAccessTitle) || CMS_DEFAULTS.frontendAccess.maintenanceTitle,
+          maintenanceMessage: maintenanceMessage.trim().slice(0, CMS_LIMITS.frontendAccessMessage) || CMS_DEFAULTS.frontendAccess.maintenanceMessage,
+          maintenanceEta: maintenanceEta.trim().slice(0, CMS_LIMITS.frontendAccessEta) || null,
+          passwordPromptTitle: passwordPromptTitle.trim().slice(0, CMS_LIMITS.frontendAccessTitle) || CMS_DEFAULTS.frontendAccess.passwordPromptTitle,
+          passwordPromptMessage: passwordPromptMessage.trim().slice(0, CMS_LIMITS.frontendAccessMessage) || CMS_DEFAULTS.frontendAccess.passwordPromptMessage,
+          passwordSessionTtlMinutes: Math.min(24 * 7, Math.max(5, Math.floor(passwordSessionTtlMinutes || CMS_DEFAULTS.frontendAccess.passwordSessionTtlMinutes))),
+        },
         updatedBy: user?.uid || 'admin',
         createdAt,
         updatedAt: now,
       }, { merge: true });
 
       await invalidateAdminRecipe(queryClient, 'cmsUpdated');
+      await queryClient.invalidateQueries({ queryKey: ['cms', 'public', 'settings'] });
+      await queryClient.invalidateQueries({ queryKey: ['cms', 'public', 'settings', 'frontendAccessGate'] });
+      await queryClient.invalidateQueries({ queryKey: ['frontendAccess', 'status'] });
       setIsDirty(false);
       setHydratedRevisionKey(null);
       notify.success('Settings saved.');
@@ -187,7 +220,7 @@ export default function CmsSettingsEditorPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">CMS Settings</h2>
-            <p className="text-sm text-gray-600 dark:text-slate-300">Simple controls for site identity, support details, and blog behavior.</p>
+            <p className="text-sm text-gray-600 dark:text-slate-300">Global controls for site identity, public access, support details, and blog behavior.</p>
           </div>
           <Link
             to={ROUTES.portal.admin.dashboard.cmsSettings}
@@ -230,6 +263,88 @@ export default function CmsSettingsEditorPage() {
               description={defaultSeoDescription || siteTagline || CMS_DEFAULTS.defaultSeoDescription}
               url={previewUrl}
             />
+          </div>
+
+          <div className="md:col-span-2 rounded-2xl border border-red-200 bg-gradient-to-br from-red-50 via-rose-50 to-white p-4 shadow-sm dark:border-red-900/40 dark:bg-slate-950/70">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-red-700 dark:text-red-300">Frontend Access Control</p>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-slate-100">Control public site availability from one place</h3>
+                <p className="text-sm text-gray-600 dark:text-slate-300">
+                  Admin routes remain available. Password mode uses a server-validated session cookie and requires the backend secret to be configured.
+                </p>
+              </div>
+              <div className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-semibold text-red-700 dark:border-red-900/50 dark:bg-slate-900 dark:text-red-300">
+                Active mode: {frontendAccessMode.replace('_', ' ')}
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <label className="rounded-xl border border-gray-300 bg-white p-3 text-sm text-gray-800 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Mode</span>
+                <select
+                  value={frontendAccessMode}
+                  onChange={(event) => { setFrontendAccessMode(event.target.value as FrontendAccessSettings['mode']); setIsDirty(true); }}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                >
+                  <option value={CMS_FRONTEND_ACCESS_MODE.open}>Open</option>
+                  <option value={CMS_FRONTEND_ACCESS_MODE.maintenance}>Scheduled maintenance</option>
+                  <option value={CMS_FRONTEND_ACCESS_MODE.passwordProtected}>Password protected</option>
+                </select>
+              </label>
+
+              <label className="rounded-xl border border-gray-300 bg-white p-3 text-sm text-gray-800 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Password Session TTL</span>
+                <input
+                  type="number"
+                  min={5}
+                  max={10080}
+                  value={passwordSessionTtlMinutes}
+                  onChange={(event) => { setPasswordSessionTtlMinutes(Number(event.target.value || CMS_DEFAULTS.frontendAccess.passwordSessionTtlMinutes)); setIsDirty(true); }}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                />
+                <span className="mt-1 block text-[11px] text-gray-500 dark:text-slate-400">Used only in password-protected mode.</span>
+              </label>
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
+                <p className="font-semibold">Server requirement</p>
+                <p className="mt-1 text-xs leading-relaxed">
+                  Configure `FRONTEND_GATE_PASSWORD` and `FRONTEND_GATE_SESSION_SECRET` in Netlify before enabling password mode in production.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Maintenance Title</span>
+                <input value={maintenanceTitle} onChange={(event) => { setMaintenanceTitle(event.target.value); setIsDirty(true); }} placeholder={CMS_DEFAULTS.frontendAccess.maintenanceTitle} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Maintenance ETA</span>
+                <input value={maintenanceEta} onChange={(event) => { setMaintenanceEta(event.target.value); setIsDirty(true); }} placeholder="Expected back by 7:30 PM IST" className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Maintenance Message</span>
+                <textarea value={maintenanceMessage} onChange={(event) => { setMaintenanceMessage(event.target.value); setIsDirty(true); }} rows={3} placeholder={CMS_DEFAULTS.frontendAccess.maintenanceMessage} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+              </label>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Password Prompt Title</span>
+                <input value={passwordPromptTitle} onChange={(event) => { setPasswordPromptTitle(event.target.value); setIsDirty(true); }} placeholder={CMS_DEFAULTS.frontendAccess.passwordPromptTitle} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+              </label>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
+                <p className="font-semibold">Mode behavior</p>
+                <p className="mt-1 text-xs leading-relaxed">
+                  `open` shows the site normally. `maintenance` blocks all non-admin app routes. `password protected` asks visitors for the configured server-side password before the site opens.
+                </p>
+              </div>
+              <label className="block md:col-span-2">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-slate-400">Password Prompt Message</span>
+                <textarea value={passwordPromptMessage} onChange={(event) => { setPasswordPromptMessage(event.target.value); setIsDirty(true); }} rows={3} placeholder={CMS_DEFAULTS.frontendAccess.passwordPromptMessage} className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500" />
+              </label>
+            </div>
           </div>
 
           <label className="block">

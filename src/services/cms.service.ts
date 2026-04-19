@@ -5,6 +5,7 @@ import { CMS_DEFAULTS, CMS_LIMITS, CMS_PAGE_KIND, CMS_QUERY_LIMITS, CMS_SETTINGS
 import type { CmsBlogPost, CmsNavMenu, CmsPage, CmsSettings } from '../types/database.types';
 import { toDateValue } from '../utils/dateValue';
 import { normalizeLocalizedCmsMap } from '../utils/cmsLocalization';
+import { normalizeFrontendAccess } from '../utils/frontendAccess';
 
 const QUERY_TIMEOUT_MS = 12000;
 
@@ -190,6 +191,7 @@ export const getPublicCmsSettings = async (): Promise<CmsSettings> => {
       supportPhone: CMS_DEFAULTS.supportPhone,
       officeCity: CMS_DEFAULTS.officeCity,
       socialLinks: {},
+      frontendAccess: normalizeFrontendAccess(null),
       updatedBy: '',
       createdAt: (new Date() as any),
       updatedAt: (new Date() as any),
@@ -218,6 +220,7 @@ export const getPublicCmsSettings = async (): Promise<CmsSettings> => {
     supportPhone: typeof data.supportPhone === 'string' ? data.supportPhone : CMS_DEFAULTS.supportPhone,
     officeCity: typeof data.officeCity === 'string' ? data.officeCity : CMS_DEFAULTS.officeCity,
     socialLinks: data.socialLinks && typeof data.socialLinks === 'object' ? data.socialLinks : {},
+    frontendAccess: normalizeFrontendAccess(data.frontendAccess),
     updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
     createdAt: (toDateValue(data.createdAt) as any) || (new Date() as any),
     updatedAt: (toDateValue(data.updatedAt) as any) || (new Date() as any),

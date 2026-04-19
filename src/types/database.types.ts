@@ -1066,6 +1066,15 @@ export interface CmsSettings {
   supportPhone?: string | null;
   officeCity?: string | null;
   socialLinks?: Record<string, string>;
+  frontendAccess?: {
+    mode: 'open' | 'maintenance' | 'password_protected';
+    maintenanceTitle?: string | null;
+    maintenanceMessage?: string | null;
+    maintenanceEta?: string | null;
+    passwordPromptTitle?: string | null;
+    passwordPromptMessage?: string | null;
+    passwordSessionTtlMinutes?: number | null;
+  };
   updatedBy: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;

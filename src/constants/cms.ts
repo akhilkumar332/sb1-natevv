@@ -42,6 +42,9 @@ export const CMS_LIMITS = {
   excerpt: 320,
   seoTitle: 70,
   seoDescription: 180,
+  frontendAccessTitle: 120,
+  frontendAccessMessage: 600,
+  frontendAccessEta: 120,
   contentJson: 20000,
   tagsPerPost: 20,
   menuItemsPerMenu: 50,
@@ -79,7 +82,24 @@ export const CMS_DEFAULTS = {
   supportEmail: 'contact@bloodhub.in',
   supportPhone: '+91 1800-123-456',
   officeCity: 'Mumbai, Maharashtra',
+  frontendAccess: {
+    mode: 'open',
+    maintenanceTitle: 'BloodHub is under scheduled maintenance',
+    maintenanceMessage: 'We are preparing a safer, faster donor experience. Please check back shortly.',
+    maintenanceEta: '',
+    passwordPromptTitle: 'Protected access',
+    passwordPromptMessage: 'Enter the access password to continue to the BloodHub frontend.',
+    passwordSessionTtlMinutes: 240,
+  },
 } as const;
+
+export const CMS_FRONTEND_ACCESS_MODE = {
+  open: 'open',
+  maintenance: 'maintenance',
+  passwordProtected: 'password_protected',
+} as const;
+
+export type CmsFrontendAccessMode = (typeof CMS_FRONTEND_ACCESS_MODE)[keyof typeof CMS_FRONTEND_ACCESS_MODE];
 
 export const CMS_SEO_DEFAULTS = {
   locale: 'en_IN',
