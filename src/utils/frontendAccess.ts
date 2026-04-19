@@ -3,6 +3,8 @@ import { ROUTES } from '../constants/routes';
 import type { CmsSettings } from '../types/database.types';
 
 export type FrontendAccessSettings = NonNullable<CmsSettings['frontendAccess']>;
+const FRONTEND_ACCESS_CACHE_KEY = 'bh_frontend_access_snapshot';
+const FRONTEND_ACCESS_CACHE_MAX_AGE_MS = 5 * 60 * 1000;
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
@@ -56,3 +58,33 @@ export const isAdminRoutePath = (pathname: string): boolean => (
   || pathname === ROUTES.portal.admin.onboarding
   || pathname.startsWith('/admin/')
 );
+
+export const readCachedFrontendAccess = (): FrontendAccessSettings | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(FRONTEND_ACCESS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { savedAt?: unknown; value?: unknown };
+    const savedAt = Number(parsed?.savedAt);
+    if (!Number.isFinite(savedAt) || Date.now() - savedAt > FRONTEND_ACCESS_CACHE_MAX_AGE_MS) {
+      window.sessionStorage.removeItem(FRONTEND_ACCESS_CACHE_KEY);
+      return null;
+    }
+    return normalizeFrontendAccess(parsed.value);
+  } catch {
+    return null;
+  }
+};
+
+export const writeCachedFrontendAccess = (value: unknown): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    const normalized = normalizeFrontendAccess(value);
+    window.sessionStorage.setItem(FRONTEND_ACCESS_CACHE_KEY, JSON.stringify({
+      savedAt: Date.now(),
+      value: normalized,
+    }));
+  } catch {
+    // Ignore storage failures so the gate still works without sessionStorage.
+  }
+};

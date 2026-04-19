@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Clock3, Droplets, HeartHandshake, Lock, ShieldAlert } from 'lucide-react';
+import { Droplets, Lock, ShieldAlert } from 'lucide-react';
 import Loading from '../Loading';
 import SeoHead from '../SeoHead';
 import { CMS_DEFAULTS, CMS_FRONTEND_ACCESS_MODE } from '../../constants/cms';
@@ -11,7 +11,12 @@ import {
   unlockFrontendAccess,
 } from '../../services/frontendAccess.service';
 import { getPublicCmsSettings } from '../../services/cms.service';
-import { isAdminRoutePath, normalizeFrontendAccess } from '../../utils/frontendAccess';
+import {
+  isAdminRoutePath,
+  normalizeFrontendAccess,
+  readCachedFrontendAccess,
+  writeCachedFrontendAccess,
+} from '../../utils/frontendAccess';
 
 type FrontendAccessGateProps = {
   children: ReactNode;
@@ -54,24 +59,6 @@ function AccessShell({ eyebrow, title, description, supportingText, icon, childr
                 ) : null}
               </div>
             </div>
-
-            <div className="mt-10 grid gap-4 md:grid-cols-3">
-              <div className="rounded-2xl border border-red-100 bg-gradient-to-br from-white to-red-50 p-4 dark:border-slate-800 dark:from-slate-900 dark:to-slate-950">
-                <HeartHandshake className="h-5 w-5 text-red-600 dark:text-red-400" />
-                <p className="mt-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Built around donor trust</p>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">We gate the frontend without affecting admin operations or safety workflows.</p>
-              </div>
-              <div className="rounded-2xl border border-red-100 bg-gradient-to-br from-white to-red-50 p-4 dark:border-slate-800 dark:from-slate-900 dark:to-slate-950">
-                <Clock3 className="h-5 w-5 text-red-600 dark:text-red-400" />
-                <p className="mt-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Low-friction recovery</p>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Maintenance and access mode updates take effect from CMS settings without redeploying the app.</p>
-              </div>
-              <div className="rounded-2xl border border-red-100 bg-gradient-to-br from-white to-red-50 p-4 dark:border-slate-800 dark:from-slate-900 dark:to-slate-950">
-                <Lock className="h-5 w-5 text-red-600 dark:text-red-400" />
-                <p className="mt-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Server-backed password flow</p>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">The password is validated server-side and unlocks the app with a short-lived cookie session.</p>
-              </div>
-            </div>
           </section>
 
           <aside className="rounded-[2rem] border border-red-100/80 bg-white/90 p-6 shadow-[0_20px_60px_rgba(127,29,29,0.14)] backdrop-blur-xl dark:border-red-900/30 dark:bg-slate-950/80">
@@ -110,7 +97,7 @@ function MaintenanceScreen({
           <div className="rounded-2xl border border-red-100 bg-red-50/80 p-5 dark:border-red-900/40 dark:bg-red-950/20">
             <p className="text-sm font-semibold uppercase tracking-[0.14em] text-red-700 dark:text-red-300">What visitors should know</p>
             <p className="mt-3 text-sm leading-7 text-slate-700 dark:text-slate-300">
-              The public frontend is temporarily paused for scheduled updates. Admin routes remain online so operational teams can continue verification, coordination, and incident handling in the background.
+              The site is temporarily paused for scheduled improvements. We are working to restore access as quickly as possible.
             </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
@@ -129,6 +116,7 @@ function PasswordScreen({
   title,
   message,
   ttlMinutes,
+  statusReady,
   configured,
   statusError,
   onUnlocked,
@@ -136,6 +124,7 @@ function PasswordScreen({
   title: string;
   message: string;
   ttlMinutes: number;
+  statusReady: boolean;
   configured: boolean;
   statusError: boolean;
   onUnlocked: () => void;
@@ -146,7 +135,7 @@ function PasswordScreen({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!configured) return;
+    if (!statusReady || !configured || statusError) return;
     setSubmitting(true);
     setErrorMessage(null);
     try {
@@ -173,7 +162,13 @@ function PasswordScreen({
         eyebrow="Protected Frontend"
         title={title}
         description={message}
-        supportingText={configured ? `Access sessions last up to ${ttlMinutes} minutes.` : 'Password mode is enabled, but the server secret is not configured yet.'}
+        supportingText={
+          !statusReady
+            ? 'Checking access availability...'
+            : configured
+              ? `Access sessions last up to ${ttlMinutes} minutes.`
+              : 'Protected access is being prepared. Please try again shortly.'
+        }
         icon={<Lock className="h-7 w-7" />}
       >
         <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
@@ -185,14 +180,14 @@ function PasswordScreen({
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete="current-password"
-                disabled={!configured || submitting}
+                disabled={!statusReady || !configured || statusError || submitting}
                 className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-200 disabled:cursor-not-allowed disabled:bg-gray-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-900"
                 placeholder="Enter password"
               />
             </label>
             <button
               type="submit"
-              disabled={!configured || submitting || !password.trim()}
+              disabled={!statusReady || !configured || statusError || submitting || !password.trim()}
               className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-700 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-red-900/20 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? 'Verifying access...' : 'Open BloodHub frontend'}
@@ -207,18 +202,18 @@ function PasswordScreen({
 
           {statusError ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-              We could not reach the frontend access verification service. Check the Netlify function or local backend setup and try again.
+              We could not verify access right now. Please wait a moment and try again.
             </div>
           ) : null}
 
-          {!configured ? (
+          {statusReady && !statusError && !configured ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
-              Password mode is enabled in CMS, but `FRONTEND_GATE_PASSWORD` or `FRONTEND_GATE_SESSION_SECRET` is missing on the server.
+              This protected page is not fully available right now. Please try again shortly.
             </div>
           ) : null}
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-            Admin routes remain accessible during protected mode. This gate is intended for public route control and staged launches.
+            Enter the access password to continue.
           </div>
         </form>
       </AccessShell>
@@ -230,6 +225,7 @@ export default function FrontendAccessGate({ children }: FrontendAccessGateProps
   const location = useLocation();
   const queryClient = useQueryClient();
   const bypassGate = isAdminRoutePath(location.pathname);
+  const cachedFrontendAccess = readCachedFrontendAccess();
   const settingsQuery = useQuery({
     queryKey: ['cms', 'public', 'settings', 'frontendAccessGate'],
     queryFn: getPublicCmsSettings,
@@ -240,7 +236,12 @@ export default function FrontendAccessGate({ children }: FrontendAccessGateProps
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     refetchInterval: 30 * 1000,
-    initialData: () => queryClient.getQueryData(['cms', 'public', 'settings']),
+    initialData: () => {
+      const cachedSettings = queryClient.getQueryData<{ frontendAccess?: unknown }>(['cms', 'public', 'settings']);
+      if (cachedSettings) return cachedSettings;
+      if (!cachedFrontendAccess) return undefined;
+      return { frontendAccess: cachedFrontendAccess };
+    },
   });
   const frontendAccess = normalizeFrontendAccess(settingsQuery.data?.frontendAccess);
 
@@ -251,6 +252,11 @@ export default function FrontendAccessGate({ children }: FrontendAccessGateProps
     retry: false,
     staleTime: 60 * 1000,
   });
+
+  useEffect(() => {
+    if (bypassGate || !settingsQuery.data?.frontendAccess) return;
+    writeCachedFrontendAccess(settingsQuery.data.frontendAccess);
+  }, [bypassGate, settingsQuery.data]);
 
   useEffect(() => {
     if (!settingsQuery.error || bypassGate) return;
@@ -288,10 +294,6 @@ export default function FrontendAccessGate({ children }: FrontendAccessGateProps
     );
   }
 
-  if (statusQuery.isLoading && !statusQuery.data) {
-    return <Loading />;
-  }
-
   if (statusQuery.data?.unlocked) {
     return <>{children}</>;
   }
@@ -301,6 +303,7 @@ export default function FrontendAccessGate({ children }: FrontendAccessGateProps
       title={frontendAccess.passwordPromptTitle || CMS_DEFAULTS.frontendAccess.passwordPromptTitle}
       message={frontendAccess.passwordPromptMessage || CMS_DEFAULTS.frontendAccess.passwordPromptMessage}
       ttlMinutes={frontendAccess.passwordSessionTtlMinutes || CMS_DEFAULTS.frontendAccess.passwordSessionTtlMinutes}
+      statusReady={statusQuery.isSuccess}
       configured={statusQuery.data?.configured === true}
       statusError={Boolean(statusQuery.error)}
       onUnlocked={() => {

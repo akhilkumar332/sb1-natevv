@@ -36,6 +36,7 @@ const createClient = () => new QueryClient({
 describe('FrontendAccessGate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     getPublicCmsSettingsMock.mockResolvedValue({
       frontendAccess: {
         mode: 'open',
@@ -79,6 +80,56 @@ describe('FrontendAccessGate', () => {
 
     expect(await screen.findByRole('heading', { name: 'Maintenance window' })).toBeInTheDocument();
     expect(screen.queryByText('Public content')).not.toBeInTheDocument();
+  });
+
+  it('renders the cached maintenance gate immediately before the refresh completes', () => {
+    window.sessionStorage.setItem('bh_frontend_access_snapshot', JSON.stringify({
+      savedAt: Date.now(),
+      value: {
+        mode: 'maintenance',
+        maintenanceTitle: 'Cached maintenance window',
+        maintenanceMessage: 'Cached message',
+        maintenanceEta: 'Soon',
+      },
+    }));
+    getPublicCmsSettingsMock.mockImplementation(() => new Promise(() => {}));
+
+    render(
+      <QueryClientProvider client={createClient()}>
+        <MemoryRouter initialEntries={['/']}>
+          <FrontendAccessGate>
+            <div>Public content</div>
+          </FrontendAccessGate>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByRole('heading', { name: 'Cached maintenance window' })).toBeInTheDocument();
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+  });
+
+  it('ignores expired cached access snapshots', async () => {
+    window.sessionStorage.setItem('bh_frontend_access_snapshot', JSON.stringify({
+      savedAt: Date.now() - (6 * 60 * 1000),
+      value: {
+        mode: 'maintenance',
+        maintenanceTitle: 'Expired maintenance window',
+        maintenanceMessage: 'Expired message',
+      },
+    }));
+
+    render(
+      <QueryClientProvider client={createClient()}>
+        <MemoryRouter initialEntries={['/']}>
+          <FrontendAccessGate>
+            <div>Public content</div>
+          </FrontendAccessGate>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByText('Public content')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Expired maintenance window' })).not.toBeInTheDocument();
   });
 
   it('bypasses the gate for admin routes', () => {
@@ -136,6 +187,9 @@ describe('FrontendAccessGate', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Members only' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByLabelText('Access password')).toBeEnabled();
+    });
     fireEvent.change(screen.getByLabelText('Access password'), { target: { value: 'secret-pass' } });
     fireEvent.click(screen.getByRole('button', { name: 'Open BloodHub frontend' }));
 
@@ -167,7 +221,9 @@ describe('FrontendAccessGate', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Members only' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Open BloodHub frontend' })).toBeDisabled();
-    expect(screen.getByText('We could not reach the frontend access verification service. Check the Netlify function or local backend setup and try again.')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open BloodHub frontend' })).toBeDisabled();
+      expect(screen.getByText('We could not verify access right now. Please wait a moment and try again.')).toBeInTheDocument();
+    });
   });
 });
