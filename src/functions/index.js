@@ -7,10 +7,10 @@ import cors from 'cors';
 import admin from 'firebase-admin';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
-import { fileURLToPath } from 'url';
-import { dirname, resolve } from 'path';
-import fs from 'fs';
+import { fileURLToPath, pathToFileURL } from 'url';
+import { dirname } from 'path';
 import crypto from 'crypto';
+import { functionHandlers, runScheduledFunctionHandler, wrapFunctionHandler } from './functionHandlerAdapter.js';
 
 // Load environment variables
 dotenv.config();
@@ -146,77 +146,17 @@ const logEvent = ({ level = 'info', event, error, meta, dedupe = true }) => {
   }
 };
 
-const resolveServiceAccountPath = () => {
-  const envPath = process.env.FIREBASE_ADMIN_SDK_PATH || process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (envPath) {
-    return resolve(envPath);
-  }
-
-  const defaultPath = resolve(__dirname, '../../secrets/firebase-admin-sdk.json');
-  if (fs.existsSync(defaultPath)) {
-    return defaultPath;
-  }
-
-  return null;
-};
-
-const loadServiceAccount = () => {
-  const filePath = resolveServiceAccountPath();
-  if (!filePath || !fs.existsSync(filePath)) {
-    return null;
-  }
-
-  try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    const data = JSON.parse(raw);
-    if (data.private_key) {
-      data.private_key = String(data.private_key).replace(/\\n/g, '\n');
-    }
-    return data;
-  } catch (error) {
-    logEvent({
-      level: 'warn',
-      event: 'firebase.service_account.load_failed',
-      error,
-      meta: { filePath },
-    });
-    return null;
-  }
-};
-
 // Initialize Firebase Admin
 if (!admin.apps.length) {
-  const serviceAccount = loadServiceAccount();
-  const rawPrivateKey = process.env.FIREBASE_PRIVATE_KEY || process.env.VITE_FIREBASE_PRIVATE_KEY;
-  const privateKey = rawPrivateKey
-    ? rawPrivateKey.replace(/^"|"$/g, '').replace(/\\n/g, '\n')
-    : undefined;
-  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || process.env.VITE_FIREBASE_CLIENT_EMAIL;
-
-  const envServiceAccount = projectId && privateKey && clientEmail
-    ? { projectId, privateKey, clientEmail }
-    : null;
-
   try {
-    if (serviceAccount) {
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-      });
-    } else if (envServiceAccount) {
-      admin.initializeApp({
-        credential: admin.credential.cert(envServiceAccount)
-      });
-    } else {
-      admin.initializeApp();
-    }
+    admin.initializeApp();
   } catch (error) {
     logEvent({
-      level: 'warn',
-      event: 'firebase.admin.init_fallback',
+      level: 'error',
+      event: 'firebase.admin.init_failed',
       error,
     });
-    admin.initializeApp();
+    throw error;
   }
 }
 
@@ -287,7 +227,7 @@ const swaggerOptions = {
         description: 'Local Development Server',
       },
       {
-        url: 'https://bloodhubindia.netlify.app',
+        url: process.env.SITE_URL || 'https://bloodhub.in',
         description: 'Production Server',
       },
     ],
@@ -779,8 +719,18 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Only run standalone server if not in Firebase Cloud Functions environment
-if (process.env.NODE_ENV !== 'production') {
+const isExecutedDirectly = (() => {
+  const entryArg = process.argv[1];
+  if (!entryArg) return false;
+  try {
+    return import.meta.url === pathToFileURL(entryArg).href;
+  } catch {
+    return false;
+  }
+})();
+
+// Only run the standalone Express server when this file is executed directly.
+if (isExecutedDirectly) {
   const PORT = process.env.PORT || 5001;
   app.listen(PORT, () => {
     logEvent({
@@ -794,6 +744,22 @@ if (process.env.NODE_ENV !== 'production') {
     });
   });
 }
+
+export const contactSubmit = functions.https.onRequest(wrapFunctionHandler(functionHandlers.contactSubmit));
+export const errorLog = functions.https.onRequest(wrapFunctionHandler(functionHandlers.errorLog));
+export const fcmBridge = functions.https.onRequest(wrapFunctionHandler(functionHandlers.fcmBridge));
+export const frontendAccess = functions.https.onRequest(wrapFunctionHandler(functionHandlers.frontendAccess));
+export const impersonate = functions.https.onRequest(wrapFunctionHandler(functionHandlers.impersonate));
+export const impersonationResume = functions.https.onRequest(wrapFunctionHandler(functionHandlers.impersonationResume));
+export const adminUserBiometrics = functions.https.onRequest(wrapFunctionHandler(functionHandlers.adminUserBiometrics));
+export const webauthnRegisterChallenge = functions.https.onRequest(wrapFunctionHandler(functionHandlers.webauthnRegisterChallenge));
+export const webauthnRegisterVerify = functions.https.onRequest(wrapFunctionHandler(functionHandlers.webauthnRegisterVerify));
+export const webauthnAuthChallenge = functions.https.onRequest(wrapFunctionHandler(functionHandlers.webauthnAuthChallenge));
+export const webauthnAuthVerify = functions.https.onRequest(wrapFunctionHandler(functionHandlers.webauthnAuthVerify));
+export const errorLogRetentionJob = functions.pubsub
+  .schedule('30 2 * * *')
+  .timeZone('Etc/UTC')
+  .onRun(async () => runScheduledFunctionHandler(functionHandlers.errorLogRetention));
 
 // Keep the Firebase Cloud Function export
 export const api = functions.https.onRequest((req, res) => {

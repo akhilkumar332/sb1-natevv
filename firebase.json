@@ -8,6 +8,58 @@
     ],
     "rewrites": [
       {
+        "source": "/api",
+        "function": "api"
+      },
+      {
+        "source": "/api/**",
+        "function": "api"
+      },
+      {
+        "source": "/functions/contact-submit",
+        "function": "contactSubmit"
+      },
+      {
+        "source": "/functions/error-log",
+        "function": "errorLog"
+      },
+      {
+        "source": "/functions/fcm-bridge",
+        "function": "fcmBridge"
+      },
+      {
+        "source": "/functions/frontend-access",
+        "function": "frontendAccess"
+      },
+      {
+        "source": "/functions/impersonate",
+        "function": "impersonate"
+      },
+      {
+        "source": "/functions/impersonation-resume",
+        "function": "impersonationResume"
+      },
+      {
+        "source": "/functions/admin-user-biometrics",
+        "function": "adminUserBiometrics"
+      },
+      {
+        "source": "/functions/webauthn-register-challenge",
+        "function": "webauthnRegisterChallenge"
+      },
+      {
+        "source": "/functions/webauthn-register-verify",
+        "function": "webauthnRegisterVerify"
+      },
+      {
+        "source": "/functions/webauthn-auth-challenge",
+        "function": "webauthnAuthChallenge"
+      },
+      {
+        "source": "/functions/webauthn-auth-verify",
+        "function": "webauthnAuthVerify"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

@@ -7,13 +7,20 @@ import {
 } from '@simplewebauthn/browser';
 import { collection, getDocs, getDocsFromServer, doc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { SERVERLESS_ENDPOINTS } from '../constants/backend';
 import { COLLECTIONS } from '../constants/firestore';
 
-const BASE = '/.netlify/functions';
 const ANONYMOUS_CACHE_KEY = 'anonymous';
 const CHALLENGE_CACHE_TTL_MS = 4 * 60 * 1000;
 const ENROLLMENT_SYNC_RETRY_DELAYS_MS = [0, 250, 800];
 export const LAST_USER_KEY = 'bh_wauthn_last_uid';
+
+const WEBAUTHN_ENDPOINTS = {
+  'webauthn-register-challenge': SERVERLESS_ENDPOINTS.webauthnRegisterChallenge,
+  'webauthn-register-verify': SERVERLESS_ENDPOINTS.webauthnRegisterVerify,
+  'webauthn-auth-challenge': SERVERLESS_ENDPOINTS.webauthnAuthChallenge,
+  'webauthn-auth-verify': SERVERLESS_ENDPOINTS.webauthnAuthVerify,
+} as const;
 
 type ChallengeResponse = {
   challengeId: string;
@@ -62,7 +69,7 @@ const post = async (
 
   let response: Response;
   try {
-    response = await fetch(`${BASE}/${path}`, {
+    response = await fetch(WEBAUTHN_ENDPOINTS[path as keyof typeof WEBAUTHN_ENDPOINTS] || path, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
@@ -464,7 +471,9 @@ export const removeBiometricCredential = async (userId: string): Promise<boolean
 };
 
 export const warmupBiometricFunctions = (): void => {
-  const ping = (path: string) => fetch(`${BASE}/${path}`, { method: 'OPTIONS' }).catch(() => {});
+  const ping = (path: keyof typeof WEBAUTHN_ENDPOINTS) => (
+    fetch(WEBAUTHN_ENDPOINTS[path], { method: 'OPTIONS' }).catch(() => {})
+  );
   void ping('webauthn-auth-challenge');
   void ping('webauthn-auth-verify');
 };

@@ -218,11 +218,11 @@ const hasRecentDuplicateInFirestore = async (db, fingerprint) => {
   }
 };
 
-const logNetlifyError = async ({ admin, event, error, route, scope, actorUid, actorRole, metadata }) => {
+const logFunctionError = async ({ admin, event, error, route, scope, actorUid, actorRole, metadata }) => {
   try {
     if (!admin?.apps?.length) return;
     const db = admin.firestore();
-    const message = truncate(sanitizeText(error?.message || String(error || 'Netlify function error')), 600);
+    const message = truncate(sanitizeText(error?.message || String(error || 'Function error')), 600);
     const stack = truncate(sanitizeText(error?.stack || ''), 4000);
     const code = typeof error?.code === 'string' ? error.code : null;
     const resolvedRoute = sanitizeRoute(route || event?.path || null);
@@ -238,7 +238,7 @@ const logNetlifyError = async ({ admin, event, error, route, scope, actorUid, ac
     if (await hasRecentDuplicateInFirestore(db, fingerprint)) return;
 
     await db.collection('errorLogs').add({
-      source: 'netlify',
+      source: 'functions',
       scope: scope || inferScope(resolvedRoute || ''),
       level: 'error',
       message,
@@ -264,5 +264,5 @@ const logNetlifyError = async ({ admin, event, error, route, scope, actorUid, ac
 };
 
 module.exports = {
-  logNetlifyError,
+  logFunctionError,
 };

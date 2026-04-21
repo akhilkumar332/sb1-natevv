@@ -1,4 +1,5 @@
 import { captureHandledError } from './errorLog.service';
+import { SERVERLESS_ENDPOINTS } from '../constants/backend';
 
 export type FrontendAccessStatusResponse = {
   ok: boolean;
@@ -12,7 +13,7 @@ type UnlockResponse = FrontendAccessStatusResponse & {
   error?: string;
 };
 
-const FRONTEND_ACCESS_ENDPOINT = '/.netlify/functions/frontend-access';
+const FRONTEND_ACCESS_ENDPOINT = SERVERLESS_ENDPOINTS.frontendAccess;
 
 const parseJson = async <T>(response: Response): Promise<T | null> => {
   try {

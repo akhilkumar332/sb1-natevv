@@ -1,4 +1,5 @@
 import { auth } from '../firebase';
+import { SERVERLESS_ENDPOINTS } from '../constants/backend';
 
 type FcmBridgePayload = {
   messageId?: string;
@@ -10,7 +11,7 @@ type FcmBridgePayload = {
   data?: Record<string, any>;
 };
 
-const BRIDGE_URL = (import.meta as any).env?.VITE_FCM_BRIDGE_URL || '/.netlify/functions/fcm-bridge';
+const BRIDGE_URL = SERVERLESS_ENDPOINTS.fcmBridge;
 
 export const sendFcmToBridge = async (payload: FcmBridgePayload): Promise<boolean> => {
   if (typeof window === 'undefined') return false;

@@ -1,6 +1,6 @@
 const admin = require('firebase-admin');
 const crypto = require('crypto');
-const { logNetlifyError } = require('./error-log.cjs');
+const { logFunctionError } = require('./error-log.cjs');
 
 const VALID_TYPES = new Set([
   'emergency_request',
@@ -80,18 +80,7 @@ const sanitizeActionUrl = (value, role) => {
 
 const initAdmin = () => {
   if (admin.apps.length) return;
-  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || process.env.VITE_FIREBASE_CLIENT_EMAIL;
-  const rawPrivateKey = process.env.FIREBASE_PRIVATE_KEY || process.env.VITE_FIREBASE_PRIVATE_KEY;
-  const privateKey = rawPrivateKey ? rawPrivateKey.replace(/\\n/g, '\n') : undefined;
-
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error('Missing Firebase Admin credentials.');
-  }
-
-  admin.initializeApp({
-    credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
-  });
+  admin.initializeApp();
 };
 
 const getAuthToken = (headers) => {
@@ -298,11 +287,11 @@ exports.handler = async (event) => {
     const ref = await db.collection('notifications').add(docData);
     return { statusCode: 200, headers: responseHeaders, body: JSON.stringify({ ok: true, id: ref.id }) };
   } catch (error) {
-    await logNetlifyError({
+    await logFunctionError({
       admin,
       event,
       error,
-      route: '/.netlify/functions/fcm-bridge',
+      route: '/functions/fcm-bridge',
       scope: 'unknown',
       actorUid: actorUid || userId || null,
       actorRole: userRole || null,

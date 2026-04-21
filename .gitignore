@@ -52,4 +52,3 @@ workflow/*
 
 .gemini/
 gha-creds-*.json
-.github/*

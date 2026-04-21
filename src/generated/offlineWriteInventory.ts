@@ -1244,22 +1244,22 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.services/adminUserDetail.service.ts:822",
+    "id": "USERS.updateDoc.services/adminUserDetail.service.ts:823",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "services",
     "path": "services/adminUserDetail.service.ts",
-    "line": 822,
+    "line": 823,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.updateDoc.services/adminUserDetail.service.ts:839",
+    "id": "USERS.updateDoc.services/adminUserDetail.service.ts:840",
     "method": "updateDoc",
     "collectionKey": "USERS",
     "module": "services",
     "path": "services/adminUserDetail.service.ts",
-    "line": 839,
+    "line": 840,
     "area": "USERS updateDoc",
     "mode": "queue_safe"
   },
@@ -2284,12 +2284,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "USERS.deleteDoc.services/webauthn.service.ts:302",
+    "id": "USERS.deleteDoc.services/webauthn.service.ts:309",
     "method": "deleteDoc",
     "collectionKey": "USERS",
     "module": "services",
     "path": "services/webauthn.service.ts",
-    "line": 302,
+    "line": 309,
     "area": "USERS deleteDoc",
     "mode": "online_only"
   },

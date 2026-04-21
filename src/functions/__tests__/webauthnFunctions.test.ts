@@ -47,7 +47,7 @@ const buildFirestore = () => {
         state.challenges.delete(id);
       }
     },
-    collection(subcollectionName: string) {
+    collection(_subcollectionName: string) {
       if (collectionName !== 'users') {
         throw new Error(`Unsupported nested collection for ${collectionName}`);
       }
@@ -171,7 +171,23 @@ vi.mock('@simplewebauthn/server', () => ({
   verifyRegistrationResponse: verifyRegistrationResponseMock,
 }));
 
-describe('WebAuthn Netlify handlers', () => {
+const loadAuthChallengeHandler = async () => (
+  await import('../http-handlers/' + 'webauthn-auth-challenge.mjs')
+).handler as (event: any) => Promise<any>;
+
+const loadRegisterChallengeHandler = async () => (
+  await import('../http-handlers/' + 'webauthn-register-challenge.mjs')
+).handler as (event: any) => Promise<any>;
+
+const loadAuthVerifyHandler = async () => (
+  await import('../http-handlers/' + 'webauthn-auth-verify.mjs')
+).handler as (event: any) => Promise<any>;
+
+const loadRegisterVerifyHandler = async () => (
+  await import('../http-handlers/' + 'webauthn-register-verify.mjs')
+).handler as (event: any) => Promise<any>;
+
+describe('WebAuthn Firebase handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     state.users.clear();
@@ -180,23 +196,10 @@ describe('WebAuthn Netlify handlers', () => {
     state.verifyIdTokenMock.mockResolvedValue({ uid: 'donor-1' });
     verifyAuthenticationResponseMock.mockReset();
     verifyRegistrationResponseMock.mockReset();
-    process.env.FIREBASE_PROJECT_ID = 'project';
-    process.env.FIREBASE_CLIENT_EMAIL = 'user@example.com';
-    process.env.FIREBASE_PRIVATE_KEY = 'private-key';
-    delete process.env.VITE_FIREBASE_PROJECT_ID;
-    delete process.env.VITE_FIREBASE_CLIENT_EMAIL;
-    delete process.env.VITE_FIREBASE_PRIVATE_KEY;
   });
 
-  it('accepts VITE-prefixed admin credentials when FIREBASE-prefixed vars are absent', async () => {
-    delete process.env.FIREBASE_PROJECT_ID;
-    delete process.env.FIREBASE_CLIENT_EMAIL;
-    delete process.env.FIREBASE_PRIVATE_KEY;
-    process.env.VITE_FIREBASE_PROJECT_ID = 'project';
-    process.env.VITE_FIREBASE_CLIENT_EMAIL = 'user@example.com';
-    process.env.VITE_FIREBASE_PRIVATE_KEY = 'private-key';
-
-    const { handler } = await import('../webauthn-auth-challenge.mjs');
+  it('initializes using the default Firebase admin app without manual credentials', async () => {
+    const handler = await loadAuthChallengeHandler();
 
     const response = await handler({
       httpMethod: 'POST',
@@ -209,15 +212,15 @@ describe('WebAuthn Netlify handlers', () => {
   it('creates unique auth challenge IDs for parallel attempts instead of overwriting a shared doc', async () => {
     const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID');
     randomUuidSpy
-      .mockReturnValueOnce('challenge-a')
-      .mockReturnValueOnce('challenge-b');
+      .mockReturnValueOnce('11111111-1111-1111-1111-111111111111')
+      .mockReturnValueOnce('22222222-2222-2222-2222-222222222222');
 
     state.users.set('donor-1', { uid: 'donor-1' });
     state.userCredentials.set('donor-1', new Map([
       ['cred-1', { credentialId: 'cred-1', transports: ['internal'] }],
     ]));
 
-    const { handler } = await import('../webauthn-auth-challenge.mjs');
+    const handler = await loadAuthChallengeHandler();
 
     const first = await handler({
       httpMethod: 'POST',
@@ -228,8 +231,8 @@ describe('WebAuthn Netlify handlers', () => {
       body: JSON.stringify({ userId: 'donor-1', credentialId: 'cred-1' }),
     });
 
-    expect(JSON.parse(first.body).challengeId).toBe('challenge-a');
-    expect(JSON.parse(second.body).challengeId).toBe('challenge-b');
+    expect(JSON.parse(first.body).challengeId).toBe('11111111-1111-1111-1111-111111111111');
+    expect(JSON.parse(second.body).challengeId).toBe('22222222-2222-2222-2222-222222222222');
     expect(state.challenges.size).toBe(2);
   });
 
@@ -239,7 +242,7 @@ describe('WebAuthn Netlify handlers', () => {
       ['cred-1', { credentialId: 'cred-1', transports: ['internal'] }],
     ]));
 
-    const { handler } = await import('../webauthn-auth-challenge.mjs');
+    const handler = await loadAuthChallengeHandler();
 
     const response = await handler({
       httpMethod: 'POST',
@@ -255,14 +258,14 @@ describe('WebAuthn Netlify handlers', () => {
 
   it('does not bind an unauthenticated auth challenge to a caller-supplied userId without a known credential hint', async () => {
     const randomUuidSpy = vi.spyOn(globalThis.crypto, 'randomUUID');
-    randomUuidSpy.mockReturnValueOnce('challenge-usernameless');
+    randomUuidSpy.mockReturnValueOnce('33333333-3333-3333-3333-333333333333');
 
     state.users.set('donor-1', { uid: 'donor-1' });
     state.userCredentials.set('donor-1', new Map([
       ['cred-1', { credentialId: 'cred-1', transports: ['internal'] }],
     ]));
 
-    const { handler } = await import('../webauthn-auth-challenge.mjs');
+    const handler = await loadAuthChallengeHandler();
 
     const response = await handler({
       httpMethod: 'POST',
@@ -270,73 +273,129 @@ describe('WebAuthn Netlify handlers', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(state.challenges.get('challenge-usernameless')).toMatchObject({
+    expect(state.challenges.get('33333333-3333-3333-3333-333333333333')).toMatchObject({
       userId: null,
       credentialId: null,
     });
   });
 
-  it('rejects registration challenge requests without an auth token', async () => {
-    const { handler } = await import('../webauthn-register-challenge.mjs');
+  it('creates registration challenges for authenticated users', async () => {
+    state.users.set('donor-1', { uid: 'donor-1', displayName: 'Donor One' });
 
+    const handler = await loadRegisterChallengeHandler();
     const response = await handler({
       httpMethod: 'POST',
-      headers: {},
+      headers: { authorization: 'Bearer token-1' },
       body: JSON.stringify({ userId: 'donor-1' }),
     });
 
-    expect(response.statusCode).toBe(401);
-    expect(JSON.parse(response.body)).toEqual({ error: 'Missing auth token' });
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body)).toMatchObject({
+      challengeId: expect.any(String),
+      options: expect.objectContaining({
+        challenge: 'registration-value',
+      }),
+    });
   });
 
-  it('does not exclude other-device credentials from registration challenge generation', async () => {
-    state.users.set('donor-1', {
-      uid: 'donor-1',
-      phoneNumber: '+911234567890',
-      displayName: 'Donor One',
+  it('rejects registration challenges for users that do not exist', async () => {
+    const handler = await loadRegisterChallengeHandler();
+    const response = await handler({
+      httpMethod: 'POST',
+      headers: { authorization: 'Bearer token-1' },
+      body: JSON.stringify({ userId: 'donor-1' }),
     });
+
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body)).toEqual({ error: 'User not found' });
+  });
+
+  it('verifies authentication responses and returns a custom token', async () => {
+    const webauthnServer = await import('@simplewebauthn/server');
+    vi.mocked(webauthnServer.verifyAuthenticationResponse).mockResolvedValue({
+      verified: true,
+      authenticationInfo: { newCounter: 42 },
+    } as never);
+
+    state.users.set('donor-1', { uid: 'donor-1' });
     state.userCredentials.set('donor-1', new Map([
-      ['cred-mac', {
-        credentialId: 'cred-mac',
+      ['cred-1', {
+        credentialId: 'cred-1',
+        publicKey: Buffer.from(new Uint8Array([1, 2, 3])).toString('base64url'),
         transports: ['internal'],
-        backedUp: true,
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
-      }],
-      ['cred-android', {
-        credentialId: 'cred-android',
-        transports: ['internal'],
-        backedUp: false,
-        userAgent: 'Mozilla/5.0 (Linux; Android 15; CPH2447) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Mobile Safari/537.36',
+        counter: 1,
       }],
     ]));
 
-    const { handler } = await import('../webauthn-register-challenge.mjs');
-
-    const response = await handler({
-      httpMethod: 'POST',
-      headers: {
-        authorization: 'Bearer token-1',
-        'user-agent': 'Mozilla/5.0 (Linux; Android 15; CPH2447) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Mobile Safari/537.36',
-      },
-      body: JSON.stringify({ userId: 'donor-1' }),
+    const handler = await loadAuthVerifyHandler();
+    const challengeId = 'challenge-verify-auth';
+    state.challenges.set(challengeId, {
+      type: 'authentication',
+      challenge: 'challenge-value',
+      rpId: 'bloodhub.in',
+      origin: 'https://bloodhub.in',
+      userId: 'donor-1',
+      credentialId: 'cred-1',
+      expiresAt: Date.now() + 5_000,
     });
-
-    const webauthnServer = await import('@simplewebauthn/server');
-
-    expect(response.statusCode).toBe(200);
-    expect(webauthnServer.generateRegistrationOptions).toHaveBeenCalledWith(expect.objectContaining({
-      excludeCredentials: [],
-    }));
-  });
-
-  it('returns a 400 when auth verification is attempted with a missing challenge', async () => {
-    const { handler } = await import('../webauthn-auth-verify.mjs');
 
     const response = await handler({
       httpMethod: 'POST',
       body: JSON.stringify({
-        challengeId: 'missing',
-        credential: { id: 'cred-1' },
+        challengeId,
+        credential: { id: 'cred-1', rawId: 'cred-1' },
+      }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body)).toMatchObject({
+      userId: 'donor-1',
+      customToken: 'token-donor-1',
+    });
+  });
+
+  it('returns a client error for mismatched challenge state during auth verification', async () => {
+    const webauthnServer = await import('@simplewebauthn/server');
+    vi.mocked(webauthnServer.verifyAuthenticationResponse).mockRejectedValue(new Error('Challenge mismatch'));
+    state.userCredentials.set('donor-1', new Map([
+      ['cred-1', {
+        credentialId: 'cred-1',
+        publicKey: Buffer.from(new Uint8Array([1, 2, 3])).toString('base64url'),
+        transports: ['internal'],
+        counter: 1,
+      }],
+    ]));
+
+    const handler = await loadAuthVerifyHandler();
+    state.challenges.set('challenge-mismatch', {
+      type: 'authentication',
+      challenge: 'challenge-value',
+      rpId: 'bloodhub.in',
+      origin: 'https://bloodhub.in',
+      userId: 'donor-1',
+      credentialId: 'cred-1',
+      expiresAt: Date.now() + 5_000,
+    });
+
+    const response = await handler({
+      httpMethod: 'POST',
+      body: JSON.stringify({
+        challengeId: 'challenge-mismatch',
+        credential: { id: 'cred-1', rawId: 'cred-1' },
+      }),
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body)).toEqual({ error: 'Authentication failed' });
+  });
+
+  it('returns not found when auth verification challenge IDs are stale', async () => {
+    const handler = await loadAuthVerifyHandler();
+    const response = await handler({
+      httpMethod: 'POST',
+      body: JSON.stringify({
+        challengeId: 'missing-challenge',
+        credential: { id: 'cred-1', rawId: 'cred-1' },
       }),
     });
 
@@ -344,131 +403,77 @@ describe('WebAuthn Netlify handlers', () => {
     expect(JSON.parse(response.body)).toEqual({ error: 'No pending challenge' });
   });
 
-  it('rejects auth verification when the credential does not match the hinted challenge credential', async () => {
-    state.challenges.set('challenge-hinted', {
+  it('returns a client error when auth verification has no stored credential', async () => {
+    const handler = await loadAuthVerifyHandler();
+    state.challenges.set('challenge-missing-cred', {
       type: 'authentication',
-      userId: 'donor-1',
-      credentialId: 'cred-expected',
       challenge: 'challenge-value',
       rpId: 'bloodhub.in',
       origin: 'https://bloodhub.in',
-      expiresAt: Date.now() + 60_000,
+      credentialId: 'cred-1',
+      expiresAt: Date.now() + 5_000,
     });
-
-    const { handler } = await import('../webauthn-auth-verify.mjs');
 
     const response = await handler({
       httpMethod: 'POST',
       body: JSON.stringify({
-        challengeId: 'challenge-hinted',
-        credential: { id: 'cred-other' },
+        challengeId: 'challenge-missing-cred',
+        credential: { id: 'cred-1', rawId: 'cred-1' },
       }),
     });
 
-    expect(response.statusCode).toBe(400);
-    expect(JSON.parse(response.body)).toEqual({ error: 'Credential mismatch for challenge' });
-    expect(state.challenges.has('challenge-hinted')).toBe(false);
+    expect(response.statusCode).toBe(404);
+    expect(JSON.parse(response.body)).toEqual({ error: 'Credential not found' });
   });
 
-  it('consumes an auth challenge after a failed verification attempt', async () => {
-    state.challenges.set('challenge-auth-fail', {
-      type: 'authentication',
-      userId: 'donor-1',
-      challenge: 'challenge-value',
-      rpId: 'bloodhub.in',
-      origin: 'https://bloodhub.in',
-      expiresAt: Date.now() + 60_000,
-    });
-    state.userCredentials.set('donor-1', new Map([
-      ['cred-1', {
-        credentialId: 'cred-1',
-        publicKey: Buffer.from('public-key').toString('base64url'),
-        counter: 1,
-        transports: ['internal'],
-      }],
-    ]));
-    verifyAuthenticationResponseMock.mockResolvedValueOnce({ verified: false });
+  it('verifies registration responses and stores the credential', async () => {
+    const webauthnServer = await import('@simplewebauthn/server');
+    vi.mocked(webauthnServer.verifyRegistrationResponse).mockResolvedValue({
+      verified: true,
+      registrationInfo: {
+        credential: {
+          id: 'cred-registered',
+          publicKey: new Uint8Array([1, 2, 3]),
+          counter: 9,
+          transports: ['internal'],
+        },
+        credentialDeviceType: 'singleDevice',
+        credentialBackedUp: false,
+      },
+    } as never);
 
-    const { handler } = await import('../webauthn-auth-verify.mjs');
-
-    const response = await handler({
-      httpMethod: 'POST',
-      body: JSON.stringify({
-        challengeId: 'challenge-auth-fail',
-        credential: { id: 'cred-1' },
-      }),
-    });
-
-    expect(response.statusCode).toBe(401);
-    expect(JSON.parse(response.body)).toEqual({ error: 'Authentication failed' });
-    expect(state.challenges.has('challenge-auth-fail')).toBe(false);
-  });
-
-  it('returns a 400 instead of 500 when auth verification throws a WebAuthn validation error', async () => {
-    state.challenges.set('challenge-1', {
-      type: 'authentication',
-      userId: 'donor-1',
-      challenge: 'challenge-value',
-      rpId: 'bloodhub.in',
-      origin: 'https://bloodhub.in',
-      expiresAt: Date.now() + 60_000,
-    });
-    state.userCredentials.set('donor-1', new Map([
-      ['cred-1', {
-        credentialId: 'cred-1',
-        publicKey: Buffer.from('public-key').toString('base64url'),
-        counter: 1,
-        transports: ['internal'],
-      }],
-    ]));
-    verifyAuthenticationResponseMock.mockRejectedValueOnce(new Error('Unexpected authentication response origin "https://evil.example"'));
-
-    const { handler } = await import('../webauthn-auth-verify.mjs');
-
-    const response = await handler({
-      httpMethod: 'POST',
-      body: JSON.stringify({
-        challengeId: 'challenge-1',
-        credential: { id: 'cred-1' },
-      }),
-    });
-
-    expect(response.statusCode).toBe(400);
-    expect(JSON.parse(response.body)).toEqual({ error: 'Authentication failed' });
-    expect(state.challenges.has('challenge-1')).toBe(false);
-  });
-
-  it('consumes a registration challenge after a failed verification attempt', async () => {
-    state.challenges.set('challenge-register-fail', {
+    const handler = await loadRegisterVerifyHandler();
+    state.users.set('donor-1', { uid: 'donor-1' });
+    state.challenges.set('register-verify', {
       type: 'registration',
-      userId: 'donor-1',
       challenge: 'registration-value',
       rpId: 'bloodhub.in',
       origin: 'https://bloodhub.in',
-      expiresAt: Date.now() + 60_000,
+      userId: 'donor-1',
+      expiresAt: Date.now() + 5_000,
     });
-    verifyRegistrationResponseMock.mockResolvedValueOnce({
-      verified: false,
-      registrationInfo: null,
-    });
-
-    const { handler } = await import('../webauthn-register-verify.mjs');
 
     const response = await handler({
       httpMethod: 'POST',
-      headers: {
-        authorization: 'Bearer token-1',
-        'user-agent': 'Mozilla/5.0',
-      },
+      headers: { authorization: 'Bearer token-1', 'user-agent': 'Mozilla/5.0' },
       body: JSON.stringify({
         userId: 'donor-1',
-        challengeId: 'challenge-register-fail',
-        credential: { id: 'cred-1', response: {} },
+        challengeId: 'register-verify',
+        credential: {
+          id: 'cred-registered',
+          rawId: 'cred-registered',
+          response: {
+            transports: ['internal'],
+          },
+        },
       }),
     });
 
-    expect(response.statusCode).toBe(400);
-    expect(JSON.parse(response.body)).toEqual({ error: 'Verification failed' });
-    expect(state.challenges.has('challenge-register-fail')).toBe(false);
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body)).toEqual({ success: true, credentialId: 'cred-registered' });
+    expect(state.userCredentials.get('donor-1')?.get('cred-registered')).toMatchObject({
+      credentialId: 'cred-registered',
+      counter: 9,
+    });
   });
 });

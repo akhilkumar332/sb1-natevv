@@ -1,4 +1,5 @@
 import { auth } from '../firebase';
+import { SERVERLESS_ENDPOINTS } from '../constants/backend';
 import type { UserRole, UserStatus } from '../types/database.types';
 
 export type ImpersonationResponse = {
@@ -32,7 +33,7 @@ export const requestImpersonation = async (
     throw new Error('Authentication token unavailable.');
   }
 
-  const response = await fetch('/.netlify/functions/impersonate', {
+  const response = await fetch(SERVERLESS_ENDPOINTS.impersonate, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -75,7 +76,7 @@ export const requestImpersonationResume = async (
     throw new Error('Authentication token unavailable.');
   }
 
-  const response = await fetch('/.netlify/functions/impersonation-resume', {
+  const response = await fetch(SERVERLESS_ENDPOINTS.impersonationResume, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

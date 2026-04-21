@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
   cmsSettings: null as Record<string, unknown> | null,
-  logNetlifyErrorMock: vi.fn(),
+  logFunctionErrorMock: vi.fn(),
 }));
 
 const buildFirestore = () => ({
@@ -45,8 +45,8 @@ vi.mock('firebase-admin', () => {
         FieldValue: {
           serverTimestamp: () => 'server-timestamp',
         },
-        },
-      ),
+      },
+    ),
   };
   return {
     ...adminMock,
@@ -54,24 +54,25 @@ vi.mock('firebase-admin', () => {
   };
 });
 
-vi.mock('../error-log.cjs', () => ({
-  logNetlifyError: (...args: unknown[]) => state.logNetlifyErrorMock(...args),
+vi.mock('../http-handlers/error-log.cjs', () => ({
+  logFunctionError: (...args: unknown[]) => state.logFunctionErrorMock(...args),
 }));
 
-describe('frontend-access Netlify handler', () => {
+const loadFrontendAccessHandler = async () => (
+  await import('../http-handlers/' + 'frontend-access.mjs')
+).handler as (event: any) => Promise<any>;
+
+describe('frontend-access Firebase handler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     state.cmsSettings = null;
-    process.env.FIREBASE_PROJECT_ID = 'project';
-    process.env.FIREBASE_CLIENT_EMAIL = 'user@example.com';
-    process.env.FIREBASE_PRIVATE_KEY = 'private-key';
     process.env.FRONTEND_GATE_PASSWORD = 'open-sesame';
     process.env.FRONTEND_GATE_SESSION_SECRET = 'very-secret-signing-key';
     process.env.FRONTEND_GATE_MAX_ATTEMPTS_PER_MINUTE = '2';
   });
 
   it('returns open mode when cms settings are missing', async () => {
-    const { handler } = await import('../frontend-access.mjs');
+    const handler = await loadFrontendAccessHandler();
     const response = await handler({
       httpMethod: 'GET',
       headers: {},
@@ -92,7 +93,7 @@ describe('frontend-access Netlify handler', () => {
       },
     };
 
-    const { handler } = await import('../frontend-access.mjs');
+    const handler = await loadFrontendAccessHandler();
     const response = await handler({
       httpMethod: 'POST',
       headers: {},
@@ -111,7 +112,7 @@ describe('frontend-access Netlify handler', () => {
       },
     };
 
-    const { handler } = await import('../frontend-access.mjs');
+    const handler = await loadFrontendAccessHandler();
     const response = await handler({
       httpMethod: 'POST',
       headers: {},
@@ -125,7 +126,7 @@ describe('frontend-access Netlify handler', () => {
       configured: true,
       ttlMinutes: 60,
     });
-    expect(response.headers['Set-Cookie']).toContain('bh_frontend_access=');
+    expect(response.headers['Set-Cookie']).toContain('__session=');
     expect(response.headers['Set-Cookie']).toContain('HttpOnly');
     expect(response.headers['Set-Cookie']).not.toContain('Secure');
   });
@@ -138,7 +139,7 @@ describe('frontend-access Netlify handler', () => {
       },
     };
 
-    const { handler } = await import('../frontend-access.mjs');
+    const handler = await loadFrontendAccessHandler();
     const unlockResponse = await handler({
       httpMethod: 'POST',
       headers: {},
@@ -169,7 +170,7 @@ describe('frontend-access Netlify handler', () => {
     };
     delete process.env.FRONTEND_GATE_PASSWORD;
 
-    const { handler } = await import('../frontend-access.mjs');
+    const handler = await loadFrontendAccessHandler();
     const response = await handler({
       httpMethod: 'GET',
       headers: {},
@@ -191,7 +192,7 @@ describe('frontend-access Netlify handler', () => {
       },
     };
 
-    const { handler } = await import('../frontend-access.mjs');
+    const handler = await loadFrontendAccessHandler();
     const headers = {
       'x-forwarded-for': '1.2.3.4',
     };

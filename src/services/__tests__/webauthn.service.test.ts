@@ -84,12 +84,12 @@ describe('webauthn.service', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      '/.netlify/functions/webauthn-auth-challenge',
+      '/functions/webauthn-auth-challenge',
       expect.objectContaining({ method: 'POST' }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      '/.netlify/functions/webauthn-auth-challenge',
+      '/functions/webauthn-auth-challenge',
       expect.objectContaining({ method: 'POST' }),
     );
     expect(startAuthenticationMock).toHaveBeenCalledTimes(2);

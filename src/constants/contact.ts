@@ -1,4 +1,5 @@
 import { ONE_MINUTE_MS } from './time';
+import { SERVERLESS_ENDPOINTS } from './backend';
 
 export const CONTACT_SUBMISSION_STATUS = {
   unread: 'unread',
@@ -7,7 +8,7 @@ export const CONTACT_SUBMISSION_STATUS = {
 
 export type ContactSubmissionStatus = (typeof CONTACT_SUBMISSION_STATUS)[keyof typeof CONTACT_SUBMISSION_STATUS];
 
-export const CONTACT_SUBMIT_ENDPOINT = '/.netlify/functions/contact-submit';
+export const CONTACT_SUBMIT_ENDPOINT = SERVERLESS_ENDPOINTS.contactSubmit;
 
 export const CONTACT_RATE_LIMIT_MAX_PER_MINUTE = 5;
 export const CONTACT_RATE_LIMIT_WINDOW_MS = ONE_MINUTE_MS;

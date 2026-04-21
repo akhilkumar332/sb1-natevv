@@ -1,10 +1,12 @@
 import admin from 'firebase-admin';
 import crypto from 'crypto';
-import { logNetlifyError } from './error-log.cjs';
+import { logFunctionError } from './error-log.cjs';
 
 const CMS_SETTINGS_COLLECTION = 'cmsSettings';
 const CMS_SETTINGS_DOC_ID = 'global';
-const COOKIE_NAME = 'bh_frontend_access';
+// Firebase Hosting only forwards the specially named `__session` cookie
+// to rewritten Functions requests.
+const COOKIE_NAME = '__session';
 const DEFAULT_TTL_MINUTES = 240;
 const MAX_PASSWORD_LENGTH = 200;
 const MAX_COOKIE_AGE_SECONDS = 7 * 24 * 60 * 60;
@@ -27,18 +29,7 @@ const RESPONSE_HEADERS = {
 
 const initAdmin = () => {
   if (admin.apps.length) return;
-  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || process.env.VITE_FIREBASE_CLIENT_EMAIL;
-  const rawPrivateKey = process.env.FIREBASE_PRIVATE_KEY || process.env.VITE_FIREBASE_PRIVATE_KEY;
-  const privateKey = rawPrivateKey ? rawPrivateKey.replace(/\\n/g, '\n') : undefined;
-
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error('Missing Firebase Admin credentials.');
-  }
-
-  admin.initializeApp({
-    credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
-  });
+  admin.initializeApp();
 };
 
 const normalizeText = (value, maxLength) => String(value ?? '').trim().slice(0, maxLength);
@@ -323,11 +314,11 @@ export const handler = async (event) => {
     };
   } catch (error) {
     try {
-      await logNetlifyError({
+      await logFunctionError({
         admin,
         event,
         error,
-        route: '/.netlify/functions/frontend-access',
+        route: '/functions/frontend-access',
         scope: 'unknown',
         metadata: {
           functionName: 'frontend-access',

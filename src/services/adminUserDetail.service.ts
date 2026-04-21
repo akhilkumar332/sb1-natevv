@@ -19,6 +19,7 @@ import { runDedupedRequest } from '../utils/requestDedupe';
 import { logAuditEvent } from './audit.service';
 import { toDateValue } from '../utils/dateValue';
 import { COLLECTIONS } from '../constants/firestore';
+import { SERVERLESS_ENDPOINTS } from '../constants/backend';
 import { FIFTEEN_SECONDS_MS } from '../constants/time';
 
 type JsonRecord = Record<string, any>;
@@ -211,7 +212,7 @@ const getAdminBiometricsIdToken = async () => {
 
 const postAdminBiometrics = async (body: Record<string, unknown>) => {
   const idToken = await getAdminBiometricsIdToken();
-  const response = await fetch('/.netlify/functions/admin-user-biometrics', {
+  const response = await fetch(SERVERLESS_ENDPOINTS.adminUserBiometrics, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -96,22 +96,23 @@ vi.mock('firebase-admin', () => {
   };
 });
 
-describe('admin-user-biometrics Netlify handler', () => {
+const loadAdminUserBiometricsHandler = async () => (
+  await import('../http-handlers/' + 'admin-user-biometrics.mjs')
+).handler as (event: any) => Promise<any>;
+
+describe('admin-user-biometrics Firebase handler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     state.users.clear();
     state.userCredentials.clear();
     state.auditLogs.length = 0;
     state.verifyIdTokenMock.mockResolvedValue({ uid: 'admin-1' });
-    process.env.FIREBASE_PROJECT_ID = 'project';
-    process.env.FIREBASE_CLIENT_EMAIL = 'user@example.com';
-    process.env.FIREBASE_PRIVATE_KEY = 'private-key';
   });
 
   it('rejects non-admin callers', async () => {
     state.users.set('admin-1', { uid: 'admin-1', role: 'donor' });
 
-    const { handler } = await import('../admin-user-biometrics.mjs');
+    const handler = await loadAdminUserBiometricsHandler();
     const response = await handler({
       httpMethod: 'POST',
       headers: { authorization: 'Bearer token-1' },
@@ -139,7 +140,7 @@ describe('admin-user-biometrics Netlify handler', () => {
       }],
     ]));
 
-    const { handler } = await import('../admin-user-biometrics.mjs');
+    const handler = await loadAdminUserBiometricsHandler();
     const response = await handler({
       httpMethod: 'POST',
       headers: { authorization: 'Bearer token-1' },
@@ -167,7 +168,7 @@ describe('admin-user-biometrics Netlify handler', () => {
     state.users.set('admin-1', { uid: 'admin-1', role: 'admin' });
     state.users.set('ngo-1', { uid: 'ngo-1', role: 'ngo' });
 
-    const { handler } = await import('../admin-user-biometrics.mjs');
+    const handler = await loadAdminUserBiometricsHandler();
     const response = await handler({
       httpMethod: 'POST',
       headers: { authorization: 'Bearer token-1' },
@@ -190,7 +191,7 @@ describe('admin-user-biometrics Netlify handler', () => {
       }],
     ]));
 
-    const { handler } = await import('../admin-user-biometrics.mjs');
+    const handler = await loadAdminUserBiometricsHandler();
     const response = await handler({
       httpMethod: 'POST',
       headers: { authorization: 'Bearer token-1' },

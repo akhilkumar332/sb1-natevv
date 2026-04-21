@@ -163,7 +163,6 @@ Offline outbox + sync health + diagnostics
 ├── firestore.indexes.json
 ├── storage.rules
 ├── firebase.json
-├── netlify.toml
 └── vite.config.ts
 ```
 
@@ -220,7 +219,7 @@ The frontend development server runs on `http://localhost:5180` and proxies API 
 
 ## Environment Configuration
 
-The project expects a combination of client-safe `VITE_` variables and server-only Firebase Admin credentials.
+The project expects a combination of client-safe `VITE_` variables plus Firebase Functions runtime config and secrets.
 
 ### Client Variables
 
@@ -241,16 +240,18 @@ VITE_ENABLE_ERROR_TRACKING=false
 VITE_ENABLE_PERFORMANCE_MONITORING=false
 ```
 
-### Server Variables
+### Firebase Functions Runtime
+
+Use `src/functions/.env` for non-sensitive runtime values and Firebase Secret Manager for sensitive values.
 
 ```env
-FIREBASE_PROJECT_ID=
-FIREBASE_PRIVATE_KEY=
-FIREBASE_CLIENT_EMAIL=
 FCM_BRIDGE_SIGNING_SECRET=
 CONTACT_RATE_LIMIT_MAX_PER_MINUTE=5
+FRONTEND_GATE_MAX_ATTEMPTS_PER_MINUTE=10
 PORT=5001
 ```
+
+Deployed Firebase Cloud Functions use the default Firebase service account. Do not set `FIREBASE_PROJECT_ID`, `FIREBASE_PRIVATE_KEY`, or `FIREBASE_CLIENT_EMAIL` for the deployed runtime.
 
 Use `.env.example` as the source of truth for required keys.
 
@@ -329,7 +330,7 @@ The admin dashboard includes:
 
 ## Deployment
 
-This repository is configured primarily for Firebase deployment and also contains Netlify-compatible redirect and serverless function support.
+This repository is configured for Firebase deployment.
 
 ### Deployment Profile
 
@@ -338,7 +339,7 @@ This repository is configured primarily for Firebase deployment and also contain
 | Frontend build | Vite production build |
 | Hosting target | Firebase-first deployment flow |
 | Redirect support | `_redirects` copied into `dist/` |
-| Serverless support | `netlify/functions/` present for bridge and maintenance flows |
+| Serverless support | Firebase Hosting rewrites to Cloud Functions |
 | Data platform | Firebase Auth, Firestore, Storage |
 | Production API default | `https://api.bloodhubindia.com/api/v1` via Vite config fallback |
 
@@ -362,7 +363,6 @@ npm run deploy:indexes
 - `npm run build` regenerates SEO artifacts and offline write inventory before bundling.
 - PWA assets and service worker output are produced during the production build.
 - Firebase rules and indexes are versioned in-repo and should be deployed with application changes that depend on them.
-- Netlify function files exist for selected backend bridge flows even though the primary deployment scripts target Firebase.
 
 ## Testing Strategy
 
