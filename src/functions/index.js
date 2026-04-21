@@ -476,9 +476,20 @@ app.post('/api/v1/blood-requests', async (req, res) => {
   res.status(201).json({ message: 'Blood request created successfully' });
 });
 
-// Swagger setup
-const specs = swaggerJsdoc(swaggerOptions);
-app.use('/v1/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+const registerSwaggerDocs = () => {
+  try {
+    const specs = swaggerJsdoc(swaggerOptions);
+    app.use('/v1/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+    return true;
+  } catch (error) {
+    logEvent({
+      level: 'warn',
+      event: 'swagger.setup_failed',
+      error,
+    });
+    return false;
+  }
+};
 
 // ========================================================================
 // Scheduled Jobs: Inventory Expiry + Alerts
@@ -732,6 +743,7 @@ const isExecutedDirectly = (() => {
 // Only run the standalone Express server when this file is executed directly.
 if (isExecutedDirectly) {
   const PORT = process.env.PORT || 5001;
+  const swaggerEnabled = registerSwaggerDocs();
   app.listen(PORT, () => {
     logEvent({
       level: 'info',
@@ -739,7 +751,7 @@ if (isExecutedDirectly) {
       dedupe: false,
       meta: {
         port: PORT,
-        swaggerUrl: `http://localhost:${PORT}/v1/api-docs`,
+        swaggerUrl: swaggerEnabled ? `http://localhost:${PORT}/v1/api-docs` : null,
       },
     });
   });
