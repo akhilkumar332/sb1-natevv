@@ -15,5 +15,8 @@
     "firebase-functions": "^7.2.5",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
+  },
+  "overrides": {
+    "yaml": "^2.8.3"
   }
 }
