@@ -3,7 +3,7 @@ import { captureHandledError } from './errorLog.service';
 
 type NotificationContext = {
   scope?: 'auth' | 'donor' | 'ngo' | 'bloodbank' | 'admin' | 'unknown';
-  source?: 'frontend' | 'functions' | 'netlify' | 'unknown';
+  source?: 'frontend' | 'functions' | 'unknown';
   metadata?: Record<string, unknown>;
 };
 

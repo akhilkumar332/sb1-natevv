@@ -1,3 +1,2 @@
-/api/v1/api-docs/*  /api/v1/api-docs/:splat  200
 /api/*  /api/:splat  200
 /*      /index.html   200

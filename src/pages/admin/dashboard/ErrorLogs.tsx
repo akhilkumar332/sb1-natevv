@@ -12,6 +12,7 @@ import { COLLECTIONS } from '../../../constants/firestore';
 type ErrorLogRow = {
   id: string;
   source: string;
+  rawSource: string;
   scope: string;
   level: string;
   message: string;
@@ -26,6 +27,11 @@ type ErrorLogRow = {
   sessionId: string | null;
   metadata: Record<string, unknown> | null;
   createdAt?: Date;
+};
+
+const normalizeSource = (value: unknown): string => {
+  const source = typeof value === 'string' ? value : 'unknown';
+  return source === 'netlify' ? 'functions' : source;
 };
 
 const getMetadataString = (metadata: Record<string, unknown> | null): string => {
@@ -84,7 +90,8 @@ function ErrorLogsPage() {
       const entry = docSnap.data() as Record<string, unknown>;
       return {
         id: docSnap.id,
-        source: String(entry.source || 'unknown'),
+        source: normalizeSource(entry.source),
+        rawSource: typeof entry.source === 'string' ? entry.source : 'unknown',
         scope: String(entry.scope || 'unknown'),
         level: String(entry.level || 'error'),
         message: String(entry.message || 'Unknown error'),
@@ -225,7 +232,6 @@ function ErrorLogsPage() {
             <option value="all">All sources</option>
             <option value="frontend">frontend</option>
             <option value="functions">functions</option>
-            <option value="netlify">netlify</option>
             <option value="unknown">unknown</option>
           </select>
           <select
@@ -313,6 +319,9 @@ function ErrorLogsPage() {
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-slate-400">
                   <p>Scope: <span className="font-semibold text-gray-800 dark:text-slate-200">{row.scope}</span></p>
                   <p>Source: <span className="font-semibold text-gray-800 dark:text-slate-200">{row.source}</span></p>
+                  {row.rawSource !== row.source && (
+                    <p className="col-span-2">Legacy source: <span className="font-semibold text-gray-800 dark:text-slate-200">{row.rawSource}</span></p>
+                  )}
                   <p className="col-span-2">Route: <span className="font-semibold text-gray-800 dark:text-slate-200">{row.route || '-'}</span></p>
                   <p>User: <span className="font-semibold text-gray-800 dark:text-slate-200">{row.userUid || '-'}</span></p>
                   <p>Time: <span className="font-semibold text-gray-800 dark:text-slate-200">{row.createdAt ? row.createdAt.toLocaleString() : 'N/A'}</span></p>
@@ -378,6 +387,8 @@ function ErrorLogsPage() {
                               <div className="grid gap-3 text-xs text-gray-700 dark:text-slate-300 md:grid-cols-2">
                                 <p><span className="font-semibold">Route:</span> {row.route || '-'}</p>
                                 <p><span className="font-semibold">User Role:</span> {row.userRole || '-'}</p>
+                                <p><span className="font-semibold">Source:</span> {row.source}</p>
+                                <p><span className="font-semibold">Legacy Source:</span> {row.rawSource !== row.source ? row.rawSource : '-'}</p>
                                 <p><span className="font-semibold">Impersonating:</span> {row.isImpersonating ? 'yes' : 'no'}</p>
                                 <p><span className="font-semibold">Actor UID:</span> {row.impersonationActorUid || '-'}</p>
                                 <p><span className="font-semibold">Fingerprint:</span> {row.fingerprint || '-'}</p>

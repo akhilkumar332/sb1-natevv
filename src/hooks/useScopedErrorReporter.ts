@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { captureHandledError } from '../services/errorLog.service';
 
 type ErrorScope = 'auth' | 'donor' | 'ngo' | 'bloodbank' | 'admin' | 'unknown';
-type ErrorSource = 'frontend' | 'functions' | 'netlify' | 'unknown';
+type ErrorSource = 'frontend' | 'functions' | 'unknown';
 
 type ReporterOptions = {
   scope: ErrorScope;

@@ -5,8 +5,6 @@ import * as functions from 'firebase-functions/v1';
 import express from 'express';
 import cors from 'cors';
 import admin from 'firebase-admin';
-import swaggerUi from 'swagger-ui-express';
-import swaggerJsdoc from 'swagger-jsdoc';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { dirname } from 'path';
 import crypto from 'crypto';
@@ -212,52 +210,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Swagger configuration
-const swaggerOptions = {
-  swaggerDefinition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'LifeFlow API',
-      version: '1.0.0',
-      description: 'API documentation for the LifeFlow blood donation application',
-    },
-    servers: [
-      {
-        url: `http://localhost:5001`,
-        description: 'Local Development Server',
-      },
-      {
-        url: process.env.SITE_URL || 'https://bloodhub.in',
-        description: 'Production Server',
-      },
-    ],
-  },
-  apis: ['./src/functions/index.js'], // Path to your API routes
-};
-
 // Routes
-
-/**
- * @swagger
- * /api/v1/health:
- *   get:
- *     summary: Check API health
- *     tags: [Health]
- *     responses:
- *       200:
- *         description: API is running
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                 timestamp:
- *                   type: string
- *                 message:
- *                   type: string
- */
 app.get('/api/v1/health', (req, res) => {
   res.json({ 
     status: 'ok', 
@@ -265,40 +218,6 @@ app.get('/api/v1/health', (req, res) => {
     message: 'API is running'
   });
 });
-
-/**
- * @swagger
- * /api/v1/auth/login:
- *   post:
- *     summary: Login a user
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *             properties:
- *               email:
- *                 type: string
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Login successful
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 idToken:
- *                   type: string
- *       400:
- *         description: Invalid credentials
- */
 app.post('/api/v1/auth/login', async (req, res) => {
   logEvent({
     level: 'warn',
@@ -315,40 +234,6 @@ app.post('/api/v1/auth/login', async (req, res) => {
     message: 'This endpoint has been disabled for security hardening.',
   });
 });
-
-/**
- * @swagger
- * /api/v1/donors:
- *   post:
- *     summary: Get a list of donors
- *     tags: [Donors]
- *     requestBody:
- *       required: false
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               bloodType:
- *                 type: string
- *                 description: Filter by blood type
- *     responses:
- *       200:
- *         description: List of donors
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: string
- *                   name:
- *                     type: string
- *                   bloodType:
- *                     type: string
- */
 const listDonorsHandler = async (req, res) => {
   try {
     const bloodType = req.method === 'GET'
@@ -431,40 +316,6 @@ const listDonorsHandler = async (req, res) => {
 app.get('/api/v1/donors', listDonorsHandler);
 app.post('/api/v1/donors', listDonorsHandler);
 app.get('/v1/donors', listDonorsHandler);
-
-/**
- * @swagger
- * /api/v1/blood-requests:
- *   post:
- *     summary: Create a new blood request
- *     tags: [Blood Requests]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - bloodType
- *               - quantity
- *             properties:
- *               bloodType:
- *                 type: string
- *               quantity:
- *                 type: integer
- *     responses:
- *       201:
- *         description: Blood request created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       400:
- *         description: Invalid request data
- */
 app.post('/api/v1/blood-requests', async (req, res) => {
   const { bloodType, quantity } = req.body;
 
@@ -475,21 +326,6 @@ app.post('/api/v1/blood-requests', async (req, res) => {
   // Here you would typically save the blood request to your database
   res.status(201).json({ message: 'Blood request created successfully' });
 });
-
-const registerSwaggerDocs = () => {
-  try {
-    const specs = swaggerJsdoc(swaggerOptions);
-    app.use('/v1/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
-    return true;
-  } catch (error) {
-    logEvent({
-      level: 'warn',
-      event: 'swagger.setup_failed',
-      error,
-    });
-    return false;
-  }
-};
 
 // ========================================================================
 // Scheduled Jobs: Inventory Expiry + Alerts
@@ -743,7 +579,6 @@ const isExecutedDirectly = (() => {
 // Only run the standalone Express server when this file is executed directly.
 if (isExecutedDirectly) {
   const PORT = process.env.PORT || 5001;
-  const swaggerEnabled = registerSwaggerDocs();
   app.listen(PORT, () => {
     logEvent({
       level: 'info',
@@ -751,7 +586,6 @@ if (isExecutedDirectly) {
       dedupe: false,
       meta: {
         port: PORT,
-        swaggerUrl: swaggerEnabled ? `http://localhost:${PORT}/v1/api-docs` : null,
       },
     });
   });

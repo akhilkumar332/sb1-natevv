@@ -187,6 +187,7 @@ export interface ImpersonationEvent {
 
 export interface ErrorLog {
   id?: string;
+  // `netlify` is retained only for historical records created before the Firebase migration.
   source: 'frontend' | 'functions' | 'netlify' | 'unknown';
   scope: 'auth' | 'donor' | 'ngo' | 'bloodbank' | 'admin' | 'unknown';
   level: 'error' | 'warning';

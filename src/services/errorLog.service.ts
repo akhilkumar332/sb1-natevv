@@ -4,7 +4,7 @@ import { COLLECTIONS } from '../constants/firestore';
 import { LEGACY_ROUTE_PREFIXES, PORTAL_PATH_PREFIXES } from '../constants/routes';
 import { THIRTY_SECONDS_MS, ONE_MINUTE_MS } from '../constants/time';
 
-type ErrorLogSource = 'frontend' | 'functions' | 'netlify' | 'unknown';
+type ErrorLogSource = 'frontend' | 'functions' | 'unknown';
 type ErrorLogScope = 'auth' | 'donor' | 'ngo' | 'bloodbank' | 'admin' | 'unknown';
 type ErrorLogLevel = 'error' | 'warning';
 
