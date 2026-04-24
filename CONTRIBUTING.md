@@ -1,16 +1,17 @@
-# Contributing to BloodHub India
+# Contributing To BloodHub India
 
-## Scope
+## Before You Start
 
-This repository contains a production-oriented multi-portal blood donation platform. Contributions should prioritize stability, operational clarity, and data safety over broad refactors.
+This is a production-oriented Firebase application with multiple role-based portals and operational dashboards. Favor correctness, scoped changes, and low-regression work over broad refactors.
 
-## Contribution Principles
+Read these first:
 
-- Keep changes scoped and reversible.
-- Avoid unrelated refactors in feature or bug-fix branches.
-- Preserve existing user flows unless the change explicitly updates them.
-- Treat Firestore rules, indexes, offline behavior, and admin tooling as high-risk areas.
-- Do not commit secrets, production credentials, or local environment files.
+- [README.md](./README.md)
+- [workflow/source-of-truth.md](./workflow/source-of-truth.md)
+- [workflow/feature-playbooks.md](./workflow/feature-playbooks.md)
+- [workflow/mutation-and-data-rules.md](./workflow/mutation-and-data-rules.md)
+- [workflow/testing-matrix.md](./workflow/testing-matrix.md)
+- [workflow/security-checklists.md](./workflow/security-checklists.md)
 
 ## Local Setup
 
@@ -20,26 +21,71 @@ cp .env.example .env
 npm run dev
 ```
 
-Use [README.md](README.md) for the full environment and platform overview.
+Useful local commands:
 
-## Branch and Change Expectations
+```bash
+npm run dev:server
+npm run firebase:emulators
+```
 
-- Use focused branches per feature or fix.
-- Keep commits atomic and descriptive.
-- If a build regenerates tracked assets, review them before committing.
-- Do not revert unrelated working tree changes you did not create.
+## Contribution Principles
 
-## Code Standards
+- keep changes focused and reversible
+- do not mix unrelated cleanup into feature or bug-fix work
+- preserve route/constants/service layering
+- prefer existing hooks, services, constants, and providers over new parallel patterns
+- do not commit secrets or local env files
 
-- Use TypeScript and follow the existing project structure.
-- Preserve established route, query, and service patterns.
-- Prefer additive changes over risky rewrites.
-- Keep UI changes consistent with the surrounding dashboard or portal surface.
-- Add comments only when the logic is not self-evident.
+## Repository Conventions
 
-## Testing Requirements
+Follow the established structure:
 
-Run the standard verification suite before opening a PR:
+- pages compose screens and route state
+- components render UI
+- hooks coordinate data loading and behavior
+- services handle Firestore, backend, and operational interaction
+- constants and utils centralize shared logic
+
+Important source-of-truth locations:
+
+- routes: `src/constants/routes.ts`, `src/AppRoutes.tsx`
+- backend endpoints: `src/constants/backend.ts`
+- Firestore collections: `src/constants/firestore.ts`
+- offline policy: `src/constants/offline*.ts`, `src/services/offlineMutationOutbox.service.ts`
+- Firebase Functions: `src/functions/`
+
+## High-Risk Change Areas
+
+Extra care is required when touching:
+
+- `firestore.rules`
+- `firestore.indexes.json`
+- `storage.rules`
+- `firebase.json`
+- `src/functions/`
+- auth/session handling
+- admin and superadmin flows
+- offline mutation and sync health
+- CMS write paths
+- error logging and operational diagnostics
+
+## Documentation Expectations
+
+Update docs when a change affects:
+
+- deployment steps
+- environment variables
+- backend endpoints
+- admin workflows
+- offline behavior
+- security posture
+- data model assumptions
+
+Check `docs/` first before adding a new plan file; there is often existing project-specific context already.
+
+## Testing Expectations
+
+Baseline validation for most changes:
 
 ```bash
 npm run lint
@@ -47,7 +93,7 @@ npm run test:run
 npm run build
 ```
 
-Run additional targeted checks when relevant:
+Run broader checks when relevant:
 
 ```bash
 npm run test:e2e
@@ -55,48 +101,41 @@ npm run offline:inventory
 npm run memory:check
 ```
 
-## High-Risk Areas
-
-Changes in the following areas require extra review discipline:
-
-- `firestore.rules`
-- `firestore.indexes.json`
-- `storage.rules`
-- authentication and role resolution
-- admin services and query aggregation
-- offline mutation outbox and sync health
-- notifications and FCM bridge flows
-- CMS write paths and content publishing behavior
+Use [workflow/testing-matrix.md](./workflow/testing-matrix.md) to decide the minimum required validation for your change type.
 
 ## Pull Request Guidance
 
-A strong PR should include:
+A good PR should include:
 
-- a clear problem statement
-- the intended user or operator impact
-- any Firestore rule, index, or data-shape changes
-- screenshots for visible UI changes
-- testing notes with exact commands run
-- rollback considerations for risky changes
+- clear summary of what changed
+- why the change was needed
+- user or operator impact
+- any rule/index/schema implications
+- testing performed
+- screenshots for visible UI changes when relevant
 
-## Secrets and Environment Safety
+## Secrets And Safety
 
-- Never commit `.env` or production credential material.
-- Keep Firebase Admin credentials server-side only.
-- Do not expose server secrets through `VITE_` variables.
-- Sanitize logs, screenshots, and test fixtures before sharing externally.
+- never commit `.env*` files with real values
+- keep Firebase Admin credentials server-side only
+- do not expose server secrets through `VITE_*`
+- sanitize logs, screenshots, and fixtures before sharing
 
-## Documentation Expectations
+For sensitive work, review:
 
-Update documentation when a change affects:
+- [SECURITY.md](./SECURITY.md)
+- [workflow/security-checklists.md](./workflow/security-checklists.md)
 
-- environment variables
-- deployment steps
-- admin workflows
-- offline behavior
-- security posture
-- data model assumptions
+## Commit Guidance
 
-## License
+Prefer short, imperative commit messages scoped to one change. Keep commits atomic when possible.
+
+Examples:
+
+- `Fix frontend access cookie handling`
+- `Update Firebase deploy workflow`
+- `Remove unused Swagger dependencies`
+
+## License Note
 
 No project license file is currently present. Coordinate with the repository owner before contributing code intended for public redistribution.

@@ -324,7 +324,7 @@ export default function CmsSettingsEditorPage() {
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
                 <p className="font-semibold">Operational readiness</p>
                 <p className="mt-2 text-xs leading-relaxed">
-                  Admin routes remain available in gated modes. Password mode requires `FRONTEND_GATE_PASSWORD` and `FRONTEND_GATE_SESSION_SECRET` on Netlify.
+                  Admin routes remain available in gated modes. Password mode requires `FRONTEND_GATE_PASSWORD` and `FRONTEND_GATE_SESSION_SECRET` in the Firebase Functions runtime.
                 </p>
                 <p className="mt-3 text-xs leading-relaxed">
                   Default gate copy comes from the `frontendAccess.*` translation namespace. Custom CMS text overrides the translated default.
