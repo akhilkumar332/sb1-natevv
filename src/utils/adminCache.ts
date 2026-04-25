@@ -4,6 +4,7 @@ type CachePayload<T> = {
 };
 
 const ADMIN_CACHE_PREFIX = 'admin_cache_';
+const adminCacheStore = new Map<string, string>();
 
 const isoDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
 
@@ -40,18 +41,18 @@ export const readAdminCache = <T>(
   if (!isBrowser()) return undefined;
 
   try {
-    const raw = window.sessionStorage.getItem(toStorageKey(key));
+    const raw = adminCacheStore.get(toStorageKey(key));
     if (!raw) return undefined;
 
     const parsed = JSON.parse(raw) as CachePayload<T>;
     if (!parsed?.savedAt || Date.now() - parsed.savedAt > ttlMs) {
-      window.sessionStorage.removeItem(toStorageKey(key));
+      adminCacheStore.delete(toStorageKey(key));
       return undefined;
     }
 
     return hydrateDateFields(parsed.data, dateFields) as T;
   } catch (error) {
-    window.sessionStorage.removeItem(toStorageKey(key));
+    adminCacheStore.delete(toStorageKey(key));
     return undefined;
   }
 };
@@ -63,7 +64,7 @@ export const writeAdminCache = <T>(key: string, data: T): void => {
       savedAt: Date.now(),
       data,
     };
-    window.sessionStorage.setItem(toStorageKey(key), JSON.stringify(payload));
+    adminCacheStore.set(toStorageKey(key), JSON.stringify(payload));
   } catch (error) {
     // Ignore cache write failures to keep data flow resilient.
   }
@@ -74,14 +75,17 @@ export const clearAdminCache = (predicate?: (key: string) => boolean): void => {
   if (!isBrowser()) return;
   try {
     const keysToDelete: string[] = [];
-    for (let index = 0; index < window.sessionStorage.length; index += 1) {
-      const storageKey = window.sessionStorage.key(index);
-      if (!storageKey || !storageKey.startsWith(ADMIN_CACHE_PREFIX)) continue;
+    for (const storageKey of adminCacheStore.keys()) {
+      if (!storageKey.startsWith(ADMIN_CACHE_PREFIX)) continue;
       const rawKey = storageKey.slice(ADMIN_CACHE_PREFIX.length);
       if (!predicate || predicate(rawKey)) keysToDelete.push(storageKey);
     }
-    keysToDelete.forEach((storageKey) => window.sessionStorage.removeItem(storageKey));
+    keysToDelete.forEach((storageKey) => adminCacheStore.delete(storageKey));
   } catch (error) {
     // Ignore cache clear failures to keep admin flows resilient.
   }
+};
+
+export const __setAdminCacheRawForTest = (key: string, raw: string): void => {
+  adminCacheStore.set(toStorageKey(key), raw);
 };

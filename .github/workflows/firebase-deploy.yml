@@ -31,6 +31,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/functions/package-lock.json
+            scripts/package-lock.json
 
       - name: Verify Firebase deploy secret is available
         run: |

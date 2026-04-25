@@ -85,6 +85,35 @@ const sanitizeNode = (node: Node, doc: Document): Node | null => {
   return cleanEl;
 };
 
+const serializeSanitizedNode = (node: Node): string => {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return escapeHtml(node.textContent || '');
+  }
+  if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+    return Array.from(node.childNodes).map((child) => serializeSanitizedNode(child)).join('');
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return '';
+  }
+
+  const element = node as HTMLElement;
+  const tagName = element.tagName.toLowerCase();
+  const childHtml = Array.from(element.childNodes).map((child) => serializeSanitizedNode(child)).join('');
+
+  if (tagName === 'br') {
+    return '<br>';
+  }
+
+  if (tagName === 'a') {
+    const href = element.getAttribute('href') || '';
+    const rel = element.getAttribute('rel') || 'noopener noreferrer';
+    const target = element.getAttribute('target') || (href.startsWith('/') ? '_self' : '_blank');
+    return `<a href="${escapeHtml(href)}" rel="${escapeHtml(rel)}" target="${escapeHtml(target)}">${childHtml}</a>`;
+  }
+
+  return `<${tagName}>${childHtml}</${tagName}>`;
+};
+
 export const sanitizeRichHtml = (input: string): string => {
   const raw = (input || '').trim();
   if (!raw) return '';
@@ -103,7 +132,7 @@ export const sanitizeRichHtml = (input: string): string => {
     if (sanitized) wrapper.appendChild(sanitized);
   });
 
-  return wrapper.innerHTML.trim();
+  return Array.from(wrapper.childNodes).map((child) => serializeSanitizedNode(child)).join('').trim();
 };
 
 export const serializeCmsRichContent = (html: string): string => {

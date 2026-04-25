@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
@@ -29,6 +30,12 @@ dotenv.config({ path: path.resolve(rootDir, '.env') });
 dotenv.config({ path: path.resolve(rootDir, '.env.production'), override: false });
 
 const args = new Set(process.argv.slice(2));
+if (args.has('--help') || args.has('-h')) {
+  console.log('Usage: node scripts/diagnose-donor-registration.mjs [--keep]');
+  console.log('Runs donor-registration diagnostic scenarios against the configured Firebase project.');
+  console.log('Use --keep to skip cleanup of generated diagnostic user artifacts.');
+  process.exit(0);
+}
 const keepArtifacts = args.has('--keep');
 
 const firebaseConfig = {
@@ -104,7 +111,7 @@ const adminDb = admin.firestore(app);
 const adminAuth = admin.auth(app);
 
 const createClient = () => {
-  const clientApp = initializeClientApp(firebaseConfig, `diag-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`);
+  const clientApp = initializeClientApp(firebaseConfig, `diag-${randomUUID()}`);
   const auth = getClientAuth(clientApp);
   const db = initializeFirestore(clientApp, {
     experimentalAutoDetectLongPolling: true,
@@ -212,7 +219,7 @@ const cleanupUserArtifacts = async (uid) => {
 };
 
 const runScenario = async ({ name, seedDoc }) => {
-  const uid = `diag-${name}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const uid = `diag-${name}-${randomUUID()}`;
   const email = `${uid}@example.com`;
   const { clientApp, auth, db } = createClient();
   const userRef = doc(db, 'users', uid);

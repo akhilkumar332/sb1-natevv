@@ -4,6 +4,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import FrontendAccessGate from '../FrontendAccessGate';
 import { ROUTES } from '../../../constants/routes';
+import {
+  __resetCachedFrontendAccessForTest,
+  __setCachedFrontendAccessForTest,
+} from '../../../utils/frontendAccess';
 
 const getPublicCmsSettingsMock = vi.fn();
 const getFrontendAccessStatusMock = vi.fn();
@@ -99,7 +103,7 @@ const createClient = () => new QueryClient({
 describe('FrontendAccessGate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.sessionStorage.clear();
+    __resetCachedFrontendAccessForTest();
     getPublicCmsSettingsMock.mockResolvedValue({
       frontendAccess: {
         mode: 'open',
@@ -171,7 +175,7 @@ describe('FrontendAccessGate', () => {
   });
 
   it('renders the cached maintenance gate immediately before the refresh completes', () => {
-    window.sessionStorage.setItem('bh_frontend_access_snapshot', JSON.stringify({
+    __setCachedFrontendAccessForTest({
       savedAt: Date.now(),
       value: {
         mode: 'maintenance',
@@ -179,7 +183,7 @@ describe('FrontendAccessGate', () => {
         maintenanceMessage: 'Cached message',
         maintenanceEta: 'Soon',
       },
-    }));
+    });
     getPublicCmsSettingsMock.mockImplementation(() => new Promise(() => {}));
 
     render(
@@ -197,14 +201,14 @@ describe('FrontendAccessGate', () => {
   });
 
   it('ignores expired cached access snapshots', async () => {
-    window.sessionStorage.setItem('bh_frontend_access_snapshot', JSON.stringify({
+    __setCachedFrontendAccessForTest({
       savedAt: Date.now() - (6 * 60 * 1000),
       value: {
         mode: 'maintenance',
         maintenanceTitle: 'Expired maintenance window',
         maintenanceMessage: 'Expired message',
       },
-    }));
+    });
 
     render(
       <QueryClientProvider client={createClient()}>

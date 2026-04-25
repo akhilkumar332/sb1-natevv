@@ -71,6 +71,23 @@ const sensitiveRouteParamPatterns = [
 
 const safeWindow = () => (typeof window !== 'undefined' ? window : null);
 
+let fallbackIdCounter = 0;
+
+const createSecureClientId = (): string => {
+  const w = safeWindow();
+  const cryptoObject = w?.crypto ?? globalThis.crypto;
+  if (cryptoObject?.randomUUID) {
+    return cryptoObject.randomUUID();
+  }
+  if (cryptoObject?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    cryptoObject.getRandomValues(bytes);
+    return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+  }
+  fallbackIdCounter += 1;
+  return `fallback-${Date.now()}-${fallbackIdCounter}`;
+};
+
 const sanitizeText = (input: string): string => {
   return input
     .replace(/Bearer\s+[A-Za-z0-9\-_.]+/gi, 'Bearer [REDACTED]')
@@ -135,11 +152,11 @@ const getSessionId = (): string => {
   try {
     const existing = w.sessionStorage.getItem(ERROR_SESSION_ID_KEY);
     if (existing) return existing;
-    const next = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const next = createSecureClientId();
     w.sessionStorage.setItem(ERROR_SESSION_ID_KEY, next);
     return next;
   } catch {
-    return `ephemeral-${Date.now()}`;
+    return `ephemeral-${createSecureClientId()}`;
   }
 };
 

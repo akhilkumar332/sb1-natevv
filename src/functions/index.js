@@ -91,7 +91,7 @@ const buildFingerprint = ({ event, level, error, meta }) => {
     error: serializeError(error),
     meta: sanitizeForLog(meta),
   };
-  return crypto.createHash('sha1').update(JSON.stringify(payload)).digest('hex');
+  return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 };
 
 const shouldEmitLog = (fingerprint, dedupe) => {

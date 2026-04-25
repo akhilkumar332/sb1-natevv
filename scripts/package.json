@@ -1,0 +1,10 @@
+{
+  "name": "bloodhub-ops-scripts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "firebase": "^12.12.1",
+    "firebase-admin": "^13.8.0"
+  }
+}

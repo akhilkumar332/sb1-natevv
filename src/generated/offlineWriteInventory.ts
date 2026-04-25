@@ -244,6 +244,286 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database-compat/dist/database-compat/src/index.d.ts:67",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database-compat/dist/database-compat/src/index.d.ts",
+    "line": 67,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/internal.d.ts:2318",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/internal.d.ts",
+    "line": 2318,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/internal.d.ts:2322",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/internal.d.ts",
+    "line": 2322,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/internal.d.ts:2332",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/internal.d.ts",
+    "line": 2332,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/internal.d.ts:2351",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/internal.d.ts",
+    "line": 2351,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/node-esm/src/api/Transaction.d.ts:50",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/node-esm/src/api/Transaction.d.ts",
+    "line": 50,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/node-esm/src/api/Transaction.d.ts:54",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/node-esm/src/api/Transaction.d.ts",
+    "line": 54,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/node-esm/src/api/Transaction.d.ts:64",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/node-esm/src/api/Transaction.d.ts",
+    "line": 64,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/node-esm/src/api/Transaction.d.ts:83",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/node-esm/src/api/Transaction.d.ts",
+    "line": 83,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/private.d.ts:2209",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/private.d.ts",
+    "line": 2209,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/private.d.ts:2213",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/private.d.ts",
+    "line": 2213,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/private.d.ts:2223",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/private.d.ts",
+    "line": 2223,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/private.d.ts:2242",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/private.d.ts",
+    "line": 2242,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/public.d.ts:1176",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/public.d.ts",
+    "line": 1176,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/public.d.ts:1180",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/public.d.ts",
+    "line": 1180,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/public.d.ts:1190",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/public.d.ts",
+    "line": 1190,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/public.d.ts:1209",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/public.d.ts",
+    "line": 1209,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/src/api/Transaction.d.ts:50",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/src/api/Transaction.d.ts",
+    "line": 50,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/src/api/Transaction.d.ts:54",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/src/api/Transaction.d.ts",
+    "line": 54,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/src/api/Transaction.d.ts:64",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/src/api/Transaction.d.ts",
+    "line": 64,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_firebase/database/dist/src/api/Transaction.d.ts:83",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@firebase/database/dist/src/api/Transaction.d.ts",
+    "line": 83,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_google-cloud/firestore/build/src/index.d.ts:697",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@google-cloud/firestore/build/src/index.d.ts",
+    "line": 697,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_google-cloud/firestore/build/src/transaction.d.ts:28",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@google-cloud/firestore/build/src/transaction.d.ts",
+    "line": 28,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_google-cloud/firestore/build/src/transaction.d.ts:101",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@google-cloud/firestore/build/src/transaction.d.ts",
+    "line": 101,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_google-cloud/firestore/build/src/transaction.d.ts:124",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@google-cloud/firestore/build/src/transaction.d.ts",
+    "line": 124,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_google-cloud/firestore/build/src/transaction.d.ts:166",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@google-cloud/firestore/build/src/transaction.d.ts",
+    "line": 166,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_google-cloud/firestore/build/src/transaction.d.ts:197",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@google-cloud/firestore/build/src/transaction.d.ts",
+    "line": 197,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
+    "id": "UNKNOWN.runTransaction.functions/node_modules/_google-cloud/firestore/types/firestore.d.ts:761",
+    "method": "runTransaction",
+    "collectionKey": "UNKNOWN",
+    "module": "functions",
+    "path": "functions/node_modules/@google-cloud/firestore/types/firestore.d.ts",
+    "line": 761,
+    "area": "UNKNOWN runTransaction",
+    "mode": "online_only"
+  },
+  {
     "id": "NOTIFICATIONS.updateDoc.hooks/useBloodRequest.ts:57",
     "method": "updateDoc",
     "collectionKey": "NOTIFICATIONS",
@@ -1624,12 +1904,12 @@ export const GENERATED_OFFLINE_WRITE_INVENTORY: GeneratedOfflineWriteInventoryRo
     "mode": "queue_safe"
   },
   {
-    "id": "ERROR_LOGS.addDoc.services/errorLog.service.ts:369",
+    "id": "ERROR_LOGS.addDoc.services/errorLog.service.ts:386",
     "method": "addDoc",
     "collectionKey": "ERROR_LOGS",
     "module": "services",
     "path": "services/errorLog.service.ts",
-    "line": 369,
+    "line": 386,
     "area": "ERROR_LOGS addDoc",
     "mode": "queue_safe"
   },

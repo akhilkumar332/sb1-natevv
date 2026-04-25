@@ -1,9 +1,15 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { getAdminCacheKey, readAdminCache, writeAdminCache } from '../adminCache';
+import {
+  __setAdminCacheRawForTest,
+  clearAdminCache,
+  getAdminCacheKey,
+  readAdminCache,
+  writeAdminCache,
+} from '../adminCache';
 
 describe('adminCache', () => {
   beforeEach(() => {
-    window.sessionStorage.clear();
+    clearAdminCache();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-02-24T00:00:00.000Z'));
   });
@@ -39,10 +45,9 @@ describe('adminCache', () => {
 
   it('drops invalid json payloads safely', () => {
     const key = getAdminCacheKey(['admin', 'broken']);
-    window.sessionStorage.setItem(`admin_cache_${key}`, '{bad json');
+    __setAdminCacheRawForTest(key, '{bad json');
 
     const cached = readAdminCache(key, 60_000);
     expect(cached).toBeUndefined();
   });
 });
-

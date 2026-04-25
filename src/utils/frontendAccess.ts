@@ -3,7 +3,7 @@ import { ROUTES } from '../constants/routes';
 import type { CmsSettings } from '../types/database.types';
 
 export type FrontendAccessSettings = NonNullable<CmsSettings['frontendAccess']>;
-const FRONTEND_ACCESS_CACHE_KEY = 'bh_frontend_access_snapshot';
+let frontendAccessCacheSnapshot: { savedAt: number; value: FrontendAccessSettings } | null = null;
 
 export type FrontendAccessCountdown = {
   expired: boolean;
@@ -121,15 +121,13 @@ export const isAdminRoutePath = (pathname: string): boolean => (
 export const readCachedFrontendAccess = (): FrontendAccessSettings | null => {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = window.sessionStorage.getItem(FRONTEND_ACCESS_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { savedAt?: unknown; value?: unknown };
-    const savedAt = Number(parsed?.savedAt);
+    if (!frontendAccessCacheSnapshot) return null;
+    const savedAt = Number(frontendAccessCacheSnapshot.savedAt);
     if (!Number.isFinite(savedAt) || Date.now() - savedAt > CMS_FRONTEND_ACCESS.cacheMaxAgeMs) {
-      window.sessionStorage.removeItem(FRONTEND_ACCESS_CACHE_KEY);
+      frontendAccessCacheSnapshot = null;
       return null;
     }
-    return normalizeFrontendAccess(parsed.value);
+    return normalizeFrontendAccess(frontendAccessCacheSnapshot.value);
   } catch {
     return null;
   }
@@ -139,11 +137,22 @@ export const writeCachedFrontendAccess = (value: unknown): void => {
   if (typeof window === 'undefined') return;
   try {
     const normalized = normalizeFrontendAccess(value);
-    window.sessionStorage.setItem(FRONTEND_ACCESS_CACHE_KEY, JSON.stringify({
+    frontendAccessCacheSnapshot = {
       savedAt: Date.now(),
       value: normalized,
-    }));
+    };
   } catch {
     // Ignore storage failures so the gate still works without sessionStorage.
   }
+};
+
+export const __setCachedFrontendAccessForTest = (snapshot: {
+  savedAt: number;
+  value: FrontendAccessSettings;
+} | null): void => {
+  frontendAccessCacheSnapshot = snapshot;
+};
+
+export const __resetCachedFrontendAccessForTest = (): void => {
+  frontendAccessCacheSnapshot = null;
 };

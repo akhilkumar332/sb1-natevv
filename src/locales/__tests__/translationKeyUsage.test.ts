@@ -20,7 +20,7 @@ const flattenLocaleKeys = (input: unknown, prefix = ''): string[] => {
 
 const walkSourceFiles = (dir: string): string[] => {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    if (entry.name === 'locales' || entry.name === 'generated') return [];
+    if (entry.name === 'locales' || entry.name === 'generated' || entry.name === 'node_modules') return [];
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) return walkSourceFiles(fullPath);
     return /\.(ts|tsx)$/.test(entry.name) ? [fullPath] : [];

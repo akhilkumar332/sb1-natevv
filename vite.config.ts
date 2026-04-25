@@ -1,7 +1,6 @@
 // vite.config.ts
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-import legacy from '@vitejs/plugin-legacy';
 import { VitePWA } from 'vite-plugin-pwa';
 import { resolve } from 'path';
 import fs from 'fs-extra';
@@ -24,9 +23,6 @@ export default defineConfig(({ command, mode }) => {
   return {
     plugins: [
       react(),
-      legacy({
-        targets: ['defaults', 'not IE 11'],
-      }),
       VitePWA({
         strategies: 'injectManifest',
         srcDir: 'src',
@@ -44,6 +40,7 @@ export default defineConfig(({ command, mode }) => {
         injectManifest: {
           globPatterns: ['**/*.{js,css,html,svg,ico,png,webp,json,txt,woff,woff2}'],
           globIgnores: ['**/firebase-messaging-sw.js', '**/firebase-config.js'],
+          target: 'esnext',
         },
       }),
       {
@@ -73,6 +70,7 @@ export default defineConfig(({ command, mode }) => {
     base: '/',
     build: {
       outDir: 'dist',
+      target: 'esnext',
       sourcemap: !isProd,
       // Optimize bundle size
       minify: 'terser',
@@ -93,7 +91,7 @@ export default defineConfig(({ command, mode }) => {
             'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
             'ui-vendor': ['lucide-react', 'react-hot-toast'],
             '3d-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
-            'i18n-vendor': ['i18next', 'react-i18next', 'i18next-browser-languagedetector', 'i18next-http-backend'],
+            'i18n-vendor': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
             // App chunks
             'analytics': [
               './src/services/analytics.service.ts',
@@ -109,7 +107,10 @@ export default defineConfig(({ command, mode }) => {
       },
     },
     server: {
+      host: '127.0.0.1',
       port: 5180,
+      strictPort: true,
+      cors: false,
       headers: {
         'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
         'Cross-Origin-Embedder-Policy': 'unsafe-none',
@@ -133,6 +134,12 @@ export default defineConfig(({ command, mode }) => {
           },
         }
       }
+    },
+    preview: {
+      host: '127.0.0.1',
+      port: 4173,
+      strictPort: true,
+      cors: false,
     }
   };
 });
