@@ -41,6 +41,18 @@ const readGitLog = () => {
     .filter((entry) => entry.gitCommit);
 };
 
+const readAppVersionAtCommit = (gitCommit) => {
+  if (!gitCommit) return null;
+
+  try {
+    const output = execSync(`git show ${gitCommit}:package.json`, { stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+    const parsed = JSON.parse(output);
+    return typeof parsed?.version === 'string' ? parsed.version : null;
+  } catch {
+    return null;
+  }
+};
+
 const main = async () => {
   const rows = readGitLog();
   const gitBranch = process.env.GITHUB_REF_NAME || readCurrentBranch();
@@ -62,6 +74,7 @@ const main = async () => {
       commitMessage: row.commitMessage || null,
       authorName: row.authorName || null,
       authorEmail: row.authorEmail || null,
+      appVersion: readAppVersionAtCommit(row.gitCommit),
       deployTarget: 'firebase-hosting',
       environment: process.env.APP_ENVIRONMENT || 'prod',
       occurredAt: row.committedAt,

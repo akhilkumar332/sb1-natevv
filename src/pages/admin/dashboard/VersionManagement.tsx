@@ -28,6 +28,12 @@ const HISTORY_FILTERS = [
   { id: 'firebase-hosting-release', label: 'Hosting releases', kind: 'firebase-hosting-release' },
 ] as const;
 
+const HISTORY_KIND_LABELS = {
+  'git-commit': 'Git commit',
+  'firebase-hosting-release': 'Hosting release',
+  'deploy-ledger': 'Deploy ledger',
+} as const;
+
 const formatDateTime = (value: unknown) => {
   const date = toDateValue(value);
   if (!date) return 'Unknown';
@@ -163,7 +169,7 @@ export default function VersionManagementPage() {
         onRetry={refreshAll}
       />
 
-      <section className="grid gap-4 xl:grid-cols-[1.1fr,1.4fr]">
+      <section className="space-y-4">
         <div className="rounded-3xl border border-red-100 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-[#0b1220]">
           <div className="flex items-center gap-2">
             <Boxes className="h-5 w-5 text-red-600 dark:text-red-300" />
@@ -315,6 +321,9 @@ export default function VersionManagementPage() {
                 : entry.verificationLevel === 'partial'
                   ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'
                   : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
+              const isGitCommit = entry.kind === 'git-commit';
+              const isHostingRelease = entry.kind === 'firebase-hosting-release';
+              const entryKindLabel = HISTORY_KIND_LABELS[entry.kind] || entry.kind;
 
               return (
                 <article key={entry.id} className="rounded-2xl border border-gray-100 p-4 dark:border-gray-700">
@@ -325,7 +334,7 @@ export default function VersionManagementPage() {
                           {entry.verificationLevel}
                         </span>
                         <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">
-                          {entry.kind}
+                          {entryKindLabel}
                         </span>
                         {entry.gitShortCommit && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">
@@ -339,13 +348,28 @@ export default function VersionManagementPage() {
                         <p><span className="font-semibold text-gray-900 dark:text-white">Occurred at:</span> {formatDateTime(entry.occurredAt)}</p>
                         <p><span className="font-semibold text-gray-900 dark:text-white">Recorded at:</span> {formatDateTime(entry.recordedAt)}</p>
                         <p><span className="font-semibold text-gray-900 dark:text-white">Source:</span> {entry.source}</p>
-                        <p><span className="font-semibold text-gray-900 dark:text-white">Branch:</span> {entry.gitBranch || 'Unknown'}</p>
-                        <p><span className="font-semibold text-gray-900 dark:text-white">Commit:</span> {entry.gitCommit || 'Unknown'}</p>
-                        <p><span className="font-semibold text-gray-900 dark:text-white">Release id:</span> {entry.releaseId || 'Unknown'}</p>
-                        <p><span className="font-semibold text-gray-900 dark:text-white">App version:</span> {entry.appVersion || 'Unknown'}</p>
+                        {entry.gitBranch && (
+                          <p><span className="font-semibold text-gray-900 dark:text-white">Branch:</span> {entry.gitBranch}</p>
+                        )}
+                        {entry.gitCommit && (
+                          <p><span className="font-semibold text-gray-900 dark:text-white">Commit:</span> {entry.gitCommit}</p>
+                        )}
+                        {entry.releaseId && (
+                          <p><span className="font-semibold text-gray-900 dark:text-white">Release id:</span> {entry.releaseId}</p>
+                        )}
+                        {entry.appVersion && (
+                          <p><span className="font-semibold text-gray-900 dark:text-white">App version:</span> {entry.appVersion}</p>
+                        )}
                         <p><span className="font-semibold text-gray-900 dark:text-white">Environment:</span> {entry.environment || 'Unknown'}</p>
-                        <p><span className="font-semibold text-gray-900 dark:text-white">Actor:</span> {entry.actor || entry.authorName || 'Unknown'}</p>
-                        <p><span className="font-semibold text-gray-900 dark:text-white">Author email:</span> {entry.authorEmail || 'Unknown'}</p>
+                        {(entry.actor || entry.authorName) && (
+                          <p><span className="font-semibold text-gray-900 dark:text-white">{isHostingRelease ? 'Actor' : 'Author'}:</span> {entry.actor || entry.authorName}</p>
+                        )}
+                        {isGitCommit && entry.authorEmail && (
+                          <p><span className="font-semibold text-gray-900 dark:text-white">Author email:</span> {entry.authorEmail}</p>
+                        )}
+                        {isHostingRelease && entry.projectId && (
+                          <p><span className="font-semibold text-gray-900 dark:text-white">Project id:</span> {entry.projectId}</p>
+                        )}
                       </div>
 
                       {entry.commitMessage && (
