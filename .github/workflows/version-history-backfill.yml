@@ -1,0 +1,87 @@
+name: Version History Backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_git_backfill:
+        description: Run git commit history backfill
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      git_limit:
+        description: Number of git commits to backfill
+        required: true
+        default: '200'
+      run_hosting_backfill:
+        description: Run Firebase Hosting history backfill
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      hosting_limit:
+        description: Number of Hosting releases to backfill
+        required: true
+        default: '100'
+      hosting_site:
+        description: Optional Firebase Hosting site id override
+        required: false
+        default: ''
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions:
+      contents: read
+
+    env:
+      VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BLOODHUBINDIA_1DA2A }}
+      APP_ENVIRONMENT: prod
+      APP_DEPLOY_TARGET: firebase-hosting
+      SITE_URL: ${{ secrets.SITE_URL }}
+      FIREBASE_HOSTING_SITE: ${{ inputs.hosting_site != '' && inputs.hosting_site || secrets.VITE_FIREBASE_PROJECT_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/functions/package-lock.json
+            scripts/package-lock.json
+
+      - name: Verify Firebase deploy secret is available
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "Missing GitHub Actions secret: FIREBASE_SERVICE_ACCOUNT_BLOODHUBINDIA_1DA2A"
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Backfill git commit history
+        if: ${{ inputs.run_git_backfill == 'true' }}
+        run: npm run backfill:version:git -- --limit=${{ inputs.git_limit }} --commit
+
+      - name: Backfill Firebase Hosting history
+        if: ${{ inputs.run_hosting_backfill == 'true' }}
+        run: npm run backfill:version:hosting -- --limit=${{ inputs.hosting_limit }} --commit

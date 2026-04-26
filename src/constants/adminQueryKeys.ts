@@ -79,4 +79,7 @@ export const adminQueryKeys = {
   versionMetadata: () => ['admin', 'versionMetadata'] as const,
   deploymentsRoot: ['admin', 'deployments'] as const,
   deployments: (limit: number = 50) => ['admin', 'deployments', { limit }] as const,
+  deploymentHistoryRoot: ['admin', 'deploymentHistory'] as const,
+  deploymentHistory: (limit: number = 200, filters?: { kind?: string }) =>
+    ['admin', 'deploymentHistory', { limit, ...(filters || {}) }] as const,
 };

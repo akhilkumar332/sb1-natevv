@@ -342,6 +342,11 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /deploymentHistory/{historyId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
     match /webauthnChallenges/{challengeId} {
       allow read, write: if false;
     }

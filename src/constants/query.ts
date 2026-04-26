@@ -73,6 +73,12 @@ export const ADMIN_QUERY_TIMINGS = {
     gcTime: FIVE_MINUTES_MS,
     refetchInterval: ONE_MINUTE_MS,
   },
+  deploymentHistory: {
+    ttl: FIVE_MINUTES_MS,
+    staleTime: THREE_MINUTES_MS,
+    gcTime: TEN_MINUTES_MS,
+    refetchInterval: FIVE_MINUTES_MS,
+  },
   contactSubmissions: {
     ttl: TWO_MINUTES_MS,
     staleTime: TWO_MINUTES_MS,

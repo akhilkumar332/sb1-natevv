@@ -188,6 +188,37 @@ export interface DeploymentRecord {
 }
 
 // ============================================================================
+// COLLECTION: deploymentHistory
+// ============================================================================
+
+export interface DeploymentHistoryRecord {
+  id?: string;
+  kind: 'git-commit' | 'firebase-hosting-release' | 'deploy-ledger';
+  source: 'github-actions' | 'git-backfill' | 'firebase-hosting-backfill';
+  verificationLevel: 'verified' | 'historical' | 'partial';
+  gitCommit?: string | null;
+  gitShortCommit?: string | null;
+  gitBranch?: string | null;
+  commitMessage?: string | null;
+  authorName?: string | null;
+  authorEmail?: string | null;
+  appVersion?: string | null;
+  deployId?: string | null;
+  releaseId?: string | null;
+  environment?: string | null;
+  deployTarget?: string | null;
+  workflowRunId?: string | null;
+  workflowRunNumber?: string | null;
+  workflowRunUrl?: string | null;
+  siteUrl?: string | null;
+  projectId?: string | null;
+  actor?: string | null;
+  occurredAt: Timestamp;
+  recordedAt?: Timestamp;
+  metadata?: Record<string, any> | null;
+}
+
+// ============================================================================
 // COLLECTION: impersonationEvents
 // ============================================================================
 

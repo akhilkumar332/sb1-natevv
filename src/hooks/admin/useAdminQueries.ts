@@ -47,6 +47,7 @@ import type {
   CmsPage,
   CmsSettings,
   ContactSubmission,
+  DeploymentHistoryRecord,
   DeploymentRecord,
   NpsPromptOverride,
   NpsResponse,
@@ -108,6 +109,7 @@ export type AdminNpsActiveUserProfile = {
 export type AdminOfflineSyncHealthRecord = OfflineSyncHealthRecord;
 export type AdminTranslationOverride = TranslationOverrideDocument;
 export type AdminDeploymentRecord = DeploymentRecord;
+export type AdminDeploymentHistoryRecord = DeploymentHistoryRecord;
 
 const useCachedAdminQuery = <T,>(
   queryKey: readonly unknown[],
@@ -630,6 +632,50 @@ const fetchDeployments = async (limitCount: number): Promise<AdminDeploymentReco
   });
 };
 
+const fetchDeploymentHistory = async (limitCount: number): Promise<AdminDeploymentHistoryRecord[]> => {
+  const snapshot = await getDocs(query(
+    collection(db, COLLECTIONS.DEPLOYMENT_HISTORY),
+    orderBy('occurredAt', 'desc'),
+    limit(limitCount),
+  ));
+
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data() as Record<string, any>;
+    return {
+      id: docSnap.id,
+      kind: data.kind === 'git-commit' || data.kind === 'firebase-hosting-release' || data.kind === 'deploy-ledger'
+        ? data.kind
+        : 'git-commit',
+      source: data.source === 'github-actions' || data.source === 'git-backfill' || data.source === 'firebase-hosting-backfill'
+        ? data.source
+        : 'git-backfill',
+      verificationLevel: data.verificationLevel === 'verified' || data.verificationLevel === 'partial'
+        ? data.verificationLevel
+        : 'historical',
+      gitCommit: typeof data.gitCommit === 'string' ? data.gitCommit : null,
+      gitShortCommit: typeof data.gitShortCommit === 'string' ? data.gitShortCommit : null,
+      gitBranch: typeof data.gitBranch === 'string' ? data.gitBranch : null,
+      commitMessage: typeof data.commitMessage === 'string' ? data.commitMessage : null,
+      authorName: typeof data.authorName === 'string' ? data.authorName : null,
+      authorEmail: typeof data.authorEmail === 'string' ? data.authorEmail : null,
+      appVersion: typeof data.appVersion === 'string' ? data.appVersion : null,
+      deployId: typeof data.deployId === 'string' ? data.deployId : null,
+      releaseId: typeof data.releaseId === 'string' ? data.releaseId : null,
+      environment: typeof data.environment === 'string' ? data.environment : null,
+      deployTarget: typeof data.deployTarget === 'string' ? data.deployTarget : null,
+      workflowRunId: typeof data.workflowRunId === 'string' ? data.workflowRunId : null,
+      workflowRunNumber: typeof data.workflowRunNumber === 'string' ? data.workflowRunNumber : null,
+      workflowRunUrl: typeof data.workflowRunUrl === 'string' ? data.workflowRunUrl : null,
+      siteUrl: typeof data.siteUrl === 'string' ? data.siteUrl : null,
+      projectId: typeof data.projectId === 'string' ? data.projectId : null,
+      actor: typeof data.actor === 'string' ? data.actor : null,
+      occurredAt: (toDateValue(data.occurredAt) as any) || null,
+      recordedAt: (toDateValue(data.recordedAt) as any) || null,
+      metadata: typeof data.metadata === 'object' && data.metadata !== null ? data.metadata : null,
+    } as AdminDeploymentHistoryRecord;
+  });
+};
+
 const mapOfflineSyncHealthActor = (data: Record<string, any>): OfflineSyncHealthActor => ({
   uid: typeof data.uid === 'string' ? data.uid : '',
   displayName: typeof data.displayName === 'string'
@@ -1133,6 +1179,20 @@ export const useAdminDeployments = (limitCount: number = 50) =>
       staleTime: ADMIN_QUERY_TIMINGS.deployments.staleTime,
       gcTime: ADMIN_QUERY_TIMINGS.deployments.gcTime,
       refetchInterval: ADMIN_QUERY_TIMINGS.deployments.refetchInterval,
+      refetchIntervalInBackground: false,
+    },
+  );
+
+export const useAdminDeploymentHistory = (limitCount: number = 200) =>
+  useCachedAdminQuery<AdminDeploymentHistoryRecord[]>(
+    adminQueryKeys.deploymentHistory(limitCount),
+    ADMIN_QUERY_TIMINGS.deploymentHistory.ttl,
+    ['occurredAt', 'recordedAt'],
+    () => fetchDeploymentHistory(limitCount),
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.deploymentHistory.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.deploymentHistory.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.deploymentHistory.refetchInterval,
       refetchIntervalInBackground: false,
     },
   );

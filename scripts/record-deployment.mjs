@@ -1,23 +1,12 @@
 import { readFile } from 'fs/promises';
 import path from 'path';
-import { applicationDefault, initializeApp, getApps } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
+import { getAdminFirestore } from './lib/firebaseAdminApp.mjs';
 
 const readVersionMetadata = async () => {
   const versionPath = path.resolve('public', 'version.json');
   const raw = await readFile(versionPath, 'utf8');
   return JSON.parse(raw);
-};
-
-const ensureAdminApp = () => {
-  if (getApps().length > 0) {
-    return getApps()[0];
-  }
-
-  return initializeApp({
-    credential: applicationDefault(),
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT,
-  });
 };
 
 const requiredString = (value, fallback = 'unknown') => (
@@ -26,8 +15,7 @@ const requiredString = (value, fallback = 'unknown') => (
 
 const main = async () => {
   const metadata = await readVersionMetadata();
-  const app = ensureAdminApp();
-  const db = getFirestore(app);
+  const db = getAdminFirestore();
 
   const deployId = requiredString(metadata.deployId, `manual-${Date.now()}`);
   const workflowRunId = requiredString(process.env.GITHUB_RUN_ID, null);

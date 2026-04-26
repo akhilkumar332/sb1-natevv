@@ -44,6 +44,7 @@ export const COLLECTIONS = {
   OFFLINE_SYNC_HEALTH_RECORDS: 'offlineSyncHealthRecords',
   TRANSLATION_OVERRIDES: 'translationOverrides',
   DEPLOYMENTS: 'deployments',
+  DEPLOYMENT_HISTORY: 'deploymentHistory',
   WEBAUTHN_CREDENTIALS: 'webauthnCredentials',
   WEBAUTHN_CHALLENGES: 'webauthnChallenges',
 } as const;

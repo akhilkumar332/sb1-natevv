@@ -29,6 +29,8 @@
     "deploy:hosting": "npm run build:prod && firebase deploy --only hosting",
     "deploy:rules": "firebase deploy --only firestore:rules,storage:rules",
     "deploy:indexes": "firebase deploy --only firestore:indexes",
+    "backfill:version:git": "node scripts/backfill-git-history.mjs",
+    "backfill:version:hosting": "node scripts/backfill-firebase-hosting-history.mjs",
     "migrate:bloodbank": "node scripts/migrate-hospital-to-bloodbank.mjs",
     "seed:cms:blog": "node scripts/seed-cms-blog-posts.mjs",
     "sync:cms:blog:summaries": "node scripts/sync-cms-blog-summaries.mjs",
