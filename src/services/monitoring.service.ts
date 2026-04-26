@@ -4,6 +4,14 @@
  * Handles error tracking, performance monitoring, and analytics
  */
 import { captureHandledError } from './errorLog.service';
+import {
+  clearFirebaseAnalyticsUser,
+  initializeFirebaseAnalytics,
+  setFirebaseAnalyticsUser,
+  trackFirebaseAnalyticsEvent,
+  trackFirebaseAnalyticsPageView,
+} from './firebaseAnalytics.service';
+import { FIREBASE_ANALYTICS_EVENTS } from '../constants/analytics';
 
 const debugLog = (...args: unknown[]) => {
   if (import.meta.env.DEV) {
@@ -30,6 +38,10 @@ interface PerformanceMetric {
   value: number;
   unit: string;
   context?: Record<string, any>;
+}
+
+interface AnalyticsUserContext {
+  [key: string]: string | number | boolean | null | undefined;
 }
 
 class MonitoringService {
@@ -63,7 +75,7 @@ class MonitoringService {
     }
 
     // Initialize analytics
-    if (this.config.enableAnalytics && import.meta.env.VITE_GA_TRACKING_ID) {
+    if (this.config.enableAnalytics) {
       this.initializeAnalytics();
     }
 
@@ -88,73 +100,16 @@ class MonitoringService {
    * Initialize performance monitoring
    */
   private initializePerformanceMonitoring(): void {
-    // Monitor Core Web Vitals
-    if ('PerformanceObserver' in window) {
-      try {
-        // Monitor LCP (Largest Contentful Paint)
-        const lcpObserver = new PerformanceObserver((list) => {
-          const entries = list.getEntries();
-          const lastEntry = entries[entries.length - 1] as any;
-          this.trackPerformance({
-            name: 'LCP',
-            value: lastEntry.renderTime || lastEntry.loadTime,
-            unit: 'ms',
-            context: { url: window.location.pathname }
-          });
-        });
-        lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
-
-        // Monitor FID (First Input Delay)
-        const fidObserver = new PerformanceObserver((list) => {
-          const entries = list.getEntries();
-          entries.forEach((entry: any) => {
-            this.trackPerformance({
-              name: 'FID',
-              value: entry.processingStart - entry.startTime,
-              unit: 'ms',
-              context: { url: window.location.pathname }
-            });
-          });
-        });
-        fidObserver.observe({ entryTypes: ['first-input'] });
-
-        // Monitor CLS (Cumulative Layout Shift)
-        let clsValue = 0;
-        const clsObserver = new PerformanceObserver((list) => {
-          const entries = list.getEntries();
-          entries.forEach((entry: any) => {
-            if (!entry.hadRecentInput) {
-              clsValue += entry.value;
-            }
-          });
-          this.trackPerformance({
-            name: 'CLS',
-            value: clsValue,
-            unit: 'score',
-            context: { url: window.location.pathname }
-          });
-        });
-        clsObserver.observe({ entryTypes: ['layout-shift'] });
-
-      } catch (error) {
-        void captureHandledError(error, {
-          source: 'frontend',
-          scope: 'unknown',
-          metadata: { kind: 'monitoring.performance.setup' },
-        });
-      }
-    }
-
-    debugLog('Performance monitoring initialized');
+    // Runtime vitals are measured in src/utils/performanceMonitoring.ts.
+    // Keep this service as the sink only to avoid duplicate observers.
+    debugLog('Performance monitoring sink initialized');
   }
 
   /**
    * Initialize analytics (Google Analytics)
    */
   private initializeAnalytics(): void {
-    // In production, you would initialize GA here:
-    // gtag('config', import.meta.env.VITE_GA_TRACKING_ID);
-
+    void initializeFirebaseAnalytics();
     debugLog('Analytics initialized');
   }
 
@@ -209,14 +164,13 @@ class MonitoringService {
     // In production, send to analytics or monitoring service
     debugLog('Performance metric:', metric);
 
-    // Track in Google Analytics if enabled
-    if (this.config.enableAnalytics && typeof window !== 'undefined' && (window as any).gtag) {
-      (window as any).gtag('event', 'web_vitals', {
-        event_category: 'Web Vitals',
-        event_label: metric.name,
-        value: Math.round(metric.value),
-        metric_value: metric.value,
+    if (this.config.enableAnalytics) {
+      void trackFirebaseAnalyticsEvent(FIREBASE_ANALYTICS_EVENTS.webVitals, {
+        metric_name: metric.name,
         metric_unit: metric.unit,
+        metric_value: Math.round(metric.value),
+        page_path: typeof window !== 'undefined' ? window.location.pathname : undefined,
+        ...metric.context,
       });
     }
   }
@@ -224,16 +178,12 @@ class MonitoringService {
   /**
    * Track page view
    */
-  trackPageView(page: string): void {
+  trackPageView(page: string, pageContext?: Record<string, any>): void {
     if (!this.config.enableAnalytics) {
       return;
     }
 
-    // In production, send to Google Analytics:
-    // gtag('config', import.meta.env.VITE_GA_TRACKING_ID, {
-    //   page_path: page
-    // });
-
+    void trackFirebaseAnalyticsPageView(page, pageContext);
     debugLog('Page view tracked:', page);
   }
 
@@ -245,36 +195,27 @@ class MonitoringService {
       return;
     }
 
-    // In production, send to Google Analytics:
-    // gtag('event', eventName, eventParams);
-
+    void trackFirebaseAnalyticsEvent(eventName, eventParams);
     debugLog('Event tracked:', eventName, eventParams);
   }
 
   /**
    * Set user context for error tracking
    */
-  setUser(userId: string, email?: string): void {
-    if (!this.config.enableErrorTracking) {
-      return;
+  setUser(userId: string, analyticsContext?: AnalyticsUserContext): void {
+    if (this.config.enableAnalytics) {
+      void setFirebaseAnalyticsUser(userId, analyticsContext);
     }
-
-    // In production, set user in Sentry:
-    // Sentry.setUser({ id: userId, email });
-
-    debugLog('User context set:', { userId, email });
+    debugLog('User context set:', { userId, analyticsContext });
   }
 
   /**
    * Clear user context
    */
   clearUser(): void {
-    if (!this.config.enableErrorTracking) {
-      return;
+    if (this.config.enableAnalytics) {
+      void clearFirebaseAnalyticsUser();
     }
-
-    // In production, clear user in Sentry:
-    // Sentry.setUser(null);
 
     debugLog('User context cleared');
   }
@@ -333,8 +274,4 @@ class MonitoringService {
 
 // Export singleton instance
 export const monitoringService = new MonitoringService();
-
-// Initialize on import (production only)
-if (import.meta.env.PROD) {
-  monitoringService.initialize();
-}
+export const initMonitoring = () => monitoringService.initialize();

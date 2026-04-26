@@ -9,6 +9,7 @@ import { collection, getDocs, getDocsFromServer, doc, deleteDoc } from 'firebase
 import { auth, db } from '../firebase';
 import { SERVERLESS_ENDPOINTS } from '../constants/backend';
 import { COLLECTIONS } from '../constants/firestore';
+import { monitoringService } from './monitoring.service';
 
 const ANONYMOUS_CACHE_KEY = 'anonymous';
 const CHALLENGE_CACHE_TTL_MS = 4 * 60 * 1000;
@@ -42,13 +43,7 @@ const nowMs = (): number => (
 );
 
 const emitBiometricEvent = (eventName: string, params?: Record<string, unknown>): void => {
-  void import('./monitoring.service')
-    .then(({ monitoringService }) => {
-      monitoringService.trackEvent(eventName, params);
-    })
-    .catch(() => {
-      // ignore monitoring failures
-    });
+  monitoringService.trackEvent(eventName, params);
 };
 
 const getIdToken = async (): Promise<string> => {

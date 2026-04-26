@@ -5,6 +5,7 @@ import { notify } from 'services/notify.service';
 import { CONTACT_SUBJECT_OPTIONS } from '../constants/contact';
 import { submitContactForm } from '../services/contact.service';
 import { captureHandledError } from '../services/errorLog.service';
+import { monitoringService } from '../services/monitoring.service';
 import { useCmsFrontendPageContent } from '../hooks/useCmsFrontendPageContent';
 import { usePublicCmsSettings } from '../hooks/useCmsContent';
 import { CMS_DEFAULTS } from '../constants/cms';
@@ -35,6 +36,10 @@ function Contact() {
     setSubmitting(true);
     try {
       await submitContactForm(formData);
+      monitoringService.trackEvent('contact_form_submitted', {
+        subject: formData.subject || 'general',
+        has_phone: Boolean(formData.phone),
+      });
       notify.success(t('contact.successMessage'));
       setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
     } catch (error) {

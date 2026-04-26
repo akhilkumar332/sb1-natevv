@@ -14,10 +14,12 @@ import { initPerformanceMonitoring } from './utils/performanceMonitoring';
 import { initGlobalErrorLogging } from './utils/errorLoggingBootstrap';
 import { initializeFirestoreOfflinePersistence } from './firebase';
 import { loadTranslationOverridesIntoI18n } from './services/translationRuntime.service';
+import { initMonitoring } from './services/monitoring.service';
 import '../index.css';
 
 // Initialize performance monitoring
 const initRuntimeOptimizations = () => {
+  initMonitoring();
   initPerformanceMonitoring();
   initGlobalErrorLogging();
   void initializeFirestoreOfflinePersistence();

@@ -3,6 +3,7 @@ import { Droplet, AlertCircle, User, Calendar, Phone, Mail, Hospital, FileText, 
 import { notify } from 'services/notify.service';
 import { Link } from 'react-router-dom';
 import { captureHandledError } from '../services/errorLog.service';
+import { monitoringService } from '../services/monitoring.service';
 import { ROUTES } from '../constants/routes';
 import { useCmsFrontendPageContent } from '../hooks/useCmsFrontendPageContent';
 import CmsCustomSections from '../components/cms/CmsCustomSections';
@@ -160,6 +161,11 @@ function RequestBlood() {
 
     if (validateForm()) {
       try {
+        monitoringService.trackEvent('blood_request_form_submitted', {
+          blood_type: formData.bloodType,
+          urgency: formData.urgency,
+          units_needed: Number(formData.unitsNeeded) || undefined,
+        });
         setFormData({
           patientName: '',
           patientAge: '',

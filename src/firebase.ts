@@ -13,10 +13,12 @@ const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || import.meta.env.VITE_GA_TRACKING_ID,
 };
 
 const app = initializeApp(firebaseConfig);
+export const firebaseMeasurementId = firebaseConfig.measurementId || '';
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
@@ -99,4 +101,5 @@ export const subscribeFirestorePersistenceStatus = (
   };
 };
 
+export { app };
 export default app;

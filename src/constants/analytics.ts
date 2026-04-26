@@ -23,4 +23,20 @@ export const SYSTEM_HEALTH_THRESHOLDS = {
   pendingVerificationsDegraded: 100,
 } as const;
 
+export const FIREBASE_ANALYTICS_EVENTS = {
+  pageView: 'page_view',
+  webVitals: 'web_vitals',
+} as const;
+
+export const ANALYTICS_SURFACES = {
+  public: 'public',
+  donor: 'donor',
+  ngo: 'ngo',
+  bloodbank: 'bloodbank',
+  admin: 'admin',
+  auth: 'auth',
+  unknown: 'unknown',
+} as const;
+
 export type AnalyticsRangeScope = 'selected_range' | 'all_time';
+export type AnalyticsSurface = typeof ANALYTICS_SURFACES[keyof typeof ANALYTICS_SURFACES];

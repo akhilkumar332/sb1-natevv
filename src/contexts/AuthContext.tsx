@@ -51,6 +51,7 @@ import { buildPublicDonorPayload } from '../utils/publicDonor';
 import { PhoneAuthError } from '../errors/PhoneAuthError';
 import { authStorage } from '../utils/authStorage';
 import { cleanupAuthSession } from '../utils/authSessionCleanup';
+import { monitoringService } from '../services/monitoring.service';
 import { readFcmTokenMeta, readStoredFcmToken, writeFcmTokenMeta, writeStoredFcmToken } from '../utils/fcmStorage';
 import { authMessages } from '../constants/messages';
 import { ROUTES } from '../constants/routes';
@@ -64,23 +65,11 @@ import {
 import { createUserDocumentViaRest, patchUserDocumentViaRest } from '../utils/firestoreRestUserWrite';
 
 const trackImpersonationEvent = (eventName: string, params?: Record<string, any>) => {
-  void import('../services/monitoring.service')
-    .then(({ monitoringService }) => {
-      monitoringService.trackEvent(eventName, params);
-    })
-    .catch(() => {
-      // ignore analytics failures
-    });
+  monitoringService.trackEvent(eventName, params);
 };
 
 const trackAuthEvent = (eventName: string, params?: Record<string, any>) => {
-  void import('../services/monitoring.service')
-    .then(({ monitoringService }) => {
-      monitoringService.trackEvent(eventName, params);
-    })
-    .catch(() => {
-      // ignore analytics failures
-    });
+  monitoringService.trackEvent(eventName, params);
 };
 
 // Define window recaptcha type

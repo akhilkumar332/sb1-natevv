@@ -14,6 +14,7 @@ import {
   getFrontendAccessStatus,
   unlockFrontendAccess,
 } from '../../services/frontendAccess.service';
+import { monitoringService } from '../../services/monitoring.service';
 import { getPublicCmsSettings } from '../../services/cms.service';
 import {
   getFrontendAccessCountdown,
@@ -259,6 +260,9 @@ function PasswordScreen({
     try {
       const result = await unlockFrontendAccess(password.trim());
       if (result.ok && result.unlocked) {
+        monitoringService.trackEvent('frontend_access_unlocked', {
+          mode: CMS_FRONTEND_ACCESS_MODE.passwordProtected,
+        });
         setPassword('');
         onUnlocked();
         return;

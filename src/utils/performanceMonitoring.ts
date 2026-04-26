@@ -1,4 +1,5 @@
 import { ZERO_MS } from '../constants/time';
+import { monitoringService } from '../services/monitoring.service';
 /**
  * Performance Monitoring Utility
  *
@@ -18,6 +19,16 @@ export interface PerformanceMetrics {
  * Report performance metric to analytics
  */
 const reportMetric = (metric: { name: string; value: number; rating?: string }) => {
+  monitoringService.trackPerformance({
+    name: metric.name,
+    value: metric.value,
+    unit: metric.name === 'CLS' ? 'score' : 'ms',
+    context: {
+      rating: metric.rating,
+      url: typeof window !== 'undefined' ? window.location.pathname : undefined,
+    },
+  });
+
   // Keep console output in development only.
   // In production, wire this to a telemetry sink if needed.
   if (import.meta.env.DEV) {

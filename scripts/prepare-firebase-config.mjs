@@ -23,6 +23,7 @@ export const writeFirebaseConfig = async () => {
     storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || '',
     messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
     appId: process.env.VITE_FIREBASE_APP_ID || '',
+    measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID || process.env.VITE_GA_TRACKING_ID || '',
   };
 
   const content = `self.firebaseConfig = ${JSON.stringify(config, null, 2)};\n`;

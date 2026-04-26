@@ -4,6 +4,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Home } from 'lucide-react';
 import { captureFatalError } from '../services/errorLog.service';
+import { monitoringService } from '../services/monitoring.service';
 import { ROUTES } from '../constants/routes';
 import i18n from '../i18n';
 
@@ -37,13 +38,10 @@ class ErrorBoundary extends React.Component<Props, State> {
       },
     });
 
-    // Log to monitoring service in production
     if (import.meta.env.PROD) {
-      import('../services/monitoring.service').then(({ monitoringService }) => {
-        monitoringService.logError(error, {
-          componentStack: errorInfo.componentStack,
-          errorBoundary: true,
-        });
+      monitoringService.logError(error, {
+        componentStack: errorInfo.componentStack,
+        errorBoundary: true,
       });
     }
   }
