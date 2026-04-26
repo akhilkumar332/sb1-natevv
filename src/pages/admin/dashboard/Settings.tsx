@@ -91,6 +91,9 @@ function SettingsPage() {
           <Link to={ROUTES.portal.admin.dashboard.errorLogs} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
             {t('admin.openErrorLogs')}
           </Link>
+          <Link to={ROUTES.portal.admin.dashboard.versionManagement} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
+            {t('admin.openVersionManagement')}
+          </Link>
           {isSuperAdmin && (
             <Link to={ROUTES.portal.admin.dashboard.impersonationAudit} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
               {t('admin.openImpersonationAudit')}

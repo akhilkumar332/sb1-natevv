@@ -163,6 +163,31 @@ export interface AuditLog {
 }
 
 // ============================================================================
+// COLLECTION: deployments
+// ============================================================================
+
+export interface DeploymentRecord {
+  id?: string;
+  appVersion: string;
+  buildTime: string;
+  gitCommit: string;
+  gitBranch?: string | null;
+  deployId: string;
+  environment: string;
+  deployTarget: string;
+  workflowRunId?: string | null;
+  workflowRunNumber?: string | null;
+  workflowRunUrl?: string | null;
+  repository?: string | null;
+  siteUrl?: string | null;
+  projectId?: string | null;
+  actor?: string | null;
+  status: 'success' | 'failed' | 'unknown';
+  deployedAt: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+// ============================================================================
 // COLLECTION: impersonationEvents
 // ============================================================================
 

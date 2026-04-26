@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   BarChart3,
   Bell,
+  Boxes,
   Building2,
   Calendar,
   FileImage,
@@ -78,6 +79,7 @@ function AdminPortal() {
     impersonation: Shield,
     'contact-submissions': Mail,
     'offline-sync-health': Activity,
+    'version-management': Boxes,
     notifications: Bell,
     settings: Settings,
   };

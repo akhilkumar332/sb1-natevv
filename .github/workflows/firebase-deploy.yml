@@ -73,7 +73,16 @@ jobs:
         run: npm run lint
 
       - name: Build
+        env:
+          APP_ENVIRONMENT: prod
+          APP_DEPLOY_TARGET: firebase-hosting
         run: npm run build
 
       - name: Deploy Hosting and Functions
         run: firebase deploy --only hosting,functions --project bloodhubindia-1da2a
+
+      - name: Record deployment ledger
+        continue-on-error: true
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
+        run: node scripts/record-deployment.mjs

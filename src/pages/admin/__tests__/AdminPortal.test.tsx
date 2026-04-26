@@ -39,6 +39,7 @@ describe('AdminPortal', () => {
 
     expect(screen.getAllByText('Impersonation Audit').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Error Logs').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Version Management').length).toBeGreaterThan(0);
   });
 
   it('hides impersonation audit menu for non-superadmin', () => {
@@ -61,5 +62,6 @@ describe('AdminPortal', () => {
 
     expect(screen.queryByText('Impersonation Audit')).not.toBeInTheDocument();
     expect(screen.getAllByText('Error Logs').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Version Management').length).toBeGreaterThan(0);
   });
 });

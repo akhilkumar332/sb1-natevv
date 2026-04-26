@@ -76,4 +76,7 @@ export const adminQueryKeys = {
   offlineSyncHealthRoot: ['admin', 'offlineSyncHealth'] as const,
   offlineSyncHealth: (windowMs: number, limit: number = 500) =>
     ['admin', 'offlineSyncHealth', { windowMs, limit }] as const,
+  versionMetadata: () => ['admin', 'versionMetadata'] as const,
+  deploymentsRoot: ['admin', 'deployments'] as const,
+  deployments: (limit: number = 50) => ['admin', 'deployments', { limit }] as const,
 };

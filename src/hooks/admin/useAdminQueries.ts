@@ -47,6 +47,7 @@ import type {
   CmsPage,
   CmsSettings,
   ContactSubmission,
+  DeploymentRecord,
   NpsPromptOverride,
   NpsResponse,
   TranslationOverrideDocument,
@@ -106,6 +107,7 @@ export type AdminNpsActiveUserProfile = {
 };
 export type AdminOfflineSyncHealthRecord = OfflineSyncHealthRecord;
 export type AdminTranslationOverride = TranslationOverrideDocument;
+export type AdminDeploymentRecord = DeploymentRecord;
 
 const useCachedAdminQuery = <T,>(
   queryKey: readonly unknown[],
@@ -593,6 +595,38 @@ const fetchErrorLogs = async (limitCount: number): Promise<AdminEntity[]> => {
       createdAt: toDateValue(data.createdAt),
       updatedAt: toDateValue(data.updatedAt),
     };
+  });
+};
+
+const fetchDeployments = async (limitCount: number): Promise<AdminDeploymentRecord[]> => {
+  const snapshot = await getDocs(query(
+    collection(db, COLLECTIONS.DEPLOYMENTS),
+    orderBy('deployedAt', 'desc'),
+    limit(limitCount),
+  ));
+
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data() as Record<string, any>;
+    return {
+      id: docSnap.id,
+      appVersion: typeof data.appVersion === 'string' ? data.appVersion : '0.0.0',
+      buildTime: typeof data.buildTime === 'string' ? data.buildTime : '',
+      gitCommit: typeof data.gitCommit === 'string' ? data.gitCommit : '',
+      gitBranch: typeof data.gitBranch === 'string' ? data.gitBranch : null,
+      deployId: typeof data.deployId === 'string' ? data.deployId : docSnap.id,
+      environment: typeof data.environment === 'string' ? data.environment : 'unknown',
+      deployTarget: typeof data.deployTarget === 'string' ? data.deployTarget : 'firebase-hosting',
+      workflowRunId: typeof data.workflowRunId === 'string' ? data.workflowRunId : null,
+      workflowRunNumber: typeof data.workflowRunNumber === 'string' ? data.workflowRunNumber : null,
+      workflowRunUrl: typeof data.workflowRunUrl === 'string' ? data.workflowRunUrl : null,
+      repository: typeof data.repository === 'string' ? data.repository : null,
+      siteUrl: typeof data.siteUrl === 'string' ? data.siteUrl : null,
+      projectId: typeof data.projectId === 'string' ? data.projectId : null,
+      actor: typeof data.actor === 'string' ? data.actor : null,
+      status: data.status === 'success' || data.status === 'failed' ? data.status : 'unknown',
+      deployedAt: (toDateValue(data.deployedAt) as any) || null,
+      updatedAt: (toDateValue(data.updatedAt) as any) || null,
+    } as AdminDeploymentRecord;
   });
 };
 
@@ -1085,6 +1119,20 @@ export const useAdminOfflineSyncHealth = (windowMs: number, limitCount: number =
       staleTime: ADMIN_QUERY_TIMINGS.offlineSyncHealth.staleTime,
       gcTime: ADMIN_QUERY_TIMINGS.offlineSyncHealth.gcTime,
       refetchInterval: ADMIN_QUERY_TIMINGS.offlineSyncHealth.refetchInterval,
+      refetchIntervalInBackground: false,
+    },
+  );
+
+export const useAdminDeployments = (limitCount: number = 50) =>
+  useCachedAdminQuery<AdminDeploymentRecord[]>(
+    adminQueryKeys.deployments(limitCount),
+    ADMIN_QUERY_TIMINGS.deployments.ttl,
+    ['deployedAt', 'updatedAt'],
+    () => fetchDeployments(limitCount),
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.deployments.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.deployments.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.deployments.refetchInterval,
       refetchIntervalInBackground: false,
     },
   );

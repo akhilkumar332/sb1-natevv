@@ -1,20 +1,52 @@
 import { spawn, execSync } from 'child_process';
-import { writeFile } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 import path from 'path';
 import { writeFirebaseConfig } from './prepare-firebase-config.mjs';
 
-const writeVersionFile = async () => {
-  let commit = 'unknown';
+const readJsonFile = async (filePath) => {
+  const raw = await readFile(filePath, 'utf8');
+  return JSON.parse(raw);
+};
+
+const readGitOutput = (command) => {
   try {
-    commit = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+    return execSync(command, { stdio: ['ignore', 'pipe', 'ignore'] })
       .toString()
       .trim();
-  } catch (error) {
+  } catch {
+    return null;
+  }
+};
+
+const writeVersionFile = async () => {
+  const packageJson = await readJsonFile(path.resolve('package.json'));
+  const buildTime = new Date().toISOString();
+  const gitCommit = (process.env.GITHUB_SHA || readGitOutput('git rev-parse --short HEAD') || 'unknown').slice(0, 12);
+  const gitBranch = process.env.GITHUB_REF_NAME
+    || readGitOutput('git rev-parse --abbrev-ref HEAD')
+    || 'unknown';
+  const deployId = process.env.GITHUB_RUN_ID
+    ? `gha-${process.env.GITHUB_RUN_ID}`
+    : 'local-build';
+  const environment = process.env.APP_ENVIRONMENT || 'local';
+  const deployTarget = process.env.APP_DEPLOY_TARGET || 'firebase-hosting';
+
+  if (gitCommit === 'unknown') {
     console.warn('Unable to read git commit hash, using fallback.');
   }
 
-  const version = new Date().toISOString();
-  const payload = { version, commit };
+  const payload = {
+    appVersion: typeof packageJson?.version === 'string' ? packageJson.version : '0.0.0',
+    buildTime,
+    gitCommit,
+    gitBranch,
+    deployId,
+    environment,
+    deployTarget,
+    // Backward compatibility for already-deployed clients still reading the old shape.
+    version: buildTime,
+    commit: gitCommit,
+  };
   const versionPath = path.resolve('public', 'version.json');
   await writeFile(versionPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
 };

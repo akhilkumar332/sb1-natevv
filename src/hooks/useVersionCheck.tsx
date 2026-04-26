@@ -8,6 +8,13 @@ const POLL_INTERVAL_MS = ONE_MINUTE_MS;
 const VERSION_STORAGE_KEY = 'bh_app_version';
 
 type VersionPayload = {
+  appVersion?: string;
+  buildTime?: string;
+  gitCommit?: string;
+  gitBranch?: string;
+  deployId?: string;
+  environment?: string;
+  deployTarget?: string;
   version?: string;
   commit?: string;
 };
@@ -132,7 +139,11 @@ export const useVersionCheck = () => {
           return;
         }
         const data: VersionPayload = await response.json();
-        const nextVersion = typeof data?.version === 'string' ? data.version : null;
+        const nextVersion = typeof data?.buildTime === 'string'
+          ? data.buildTime
+          : typeof data?.version === 'string'
+            ? data.version
+            : null;
         if (!nextVersion || !isMounted) {
           return;
         }

@@ -43,6 +43,7 @@ export const COLLECTIONS = {
   DONATION_FEEDBACK: 'DonationFeedback',
   OFFLINE_SYNC_HEALTH_RECORDS: 'offlineSyncHealthRecords',
   TRANSLATION_OVERRIDES: 'translationOverrides',
+  DEPLOYMENTS: 'deployments',
   WEBAUTHN_CREDENTIALS: 'webauthnCredentials',
   WEBAUTHN_CHALLENGES: 'webauthnChallenges',
 } as const;

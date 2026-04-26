@@ -333,6 +333,15 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ========================================================================
+    // COLLECTION: deployments
+    // ========================================================================
+
+    match /deployments/{deployId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
     match /webauthnChallenges/{challengeId} {
       allow read, write: if false;
     }
