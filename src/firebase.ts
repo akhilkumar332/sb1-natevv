@@ -7,14 +7,34 @@ import {
   initializeFirestore,
 } from 'firebase/firestore';
 
+type RuntimeFirebaseConfig = Partial<{
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
+  measurementId: string;
+}>;
+
+const runtimeFirebaseConfig: RuntimeFirebaseConfig = (() => {
+  if (typeof globalThis === 'undefined') return {};
+  return ((globalThis as typeof globalThis & { firebaseConfig?: RuntimeFirebaseConfig }).firebaseConfig) || {};
+})();
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || import.meta.env.VITE_GA_TRACKING_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || runtimeFirebaseConfig.apiKey || '',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || runtimeFirebaseConfig.authDomain || '',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || runtimeFirebaseConfig.projectId || '',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || runtimeFirebaseConfig.storageBucket || '',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || runtimeFirebaseConfig.messagingSenderId || '',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || runtimeFirebaseConfig.appId || '',
+  measurementId: (
+    import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+    || import.meta.env.VITE_GA_TRACKING_ID
+    || runtimeFirebaseConfig.measurementId
+    || ''
+  ),
 };
 
 const app = initializeApp(firebaseConfig);

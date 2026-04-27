@@ -7,10 +7,18 @@ type AnalyticsEventParams = Record<string, AnalyticsEventValue>;
 type AnalyticsUserProperties = Record<string, AnalyticsEventValue>;
 
 const isAnalyticsEnabled = import.meta.env.VITE_ENABLE_ANALYTICS === 'true';
-const hasMeasurementId = Boolean(firebaseMeasurementId);
 
 let analyticsInstance: Analytics | null = null;
 let analyticsInitPromise: Promise<Analytics | null> | null = null;
+let analyticsStatus:
+  | 'idle'
+  | 'disabled'
+  | 'missing_measurement_id'
+  | 'unsupported_environment'
+  | 'unsupported_browser'
+  | 'initialized'
+  | 'init_failed' = 'idle';
+let analyticsError: string | null = null;
 
 const toAnalyticsValue = (value: AnalyticsEventValue): string | number | undefined => {
   if (value === null || value === undefined) return undefined;
@@ -43,22 +51,50 @@ const sanitizeUserProperties = (properties?: AnalyticsUserProperties): Record<st
 export const canInitializeFirebaseAnalytics = (): boolean => (
   typeof window !== 'undefined'
   && isAnalyticsEnabled
-  && hasMeasurementId
+  && Boolean(firebaseMeasurementId)
 );
 
+export const getFirebaseAnalyticsStatus = () => ({
+  enabled: isAnalyticsEnabled,
+  measurementIdConfigured: Boolean(firebaseMeasurementId),
+  measurementId: firebaseMeasurementId || null,
+  status: analyticsStatus,
+  error: analyticsError,
+});
+
 export const initializeFirebaseAnalytics = async (): Promise<Analytics | null> => {
-  if (!canInitializeFirebaseAnalytics()) return null;
+  if (typeof window === 'undefined') {
+    analyticsStatus = 'unsupported_environment';
+    return null;
+  }
+  if (!isAnalyticsEnabled) {
+    analyticsStatus = 'disabled';
+    return null;
+  }
+  if (!firebaseMeasurementId) {
+    analyticsStatus = 'missing_measurement_id';
+    return null;
+  }
   if (analyticsInstance) return analyticsInstance;
   if (analyticsInitPromise) return analyticsInitPromise;
 
   analyticsInitPromise = import('firebase/analytics')
     .then(async ({ getAnalytics, isSupported }) => {
       const supported = await isSupported().catch(() => false);
-      if (!supported) return null;
+      if (!supported) {
+        analyticsStatus = 'unsupported_browser';
+        return null;
+      }
       analyticsInstance = getAnalytics(app);
+      analyticsStatus = 'initialized';
+      analyticsError = null;
       return analyticsInstance;
     })
-    .catch(() => null)
+    .catch((error) => {
+      analyticsStatus = 'init_failed';
+      analyticsError = error instanceof Error ? error.message : 'unknown_error';
+      return null;
+    })
     .finally(() => {
       analyticsInitPromise = null;
     });

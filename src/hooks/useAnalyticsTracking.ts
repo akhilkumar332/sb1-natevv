@@ -34,15 +34,12 @@ export const useAnalyticsTracking = (): void => {
   const { user, isImpersonating } = useAuth();
 
   useEffect(() => {
-    const pagePath = location.pathname;
+    const pagePath = `${location.pathname}${location.search}${location.hash}`;
     monitoringService.trackPageView(pagePath, {
       language: i18n.resolvedLanguage || 'en',
-      surface: getAnalyticsSurface(pagePath),
-      authenticated: Boolean(user?.uid),
-      user_role: user?.role || 'anonymous',
-      impersonating: isImpersonating,
+      surface: getAnalyticsSurface(location.pathname),
     });
-  }, [i18n.resolvedLanguage, isImpersonating, location.pathname, user?.role, user?.uid]);
+  }, [i18n.resolvedLanguage, location.hash, location.pathname, location.search]);
 
   useEffect(() => {
     if (!user?.uid) {

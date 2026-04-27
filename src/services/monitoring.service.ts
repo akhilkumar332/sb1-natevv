@@ -6,6 +6,7 @@
 import { captureHandledError } from './errorLog.service';
 import {
   clearFirebaseAnalyticsUser,
+  getFirebaseAnalyticsStatus,
   initializeFirebaseAnalytics,
   setFirebaseAnalyticsUser,
   trackFirebaseAnalyticsEvent,
@@ -109,8 +110,9 @@ class MonitoringService {
    * Initialize analytics (Google Analytics)
    */
   private initializeAnalytics(): void {
-    void initializeFirebaseAnalytics();
-    debugLog('Analytics initialized');
+    void initializeFirebaseAnalytics().then(() => {
+      debugLog('Analytics initialization status:', getFirebaseAnalyticsStatus());
+    });
   }
 
   /**
