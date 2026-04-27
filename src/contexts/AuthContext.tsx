@@ -52,6 +52,7 @@ import { PhoneAuthError } from '../errors/PhoneAuthError';
 import { authStorage } from '../utils/authStorage';
 import { cleanupAuthSession } from '../utils/authSessionCleanup';
 import { monitoringService } from '../services/monitoring.service';
+import { ANALYTICS_METHODS, FIREBASE_ANALYTICS_EVENTS } from '../constants/analytics';
 import { readFcmTokenMeta, readStoredFcmToken, writeFcmTokenMeta, writeStoredFcmToken } from '../utils/fcmStorage';
 import { authMessages } from '../constants/messages';
 import { ROUTES } from '../constants/routes';
@@ -2021,6 +2022,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         uid,
         durationMs: Math.max(0, Date.now() - startedAt),
       });
+      trackAuthEvent(FIREBASE_ANALYTICS_EVENTS.login, {
+        method: ANALYTICS_METHODS.biometric,
+        user_role: userForCache?.role || 'unknown',
+        portal_surface: userForCache?.role || 'unknown',
+      });
     } catch (error) {
       trackAuthEvent('biometric_custom_token_signin_failed', {
         durationMs: Math.max(0, Date.now() - startedAt),
@@ -2269,6 +2275,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Update user state immediately for navigation
       setUser(userDataToReturn);
       recentLoginRef.current = { uid: userDataToReturn.uid, at: Date.now(), user: userDataToReturn };
+      trackAuthEvent(FIREBASE_ANALYTICS_EVENTS.login, {
+        method: ANALYTICS_METHODS.phone,
+        user_role: userDataToReturn.role || 'unknown',
+        portal_surface: userDataToReturn.role || 'unknown',
+      });
 
       // Return user data for immediate navigation
       return userDataToReturn;
@@ -2674,6 +2685,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Update user state immediately
       setUser(userDataToReturn);
       recentLoginRef.current = { uid: userDataToReturn.uid, at: Date.now(), user: userDataToReturn };
+      trackAuthEvent(FIREBASE_ANALYTICS_EVENTS.login, {
+        method: ANALYTICS_METHODS.email,
+        user_role: userDataToReturn.role || 'unknown',
+        portal_surface: userDataToReturn.role || 'unknown',
+      });
 
       return {
         token,
@@ -2876,6 +2892,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Update user state immediately for navigation
       setUser(userDataToReturn);
       recentLoginRef.current = { uid: userDataToReturn.uid, at: Date.now(), user: userDataToReturn };
+      trackAuthEvent(FIREBASE_ANALYTICS_EVENTS.login, {
+        method: ANALYTICS_METHODS.google,
+        user_role: userDataToReturn.role || 'unknown',
+        portal_surface: userDataToReturn.role || 'unknown',
+      });
       if (phoneLinkRequiresFreshOtp && pendingPhoneNumber) {
         const continuation = {
           phoneNumber: pendingPhoneNumber,
@@ -3179,6 +3200,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         onboardingCompleted: true, // Ensure this is updated in the state
         bhId: prev?.bhId || generatedBhId || undefined
       } as User));
+      if (user.onboardingCompleted !== true) {
+        trackAuthEvent(FIREBASE_ANALYTICS_EVENTS.onboardingCompleted, {
+          method: ANALYTICS_METHODS.profileUpdate,
+          user_role: nextRole || 'unknown',
+          portal_surface: nextRole || 'unknown',
+        });
+      }
       clearRegistrationIntent();
       clearPendingPortalRole();
     } catch (error) {

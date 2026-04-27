@@ -16,6 +16,8 @@ import {
 } from './registrationIntent';
 import { createUserDocumentViaRest, patchUserDocumentViaRest } from './firestoreRestUserWrite';
 import { cleanupAuthSession } from './authSessionCleanup';
+import { monitoringService } from '../services/monitoring.service';
+import { ANALYTICS_METHODS, FIREBASE_ANALYTICS_EVENTS } from '../constants/analytics';
 
 type GoogleRegisterRole = 'donor' | 'ngo' | 'bloodbank';
 let activeGoogleRegisterPromise: Promise<void> | null = null;
@@ -290,6 +292,11 @@ export const registerWithGoogleRole = async ({
           });
         }
       }
+      monitoringService.trackEvent(FIREBASE_ANALYTICS_EVENTS.signUp, {
+        method: ANALYTICS_METHODS.google,
+        user_role: role,
+        portal_surface: role,
+      });
 
       clearRegistrationIntent();
 

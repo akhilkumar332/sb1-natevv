@@ -27,6 +27,8 @@ import {
 } from '../utils/registrationIntent';
 import { createUserDocumentViaRest, patchUserDocumentViaRest } from '../utils/firestoreRestUserWrite';
 import { cleanupAuthSession } from '../utils/authSessionCleanup';
+import { monitoringService } from '../services/monitoring.service';
+import { ANALYTICS_METHODS, FIREBASE_ANALYTICS_EVENTS } from '../constants/analytics';
 
 interface RegisterFormData {
   identifier: string;
@@ -340,6 +342,11 @@ export const useRegister = () => {
         throw new Error('No token received');
       }
       authStorage.setAuthToken(token);
+      monitoringService.trackEvent(FIREBASE_ANALYTICS_EVENTS.signUp, {
+        method: ANALYTICS_METHODS.phone,
+        user_role: 'donor',
+        portal_surface: 'donor',
+      });
 
       clearRegistrationIntent();
 

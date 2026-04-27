@@ -33,9 +33,11 @@ import { useNetworkStatus } from '../contexts/NetworkStatusContext';
 import { isOnlineRequiredError, runOnlineTransaction } from '../utils/onlineOnlyTransaction';
 import { COLLECTIONS } from '../constants/firestore';
 import { ROUTES } from '../constants/routes';
+import { FIREBASE_ANALYTICS_EVENTS } from '../constants/analytics';
 import { useCmsFrontendPageContent } from '../hooks/useCmsFrontendPageContent';
 import CmsCustomSections from '../components/cms/CmsCustomSections';
 import CmsVisualEditor from '../components/cms/CmsVisualEditor';
+import { monitoringService } from '../services/monitoring.service';
 import {
   EIGHT_HUNDRED_MS,
   EIGHT_SECONDS_MS,
@@ -734,6 +736,11 @@ function FindDonors() {
         await clearPendingDonorRequestDoc(user.uid);
         pendingRequestProcessedRef.current = pendingBatchKey;
         setRequestResult({ sent: result.sentCount, skipped: result.skippedCount });
+        monitoringService.trackEvent(FIREBASE_ANALYTICS_EVENTS.donorRequestBatchSubmitted, {
+          recipient_count: result.sentCount,
+          skipped_count: result.skippedCount,
+          donation_type: payload.donationType,
+        });
         notify.success('Request submitted successfully.');
       } catch (error) {
         reportFindDonorsError(error, 'submit_pending_donor_request');
@@ -956,6 +963,11 @@ function FindDonors() {
     try {
       const result = await submitDonorRequestBatch(user, payload);
       setRequestResult({ sent: result.sentCount, skipped: result.skippedCount });
+      monitoringService.trackEvent(FIREBASE_ANALYTICS_EVENTS.donorRequestBatchSubmitted, {
+        recipient_count: result.sentCount,
+        skipped_count: result.skippedCount,
+        donation_type: payload.donationType,
+      });
       showUndoToast(result.batchId, result.sentCount);
       notify.success('Requests sent successfully.');
       if (!useFilteredRecipients) {

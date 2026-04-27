@@ -7,6 +7,8 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { notify } from 'services/notify.service';
 import { registerDonorForCampaign } from '../../../services/ngo.service';
+import { monitoringService } from '../../../services/monitoring.service';
+import { FIREBASE_ANALYTICS_EVENTS } from '../../../constants/analytics';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -140,6 +142,11 @@ const DonorBloodDrives = () => {
     try {
       setParticipatingId(campaign.id);
       await registerDonorForCampaign(campaign.id, user.uid);
+      monitoringService.trackEvent(FIREBASE_ANALYTICS_EVENTS.campaignParticipation, {
+        campaign_id: campaign.id,
+        campaign_type: campaign.type || 'unknown',
+        target_type: campaign.targetType || 'unknown',
+      });
       notify.success('Participation confirmed.');
     } catch (error: any) {
       const message = error?.message || '';
