@@ -8,6 +8,8 @@ import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../.
 import { toDateValue } from '../../../utils/dateValue';
 import { db } from '../../../firebase';
 import { COLLECTIONS } from '../../../constants/firestore';
+import { monitoringService } from '../../../services/monitoring.service';
+import { FIREBASE_ANALYTICS_EVENTS } from '../../../constants/analytics';
 
 type ErrorLogRow = {
   id: string;
@@ -74,6 +76,12 @@ function ErrorLogsPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+
+  useEffect(() => {
+    monitoringService.trackEvent(FIREBASE_ANALYTICS_EVENTS.errorLogsViewed, {
+      surface: 'admin',
+    });
+  }, []);
 
   const fetchErrorLogsPage = async (options?: {
     reset?: boolean;

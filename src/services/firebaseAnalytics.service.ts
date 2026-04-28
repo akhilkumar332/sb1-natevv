@@ -156,5 +156,14 @@ export const clearFirebaseAnalyticsUser = async (): Promise<void> => {
     verified: '',
     preferred_language: '',
     impersonating: '',
+    device_category: '',
+    device_model_family: '',
+    os_family: '',
+    browser_family: '',
+    memory_tier: '',
+    network_effective_type: '',
+    connection_type: '',
+    save_data: '',
+    touch_capable: '',
   });
 };

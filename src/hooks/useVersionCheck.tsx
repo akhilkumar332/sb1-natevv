@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { notify } from 'services/notify.service';
 import { captureHandledError } from '../services/errorLog.service';
 import { ONE_MINUTE_MS } from '../constants/time';
+import { monitoringService } from '../services/monitoring.service';
+import { FIREBASE_ANALYTICS_EVENTS } from '../constants/analytics';
 
 const VERSION_URL = '/version.json';
 const POLL_INTERVAL_MS = ONE_MINUTE_MS;
@@ -162,6 +164,11 @@ export const useVersionCheck = () => {
         }
 
         if (nextVersion !== currentVersionRef.current) {
+          monitoringService.trackEvent(FIREBASE_ANALYTICS_EVENTS.appUpdateAvailable, {
+            current_build_time: currentVersionRef.current,
+            next_build_time: nextVersion,
+            source,
+          });
           if (source === 'initial') {
             await handleRefresh(nextVersion);
             return;

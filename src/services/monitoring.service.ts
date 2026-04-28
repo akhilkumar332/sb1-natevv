@@ -153,6 +153,15 @@ class MonitoringService {
         ...(errorData.context || {}),
       },
     });
+
+    if (this.config.enableAnalytics) {
+      void trackFirebaseAnalyticsEvent(FIREBASE_ANALYTICS_EVENTS.appExceptionSeen, {
+        page_path: typeof window !== 'undefined' ? window.location.pathname : undefined,
+        error_name: error.name || 'Error',
+        error_scope: typeof context?.scope === 'string' ? context.scope : 'unknown',
+        has_user: Boolean(context?.userId),
+      });
+    }
   }
 
   /**
@@ -270,6 +279,14 @@ class MonitoringService {
         duration,
         status,
       });
+
+      if (this.config.enableAnalytics) {
+        void trackFirebaseAnalyticsEvent(FIREBASE_ANALYTICS_EVENTS.apiRequestFailed, {
+          endpoint,
+          status,
+          duration_ms: Math.round(duration),
+        });
+      }
     }
   }
 }

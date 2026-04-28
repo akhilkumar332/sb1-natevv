@@ -21,8 +21,10 @@ import {
   OFFLINE_WRITE_COVERAGE_CATALOG,
 } from '../../../constants/offlineWriteCoverage';
 import { captureHandledError } from '../../../services/errorLog.service';
+import { monitoringService } from '../../../services/monitoring.service';
 import { HOUR_MS, MINUTE_MS } from '../../../constants/time';
 import { buildOfflineSystemSummary, getOfflineReporterLabel } from '../../../utils/offlineSyncHealth';
+import { FIREBASE_ANALYTICS_EVENTS } from '../../../constants/analytics';
 
 type WindowKey = '1h' | '6h' | '24h' | '7d';
 type ViewMode = 'basic' | 'advanced';
@@ -195,6 +197,8 @@ function AdminOfflineSyncHealthPage() {
 
   const selectedWindow = WINDOW_OPTIONS.find((option) => option.key === windowKey) || WINDOW_OPTIONS[2];
   const systemHealthQuery = useAdminOfflineSyncHealth(selectedWindow.ms, 600);
+  const viewedEventSentRef = useRef(false);
+  const degradedEventRef = useRef<string | null>(null);
   const coverage = useMemo(() => getOfflineWriteCoverageSummary(), []);
   const expansionTargets = useMemo(
     () => getOfflineWriteExpansionTargets(OFFLINE_WRITE_COVERAGE_CATALOG.length),
@@ -214,6 +218,45 @@ function AdminOfflineSyncHealthPage() {
     () => telemetry.recentEvents.filter((event) => event.at >= cutoff),
     [telemetry.recentEvents, cutoff],
   );
+
+  useEffect(() => {
+    if (viewedEventSentRef.current) return;
+    viewedEventSentRef.current = true;
+    monitoringService.trackEvent(FIREBASE_ANALYTICS_EVENTS.offlineSyncHealthViewed, {
+      surface: 'admin',
+      window: windowKey,
+      view_mode: viewMode,
+    });
+  }, [viewMode, windowKey]);
+
+  useEffect(() => {
+    if (systemHealthQuery.isLoading || !systemSummary.rows.length) return;
+    const severity = systemSummary.incident.severity;
+    if (severity === 'healthy') return;
+
+    const nextKey = [
+      severity,
+      windowKey,
+      systemSummary.criticalReporterCount,
+      systemSummary.staleReporterCount,
+      systemSummary.totalDeadLetterCount,
+      systemSummary.totalPendingCount,
+    ].join(':');
+    if (degradedEventRef.current === nextKey) return;
+    degradedEventRef.current = nextKey;
+
+    monitoringService.trackEvent(FIREBASE_ANALYTICS_EVENTS.offlineSyncHealthDegraded, {
+      surface: 'admin',
+      window: windowKey,
+      incident_severity: severity,
+      affected_reporters: systemSummary.affectedReporterCount,
+      critical_reporters: systemSummary.criticalReporterCount,
+      stale_reporters: systemSummary.staleReporterCount,
+      total_dead_letters: systemSummary.totalDeadLetterCount,
+      total_pending: systemSummary.totalPendingCount,
+      success_rate: Math.round(systemSummary.successRate),
+    });
+  }, [systemHealthQuery.isLoading, systemSummary, windowKey]);
 
   const flushCompleteEvents = filteredEvents.filter((event) => event.kind === 'flush_complete');
   const flushDurations = flushCompleteEvents

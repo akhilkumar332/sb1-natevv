@@ -7,6 +7,8 @@ import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../.
 import { useAdminDeploymentHistory, useAdminDeployments } from '../../../hooks/admin/useAdminQueries';
 import { adminQueryKeys } from '../../../constants/adminQueryKeys';
 import { toDateValue } from '../../../utils/dateValue';
+import { monitoringService } from '../../../services/monitoring.service';
+import { FIREBASE_ANALYTICS_EVENTS } from '../../../constants/analytics';
 
 type VersionMetadata = {
   appVersion?: string;
@@ -110,6 +112,12 @@ export default function VersionManagementPage() {
   const deploymentsError = deploymentsQuery.error;
   const historyError = historyQuery.error;
   const combinedError = versionError || deploymentsError || historyError;
+
+  useEffect(() => {
+    monitoringService.trackEvent(FIREBASE_ANALYTICS_EVENTS.versionManagementViewed, {
+      surface: 'admin',
+    });
+  }, []);
 
   return (
     <div className="space-y-6">

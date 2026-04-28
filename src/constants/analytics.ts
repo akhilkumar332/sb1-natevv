@@ -28,9 +28,17 @@ export const FIREBASE_ANALYTICS_EVENTS = {
   login: 'login',
   signUp: 'sign_up',
   onboardingCompleted: 'onboarding_completed',
+  appReleaseSeen: 'app_release_seen',
+  appUpdateAvailable: 'app_update_available',
+  appExceptionSeen: 'app_exception_seen',
+  apiRequestFailed: 'api_request_failed',
   webVitals: 'web_vitals',
   donorRequestBatchSubmitted: 'donor_request_batch_submitted',
   campaignParticipation: 'campaign_participation_confirmed',
+  versionManagementViewed: 'version_management_viewed',
+  errorLogsViewed: 'error_logs_viewed',
+  offlineSyncHealthViewed: 'offline_sync_health_viewed',
+  offlineSyncHealthDegraded: 'offline_sync_health_degraded',
 } as const;
 
 export const ANALYTICS_SURFACES = {
