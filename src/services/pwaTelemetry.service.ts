@@ -30,12 +30,19 @@ type VersionMetadata = {
 const VERSION_URL = '/version.json';
 const PWA_FIRST_SEEN_PREFIX = 'bh_pwa_first_seen_at:';
 const MAX_PATH_LENGTH = 180;
-const TELEMETRY_WRITE_TTL_MS = 12 * 60 * 60 * 1000;
+const TELEMETRY_WRITE_TTL_MS: Record<TelemetryWriteReason, number> = {
+  app_start: 12 * 60 * 60 * 1000,
+  runtime_change: 12 * 60 * 60 * 1000,
+  version_change: 60 * 60 * 1000,
+  visibility_resume: 15 * 60 * 1000,
+};
 
 let cachedVersionMetadata: VersionMetadata | null = null;
 let cachedVersionMetadataAt = 0;
-let lastWriteSignature: string | null = null;
-let lastWriteAt = 0;
+const lastWriteState: Partial<Record<TelemetryWriteReason, {
+  signature: string;
+  at: number;
+}>> = {};
 
 const sanitizePath = (pathname: string): string => pathname.slice(0, MAX_PATH_LENGTH);
 
@@ -154,7 +161,9 @@ export const persistPwaRuntimeTelemetry = async (input: {
       version,
     });
     const now = Date.now();
-    if (signature === lastWriteSignature && now - lastWriteAt < TELEMETRY_WRITE_TTL_MS) {
+    const previousWrite = lastWriteState[input.reason];
+    const ttlMs = TELEMETRY_WRITE_TTL_MS[input.reason];
+    if (previousWrite && signature === previousWrite.signature && now - previousWrite.at < ttlMs) {
       return;
     }
 
@@ -199,8 +208,10 @@ export const persistPwaRuntimeTelemetry = async (input: {
       transaction.set(diagnosticRef, payload, { merge: true });
       return true;
     }, 'PWA fleet telemetry requires an internet connection.');
-    lastWriteSignature = signature;
-    lastWriteAt = now;
+    lastWriteState[input.reason] = {
+      signature,
+      at: now,
+    };
   } catch (error) {
     void captureHandledError(error, {
       source: 'frontend',

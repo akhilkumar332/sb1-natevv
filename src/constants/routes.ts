@@ -268,7 +268,6 @@ const ADMIN_DASHBOARD_MENU_GROUPS_BASE: AdminDashboardMenuGroup[] = [
       { id: 'contact-submissions', label: 'Contact Submissions', path: ROUTES.portal.admin.dashboard.contactSubmissions },
       { id: 'offline-sync-health', label: 'Offline Sync Health', path: ROUTES.portal.admin.dashboard.offlineSyncHealth },
       { id: 'pwa-diagnostics', label: 'PWA Diagnostics', path: ROUTES.portal.admin.dashboard.pwaDiagnostics },
-      { id: 'pwa-fleet-overview', label: 'PWA Fleet Overview', path: ROUTES.portal.admin.dashboard.pwaFleetOverview },
       { id: 'version-management', label: 'Version Management', path: ROUTES.portal.admin.dashboard.versionManagement },
       { id: 'notifications', label: 'Notifications', path: ROUTES.portal.admin.dashboard.notifications },
       { id: 'settings', label: 'Settings', path: ROUTES.portal.admin.dashboard.settings },

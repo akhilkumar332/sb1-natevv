@@ -1229,7 +1229,10 @@ export const useAdminOfflineSyncHealth = (windowMs: number, limitCount: number =
     },
   );
 
-export const useAdminPwaRuntimeDiagnostics = (limitCount: number = 500) =>
+export const useAdminPwaRuntimeDiagnostics = (
+  limitCount: number = 500,
+  enabled: boolean = true,
+) =>
   useCachedAdminQuery<AdminPwaRuntimeDiagnosticRecord[]>(
     adminQueryKeys.pwaRuntimeDiagnostics(limitCount),
     ADMIN_QUERY_TIMINGS.pwaRuntimeDiagnostics.ttl,
@@ -1240,6 +1243,7 @@ export const useAdminPwaRuntimeDiagnostics = (limitCount: number = 500) =>
       gcTime: ADMIN_QUERY_TIMINGS.pwaRuntimeDiagnostics.gcTime,
       refetchInterval: ADMIN_QUERY_TIMINGS.pwaRuntimeDiagnostics.refetchInterval,
       refetchIntervalInBackground: false,
+      enabled,
     },
   );
 
