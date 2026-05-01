@@ -40,6 +40,28 @@ function resolveDefaultRoute(payload) {
   }
 }
 
+function sanitizeInternalRoute(candidate, payload) {
+  const fallbackRoute = resolveDefaultRoute(payload);
+  if (!candidate || typeof candidate !== 'string') {
+    return fallbackRoute;
+  }
+
+  try {
+    const normalized = candidate.startsWith('http')
+      ? new URL(candidate)
+      : new URL(candidate, self.location.origin);
+
+    if (normalized.origin !== self.location.origin) {
+      return fallbackRoute;
+    }
+
+    const resolvedPath = `${normalized.pathname}${normalized.search}${normalized.hash}`;
+    return resolvedPath.startsWith('/') ? resolvedPath : fallbackRoute;
+  } catch {
+    return fallbackRoute;
+  }
+}
+
 function openQueueDb() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(QUEUE_DB, 1);
@@ -93,12 +115,14 @@ if (messaging) {
   const priority = (payload.data?.priority || '').toString().toLowerCase();
   const type = payload.data?.type;
   const route =
-    payload.data?.route ||
-    payload.data?.url ||
-    payload.data?.link ||
-    payload.data?.click_action ||
-    payload.fcmOptions?.link ||
-    resolveDefaultRoute(payload);
+    sanitizeInternalRoute(
+      payload.data?.route ||
+      payload.data?.url ||
+      payload.data?.link ||
+      payload.data?.click_action ||
+      payload.fcmOptions?.link,
+      payload
+    );
   const notificationOptions = {
     body: payload.notification?.body || '',
     icon: payload.notification?.icon || '/notification-icon.svg',
@@ -156,12 +180,12 @@ self.addEventListener('notificationclick', (event) => {
   const data = event.notification.data;
 
   // Determine URL based on action and data
-  let url = data?.route || data?.url || '/donor/dashboard?panel=notifications';
+  let url = sanitizeInternalRoute(data?.route || data?.url, { data });
 
   if (action === 'respond' && data?.requestId) {
-    url = `/blood-requests/${data.requestId}`;
+    url = sanitizeInternalRoute(`/blood-requests/${data.requestId}`, { data });
   } else if (action === 'view' && data?.id) {
-    url = getUrlForType(data.type, data.id);
+    url = sanitizeInternalRoute(getUrlForType(data.type, data.id), { data });
   }
 
   // Open or focus the app

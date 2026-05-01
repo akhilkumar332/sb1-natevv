@@ -1,6 +1,7 @@
 import { APP_ROUTE_PREFIXES_WITH_LEGACY, LEGACY_ROUTE_PREFIXES, PORTAL_PATH_PREFIXES } from '../constants/routes';
 import { PWA_THEME_COLORS } from '../constants/theme';
 import type { TFunction } from 'i18next';
+import { setPwaManifestHref } from '../services/pwaRuntime.service';
 
 type PwaBrand = {
   manifest: string;
@@ -79,4 +80,5 @@ export const applyPwaBranding = (pathname: string, t: TFunction) => {
   ensureMeta('theme-color', brand.themeColor);
   ensureMeta('apple-mobile-web-app-title', title);
   ensureLink('apple-touch-icon', brand.icon, 'pwa-apple-touch-icon');
+  setPwaManifestHref(new URL(brand.manifest, window.location.origin).href);
 };

@@ -1,13 +1,17 @@
 import { clientsClaim } from 'workbox-core';
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
 import { registerRoute, setCatchHandler } from 'workbox-routing';
-import { CacheFirst, StaleWhileRevalidate, NetworkOnly } from 'workbox-strategies';
+import { CacheFirst, NetworkFirst, NetworkOnly, StaleWhileRevalidate } from 'workbox-strategies';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
+import { enable as enableNavigationPreload } from 'workbox-navigation-preload';
 
 clientsClaim();
 self.skipWaiting();
 
 cleanupOutdatedCaches();
+if (self.registration?.navigationPreload) {
+  enableNavigationPreload();
+}
 const precacheManifest = (self.__WB_MANIFEST || []).filter((entry) => {
   const url = typeof entry === 'string' ? entry : entry.url;
   return (
@@ -20,10 +24,16 @@ precacheAndRoute(precacheManifest);
 
 const OFFLINE_URL = '/offline.html';
 
-// HTML documents: always network, fall back to offline page.
+// HTML documents: prefer fresh shell, but keep a cached app shell for weak/offline sessions.
 registerRoute(
   ({ request }) => request.destination === 'document',
-  new NetworkOnly()
+  new NetworkFirst({
+    cacheName: 'documents',
+    networkTimeoutSeconds: 3,
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+    ],
+  })
 );
 
 // API calls: always network, never cache.

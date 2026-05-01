@@ -1,11 +1,11 @@
 {
   "appVersion": "0.1.0",
-  "buildTime": "2026-04-27T19:46:03.540Z",
-  "gitCommit": "ead34e1",
+  "buildTime": "2026-05-01T10:42:58.383Z",
+  "gitCommit": "c8ce18f",
   "gitBranch": "main",
   "deployId": "local-build",
   "environment": "local",
   "deployTarget": "firebase-hosting",
-  "version": "2026-04-27T19:46:03.540Z",
-  "commit": "ead34e1"
+  "version": "2026-05-01T10:42:58.383Z",
+  "commit": "c8ce18f"
 }

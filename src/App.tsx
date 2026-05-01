@@ -27,12 +27,14 @@ import { TOAST_THEME_TOKENS } from './constants/theme';
 import { FIVE_SECONDS_MS, ONE_MINUTE_MS, THREE_SECONDS_MS } from './constants/time';
 import { startOfflineMutationOutboxWorker, stopOfflineMutationOutboxWorker } from './services/offlineMutationOutbox.service';
 import { useAnalyticsTracking } from './hooks/useAnalyticsTracking';
+import { usePwaLifecycle } from './hooks/usePwaLifecycle';
 
 function App() {
   useAuthSync();
   useActivityTracker();
   useVersionCheck();
   useAnalyticsTracking();
+  usePwaLifecycle();
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { isDark } = useTheme();

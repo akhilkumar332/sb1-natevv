@@ -4,6 +4,13 @@
  * Registers and manages service worker for PWA support
  */
 import { captureHandledError } from '../services/errorLog.service';
+import {
+  markPwaControllerChanged,
+  setPwaOfflineReady,
+  setPwaRegistrationError,
+  setPwaServiceWorkerRegistration,
+  setPwaServiceWorkerUpdateAvailable,
+} from '../services/pwaRuntime.service';
 
 const isLocalhost = typeof window !== 'undefined' && Boolean(
   window.location.hostname === 'localhost' ||
@@ -33,6 +40,9 @@ export function register(config?: Config) {
     }
 
     window.addEventListener('load', () => {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        markPwaControllerChanged();
+      });
       const swUrl = `${import.meta.env.BASE_URL}sw.js`;
 
       if (isLocalhost) {
@@ -53,6 +63,10 @@ function registerValidSW(swUrl: string, config?: Config) {
   navigator.serviceWorker
     .register(swUrl)
     .then((registration) => {
+      setPwaServiceWorkerRegistration(registration);
+      if (registration.waiting) {
+        setPwaServiceWorkerUpdateAvailable(true);
+      }
       registration.update().catch(() => {
         // Ignore update errors; we'll retry on next load.
       });
@@ -67,11 +81,15 @@ function registerValidSW(swUrl: string, config?: Config) {
               debugSwLog(
                 'New content is available and will be used when all tabs are closed.'
               );
+              setPwaServiceWorkerRegistration(registration);
+              setPwaServiceWorkerUpdateAvailable(true);
               if (config && config.onUpdate) {
                 config.onUpdate(registration);
               }
             } else {
               debugSwLog('Content is cached for offline use.');
+              setPwaServiceWorkerRegistration(registration);
+              setPwaOfflineReady(true);
               if (config && config.onSuccess) {
                 config.onSuccess(registration);
               }
@@ -84,6 +102,7 @@ function registerValidSW(swUrl: string, config?: Config) {
       if ((error as any)?.name === 'AbortError' || String((error as any)?.message || '').toLowerCase().includes('aborted')) {
         return;
       }
+      setPwaRegistrationError(error instanceof Error ? error.message : 'registration_failed');
       void captureHandledError(error, {
         source: 'frontend',
         scope: 'unknown',
@@ -121,9 +140,11 @@ export function unregister() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.ready
       .then((registration) => {
+        setPwaServiceWorkerRegistration(null);
         registration.unregister();
       })
       .catch((error) => {
+        setPwaRegistrationError(error instanceof Error ? error.message : 'unregister_failed');
         void captureHandledError(error, {
           source: 'frontend',
           scope: 'unknown',

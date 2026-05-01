@@ -42,6 +42,7 @@ export const getAdminItemLabel = (itemId: string, t: TFunction) => {
     impersonation: 'admin.impersonationAudit',
     'contact-submissions': 'admin.contactSubmissions',
     'offline-sync-health': 'admin.offlineSyncHealth',
+    'pwa-diagnostics': 'admin.pwaDiagnostics',
     'version-management': 'admin.versionManagement',
     notifications: 'admin.notifications',
     settings: 'admin.settings',

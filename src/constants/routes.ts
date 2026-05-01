@@ -87,6 +87,7 @@ export const ROUTES = {
         errorLogs: '/admin/dashboard/error-logs',
         contactSubmissions: '/admin/dashboard/contact-submissions',
         offlineSyncHealth: '/admin/dashboard/offline-sync-health',
+        pwaDiagnostics: '/admin/dashboard/pwa-diagnostics',
         cmsOverview: '/admin/dashboard/cms/overview',
         cmsPages: '/admin/dashboard/cms/pages',
         cmsPageEditor: '/admin/dashboard/cms/pages/:slug',
@@ -265,6 +266,7 @@ const ADMIN_DASHBOARD_MENU_GROUPS_BASE: AdminDashboardMenuGroup[] = [
     items: [
       { id: 'contact-submissions', label: 'Contact Submissions', path: ROUTES.portal.admin.dashboard.contactSubmissions },
       { id: 'offline-sync-health', label: 'Offline Sync Health', path: ROUTES.portal.admin.dashboard.offlineSyncHealth },
+      { id: 'pwa-diagnostics', label: 'PWA Diagnostics', path: ROUTES.portal.admin.dashboard.pwaDiagnostics },
       { id: 'version-management', label: 'Version Management', path: ROUTES.portal.admin.dashboard.versionManagement },
       { id: 'notifications', label: 'Notifications', path: ROUTES.portal.admin.dashboard.notifications },
       { id: 'settings', label: 'Settings', path: ROUTES.portal.admin.dashboard.settings },

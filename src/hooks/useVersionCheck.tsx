@@ -4,6 +4,7 @@ import { captureHandledError } from '../services/errorLog.service';
 import { ONE_MINUTE_MS } from '../constants/time';
 import { monitoringService } from '../services/monitoring.service';
 import { FIREBASE_ANALYTICS_EVENTS } from '../constants/analytics';
+import { setPwaBuildState } from '../services/pwaRuntime.service';
 
 const VERSION_URL = '/version.json';
 const POLL_INTERVAL_MS = ONE_MINUTE_MS;
@@ -152,6 +153,11 @@ export const useVersionCheck = () => {
 
         if (!currentVersionRef.current) {
           currentVersionRef.current = nextVersion;
+          setPwaBuildState({
+            currentBuildTime: nextVersion,
+            nextBuildTime: null,
+            updateAvailable: false,
+          });
           const storedVersion = localStorage.getItem(VERSION_STORAGE_KEY);
           if (storedVersion && storedVersion !== nextVersion) {
             await handleRefresh(nextVersion);
@@ -164,6 +170,11 @@ export const useVersionCheck = () => {
         }
 
         if (nextVersion !== currentVersionRef.current) {
+          setPwaBuildState({
+            currentBuildTime: currentVersionRef.current,
+            nextBuildTime: nextVersion,
+            updateAvailable: true,
+          });
           monitoringService.trackEvent(FIREBASE_ANALYTICS_EVENTS.appUpdateAvailable, {
             current_build_time: currentVersionRef.current,
             next_build_time: nextVersion,
@@ -177,6 +188,12 @@ export const useVersionCheck = () => {
             notifiedVersionRef.current = nextVersion;
             showUpdateToast(nextVersion);
           }
+        } else {
+          setPwaBuildState({
+            currentBuildTime: nextVersion,
+            nextBuildTime: null,
+            updateAvailable: false,
+          });
         }
       } catch (error) {
         if (isExpectedNetworkFetchError(error)) {

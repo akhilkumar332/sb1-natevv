@@ -376,6 +376,7 @@ export default {
     impersonationAudit: "ಇಂಪರ್ಸನೇಷನ್ ಆಡಿಟ್",
     contactSubmissions: "ಸಂಪರ್ಕ ಸಲ್ಲಿಕೆಗಳು",
     offlineSyncHealth: "ಆಫ್‌ಲೈನ್ ಸಿಂಕ್ ಆರೋಗ್ಯ",
+    pwaDiagnostics: "PWA ಡಯಾಗ್ನೋಸ್ಟಿಕ್ಸ್",
     versionManagement: "ಆವೃತ್ತಿ ನಿರ್ವಹಣೆ",
     notifications: "ನೋಟಿಫಿಕೇಶನ್‌ಗಳು",
     settings: "ಸೆಟ್ಟಿಂಗ್ಸ್",

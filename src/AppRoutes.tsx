@@ -120,6 +120,7 @@ const AdminContactSubmissions = lazy(() => lazyLoad(import('./pages/admin/dashbo
 const AdminNotifications = lazy(() => lazyLoad(import('./pages/admin/dashboard/Notifications')));
 const AdminSettings = lazy(() => lazyLoad(import('./pages/admin/dashboard/Settings')));
 const AdminOfflineSyncHealth = lazy(() => lazyLoad(import('./pages/admin/dashboard/OfflineSyncHealth')));
+const AdminPwaDiagnostics = lazy(() => lazyLoad(import('./pages/admin/dashboard/PwaDiagnostics')));
 const AdminTranslations = lazy(() => lazyLoad(import('./pages/admin/dashboard/Translations')));
 const AdminVersionManagement = lazy(() => lazyLoad(import('./pages/admin/dashboard/VersionManagement')));
 const FindDonors = lazy(() => lazyLoad(import('./pages/FindDonors')));
@@ -238,6 +239,7 @@ const AppRoutes = () => {
           <Route path="error-logs" element={<AdminErrorLogs />} />
           <Route path="contact-submissions" element={<AdminContactSubmissions />} />
           <Route path="offline-sync-health" element={<AdminOfflineSyncHealth />} />
+          <Route path="pwa-diagnostics" element={<AdminPwaDiagnostics />} />
           <Route path="version-management" element={<AdminVersionManagement />} />
           <Route path="translations" element={<AdminTranslations />} />
           <Route path="cms/overview" element={<AdminCmsOverview />} />
