@@ -81,6 +81,7 @@ function AdminPortal() {
     'contact-submissions': Mail,
     'offline-sync-health': Activity,
     'pwa-diagnostics': Smartphone,
+    'pwa-fleet-overview': Smartphone,
     'version-management': Boxes,
     notifications: Bell,
     settings: Settings,

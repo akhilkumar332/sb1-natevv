@@ -49,6 +49,7 @@ import type {
   ContactSubmission,
   DeploymentHistoryRecord,
   DeploymentRecord,
+  PwaRuntimeDiagnosticRecord,
   NpsPromptOverride,
   NpsResponse,
   TranslationOverrideDocument,
@@ -110,6 +111,7 @@ export type AdminOfflineSyncHealthRecord = OfflineSyncHealthRecord;
 export type AdminTranslationOverride = TranslationOverrideDocument;
 export type AdminDeploymentRecord = DeploymentRecord;
 export type AdminDeploymentHistoryRecord = DeploymentHistoryRecord;
+export type AdminPwaRuntimeDiagnosticRecord = PwaRuntimeDiagnosticRecord;
 
 const useCachedAdminQuery = <T,>(
   queryKey: readonly unknown[],
@@ -766,6 +768,64 @@ const fetchOfflineSyncHealthRecords = async (
   }));
 };
 
+const fetchPwaRuntimeDiagnostics = async (
+  limitCount: number,
+): Promise<AdminPwaRuntimeDiagnosticRecord[]> => {
+  const snapshot = await getDocs(query(
+    collection(db, COLLECTIONS.PWA_RUNTIME_DIAGNOSTICS),
+    orderBy('lastSeenAt', 'desc'),
+    limit(limitCount),
+  ));
+
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data() as Record<string, any>;
+    const notificationPermission = data.notificationPermission === 'default'
+      || data.notificationPermission === 'denied'
+      || data.notificationPermission === 'granted'
+      || data.notificationPermission === 'unsupported'
+      ? data.notificationPermission
+      : 'unsupported';
+
+    return {
+      id: docSnap.id,
+      deviceKey: typeof data.deviceKey === 'string' ? data.deviceKey : docSnap.id,
+      uid: typeof data.uid === 'string' ? data.uid : '',
+      role: typeof data.role === 'string' ? data.role : 'unknown',
+      surface: typeof data.surface === 'string' ? data.surface : 'unknown',
+      appVersion: typeof data.appVersion === 'string' ? data.appVersion : '0.0.0',
+      buildTime: typeof data.buildTime === 'string' ? data.buildTime : '',
+      gitCommit: typeof data.gitCommit === 'string' ? data.gitCommit : '',
+      deployId: typeof data.deployId === 'string' ? data.deployId : 'unknown',
+      installed: data.installed === true,
+      standalone: data.standalone === true,
+      serviceWorkerSupported: data.serviceWorkerSupported === true,
+      serviceWorkerRegistered: data.serviceWorkerRegistered === true,
+      serviceWorkerControlling: data.serviceWorkerControlling === true,
+      notificationPermission,
+      manifestVariant: typeof data.manifestVariant === 'string' ? data.manifestVariant : 'unknown',
+      deviceCategory: typeof data.deviceCategory === 'string' ? data.deviceCategory : 'unknown',
+      osFamily: typeof data.osFamily === 'string' ? data.osFamily : 'unknown',
+      browserFamily: typeof data.browserFamily === 'string' ? data.browserFamily : 'unknown',
+      memoryTier: typeof data.memoryTier === 'string' ? data.memoryTier : 'unknown',
+      networkEffectiveType: typeof data.networkEffectiveType === 'string' ? data.networkEffectiveType : 'unknown',
+      connectionType: typeof data.connectionType === 'string' ? data.connectionType : 'unknown',
+      saveData: data.saveData === true,
+      touchCapable: data.touchCapable === true,
+      language: typeof data.language === 'string' ? data.language : 'en',
+      lastPath: typeof data.lastPath === 'string' ? data.lastPath : null,
+      firstSeenAt: (toDateValue(data.firstSeenAt) as any) || null,
+      lastSeenAt: (toDateValue(data.lastSeenAt) as any) || null,
+      updatedFrom: data.updatedFrom === 'app_start'
+        || data.updatedFrom === 'visibility_resume'
+        || data.updatedFrom === 'runtime_change'
+        || data.updatedFrom === 'version_change'
+        ? data.updatedFrom
+        : 'runtime_change',
+      updatedAt: (toDateValue(data.updatedAt) as any) || null,
+    } as AdminPwaRuntimeDiagnosticRecord;
+  });
+};
+
 export const useAdminUsers = (role: AdminUserRoleFilter = 'all', limitCount: number = 800) =>
   useCachedAdminQuery<User[]>(
     adminQueryKeys.users(role, limitCount),
@@ -1165,6 +1225,20 @@ export const useAdminOfflineSyncHealth = (windowMs: number, limitCount: number =
       staleTime: ADMIN_QUERY_TIMINGS.offlineSyncHealth.staleTime,
       gcTime: ADMIN_QUERY_TIMINGS.offlineSyncHealth.gcTime,
       refetchInterval: ADMIN_QUERY_TIMINGS.offlineSyncHealth.refetchInterval,
+      refetchIntervalInBackground: false,
+    },
+  );
+
+export const useAdminPwaRuntimeDiagnostics = (limitCount: number = 500) =>
+  useCachedAdminQuery<AdminPwaRuntimeDiagnosticRecord[]>(
+    adminQueryKeys.pwaRuntimeDiagnostics(limitCount),
+    ADMIN_QUERY_TIMINGS.pwaRuntimeDiagnostics.ttl,
+    ['firstSeenAt', 'lastSeenAt', 'updatedAt'],
+    () => fetchPwaRuntimeDiagnostics(limitCount),
+    {
+      staleTime: ADMIN_QUERY_TIMINGS.pwaRuntimeDiagnostics.staleTime,
+      gcTime: ADMIN_QUERY_TIMINGS.pwaRuntimeDiagnostics.gcTime,
+      refetchInterval: ADMIN_QUERY_TIMINGS.pwaRuntimeDiagnostics.refetchInterval,
       refetchIntervalInBackground: false,
     },
   );

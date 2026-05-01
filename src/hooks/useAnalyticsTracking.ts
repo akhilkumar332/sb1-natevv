@@ -3,11 +3,11 @@ import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { monitoringService } from '../services/monitoring.service';
-import { ANALYTICS_SURFACES, FIREBASE_ANALYTICS_EVENTS, type AnalyticsSurface } from '../constants/analytics';
-import { ROUTES } from '../constants/routes';
+import { FIREBASE_ANALYTICS_EVENTS } from '../constants/analytics';
 import { getDeviceInfo } from '../utils/device';
 import { getAnalyticsRuntimeContext } from '../utils/analyticsRuntimeContext';
 import { captureHandledError } from '../services/errorLog.service';
+import { getAnalyticsSurface } from '../utils/analyticsSurface';
 
 type VersionMetadata = {
   appVersion?: string;
@@ -19,28 +19,6 @@ type VersionMetadata = {
 
 const VERSION_URL = '/version.json';
 const RELEASE_SEEN_STORAGE_PREFIX = 'bh_analytics_release_seen';
-
-const getAnalyticsSurface = (pathname: string): AnalyticsSurface => {
-  if (pathname.startsWith(ROUTES.portal.admin.dashboard.root) || pathname === ROUTES.portal.admin.login) {
-    return ANALYTICS_SURFACES.admin;
-  }
-  if (pathname.startsWith(ROUTES.portal.ngo.dashboard.root) || pathname === ROUTES.portal.ngo.login || pathname === ROUTES.portal.ngo.register) {
-    return ANALYTICS_SURFACES.ngo;
-  }
-  if (pathname.startsWith(ROUTES.portal.bloodbank.dashboard.root) || pathname === ROUTES.portal.bloodbank.login || pathname === ROUTES.portal.bloodbank.register) {
-    return ANALYTICS_SURFACES.bloodbank;
-  }
-  if (pathname.startsWith(ROUTES.portal.hospital.dashboard) || pathname === ROUTES.portal.hospital.login || pathname === ROUTES.portal.hospital.register) {
-    return ANALYTICS_SURFACES.bloodbank;
-  }
-  if (pathname.startsWith(ROUTES.portal.donor.dashboard.root) || pathname === ROUTES.portal.donor.login || pathname === ROUTES.portal.donor.register) {
-    return ANALYTICS_SURFACES.donor;
-  }
-  if (pathname.startsWith('/admin') || pathname.startsWith('/donor') || pathname.startsWith('/ngo') || pathname.startsWith('/bloodbank') || pathname.startsWith('/hospital')) {
-    return ANALYTICS_SURFACES.auth;
-  }
-  return ANALYTICS_SURFACES.public;
-};
 
 export const useAnalyticsTracking = (): void => {
   const location = useLocation();

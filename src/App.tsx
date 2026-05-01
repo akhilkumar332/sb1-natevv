@@ -28,6 +28,7 @@ import { FIVE_SECONDS_MS, ONE_MINUTE_MS, THREE_SECONDS_MS } from './constants/ti
 import { startOfflineMutationOutboxWorker, stopOfflineMutationOutboxWorker } from './services/offlineMutationOutbox.service';
 import { useAnalyticsTracking } from './hooks/useAnalyticsTracking';
 import { usePwaLifecycle } from './hooks/usePwaLifecycle';
+import { usePwaFleetTelemetry } from './hooks/usePwaFleetTelemetry';
 
 function App() {
   useAuthSync();
@@ -35,6 +36,7 @@ function App() {
   useVersionCheck();
   useAnalyticsTracking();
   usePwaLifecycle();
+  usePwaFleetTelemetry();
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { isDark } = useTheme();

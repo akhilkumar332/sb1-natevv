@@ -90,11 +90,11 @@ export default function PwaDiagnosticsPage() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-red-700 dark:bg-red-500/10 dark:text-red-300">
               <Smartphone className="h-3.5 w-3.5" />
-              PWA Runtime
+              Current Browser Runtime
             </div>
             <h1 className="mt-3 text-3xl font-bold text-gray-900 dark:text-white">PWA Diagnostics</h1>
             <p className="mt-2 max-w-3xl text-sm text-gray-600 dark:text-slate-300">
-              Inspect installability, service worker lifecycle, update readiness, notification permission, and the runtime metadata backing the install experience.
+              Inspect installability, service worker lifecycle, update readiness, notification permission, and runtime metadata for the browser session you are using right now. For cross-user adoption and install telemetry, use PWA Fleet Overview.
             </p>
           </div>
           <button
@@ -180,6 +180,7 @@ export default function PwaDiagnosticsPage() {
             </div>
             <div className="mt-4 space-y-3">
               {[
+                { label: 'PWA Fleet Overview', path: ROUTES.portal.admin.dashboard.pwaFleetOverview, icon: Smartphone },
                 { label: t('admin.offlineSyncHealth'), path: ROUTES.portal.admin.dashboard.offlineSyncHealth, icon: WifiOff },
                 { label: t('admin.versionManagement'), path: ROUTES.portal.admin.dashboard.versionManagement, icon: Boxes },
                 { label: t('admin.translations'), path: ROUTES.portal.admin.dashboard.translations, icon: Languages },

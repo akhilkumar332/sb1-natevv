@@ -377,6 +377,7 @@ export default {
     contactSubmissions: "कॉन्टैक्ट सबमिशन्स",
     offlineSyncHealth: "ऑफ़लाइन सिंक हेल्थ",
     pwaDiagnostics: "PWA डायग्नॉस्टिक्स",
+    pwaFleetOverview: "PWA फ़्लीट ओवरव्यू",
     versionManagement: "वर्ज़न मैनेजमेंट",
     notifications: "नोटिफिकेशन्स",
     settings: "सेटिंग्स",

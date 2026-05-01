@@ -192,10 +192,16 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
+        const targetUrl = new URL(url, self.location.origin);
         // Check if app is already open
         for (let i = 0; i < clientList.length; i++) {
           const client = clientList[i];
-          if (client.url.includes(url) && 'focus' in client) {
+          const clientUrl = new URL(client.url);
+          if (
+            clientUrl.origin === targetUrl.origin
+            && `${clientUrl.pathname}${clientUrl.search}${clientUrl.hash}` === `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`
+            && 'focus' in client
+          ) {
             return client.focus();
           }
         }

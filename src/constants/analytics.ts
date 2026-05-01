@@ -37,6 +37,7 @@ export const FIREBASE_ANALYTICS_EVENTS = {
   pwaStandaloneLaunch: 'pwa_standalone_launch',
   pwaOfflineReady: 'pwa_offline_ready',
   pwaDiagnosticsViewed: 'pwa_diagnostics_viewed',
+  pwaFleetOverviewViewed: 'pwa_fleet_overview_viewed',
   appExceptionSeen: 'app_exception_seen',
   apiRequestFailed: 'api_request_failed',
   webVitals: 'web_vitals',

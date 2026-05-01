@@ -67,6 +67,12 @@ export const ADMIN_QUERY_TIMINGS = {
     gcTime: FIVE_MINUTES_MS,
     refetchInterval: ONE_MINUTE_MS,
   },
+  pwaRuntimeDiagnostics: {
+    ttl: ONE_MINUTE_MS,
+    staleTime: ONE_MINUTE_MS,
+    gcTime: FIVE_MINUTES_MS,
+    refetchInterval: ONE_MINUTE_MS,
+  },
   deployments: {
     ttl: ONE_MINUTE_MS,
     staleTime: ONE_MINUTE_MS,

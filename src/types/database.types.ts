@@ -219,6 +219,43 @@ export interface DeploymentHistoryRecord {
 }
 
 // ============================================================================
+// COLLECTION: pwaRuntimeDiagnostics
+// ============================================================================
+
+export interface PwaRuntimeDiagnosticRecord {
+  id?: string;
+  deviceKey: string;
+  uid: string;
+  role: UserRole | string;
+  surface: string;
+  appVersion: string;
+  buildTime: string;
+  gitCommit: string;
+  deployId: string;
+  installed: boolean;
+  standalone: boolean;
+  serviceWorkerSupported: boolean;
+  serviceWorkerRegistered: boolean;
+  serviceWorkerControlling: boolean;
+  notificationPermission: 'default' | 'denied' | 'granted' | 'unsupported';
+  manifestVariant: string;
+  deviceCategory: string;
+  osFamily: string;
+  browserFamily: string;
+  memoryTier: string;
+  networkEffectiveType: string;
+  connectionType: string;
+  saveData: boolean;
+  touchCapable: boolean;
+  language: string;
+  lastPath?: string | null;
+  firstSeenAt: Timestamp;
+  lastSeenAt: Timestamp;
+  updatedFrom: 'app_start' | 'visibility_resume' | 'runtime_change' | 'version_change';
+  updatedAt?: Timestamp;
+}
+
+// ============================================================================
 // COLLECTION: impersonationEvents
 // ============================================================================
 

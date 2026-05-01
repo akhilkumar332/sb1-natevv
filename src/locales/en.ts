@@ -379,6 +379,7 @@ export default {
     contactSubmissions: 'Contact Submissions',
     offlineSyncHealth: 'Offline Sync Health',
     pwaDiagnostics: 'PWA Diagnostics',
+    pwaFleetOverview: 'PWA Fleet Overview',
     versionManagement: 'Version Management',
     notifications: 'Notifications',
     settings: 'Settings',

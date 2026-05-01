@@ -43,6 +43,7 @@ export const COLLECTIONS = {
   DONATION_FEEDBACK: 'DonationFeedback',
   OFFLINE_SYNC_HEALTH_RECORDS: 'offlineSyncHealthRecords',
   TRANSLATION_OVERRIDES: 'translationOverrides',
+  PWA_RUNTIME_DIAGNOSTICS: 'pwaRuntimeDiagnostics',
   DEPLOYMENTS: 'deployments',
   DEPLOYMENT_HISTORY: 'deploymentHistory',
   WEBAUTHN_CREDENTIALS: 'webauthnCredentials',
