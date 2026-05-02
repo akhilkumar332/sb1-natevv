@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     permissions:
+      checks: write
       contents: read
       pull-requests: write
 
