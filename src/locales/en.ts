@@ -378,6 +378,7 @@ export default {
     impersonationAudit: 'Impersonation Audit',
     contactSubmissions: 'Contact Submissions',
     offlineSyncHealth: 'Offline Sync Health',
+    pwaTelemetry: 'PWA Telemetry',
     pwaDiagnostics: 'PWA Diagnostics',
     pwaFleetOverview: 'PWA Fleet Overview',
     versionManagement: 'Version Management',

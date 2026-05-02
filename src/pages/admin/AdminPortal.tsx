@@ -80,6 +80,7 @@ function AdminPortal() {
     impersonation: Shield,
     'contact-submissions': Mail,
     'offline-sync-health': Activity,
+    'pwa-telemetry': Smartphone,
     'pwa-diagnostics': Smartphone,
     'pwa-fleet-overview': Smartphone,
     'version-management': Boxes,

@@ -4,6 +4,7 @@ export type PwaFleetOverviewSummary = {
   totalDevices: number;
   installedDevices: number;
   standaloneDevices: number;
+  installedFootprintDevices: number;
   latestBuildDevices: number;
   staleBuildDevices: number;
   notificationGranted: number;
@@ -27,6 +28,7 @@ export const summarizePwaFleetDiagnostics = (
   summary.totalDevices += 1;
   if (record.installed) summary.installedDevices += 1;
   if (record.standalone) summary.standaloneDevices += 1;
+  if (record.installed || record.standalone) summary.installedFootprintDevices += 1;
   if (latestBuildTime && record.buildTime === latestBuildTime) {
     summary.latestBuildDevices += 1;
   } else if (latestBuildTime) {
@@ -46,6 +48,7 @@ export const summarizePwaFleetDiagnostics = (
   totalDevices: 0,
   installedDevices: 0,
   standaloneDevices: 0,
+  installedFootprintDevices: 0,
   latestBuildDevices: 0,
   staleBuildDevices: 0,
   notificationGranted: 0,

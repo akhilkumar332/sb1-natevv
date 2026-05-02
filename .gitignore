@@ -45,9 +45,11 @@ secrets/
 
 # project docs artifacts
 docs/
+documentation/
 
 GEMINI.md
 AGENTS.md
+workflow
 workflow/*
 
 .gemini/
