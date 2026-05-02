@@ -47,6 +47,7 @@ describe('summarizePwaFleetDiagnostics', () => {
     expect(summary.totalDevices).toBe(4);
     expect(summary.installedDevices).toBe(1);
     expect(summary.standaloneDevices).toBe(1);
+    expect(summary.installedFootprintDevices).toBe(1);
     expect(summary.latestBuildDevices).toBe(3);
     expect(summary.staleBuildDevices).toBe(1);
     expect(summary.notificationGranted).toBe(1);

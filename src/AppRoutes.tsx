@@ -240,7 +240,8 @@ const AppRoutes = () => {
           <Route path="error-logs" element={<AdminErrorLogs />} />
           <Route path="contact-submissions" element={<AdminContactSubmissions />} />
           <Route path="offline-sync-health" element={<AdminOfflineSyncHealth />} />
-          <Route path="pwa-diagnostics" element={<AdminPwaDiagnostics />} />
+          <Route path="pwa-telemetry" element={<AdminPwaDiagnostics />} />
+          <Route path="pwa-diagnostics" element={<Navigate to={ROUTES.portal.admin.dashboard.pwaTelemetry} replace />} />
           <Route path="pwa-fleet-overview" element={<AdminPwaFleetOverview />} />
           <Route path="version-management" element={<AdminVersionManagement />} />
           <Route path="translations" element={<AdminTranslations />} />

@@ -1,0 +1,61 @@
+name: Hosting Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_channel:
+        description: Source Hosting channel to clone from (for example live or qa)
+        required: false
+        default: ''
+      source_version:
+        description: Optional exact Hosting version id to clone from
+        required: false
+        default: ''
+      source_site:
+        description: Hosting site id
+        required: true
+        default: bloodhubindia-1da2a
+
+concurrency:
+  group: firebase-hosting-rollback
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions:
+      contents: read
+
+    env:
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BLOODHUBINDIA_1DA2A }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON }}
+
+      - name: Setup Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Validate rollback input
+        run: |
+          if [ -z "${{ inputs.source_channel }}" ] && [ -z "${{ inputs.source_version }}" ]; then
+            echo "Provide either source_channel or source_version."
+            exit 1
+          fi
+
+      - name: Clone Hosting version to live
+        run: |
+          if [ -n "${{ inputs.source_version }}" ]; then
+            SOURCE_REF="${{ inputs.source_site }}:@${{ inputs.source_version }}"
+          else
+            SOURCE_REF="${{ inputs.source_site }}:${{ inputs.source_channel }}"
+          fi
+          TARGET_REF="${{ inputs.source_site }}:live"
+          echo "Cloning ${SOURCE_REF} -> ${TARGET_REF}"
+          firebase hosting:clone "${SOURCE_REF}" "${TARGET_REF}" --project bloodhubindia-1da2a

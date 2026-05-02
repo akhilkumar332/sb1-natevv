@@ -376,6 +376,7 @@ export default {
     impersonationAudit: "इम्पर्सनेशन ऑडिट",
     contactSubmissions: "कॉन्टैक्ट सबमिशन्स",
     offlineSyncHealth: "ऑफ़लाइन सिंक हेल्थ",
+    pwaTelemetry: "PWA टेलीमेट्री",
     pwaDiagnostics: "PWA डायग्नॉस्टिक्स",
     pwaFleetOverview: "PWA फ़्लीट ओवरव्यू",
     versionManagement: "वर्ज़न मैनेजमेंट",
