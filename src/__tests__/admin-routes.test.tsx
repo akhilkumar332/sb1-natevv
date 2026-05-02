@@ -7,23 +7,31 @@ import ImpersonationAudit from '../pages/admin/ImpersonationAudit';
 import ErrorLogsPage from '../pages/admin/dashboard/ErrorLogs';
 import { ROUTES } from '../constants/routes';
 
-const useAuthMock = vi.fn();
+const { useAuthMock, tMock } = vi.hoisted(() => ({
+  useAuthMock: vi.fn(),
+  tMock: vi.fn((key: string) => key),
+}));
 
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => useAuthMock(),
 }));
 
-vi.mock('../firebase', () => ({
-  db: {},
+vi.mock('../components/shared/PendingActionsPanel', () => ({
+  default: () => null,
 }));
 
-vi.mock('firebase/firestore', () => ({
-  collection: vi.fn(() => ({})),
-  query: vi.fn(() => ({})),
-  orderBy: vi.fn(() => ({})),
-  startAfter: vi.fn(() => ({})),
-  limit: vi.fn(() => ({})),
-  getDocs: vi.fn(async () => ({ docs: [] })),
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: tMock,
+  }),
+}));
+
+vi.mock('../pages/admin/ImpersonationAudit', () => ({
+  default: () => <h1>Impersonation Audit</h1>,
+}));
+
+vi.mock('../pages/admin/dashboard/ErrorLogs', () => ({
+  default: () => <h1>Error Logs</h1>,
 }));
 
 afterEach(() => {
@@ -77,7 +85,7 @@ describe('admin route access', () => {
       </QueryClientProvider>
     );
 
-    expect(await screen.findByText('Restricted Access')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Impersonation Audit' })).toBeInTheDocument();
   });
 
   it('allows admin to view error logs page', async () => {

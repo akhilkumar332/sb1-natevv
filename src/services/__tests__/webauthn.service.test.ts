@@ -14,10 +14,18 @@ vi.mock('@simplewebauthn/browser', () => ({
 }));
 
 vi.mock('../../firebase', () => ({
+  default: {},
   auth: {
     currentUser: null,
   },
   db: {},
+  firebaseMeasurementId: '',
+}));
+
+vi.mock('../../services/monitoring.service', () => ({
+  monitoringService: {
+    trackEvent: vi.fn(),
+  },
 }));
 
 vi.mock('firebase/firestore', () => ({
