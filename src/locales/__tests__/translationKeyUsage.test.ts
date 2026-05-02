@@ -29,6 +29,9 @@ const walkSourceFiles = (dir: string): string[] => {
 
 const collectLiteralTranslationKeys = (filePath: string): string[] => {
   const source = fs.readFileSync(filePath, 'utf8');
+  if (!source.includes('t(')) {
+    return [];
+  }
   const sourceFile = ts.createSourceFile(
     filePath,
     source,

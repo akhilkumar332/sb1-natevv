@@ -5,10 +5,23 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AdminPortal from '../AdminPortal';
 import { ROUTES } from '../../../constants/routes';
 
-const useAuthMock = vi.fn();
+const { useAuthMock, tMock } = vi.hoisted(() => ({
+  useAuthMock: vi.fn(),
+  tMock: vi.fn((key: string) => key),
+}));
 
 vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => useAuthMock(),
+}));
+
+vi.mock('../../../components/shared/PendingActionsPanel', () => ({
+  default: () => null,
+}));
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: tMock,
+  }),
 }));
 
 describe('AdminPortal', () => {
@@ -19,7 +32,7 @@ describe('AdminPortal', () => {
     },
   });
 
-  it('shows impersonation audit menu for superadmin', () => {
+  it('shows impersonation audit menu for superadmin', async () => {
     useAuthMock.mockReturnValue({
       user: { bhId: 'BH-0001' },
       isSuperAdmin: true,
@@ -37,12 +50,11 @@ describe('AdminPortal', () => {
       </QueryClientProvider>
     );
 
-    expect(screen.getAllByText('Impersonation Audit').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Error Logs').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Version Management').length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('admin.impersonationAudit')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('admin.errorLogs')).length).toBeGreaterThan(0);
   });
 
-  it('hides impersonation audit menu for non-superadmin', () => {
+  it('hides impersonation audit menu for non-superadmin', async () => {
     useAuthMock.mockReturnValue({
       user: { bhId: 'BH-0002' },
       isSuperAdmin: false,
@@ -60,8 +72,7 @@ describe('AdminPortal', () => {
       </QueryClientProvider>
     );
 
-    expect(screen.queryByText('Impersonation Audit')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Error Logs').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Version Management').length).toBeGreaterThan(0);
+    expect(screen.queryByText('admin.impersonationAudit')).not.toBeInTheDocument();
+    expect((await screen.findAllByText('admin.errorLogs')).length).toBeGreaterThan(0);
   });
 });

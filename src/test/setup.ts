@@ -68,6 +68,7 @@ afterEach(() => {
 
 // Mock Firebase
 vi.mock('../firebase', () => ({
+  default: {},
   auth: {
     currentUser: null,
     onAuthStateChanged: vi.fn(() => {
@@ -77,6 +78,7 @@ vi.mock('../firebase', () => ({
   },
   db: {},
   storage: {},
+  firebaseMeasurementId: '',
 }));
 
 // Mock window.matchMedia

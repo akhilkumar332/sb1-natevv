@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ROUTES } from '../../constants/routes';
 
 const mockSignInWithPopup = vi.hoisted(() => vi.fn());
@@ -14,6 +14,7 @@ const mockCaptureHandledError = vi.hoisted(() => vi.fn());
 const mockSetAuthToken = vi.hoisted(() => vi.fn());
 const mockNotifySuccess = vi.hoisted(() => vi.fn());
 const mockNotifyError = vi.hoisted(() => vi.fn());
+const mockTrackEvent = vi.hoisted(() => vi.fn());
 const mockAuth = vi.hoisted(() => ({
   currentUser: null as null | { uid: string },
 }));
@@ -33,8 +34,10 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 vi.mock('../../firebase', () => ({
+  default: {},
   auth: mockAuth,
   db: {},
+  firebaseMeasurementId: '',
   googleProvider: {},
 }));
 
@@ -72,7 +75,19 @@ vi.mock('services/notify.service', () => ({
   },
 }));
 
+vi.mock('../../services/monitoring.service', () => ({
+  monitoringService: {
+    trackEvent: mockTrackEvent,
+  },
+}));
+
 import { registerWithGoogleRole } from '../googleRegister';
+
+const runRegister = async (args: Parameters<typeof registerWithGoogleRole>[0]) => {
+  const registerPromise = registerWithGoogleRole(args);
+  await vi.runAllTimersAsync();
+  await registerPromise;
+};
 
 describe('registerWithGoogleRole', () => {
   const navigate = vi.fn();
@@ -98,10 +113,15 @@ describe('registerWithGoogleRole', () => {
   };
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     navigate.mockReset();
     window.sessionStorage.clear();
     mockAuth.currentUser = null;
+    mockSignInWithPopup.mockImplementation(async () => {
+      mockAuth.currentUser = { uid: 'uid-1' };
+      return popupResult;
+    });
     mockGetAdditionalUserInfo.mockReturnValue({ isNewUser: true });
     mockEnableNetwork.mockResolvedValue(undefined);
     mockGetDoc.mockResolvedValue({
@@ -113,12 +133,16 @@ describe('registerWithGoogleRole', () => {
     }));
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('keeps registration successful when referral tracking fails', async () => {
     mockSignInWithPopup.mockResolvedValue(popupResult);
     mockSetDoc.mockResolvedValue(undefined);
     mockApplyReferralTrackingForUser.mockRejectedValue(new Error('permission-denied'));
 
-    await registerWithGoogleRole(baseArgs);
+    await runRegister(baseArgs);
 
     expect(mockSetDoc).toHaveBeenCalledTimes(1);
     expect(mockApplyReferralTrackingForUser).toHaveBeenCalledWith('uid-1');
@@ -131,11 +155,10 @@ describe('registerWithGoogleRole', () => {
   });
 
   it('signs out and redirects to login when user already exists', async () => {
-    mockSignInWithPopup.mockResolvedValue(popupResult);
     mockGetAdditionalUserInfo.mockReturnValue({ isNewUser: false });
     mockSignOut.mockResolvedValue(undefined);
 
-    await registerWithGoogleRole(baseArgs);
+    await runRegister(baseArgs);
 
     expect(mockSignOut).toHaveBeenCalled();
     expect(mockNotifyError).toHaveBeenCalledWith('email-registered');
@@ -146,11 +169,10 @@ describe('registerWithGoogleRole', () => {
   });
 
   it('still redirects existing users to login when cleanup sign-out fails', async () => {
-    mockSignInWithPopup.mockResolvedValue(popupResult);
     mockGetAdditionalUserInfo.mockReturnValue({ isNewUser: false });
     mockSignOut.mockRejectedValue(new Error('signout failed'));
 
-    await registerWithGoogleRole(baseArgs);
+    await runRegister(baseArgs);
 
     expect(mockNotifyError).toHaveBeenCalledWith('email-registered');
     expect(navigate).toHaveBeenCalledWith(ROUTES.portal.donor.login);
@@ -161,12 +183,11 @@ describe('registerWithGoogleRole', () => {
   it('signs out on non-recoverable profile creation failure', async () => {
     const fatalError = new Error('write failed');
 
-    mockSignInWithPopup.mockResolvedValue(popupResult);
     mockSetDoc.mockRejectedValue(fatalError);
     mockSignOut.mockResolvedValue(undefined);
     mockAuth.currentUser = { uid: 'uid-1' };
 
-    await registerWithGoogleRole(baseArgs);
+    await runRegister(baseArgs);
 
     expect(mockSignOut).toHaveBeenCalled();
     expect(mockNotifyError).toHaveBeenCalledWith('write failed');
@@ -176,12 +197,11 @@ describe('registerWithGoogleRole', () => {
   });
 
   it('continues registration when enableNetwork fails', async () => {
-    mockSignInWithPopup.mockResolvedValue(popupResult);
     mockEnableNetwork.mockRejectedValue(new Error('network toggle failed'));
     mockSetDoc.mockResolvedValue(undefined);
     mockApplyReferralTrackingForUser.mockResolvedValue(null);
 
-    await registerWithGoogleRole(baseArgs);
+    await runRegister(baseArgs);
 
     expect(mockSetDoc).toHaveBeenCalledTimes(1);
     expect(mockNotifySuccess).toHaveBeenCalledWith('Registration successful!');
@@ -189,18 +209,16 @@ describe('registerWithGoogleRole', () => {
   });
 
   it('shows offline-specific error message for network failures', async () => {
-    mockSignInWithPopup.mockResolvedValue(popupResult);
     mockSetDoc.mockRejectedValue(Object.assign(new Error('client is offline'), { code: 'unavailable' }));
     mockSignOut.mockResolvedValue(undefined);
     mockAuth.currentUser = { uid: 'uid-1' };
 
-    await registerWithGoogleRole(baseArgs);
+    await runRegister(baseArgs);
 
     expect(mockNotifyError).toHaveBeenCalledWith('Internet connection lost during Google signup. Reconnect and try again.');
   });
 
   it('retries bootstrap profile creation when auth has not propagated to Firestore yet', async () => {
-    mockSignInWithPopup.mockResolvedValue(popupResult);
     mockAuth.currentUser = { uid: 'uid-1' };
     mockSetDoc
       .mockRejectedValueOnce(Object.assign(new Error('Missing or insufficient permissions'), { code: 'permission-denied' }))
@@ -208,7 +226,7 @@ describe('registerWithGoogleRole', () => {
       .mockResolvedValueOnce(undefined);
     mockApplyReferralTrackingForUser.mockResolvedValue(null);
 
-    await registerWithGoogleRole(baseArgs);
+    await runRegister(baseArgs);
 
     expect(mockSetDoc).toHaveBeenCalledTimes(3);
     expect(mockNotifySuccess).toHaveBeenCalledWith('Registration successful!');
@@ -216,7 +234,6 @@ describe('registerWithGoogleRole', () => {
   });
 
   it('treats a duplicate bootstrap write as success when the donor profile already exists', async () => {
-    mockSignInWithPopup.mockResolvedValue(popupResult);
     mockAuth.currentUser = { uid: 'uid-1' };
     mockSetDoc.mockRejectedValueOnce(Object.assign(new Error('Missing or insufficient permissions'), { code: 'permission-denied' }));
     mockGetDoc.mockResolvedValue({
@@ -225,7 +242,7 @@ describe('registerWithGoogleRole', () => {
     });
     mockApplyReferralTrackingForUser.mockResolvedValue(null);
 
-    await registerWithGoogleRole(baseArgs);
+    await runRegister(baseArgs);
 
     expect(mockSetDoc).toHaveBeenCalledTimes(1);
     expect(mockGetDoc).toHaveBeenCalledTimes(1);
