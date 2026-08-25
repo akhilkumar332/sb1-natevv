@@ -5,7 +5,10 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  // 'dist' is build output. The '(1)'/'(2)' globs skip cloud-sync conflict
+  // copies of real source files, which are stale and otherwise report
+  // duplicate findings against code that no longer exists.
+  { ignores: ['dist', '**/* (1)*', '**/* (2)*'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

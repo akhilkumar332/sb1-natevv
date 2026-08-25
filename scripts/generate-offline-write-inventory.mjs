@@ -6,6 +6,10 @@ const OUTPUT_DIR = path.resolve('src/generated');
 const OUTPUT_FILE = path.join(OUTPUT_DIR, 'offlineWriteInventory.ts');
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);
+// Cloud-sync conflict copies ("AuthContext (1).tsx") are stale duplicates of
+// real modules. Scanning them produced inventory rows for write sites that do
+// not exist in the shipped app.
+const SYNC_CONFLICT_PATTERN = /\s\(\d+\)(\.|$)/;
 const FIRESTORE_WRITE_PATTERN = /\b(addDoc|setDoc|updateDoc|deleteDoc|writeBatch|runTransaction|tx\.set|tx\.update|tx\.delete|batch\.set|batch\.update|batch\.delete)\s*\(/g;
 const COLLECTION_PATTERN = /COLLECTIONS\.([A-Z0-9_]+)/;
 
@@ -100,11 +104,16 @@ const readAllSourceFiles = async (dir) => {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (entry.name === 'generated' || entry.name === '__tests__') continue;
+      // src/functions has its own node_modules; scanning it produced inventory
+      // rows for dependency type declarations whose line numbers churned on
+      // every dependency upgrade.
+      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
       files.push(...await readAllSourceFiles(fullPath));
       continue;
     }
     if (!entry.isFile()) continue;
     if (!SOURCE_EXTENSIONS.has(path.extname(entry.name))) continue;
+    if (SYNC_CONFLICT_PATTERN.test(entry.name)) continue;
     files.push(fullPath);
   }
   return files;

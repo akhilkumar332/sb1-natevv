@@ -37,6 +37,9 @@ jobs:
         run: npm run lint
 
       - name: Test
+        # Guard against the runner hanging after all suites report: fail the job
+        # fast instead of holding a runner for the default 6h job timeout.
+        timeout-minutes: 15
         run: npm run test:run
 
       - name: Build

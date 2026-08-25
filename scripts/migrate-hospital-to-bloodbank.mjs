@@ -47,12 +47,15 @@ const initAdmin = () => {
 
   const serviceAccountPath = resolveServiceAccountPath();
   const serviceAccount = loadServiceAccount(serviceAccountPath);
-  const rawPrivateKey = process.env.VITE_FIREBASE_PRIVATE_KEY;
+  // Admin credentials must come from server-only env names. VITE_* values are
+  // exposed to any client bundle that references them, so they are only read as
+  // a legacy fallback and should be removed from .env once migrated.
+  const rawPrivateKey = process.env.FIREBASE_PRIVATE_KEY || process.env.VITE_FIREBASE_PRIVATE_KEY;
   const privateKey = rawPrivateKey
     ? rawPrivateKey.replace(/^"|"$/g, '').replace(/\\n/g, '\n')
     : undefined;
-  const projectId = process.env.VITE_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.VITE_FIREBASE_CLIENT_EMAIL;
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || process.env.VITE_FIREBASE_CLIENT_EMAIL;
 
   const envServiceAccount = projectId && privateKey && clientEmail
     ? { projectId, privateKey, clientEmail }

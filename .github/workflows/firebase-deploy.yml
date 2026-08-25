@@ -130,6 +130,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Test
+        # Guard against the runner hanging after all suites report: fail the job
+        # fast instead of holding a runner for the default 6h job timeout.
+        timeout-minutes: 15
+        run: npm run test:run
+
       - name: Build
         env:
           APP_ENVIRONMENT: prod
@@ -231,20 +237,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Secrets are passed through the environment and written with a quoted
+      # heredoc so that values containing $, backticks or backslashes are
+      # written verbatim instead of being expanded by the shell.
       - name: Prepare Firebase Functions env
+        env:
+          CONTACT_RATE_LIMIT_MAX_PER_MINUTE: ${{ secrets.CONTACT_RATE_LIMIT_MAX_PER_MINUTE }}
+          FRONTEND_GATE_MAX_ATTEMPTS_PER_MINUTE: ${{ secrets.FRONTEND_GATE_MAX_ATTEMPTS_PER_MINUTE }}
+          SITE_URL: ${{ secrets.SITE_URL }}
+          CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS }}
+          WEBAUTHN_RP_ID: ${{ secrets.WEBAUTHN_RP_ID }}
+          WEBAUTHN_ALLOWED_ORIGINS: ${{ secrets.WEBAUTHN_ALLOWED_ORIGINS }}
+          FCM_BRIDGE_SIGNING_SECRET: ${{ secrets.FCM_BRIDGE_SIGNING_SECRET }}
+          FRONTEND_GATE_PASSWORD: ${{ secrets.FRONTEND_GATE_PASSWORD }}
+          FRONTEND_GATE_SESSION_SECRET: ${{ secrets.FRONTEND_GATE_SESSION_SECRET }}
         run: |
           mkdir -p src/functions
-          cat > src/functions/.env <<EOF
-          CONTACT_RATE_LIMIT_MAX_PER_MINUTE=${{ secrets.CONTACT_RATE_LIMIT_MAX_PER_MINUTE }}
-          FRONTEND_GATE_MAX_ATTEMPTS_PER_MINUTE=${{ secrets.FRONTEND_GATE_MAX_ATTEMPTS_PER_MINUTE }}
-          SITE_URL=${{ secrets.SITE_URL }}
-          CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS }}
-          WEBAUTHN_RP_ID=${{ secrets.WEBAUTHN_RP_ID }}
-          WEBAUTHN_ALLOWED_ORIGINS=${{ secrets.WEBAUTHN_ALLOWED_ORIGINS }}
-          FCM_BRIDGE_SIGNING_SECRET=${{ secrets.FCM_BRIDGE_SIGNING_SECRET }}
-          FRONTEND_GATE_PASSWORD=${{ secrets.FRONTEND_GATE_PASSWORD }}
-          FRONTEND_GATE_SESSION_SECRET=${{ secrets.FRONTEND_GATE_SESSION_SECRET }}
-          EOF
+          {
+            printf 'CONTACT_RATE_LIMIT_MAX_PER_MINUTE=%s\n' "$CONTACT_RATE_LIMIT_MAX_PER_MINUTE"
+            printf 'FRONTEND_GATE_MAX_ATTEMPTS_PER_MINUTE=%s\n' "$FRONTEND_GATE_MAX_ATTEMPTS_PER_MINUTE"
+            printf 'SITE_URL=%s\n' "$SITE_URL"
+            printf 'CORS_ALLOWED_ORIGINS=%s\n' "$CORS_ALLOWED_ORIGINS"
+            printf 'WEBAUTHN_RP_ID=%s\n' "$WEBAUTHN_RP_ID"
+            printf 'WEBAUTHN_ALLOWED_ORIGINS=%s\n' "$WEBAUTHN_ALLOWED_ORIGINS"
+            printf 'FCM_BRIDGE_SIGNING_SECRET=%s\n' "$FCM_BRIDGE_SIGNING_SECRET"
+            printf 'FRONTEND_GATE_PASSWORD=%s\n' "$FRONTEND_GATE_PASSWORD"
+            printf 'FRONTEND_GATE_SESSION_SECRET=%s\n' "$FRONTEND_GATE_SESSION_SECRET"
+          } > src/functions/.env
 
       - name: Deploy Functions
         run: firebase deploy --only functions --project bloodhubindia-1da2a

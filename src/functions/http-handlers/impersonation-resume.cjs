@@ -8,8 +8,14 @@ const initAdmin = () => {
 
 const getAuthToken = (headers) => {
   const authHeader = headers?.authorization || headers?.Authorization || '';
-  const match = String(authHeader).match(/^Bearer\s+(.+)$/i);
-  return match ? match[1] : null;
+  // Parsed without a regex on purpose: `\s+` followed by `(.+)` backtracks
+  // polynomially on a "Bearer " header padded with many spaces.
+  const raw = String(authHeader || '');
+  const separatorIndex = raw.search(/\s/);
+  if (separatorIndex < 0) return null;
+  if (raw.slice(0, separatorIndex).toLowerCase() !== 'bearer') return null;
+  const token = raw.slice(separatorIndex + 1).trim();
+  return token || null;
 };
 
 const getClientIp = (headers) => {
@@ -55,6 +61,10 @@ exports.handler = async (event) => {
 
   try {
     initAdmin();
+    // Deliberately no checkRevoked here: this endpoint only ends an
+    // impersonation session. If the impersonated account were disabled or its
+    // tokens revoked mid-session, a revocation check would throw and strand the
+    // superadmin inside the impersonated session.
     const decoded = await admin.auth().verifyIdToken(idToken);
     const actorUid = decoded.impersonatedBy;
     const targetUid = decoded.uid;
@@ -119,7 +129,7 @@ exports.handler = async (event) => {
     });
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message || 'Resume token refresh failed' }),
+      body: JSON.stringify({ error: 'Resume token refresh failed' }),
     };
   }
 };

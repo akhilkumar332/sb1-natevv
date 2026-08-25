@@ -117,6 +117,6 @@ export const handler = async (event) => {
       return jsonResponse(classified.statusCode, classified.body);
     }
     console.error('webauthn-register-verify error:', err);
-    return jsonResponse(500, { error: err?.message || 'Internal error' });
+    return jsonResponse(500, { error: 'Verification failed' });
   }
 };
