@@ -4,6 +4,7 @@ import 'dotenv/config';
 import * as functions from 'firebase-functions/v1';
 import express from 'express';
 import cors from 'cors';
+import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import admin from 'firebase-admin';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { dirname } from 'path';
@@ -16,6 +17,8 @@ dotenv.config();
 // Get the directory name of the current module
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LOG_DEDUPE_WINDOW_MS = 30 * 1000;
+const ONE_MINUTE_MS = 60 * 1000;
+const DONOR_DIRECTORY_MAX_REQUESTS_PER_MINUTE = 30;
 const MAX_REDACTION_DEPTH = 5;
 const recentLogFingerprints = new Map();
 
@@ -234,13 +237,58 @@ app.post('/api/v1/auth/login', async (req, res) => {
     message: 'This endpoint has been disabled for security hardening.',
   });
 });
+// Parsed without a regex on purpose. `/^Bearer\s+(.+)$/` lets `\s+` and `.+`
+// both match spaces, so a "Bearer " header followed by many spaces backtracks
+// polynomially against attacker-controlled input.
+const readBearerToken = (authHeader) => {
+  const header = String(authHeader || '');
+  const separatorIndex = header.search(/\s/);
+  if (separatorIndex < 0) return null;
+  if (header.slice(0, separatorIndex).toLowerCase() !== 'bearer') return null;
+  const token = header.slice(separatorIndex + 1).trim();
+  return token || null;
+};
+
+// Firebase Hosting fronts this function, so req.ip is the proxy. Key on the
+// forwarded client address the same way the standalone handlers do.
+const getRequestClientIp = (req) => {
+  const forwarded = req.headers?.['x-forwarded-for']
+    || req.headers?.['x-nf-client-connection-ip']
+    || req.headers?.['client-ip']
+    || '';
+  const candidate = String(forwarded).split(',')[0].trim();
+  return candidate || req.ip || 'unknown';
+};
+
+// Donor lookups verify an ID token, which is a network round trip, so throttle
+// before that work happens. MemoryStore is per-instance: Cloud Functions can
+// run several instances concurrently, so treat this as a per-instance brake on
+// scraping rather than a global quota.
+const donorDirectoryRateLimit = rateLimit({
+  windowMs: ONE_MINUTE_MS,
+  limit: DONOR_DIRECTORY_MAX_REQUESTS_PER_MINUTE,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(getRequestClientIp(req)),
+  validate: { trustProxy: false, xForwardedForHeader: false },
+  handler: (req, res) => {
+    logEvent({
+      level: 'warn',
+      event: 'donors.list.rate_limited',
+      meta: { path: req.path, method: req.method, ip: req.ip },
+    });
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Too many donor directory requests. Please slow down.',
+    });
+  },
+});
+
 // Donor directory exposes donor PII (name, blood type, city/state, address,
 // coordinates). It must never be readable anonymously, so every donor route is
 // gated behind a verified Firebase ID token.
 const requireAuthenticatedUser = async (req, res, next) => {
-  const authHeader = req.headers?.authorization || req.headers?.Authorization || '';
-  const match = String(authHeader).match(/^Bearer\s+(.+)$/i);
-  const idToken = match ? match[1] : null;
+  const idToken = readBearerToken(req.headers?.authorization || req.headers?.Authorization);
 
   if (!idToken) {
     logEvent({
@@ -346,9 +394,9 @@ const listDonorsHandler = async (req, res) => {
   }
 };
 
-app.get('/api/v1/donors', requireAuthenticatedUser, listDonorsHandler);
-app.post('/api/v1/donors', requireAuthenticatedUser, listDonorsHandler);
-app.get('/v1/donors', requireAuthenticatedUser, listDonorsHandler);
+app.get('/api/v1/donors', donorDirectoryRateLimit, requireAuthenticatedUser, listDonorsHandler);
+app.post('/api/v1/donors', donorDirectoryRateLimit, requireAuthenticatedUser, listDonorsHandler);
+app.get('/v1/donors', donorDirectoryRateLimit, requireAuthenticatedUser, listDonorsHandler);
 // The blood-request stub never persisted anything but still answered 201, so
 // callers were told a request had been created when it had not. Blood requests
 // are written through Firestore from the client, so this legacy route is
