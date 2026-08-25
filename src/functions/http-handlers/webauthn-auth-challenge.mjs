@@ -124,6 +124,6 @@ export const handler = async (event) => {
     return jsonResponse(200, { challengeId, options, staleCredential });
   } catch (err) {
     console.error('webauthn-auth-challenge error:', err);
-    return jsonResponse(500, { error: err?.message || 'Internal error' });
+    return jsonResponse(500, { error: 'Unable to start biometric authentication' });
   }
 };

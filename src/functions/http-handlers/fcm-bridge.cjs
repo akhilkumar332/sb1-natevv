@@ -300,6 +300,6 @@ exports.handler = async (event) => {
         authMode,
       },
     });
-    return { statusCode: 500, headers: responseHeaders, body: JSON.stringify({ ok: false, error: error.message }) };
+    return { statusCode: 500, headers: responseHeaders, body: JSON.stringify({ ok: false, error: 'Unable to record notification.' }) };
   }
 };

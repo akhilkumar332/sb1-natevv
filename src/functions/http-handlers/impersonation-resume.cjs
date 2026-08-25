@@ -55,6 +55,10 @@ exports.handler = async (event) => {
 
   try {
     initAdmin();
+    // Deliberately no checkRevoked here: this endpoint only ends an
+    // impersonation session. If the impersonated account were disabled or its
+    // tokens revoked mid-session, a revocation check would throw and strand the
+    // superadmin inside the impersonated session.
     const decoded = await admin.auth().verifyIdToken(idToken);
     const actorUid = decoded.impersonatedBy;
     const targetUid = decoded.uid;
@@ -119,7 +123,7 @@ exports.handler = async (event) => {
     });
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message || 'Resume token refresh failed' }),
+      body: JSON.stringify({ error: 'Resume token refresh failed' }),
     };
   }
 };

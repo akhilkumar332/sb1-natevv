@@ -54,3 +54,11 @@ workflow/*
 
 .gemini/
 gha-creds-*.json
+
+# Cloud-sync conflict duplicates ("file (1).ext", "file (2).ext").
+# These are stale copies, and some of them ('.env (1)', 'src/functions/.env (1).*')
+# carry real credentials that the plain `.env` / `.env.*` rules do not match.
+*\ (1)*
+*\ (2)*
+*\ copy*
+*\ Copy*

@@ -234,6 +234,39 @@ app.post('/api/v1/auth/login', async (req, res) => {
     message: 'This endpoint has been disabled for security hardening.',
   });
 });
+// Donor directory exposes donor PII (name, blood type, city/state, address,
+// coordinates). It must never be readable anonymously, so every donor route is
+// gated behind a verified Firebase ID token.
+const requireAuthenticatedUser = async (req, res, next) => {
+  const authHeader = req.headers?.authorization || req.headers?.Authorization || '';
+  const match = String(authHeader).match(/^Bearer\s+(.+)$/i);
+  const idToken = match ? match[1] : null;
+
+  if (!idToken) {
+    logEvent({
+      level: 'warn',
+      event: 'api.auth.missing_token',
+      dedupe: false,
+      meta: { path: req.path, method: req.method, ip: req.ip },
+    });
+    return res.status(401).json({ error: 'Unauthorized', message: 'Missing authentication token.' });
+  }
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    req.authUid = decoded.uid;
+    return next();
+  } catch (error) {
+    logEvent({
+      level: 'warn',
+      event: 'api.auth.invalid_token',
+      error,
+      meta: { path: req.path, method: req.method, ip: req.ip },
+    });
+    return res.status(401).json({ error: 'Unauthorized', message: 'Invalid authentication token.' });
+  }
+};
+
 const listDonorsHandler = async (req, res) => {
   try {
     const bloodType = req.method === 'GET'
@@ -313,18 +346,28 @@ const listDonorsHandler = async (req, res) => {
   }
 };
 
-app.get('/api/v1/donors', listDonorsHandler);
-app.post('/api/v1/donors', listDonorsHandler);
-app.get('/v1/donors', listDonorsHandler);
-app.post('/api/v1/blood-requests', async (req, res) => {
-  const { bloodType, quantity } = req.body;
-
-  if (!bloodType || !quantity) {
-    return res.status(400).json({ message: 'Invalid request data' });
-  }
-
-  // Here you would typically save the blood request to your database
-  res.status(201).json({ message: 'Blood request created successfully' });
+app.get('/api/v1/donors', requireAuthenticatedUser, listDonorsHandler);
+app.post('/api/v1/donors', requireAuthenticatedUser, listDonorsHandler);
+app.get('/v1/donors', requireAuthenticatedUser, listDonorsHandler);
+// The blood-request stub never persisted anything but still answered 201, so
+// callers were told a request had been created when it had not. Blood requests
+// are written through Firestore from the client, so this legacy route is
+// disabled rather than left reporting false success.
+app.post('/api/v1/blood-requests', (req, res) => {
+  logEvent({
+    level: 'warn',
+    event: 'blood_requests.legacy_endpoint.disabled',
+    dedupe: false,
+    meta: {
+      path: req.path,
+      method: req.method,
+      ip: req.ip,
+    },
+  });
+  res.status(410).json({
+    error: 'Disabled',
+    message: 'This endpoint has been disabled. Submit blood requests through the application.',
+  });
 });
 
 // ========================================================================
@@ -538,9 +581,7 @@ app.use((req, res) => {
     message: `Route ${req.originalUrl} not found`,
     availableRoutes: [
       '/api/v1/health',
-      '/api/v1/auth/login',
-      '/api/v1/donors',
-      '/api/v1/blood-requests'
+      '/api/v1/donors'
     ]
   });
 });

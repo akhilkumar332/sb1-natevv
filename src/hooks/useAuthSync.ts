@@ -86,7 +86,13 @@ export const useAuthSync = () => {
       missingTokenGraceStartedAtRef.current = null;
 
       if (lastLoginTime) {
-        const timeElapsed = now - parseInt(lastLoginTime);
+        // A corrupted value used to parse to NaN, and `NaN > SESSION_DURATION`
+        // is false, so the session would never expire. Treat an unparseable
+        // timestamp as an expired session instead.
+        const loginTimestamp = Number.parseInt(lastLoginTime, 10);
+        const timeElapsed = Number.isFinite(loginTimestamp)
+          ? now - loginTimestamp
+          : Number.POSITIVE_INFINITY;
         // Force logout after 24 hours of inactivity
         if (timeElapsed > SESSION_DURATION && !impersonationSession) {
           logout(navigate);

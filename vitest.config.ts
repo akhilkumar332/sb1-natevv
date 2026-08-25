@@ -16,6 +16,9 @@ export default defineConfig({
       '**/dist/**',
       '**/e2e/**',
       '**/.{idea,git,cache,output,temp}/**',
+      // Cloud-sync conflict copies of real test files.
+      '**/* (1)*',
+      '**/* (2)*',
     ],
     coverage: {
       provider: 'v8',

@@ -54,12 +54,48 @@ const getMaxAttemptsPerMinute = () => {
   return Math.floor(value);
 };
 
+const toNormalizedOrigin = (value) => {
+  if (!value) return null;
+  try {
+    return new URL(String(value).trim()).origin;
+  } catch {
+    return null;
+  }
+};
+
+// Only origins we own may read gate state or attempt the password with
+// credentials attached. Reflecting the caller's Origin here would let any site
+// probe the gate and brute-force the password from a visitor's browser.
+const getAllowedOrigins = () => {
+  const configured = String(process.env.CORS_ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(toNormalizedOrigin)
+    .filter(Boolean);
+
+  const siteOrigin = toNormalizedOrigin(process.env.SITE_URL);
+
+  const localOrigins = process.env.NODE_ENV === 'production'
+    ? []
+    : ['http://localhost:5180', 'http://localhost:4173', 'http://127.0.0.1:5180', 'http://127.0.0.1:4173'];
+
+  return new Set([
+    ...configured,
+    ...(siteOrigin ? [siteOrigin] : []),
+    ...localOrigins,
+  ]);
+};
+
 const getResponseHeaders = (event) => {
-  const origin = event?.headers?.origin || event?.headers?.Origin || '';
+  const origin = toNormalizedOrigin(event?.headers?.origin || event?.headers?.Origin);
   if (!origin) return RESPONSE_HEADERS;
+  if (!getAllowedOrigins().has(origin)) {
+    // Same-origin requests from Firebase Hosting rewrites still work; only
+    // disallowed cross-origin callers lose the CORS grant.
+    return { ...RESPONSE_HEADERS, Vary: 'Origin' };
+  }
   return {
     ...RESPONSE_HEADERS,
-    'Access-Control-Allow-Origin': String(origin),
+    'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Credentials': 'true',
     Vary: 'Origin',
   };

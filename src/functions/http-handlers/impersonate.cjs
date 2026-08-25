@@ -1,6 +1,8 @@
 const admin = require('firebase-admin');
 const { logFunctionError } = require('./error-log.cjs');
 
+const UID_PATTERN = /^[A-Za-z0-9:_-]{6,128}$/;
+
 const initAdmin = () => {
   if (admin.apps.length) return;
   admin.initializeApp();
@@ -45,11 +47,16 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) };
   }
 
-  const targetUid = payload?.targetUid;
+  const targetUid = typeof payload?.targetUid === 'string' ? payload.targetUid.trim() : '';
   const reason = typeof payload?.reason === 'string' ? payload.reason.trim() : '';
   const caseId = typeof payload?.caseId === 'string' ? payload.caseId.trim() : '';
   if (!targetUid) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing targetUid' }) };
+  }
+  // Firestore treats slashes in a document id as a path separator, so an
+  // unvalidated uid could be steered at an unrelated document.
+  if (!UID_PATTERN.test(targetUid)) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid targetUid' }) };
   }
 
   const idToken = getAuthToken(event.headers || {});
@@ -61,7 +68,10 @@ exports.handler = async (event) => {
   let actorRole = null;
   try {
     initAdmin();
-    const decoded = await admin.auth().verifyIdToken(idToken);
+    // checkRevoked: this is the highest-privilege endpoint in the app, so a
+    // session that has been revoked must not stay usable until the ID
+    // token's natural expiry.
+    const decoded = await admin.auth().verifyIdToken(idToken, true);
     actorUid = decoded.uid;
 
     const db = admin.firestore();
@@ -269,7 +279,7 @@ exports.handler = async (event) => {
     });
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message || 'Impersonation failed' }),
+      body: JSON.stringify({ error: 'Impersonation failed' }),
     };
   }
 };

@@ -53,6 +53,24 @@ const unregisterServiceWorkers = async () => {
   }));
 };
 
+// Storage can throw (Safari private mode, blocked third-party storage). A
+// failure to persist the version must never stop the reload from happening.
+const readStoredVersion = () => {
+  try {
+    return localStorage.getItem(VERSION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const writeStoredVersion = (version: string) => {
+  try {
+    localStorage.setItem(VERSION_STORAGE_KEY, version);
+  } catch {
+    // Ignore: the reload still needs to proceed.
+  }
+};
+
 const clearCookies = () => {
   const cookies = document.cookie.split(';');
   const host = window.location.hostname;
@@ -78,6 +96,7 @@ export const useVersionCheck = () => {
   const currentVersionRef = useRef<string | null>(null);
   const isRefreshingRef = useRef(false);
   const notifiedVersionRef = useRef<string | null>(null);
+  const trackedVersionRef = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -100,7 +119,7 @@ export const useVersionCheck = () => {
 
       clearCookies();
       if (nextVersion) {
-        localStorage.setItem(VERSION_STORAGE_KEY, nextVersion);
+        writeStoredVersion(nextVersion);
       }
       window.location.reload();
     };
@@ -158,13 +177,13 @@ export const useVersionCheck = () => {
             nextBuildTime: null,
             updateAvailable: false,
           });
-          const storedVersion = localStorage.getItem(VERSION_STORAGE_KEY);
+          const storedVersion = readStoredVersion();
           if (storedVersion && storedVersion !== nextVersion) {
             await handleRefresh(nextVersion);
             return;
           }
           if (!storedVersion) {
-            localStorage.setItem(VERSION_STORAGE_KEY, nextVersion);
+            writeStoredVersion(nextVersion);
           }
           return;
         }
@@ -175,11 +194,18 @@ export const useVersionCheck = () => {
             nextBuildTime: nextVersion,
             updateAvailable: true,
           });
-          monitoringService.trackEvent(FIREBASE_ANALYTICS_EVENTS.appUpdateAvailable, {
-            current_build_time: currentVersionRef.current,
-            next_build_time: nextVersion,
-            source,
-          });
+          // currentVersionRef intentionally keeps pointing at the running build
+          // until the user refreshes, so this branch is re-entered on every
+          // poll. Report the update once per detected build instead of once a
+          // minute for as long as the tab stays open.
+          if (trackedVersionRef.current !== nextVersion) {
+            trackedVersionRef.current = nextVersion;
+            monitoringService.trackEvent(FIREBASE_ANALYTICS_EVENTS.appUpdateAvailable, {
+              current_build_time: currentVersionRef.current,
+              next_build_time: nextVersion,
+              source,
+            });
+          }
           if (source === 'initial') {
             await handleRefresh(nextVersion);
             return;
