@@ -3,7 +3,7 @@
  * Fetches all NGO-related data from Firestore
  */
 
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { collection, query, where, limit, onSnapshot, getDocs, documentId, writeBatch, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { COLLECTIONS } from '../constants/firestore';
@@ -62,6 +62,10 @@ export interface Partnership {
   contactPerson?: string;
   contactEmail?: string;
   contactPhone?: string;
+  // Carried so the edit form can pre-fill them. Without these the edit modal
+  // opened blank and saved '' back, wiping the stored terms on every edit.
+  endDate?: Date;
+  termsOfAgreement?: string;
 }
 
 export interface DonorCommunity {
@@ -378,6 +382,8 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
           contactPerson: data.contactPerson,
           contactEmail: data.contactEmail,
           contactPhone: data.contactPhone,
+          endDate: data.endDate?.toDate?.() || undefined,
+          termsOfAgreement: data.termsOfAgreement || '',
         };
       });
       const sorted = [...partnershipList].sort((a, b) => b.since.getTime() - a.since.getTime());
@@ -653,6 +659,18 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
     ]);
   };
 
+  // NgoDashboard has an effect that depends on refreshData. A fresh function
+  // identity on every render re-fired that effect continuously, and each run
+  // re-read the whole publicDonors collection. Hand out a stable wrapper that
+  // always calls the latest implementation, so the identity is constant without
+  // capturing stale state.
+  const refreshDataRef = useRef(refreshData);
+  refreshDataRef.current = refreshData;
+  const stableRefreshData = useCallback(
+    (options?: { silent?: boolean }) => refreshDataRef.current(options),
+    [],
+  );
+
   const getParticipantDonors = async (donorIds: string[]): Promise<DonorSummary[]> => {
     if (!Array.isArray(donorIds) || donorIds.length === 0) return [];
     const normalized = Array.from(new Set(donorIds.filter(Boolean)));
@@ -789,6 +807,6 @@ export const useNgoData = (ngoId: string): UseNgoDataReturn => {
     getParticipantDonors,
     loading,
     error,
-    refreshData,
+    refreshData: stableRefreshData,
   };
 };

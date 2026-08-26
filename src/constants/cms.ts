@@ -28,8 +28,12 @@ export const CMS_REVIEW_STATUS = {
 
 export type CmsReviewStatus = (typeof CMS_REVIEW_STATUS)[keyof typeof CMS_REVIEW_STATUS];
 
+// Only locations that a public component actually renders belong here. 'header'
+// was offered in the menu editor and saved fine, but nothing ever read it, so
+// admins could build a header menu that silently did nothing. Re-add it here
+// only together with a Navbar consumer (Footer.tsx shows the pattern: read the
+// CMS menu, fall back to the hardcoded defaults when no document exists).
 export const CMS_MENU_LOCATION = {
-  header: 'header',
   footerResources: 'footer_resources',
   footerLegal: 'footer_legal',
 } as const;

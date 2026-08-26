@@ -6,6 +6,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { collection, query, where, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import { normalizeRespondedDonors, type RespondedDonor } from '../utils/bloodRequestDonors';
 import { COLLECTIONS } from '../constants/firestore';
 import { useScopedErrorReporter } from './useScopedErrorReporter';
 import { readDashboardCache, writeDashboardCache } from '../utils/dashboardCache';
@@ -57,12 +58,9 @@ export interface BloodRequest {
   status: 'active' | 'fulfilled' | 'partially_fulfilled' | 'expired' | 'cancelled';
   requestedAt: Date;
   neededBy: Date;
-  respondedDonors?: Array<{
-    donorId: string;
-    donorName: string;
-    respondedAt: Date;
-    status: 'pending' | 'confirmed' | 'rejected';
-  }>;
+  // Shared shape: entries may be stored as bare UID strings (canonical) or as
+  // legacy response objects, so respondedAt is genuinely optional.
+  respondedDonors?: RespondedDonor[];
   confirmedDonors?: string[];
   fulfilledAt?: Date;
   location: {
@@ -183,7 +181,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
       requestedAt: item.requestedAt?.toISOString(),
       neededBy: item.neededBy?.toISOString(),
       fulfilledAt: item.fulfilledAt ? item.fulfilledAt.toISOString() : null,
-      respondedDonors: (item.respondedDonors || []).map((donor) => ({
+      respondedDonors: normalizeRespondedDonors(item.respondedDonors).map((donor) => ({
         ...donor,
         respondedAt: donor.respondedAt?.toISOString(),
       })),
@@ -209,10 +207,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
       requestedAt: item.requestedAt ? new Date(item.requestedAt) : new Date(),
       neededBy: item.neededBy ? new Date(item.neededBy) : new Date(),
       fulfilledAt: item.fulfilledAt ? new Date(item.fulfilledAt) : undefined,
-      respondedDonors: (item.respondedDonors || []).map((donor: any) => ({
-        ...donor,
-        respondedAt: donor.respondedAt ? new Date(donor.respondedAt) : new Date(),
-      })),
+      respondedDonors: normalizeRespondedDonors(item.respondedDonors),
     }));
 
   const fetchInventory = async () => {
@@ -297,12 +292,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
               status: data.status || 'active',
               requestedAt: data.requestedAt?.toDate() || data.createdAt?.toDate() || new Date(),
               neededBy: data.neededBy?.toDate() || new Date(),
-              respondedDonors: (data.respondedDonors || []).map((donor: any) => ({
-                donorId: donor.donorId || '',
-                donorName: donor.donorName || '',
-                respondedAt: donor.respondedAt?.toDate() || new Date(),
-                status: donor.status || 'pending',
-              })),
+              respondedDonors: normalizeRespondedDonors(data.respondedDonors),
               confirmedDonors: data.confirmedDonors || [],
               fulfilledAt: data.fulfilledAt?.toDate(),
               location: {
@@ -453,12 +443,7 @@ export const useBloodBankData = (bloodBankId: string): UseBloodBankDataReturn =>
         status: data.status || 'active',
         requestedAt: data.requestedAt?.toDate() || data.createdAt?.toDate() || new Date(),
         neededBy: data.neededBy?.toDate() || new Date(),
-        respondedDonors: (data.respondedDonors || []).map((donor: any) => ({
-          donorId: donor.donorId || '',
-          donorName: donor.donorName || '',
-          respondedAt: donor.respondedAt?.toDate() || new Date(),
-          status: donor.status || 'pending',
-        })),
+        respondedDonors: normalizeRespondedDonors(data.respondedDonors),
         confirmedDonors: data.confirmedDonors || [],
         fulfilledAt: data.fulfilledAt?.toDate(),
         location: {

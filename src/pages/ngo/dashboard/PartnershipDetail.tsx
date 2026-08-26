@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useOutletContext, useParams } from 'react-router-dom';
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { createScopedErrorNotifier, notify } from 'services/notify.service';
 import {
   ArrowLeft,
@@ -32,6 +32,7 @@ const emptyForm = {
 import { ROUTES } from '../../../constants/routes';
 function NgoPartnershipDetail() {
   const { partnershipId } = useParams();
+  const navigate = useNavigate();
   const { partnerships, getStatusColor, refreshData, user } = useOutletContext<NgoDashboardContext>();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -82,6 +83,10 @@ function NgoPartnershipDetail() {
     try {
       await deletePartnership(partnership.id);
       notify.success('Partnership deleted.');
+      // The record this page renders is gone, so staying here shows the
+      // "not found" state. Return to the list instead, replacing the entry so
+      // Back does not land on the dead detail route.
+      navigate(ROUTES.portal.ngo.dashboard.partnerships, { replace: true });
       await refreshData();
     } catch (error: unknown) {
       notifyNgoPartnershipDetailError(

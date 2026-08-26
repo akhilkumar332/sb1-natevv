@@ -15,7 +15,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { normalizePhoneNumber } from '../../../utils/phone';
 import { isValidEmail } from '../../../utils/validation';
 import { countries, getStatesByCountry, getCitiesByState } from '../../../data/locations';
-import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import { authMessages } from '../../../constants/messages';
 import { COLLECTIONS } from '../../../constants/firestore';
@@ -660,6 +660,23 @@ const DonorAccount = () => {
     setDeleteLoading(true);
     try {
       const currentUserId = auth.currentUser.uid;
+
+      // Tombstone the public directory copy FIRST, while the session still
+      // exists. publicDonors is world-readable and only an admin may delete it,
+      // so if the auth user is destroyed before this runs the donor's name,
+      // blood type, address and coordinates stay on the public /donors listing
+      // forever with no way for them to remove it. Failing here aborts the
+      // deletion, which is recoverable -- an orphaned public record is not.
+      const publicDonorRef = doc(db, COLLECTIONS.PUBLIC_DONORS, currentUserId);
+      const publicDonorSnap = await getDoc(publicDonorRef);
+      if (publicDonorSnap.exists()) {
+        await setDoc(publicDonorRef, {
+          status: 'deleted',
+          isAvailable: false,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+
       await updateDoc(doc(db, COLLECTIONS.USERS, currentUserId), {
         status: 'deleted',
         deletedAt: serverTimestamp(),

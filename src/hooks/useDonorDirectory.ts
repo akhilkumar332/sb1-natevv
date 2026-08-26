@@ -7,6 +7,7 @@ import type { DonorSummary } from './useNgoData';
 import {
   buildDonorQueryConstraints,
   filterDonorRows,
+  isListableDonorDoc,
   mapDocToDonorSummary,
 } from '../utils/donorDirectory';
 import { readCacheWithTtl, writeCache } from '../utils/cacheLifecycle';
@@ -312,7 +313,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
         if (hasExtra) {
           docs = direction === 'prev' ? docs.slice(docs.length - pageSize) : docs.slice(0, pageSize);
         }
-        const donorList = await enrichDonorContacts(docs.map(mapDocToDonorSummary));
+        const donorList = await enrichDonorContacts(docs.filter(isListableDonorDoc).map(mapDocToDonorSummary));
         if (!isMountedRef.current || fetchId !== donorFetchIdRef.current) return;
         setDonors(donorList);
         setFirstDocId(docs[0]?.id || null);
@@ -391,6 +392,7 @@ export const useDonorDirectory = (options: UseDonorDirectoryOptions) => {
           query(collection(db, COLLECTIONS.PUBLIC_DONORS), orderBy(documentId()), limit(mapFetchLimit))
         );
         const publicRows = publicSnap.docs
+          .filter(isListableDonorDoc)
           .map(mapDocToDonorSummary)
           .filter((donor) => typeof donor.latitude === 'number' && typeof donor.longitude === 'number');
         if (!isMountedRef.current) return;

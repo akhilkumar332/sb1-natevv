@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, where, orderBy, limit, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { captureHandledError } from '../services/errorLog.service';
+import { normalizeRespondedDonors, type RespondedDonor } from '../utils/bloodRequestDonors';
 import { COLLECTIONS } from '../constants/firestore';
 import { SEVEN_DAYS_MS, THIRTY_DAYS_MS } from '../constants/time';
 
@@ -46,12 +47,9 @@ export interface BloodRequest {
   status: 'active' | 'fulfilled' | 'partially_fulfilled' | 'expired' | 'cancelled';
   requestedAt: Date;
   neededBy: Date;
-  respondedDonors?: Array<{
-    donorId: string;
-    donorName: string;
-    respondedAt: Date;
-    status: 'pending' | 'confirmed' | 'rejected';
-  }>;
+  // Shared shape: entries may be stored as bare UID strings (canonical) or as
+  // legacy response objects, so respondedAt is genuinely optional.
+  respondedDonors?: RespondedDonor[];
   confirmedDonors?: string[];
   fulfilledAt?: Date;
   location: {
@@ -229,12 +227,7 @@ export const useBloodBankLegacyData = (hospitalId: string): UseBloodBankLegacyDa
               status: data.status || 'active',
               requestedAt: data.requestedAt?.toDate() || data.createdAt?.toDate() || new Date(),
               neededBy: data.neededBy?.toDate() || new Date(),
-              respondedDonors: (data.respondedDonors || []).map((donor: any) => ({
-                donorId: donor.donorId || '',
-                donorName: donor.donorName || '',
-                respondedAt: donor.respondedAt?.toDate() || new Date(),
-                status: donor.status || 'pending',
-              })),
+              respondedDonors: normalizeRespondedDonors(data.respondedDonors),
               confirmedDonors: data.confirmedDonors || [],
               fulfilledAt: data.fulfilledAt?.toDate(),
               location: data.location || { city: '', state: '' },

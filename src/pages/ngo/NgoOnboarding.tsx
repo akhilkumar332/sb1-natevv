@@ -135,14 +135,42 @@ export function NgoOnboarding() {
     Other: t('onboarding.ngoTypes.other'),
   };
 
+  // This screen doubles as "Update Organization Profile" from the account page,
+  // so it must prefill everything already on record. It previously copied only
+  // name/email/phone, which meant an existing NGO saw a blank wizard and -- worse
+  // -- re-saved with latitude/longitude still at the India centroid default,
+  // silently moving their pin. Hydrate once, on the first resolved user, so a
+  // later context refresh cannot clobber in-progress edits.
+  const hydratedFromUserRef = useRef(false);
   useEffect(() => {
-    if (user) {
-      setFormData(prev => ({
-        ...prev,
-        contactPersonName: user.displayName || prev.contactPersonName,
-        email: user.email || prev.email,
-        phone: user.phoneNumber || prev.phone,
-      }));
+    if (!user || hydratedFromUserRef.current) return;
+    hydratedFromUserRef.current = true;
+
+    const asString = (value: unknown) => (typeof value === 'string' ? value : '');
+    const anyUser = user as Record<string, any>;
+
+    setFormData(prev => ({
+      ...prev,
+      organizationName: asString(anyUser.organizationName) || prev.organizationName,
+      registrationNumber: asString(anyUser.registrationNumber) || prev.registrationNumber,
+      ngoType: asString(anyUser.ngoType) || prev.ngoType,
+      contactPersonName: user.displayName || prev.contactPersonName,
+      email: user.email || prev.email,
+      phone: user.phoneNumber || prev.phone,
+      address: asString(anyUser.address) || prev.address,
+      city: asString(anyUser.city) || prev.city,
+      state: asString(anyUser.state) || prev.state,
+      postalCode: asString(anyUser.postalCode) || prev.postalCode,
+      country: asString(anyUser.country) || prev.country,
+      website: asString(anyUser.website) || prev.website,
+      yearEstablished: anyUser.yearEstablished ? String(anyUser.yearEstablished) : prev.yearEstablished,
+      description: asString(anyUser.description) || prev.description,
+      latitude: typeof anyUser.latitude === 'number' ? anyUser.latitude : prev.latitude,
+      longitude: typeof anyUser.longitude === 'number' ? anyUser.longitude : prev.longitude,
+    }));
+
+    if (typeof anyUser.latitude === 'number' && typeof anyUser.longitude === 'number') {
+      setMapPosition([anyUser.latitude, anyUser.longitude]);
     }
   }, [user]);
 

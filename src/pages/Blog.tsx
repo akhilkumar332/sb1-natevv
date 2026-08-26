@@ -149,21 +149,14 @@ export default function BlogPage() {
     return Array.from(set).sort();
   }, [posts]);
 
-  const effectiveCategory = (
-    selectedCategory === 'all' || categories.includes(selectedCategory)
-      ? selectedCategory
-      : 'all'
-  );
-  const effectiveSeries = (
-    selectedSeries === 'all' || series.includes(selectedSeries)
-      ? selectedSeries
-      : 'all'
-  );
-  const effectiveAuthor = (
-    selectedAuthor === 'all' || authors.includes(selectedAuthor)
-      ? selectedAuthor
-      : 'all'
-  );
+  // Do NOT coerce an unrecognised filter to 'all'. The facet lists are derived
+  // from the currently loaded (capped) page of posts, so a valid category that
+  // simply is not in this window used to fall back to 'all' and render every
+  // post -- a /blog?category=x URL silently showed unrelated articles instead of
+  // an empty state.
+  const effectiveCategory = selectedCategory;
+  const effectiveSeries = selectedSeries;
+  const effectiveAuthor = selectedAuthor;
 
   const filteredPosts = useMemo(() => (
     posts.filter((post) => {

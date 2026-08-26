@@ -29,6 +29,19 @@ const parseLongitude = (data: any): number | undefined => (
       : undefined
 );
 
+/**
+ * publicDonors is a denormalised, world-readable mirror of donor profiles.
+ * Deleting an account tombstones the mirror (status 'deleted') rather than
+ * removing it, because only an admin may delete from this collection. Every
+ * directory read must therefore filter tombstones out, or a deleted donor keeps
+ * appearing in the public listing and in NGO/blood-bank donor pickers.
+ */
+export const isListableDonorDoc = (docOrRow: any): boolean => {
+  const data = docOrRow?.data ? docOrRow.data() : docOrRow;
+  const status = data?.status;
+  return !status || status === 'active';
+};
+
 export const mapDocToDonorSummary = (docOrRow: any): DonorSummary => {
   const data = docOrRow?.data ? docOrRow.data() : docOrRow;
   const latitude = parseLatitude(data);

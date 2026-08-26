@@ -3,6 +3,7 @@ import { Droplet, AlertCircle, User, Calendar, Phone, Mail, Hospital, FileText, 
 import { notify } from 'services/notify.service';
 import { Link } from 'react-router-dom';
 import { captureHandledError } from '../services/errorLog.service';
+import { submitBloodRequest } from '../services/bloodRequestIntake.service';
 import { monitoringService } from '../services/monitoring.service';
 import { ROUTES } from '../constants/routes';
 import { useCmsFrontendPageContent } from '../hooks/useCmsFrontendPageContent';
@@ -161,6 +162,10 @@ function RequestBlood() {
 
     if (validateForm()) {
       try {
+        // Persist first, then report success. This form used to only fire an
+        // analytics event and toast -- every request submitted by a patient or
+        // family member was silently discarded.
+        await submitBloodRequest(formData);
         monitoringService.trackEvent('blood_request_form_submitted', {
           blood_type: formData.bloodType,
           urgency: formData.urgency,

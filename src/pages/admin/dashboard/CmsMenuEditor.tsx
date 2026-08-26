@@ -89,7 +89,7 @@ export default function CmsMenuEditorPage() {
 
   const initialLocation = isValidLocation(locationParam || '')
     ? (locationParam as (typeof locationOptions)[number])
-    : CMS_MENU_LOCATION.header;
+    : CMS_MENU_LOCATION.footerResources;
 
   const [location, setLocation] = useState<(typeof locationOptions)[number]>(initialLocation);
   const [status, setStatus] = useState<MenuStatus>('published');

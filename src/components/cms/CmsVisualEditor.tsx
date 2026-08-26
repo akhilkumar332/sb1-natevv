@@ -198,7 +198,9 @@ export default function CmsVisualEditor({
         title: 'Call to Action',
         body: 'Add a short, persuasive line.',
         ctaLabel: 'Get Started',
-        ctaHref: '/portal-picker',
+        // '/portal-picker' is not a route -- the shipped default 404'd. Leave it
+        // empty so the admin supplies a real destination.
+        ctaHref: '',
         enabled: true,
         order: customSections.length + 1,
       }

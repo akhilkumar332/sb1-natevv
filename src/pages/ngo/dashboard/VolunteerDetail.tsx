@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useOutletContext, useParams } from 'react-router-dom';
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { createScopedErrorNotifier, notify } from 'services/notify.service';
 import {
   ArrowLeft,
@@ -32,6 +32,7 @@ const emptyForm = {
 import { ROUTES } from '../../../constants/routes';
 function NgoVolunteerDetail() {
   const { volunteerId } = useParams();
+  const navigate = useNavigate();
   const { volunteers, getStatusColor, refreshData } = useOutletContext<NgoDashboardContext>();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -82,6 +83,10 @@ function NgoVolunteerDetail() {
     try {
       await deleteVolunteer(volunteer.id);
       notify.success('Volunteer deleted.');
+      // The record this page renders is gone, so staying here shows the
+      // "not found" state. Return to the list instead, replacing the entry so
+      // Back does not land on the dead detail route.
+      navigate(ROUTES.portal.ngo.dashboard.volunteers, { replace: true });
       await refreshData();
     } catch (error: unknown) {
       notifyNgoVolunteerDetailError(

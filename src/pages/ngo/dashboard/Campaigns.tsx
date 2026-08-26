@@ -267,8 +267,12 @@ function NgoCampaigns() {
           city: form.city,
           state: form.state,
           venue: form.venue,
-          latitude: form.latitude ? Number(form.latitude) : undefined,
-          longitude: form.longitude ? Number(form.longitude) : undefined,
+          // Coordinates are only set by the map picker / address autocomplete and
+          // are not required by the form. Omit the keys entirely when absent --
+          // emitting `undefined` inside this nested object used to fail the whole
+          // write, so a campaign typed in by hand could never be saved.
+          ...(form.latitude ? { latitude: Number(form.latitude) } : {}),
+          ...(form.longitude ? { longitude: Number(form.longitude) } : {}),
         },
         createdBy: user.uid,
       };

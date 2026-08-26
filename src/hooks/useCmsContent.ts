@@ -92,12 +92,31 @@ export const usePublishedBlogPosts = (
   useEffect(() => {
     if (!query.data?.length) return;
     writeCachedBlogPosts(query.data);
+
+    // These rows come from `cmsBlogPostSummaries`, which deliberately omits
+    // `contentJson`. Seeding them into the per-slug detail cache gives the
+    // article view an instant header/cover paint, but they must be marked stale
+    // or React Query serves the bodyless summary for the whole staleTime window
+    // and never calls getPublishedBlogPostBySlug -- which is the only thing that
+    // reads the full document. That is what made every article render the
+    // "content coming soon" placeholder.
+    const seed = (key: readonly unknown[], entry: CmsBlogPost) => {
+      const existing = queryClient.getQueryData<CmsBlogPost | null>(key);
+      // Never downgrade a full post that has already been fetched.
+      if (existing?.contentJson) return;
+      queryClient.setQueryData<CmsBlogPost | null>(
+        key,
+        entry,
+        entry.contentJson ? undefined : { updatedAt: 0 },
+      );
+    };
+
     query.data.forEach((entry) => {
       if (!entry.slug) return;
-      queryClient.setQueryData(cmsPublicQueryKeys.blogPostBySlug(entry.slug), (prev: CmsBlogPost | null | undefined) => prev || entry);
+      seed(cmsPublicQueryKeys.blogPostBySlug(entry.slug), entry);
       (entry.slugAliases || []).forEach((alias) => {
         if (!alias) return;
-        queryClient.setQueryData(cmsPublicQueryKeys.blogPostBySlug(alias), (prev: CmsBlogPost | null | undefined) => prev || entry);
+        seed(cmsPublicQueryKeys.blogPostBySlug(alias), entry);
       });
     });
   }, [query.data, queryClient]);
@@ -124,19 +143,26 @@ export const usePublishedBlogPostsPage = (
   retry: 1,
 });
 
+const readCachedBlogPostBySlug = (slug: string): CmsBlogPost | null => {
+  const normalizedSlug = toCmsSlug(slug);
+  if (!normalizedSlug) return null;
+  const cached = readCachedBlogPosts();
+  if (!cached?.length) return null;
+  return cached.find((entry) => (
+    entry.slug === normalizedSlug
+    || (Array.isArray(entry.slugAliases) && entry.slugAliases.includes(normalizedSlug))
+  )) || null;
+};
+
 export const usePublishedBlogPostBySlug = (slug: string) => useQuery<CmsBlogPost | null>({
   queryKey: cmsPublicQueryKeys.blogPostBySlug(toCmsSlug(slug)),
   queryFn: () => getPublishedBlogPostBySlug(toCmsSlug(slug)),
-  initialData: () => {
-    const normalizedSlug = toCmsSlug(slug);
-    if (!normalizedSlug) return null;
-    const cached = readCachedBlogPosts();
-    if (!cached?.length) return null;
-    return cached.find((entry) => (
-      entry.slug === normalizedSlug
-      || (Array.isArray(entry.slugAliases) && entry.slugAliases.includes(normalizedSlug))
-    )) || null;
-  },
+  initialData: () => readCachedBlogPostBySlug(slug),
+  // The localStorage blog cache stores list rows, which are summaries without
+  // `contentJson`. Treating one as fresh would suppress the fetch of the full
+  // document and render an empty article body, so age it out immediately.
+  // A cached entry that does carry content keeps normal freshness.
+  initialDataUpdatedAt: () => (readCachedBlogPostBySlug(slug)?.contentJson ? Date.now() : 0),
   enabled: Boolean(toCmsSlug(slug)),
   staleTime: CMS_CACHE.staleTime,
   gcTime: CMS_CACHE.gcTime,

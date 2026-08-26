@@ -43,14 +43,18 @@ function Footer() {
     { id: 'donor-portal', path: ROUTES.portal.donor.login, external: false },
     { id: 'bloodbank-portal', path: ROUTES.portal.bloodbank.login, external: false },
     { id: 'ngo-portal', path: ROUTES.portal.ngo.login, external: false },
-    { id: 'faq', path: '/faq', external: false },
+    // Generic CMS pages are served at /p/:slug -- there is no top-level /faq
+    // route, so the previous '/faq' default rendered the 404 screen.
+    { id: 'faq', path: ROUTES.cmsPage.replace(':slug', 'faq'), external: false },
     ...(showBlogInFooter ? [{ id: 'blog', path: ROUTES.blog, external: false }] : []),
   ];
+  // Same here: these are CMS-backed pages at /p/:slug, not top-level routes.
+  // /sitemap is dropped entirely -- the sitemap is a generated XML artifact in
+  // public/, not a rendered page, so it never had a route to point at.
   const defaultLegalLinks = [
-    { id: 'privacy', path: '/privacy', external: false },
-    { id: 'terms', path: '/terms', external: false },
-    { id: 'disclaimer', path: '/disclaimer', external: false },
-    { id: 'sitemap', path: '/sitemap', external: false },
+    { id: 'privacy', path: ROUTES.cmsPage.replace(':slug', 'privacy'), external: false },
+    { id: 'terms', path: ROUTES.cmsPage.replace(':slug', 'terms'), external: false },
+    { id: 'disclaimer', path: ROUTES.cmsPage.replace(':slug', 'disclaimer'), external: false },
   ];
   const resourceLinks = footerResourcesQuery.data?.items?.length ? footerResourcesQuery.data.items : defaultResourceLinks;
   const legalLinks = footerLegalQuery.data?.items?.length ? footerLegalQuery.data.items : defaultLegalLinks;

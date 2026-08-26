@@ -17,8 +17,13 @@ export default defineConfig({
       '**/e2e/**',
       '**/.{idea,git,cache,output,temp}/**',
       // Cloud-sync conflict copies of real test files.
-      '**/* (1)*',
-      '**/* (2)*',
+      // The parens must be bracketed: picomatch reads a bare `(1)` as an
+      // extglob group, so the obvious '**/* (1)*' silently matches nothing and
+      // the stale duplicates keep running.
+      '**/*[(]1[)]*',
+      '**/*[(]2[)]*',
+      // Rules tests need the Firestore emulator; run via `npm run test:rules`.
+      '**/*.emulator.test.*',
     ],
     coverage: {
       provider: 'v8',

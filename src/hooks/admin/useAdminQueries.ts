@@ -147,7 +147,14 @@ const useCachedAdminQuery = <T,>(
   });
 };
 
-const fetchAdminUsers = async (role: AdminUserRoleFilter = 'all', limitCount: number = 800): Promise<User[]> => {
+/**
+ * Hard ceiling on a single admin user fetch. There is no cursor pagination on
+ * this query yet, so a deployment with more users than this silently sees a
+ * truncated list -- the UI surfaces a warning when the result hits the cap.
+ */
+export const ADMIN_USER_FETCH_LIMIT = 800;
+
+const fetchAdminUsers = async (role: AdminUserRoleFilter = 'all', limitCount: number = ADMIN_USER_FETCH_LIMIT): Promise<User[]> => {
   if (role === 'donor') return getAllUsers('donor', undefined, limitCount);
   if (role === 'ngo') return getAllUsers('ngo', undefined, limitCount);
   if (role === 'bloodbank') {
@@ -826,7 +833,7 @@ const fetchPwaRuntimeDiagnostics = async (
   });
 };
 
-export const useAdminUsers = (role: AdminUserRoleFilter = 'all', limitCount: number = 800) =>
+export const useAdminUsers = (role: AdminUserRoleFilter = 'all', limitCount: number = ADMIN_USER_FETCH_LIMIT) =>
   useCachedAdminQuery<User[]>(
     adminQueryKeys.users(role, limitCount),
     ADMIN_QUERY_TIMINGS.users.ttl,
