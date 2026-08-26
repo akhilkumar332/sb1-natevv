@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Heart, Plus } from 'lucide-react';
 import type { BloodBankDashboardContext } from '../BloodBankDashboard';
+import { NewBloodRequestModal } from '../../../components/bloodbank/NewBloodRequestModal';
 
 function BloodBankRequests() {
-  const { bloodRequests, getStatusColor } = useOutletContext<BloodBankDashboardContext>();
+  const { bloodRequests, getStatusColor, user, refreshData } = useOutletContext<BloodBankDashboardContext>();
   const [filter, setFilter] = useState<'all' | 'active' | 'fulfilled' | 'expired'>('all');
+  const [showNewRequest, setShowNewRequest] = useState(false);
 
   const filteredRequests = useMemo(() => {
     if (filter === 'all') return bloodRequests;
@@ -28,6 +30,7 @@ function BloodBankRequests() {
         <div className="flex items-center gap-3">
           <button
             type="button"
+            onClick={() => setShowNewRequest(true)}
             className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-white px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
           >
             <Plus className="w-4 h-4" />
@@ -86,6 +89,13 @@ function BloodBankRequests() {
           </div>
         )}
       </div>
+      {showNewRequest && (
+        <NewBloodRequestModal
+          user={user}
+          onClose={() => setShowNewRequest(false)}
+          onCreated={refreshData}
+        />
+      )}
     </div>
   );
 }

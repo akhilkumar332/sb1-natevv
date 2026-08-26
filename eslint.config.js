@@ -49,5 +49,14 @@ export default tseslint.config(
     rules: {
       'no-restricted-syntax': 'off',
     },
+  },
+  {
+    // Security-rules tests assert against the real Firestore wire names. Routing
+    // them through COLLECTIONS constants would mean a renamed constant silently
+    // moved the test off the collection it is meant to protect.
+    files: ['**/*.emulator.test.ts'],
+    rules: {
+      'no-restricted-syntax': 'off',
+    },
   }
 );

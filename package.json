@@ -37,7 +37,8 @@
     "migrate:fcm:remove-legacy": "node scripts/migrations/remove-legacy-fcm-keys.mjs",
     "firebase:emulators": "firebase emulators:start",
     "firebase:login": "firebase login",
-    "firebase:init": "firebase init"
+    "firebase:init": "firebase init",
+    "test:rules": "firebase emulators:exec --only firestore \"vitest run --config vitest.rules.config.ts\""
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",
@@ -68,6 +69,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

@@ -38,6 +38,9 @@ const sanitizeHref = (href: string): string => {
 const allowedTags = new Set([
   'P',
   'BR',
+  // The editor's Divider button emits <hr>. Without it here the sanitizer
+  // stripped the element and the button appeared to do nothing.
+  'HR',
   'STRONG',
   'EM',
   'U',
@@ -102,6 +105,11 @@ const serializeSanitizedNode = (node: Node): string => {
 
   if (tagName === 'br') {
     return '<br>';
+  }
+
+  // Void element: emit the tag itself, never a wrapper around children.
+  if (tagName === 'hr') {
+    return '<hr>';
   }
 
   if (tagName === 'a') {

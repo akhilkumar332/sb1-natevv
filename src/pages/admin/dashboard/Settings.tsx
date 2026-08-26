@@ -6,21 +6,52 @@ import { Save } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { ROUTES } from '../../../constants/routes';
 
+// Storage is per-device: these are local operator preferences, not org config.
+const ADMIN_SETTINGS_STORAGE_KEY = 'bh_admin_settings';
+
+type AdminSettings = {
+  enableEmergencyEscalation: boolean;
+  enableVerificationNotifications: boolean;
+  enableAuditRetentionReminder: boolean;
+  dashboardAutoRefreshMinutes: number;
+};
+
 function SettingsPage() {
   const { t } = useTranslation();
   const { isSuperAdmin } = useAuth();
-  const [values, setValues] = useState({
+  const defaults: AdminSettings = {
     enableEmergencyEscalation: true,
     enableVerificationNotifications: true,
     enableAuditRetentionReminder: true,
     dashboardAutoRefreshMinutes: 5,
+  };
+
+  // Rehydrate from storage. The page wrote to localStorage on save but never
+  // read it back, so every toggle silently snapped to its default on reload and
+  // the save looked like it had done nothing.
+  const [values, setValues] = useState<AdminSettings>(() => {
+    if (typeof window === 'undefined') return defaults;
+    try {
+      const stored = window.localStorage.getItem(ADMIN_SETTINGS_STORAGE_KEY);
+      if (!stored) return defaults;
+      const parsed = JSON.parse(stored);
+      // Merge over defaults so a key added later is not left undefined.
+      return parsed && typeof parsed === 'object' ? { ...defaults, ...parsed } : defaults;
+    } catch {
+      return defaults;
+    }
   });
 
   const handleSave = () => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem('bh_admin_settings', JSON.stringify(values));
+      try {
+        window.localStorage.setItem(ADMIN_SETTINGS_STORAGE_KEY, JSON.stringify(values));
+      } catch {
+        notify.error('Could not save settings: browser storage is unavailable.');
+        return;
+      }
     }
-    notify.success('Admin settings saved locally.');
+    notify.success('Admin settings saved on this device.');
   };
 
   return (

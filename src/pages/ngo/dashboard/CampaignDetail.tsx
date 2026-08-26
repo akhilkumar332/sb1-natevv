@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useOutletContext, useParams } from 'react-router-dom';
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { createScopedErrorNotifier, notify } from 'services/notify.service';
 import {
   MapPin,
@@ -55,6 +55,7 @@ L.Icon.Default.mergeOptions({
 
 function NgoCampaignDetail() {
   const { campaignId } = useParams();
+  const navigate = useNavigate();
   const { campaigns, getStatusColor, user, getParticipantDonors } = useOutletContext<NgoDashboardContext>();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -219,6 +220,10 @@ function NgoCampaignDetail() {
     try {
       await deleteCampaign(campaign.id);
       notify.success('Campaign deleted.');
+      // The record this page renders is gone, so staying here shows the
+      // "not found" state. Return to the list instead, replacing the entry so
+      // Back does not land on the dead detail route.
+      navigate(ROUTES.portal.ngo.dashboard.campaigns, { replace: true });
     } catch (error: unknown) {
       notifyNgoCampaignDetailError(
         error,

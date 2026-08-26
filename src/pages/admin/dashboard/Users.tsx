@@ -9,7 +9,7 @@ import AdminListToolbar from '../../../components/admin/AdminListToolbar';
 import AdminPagination from '../../../components/admin/AdminPagination';
 import AdminRefreshButton from '../../../components/admin/AdminRefreshButton';
 import { AdminEmptyStateCard, AdminErrorCard, AdminRefreshingBanner } from '../../../components/admin/AdminAsyncState';
-import { useAdminUsers } from '../../../hooks/admin/useAdminQueries';
+import { ADMIN_USER_FETCH_LIMIT, useAdminUsers } from '../../../hooks/admin/useAdminQueries';
 import { refetchQuery } from '../../../utils/queryRefetch';
 
 type RoleFilter = 'all' | 'donor' | 'ngo' | 'bloodbank';
@@ -296,6 +296,12 @@ export function AdminUsersPage({
         </>
       )}
 
+      {(usersQuery.data?.length ?? 0) >= ADMIN_USER_FETCH_LIMIT && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-900">
+          Showing the first {ADMIN_USER_FETCH_LIMIT.toLocaleString()} users. This list is capped and
+          may be incomplete &mdash; narrow it with the role filter or search to find a specific user.
+        </div>
+      )}
       <AdminPagination
         page={page}
         pageSize={pageSize}

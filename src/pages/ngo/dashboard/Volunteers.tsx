@@ -5,6 +5,7 @@ import { UserPlus, Users, X } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import type { NgoDashboardContext } from '../NgoDashboard';
 import { addVolunteer, updateVolunteer, archiveVolunteer, deleteVolunteer } from '../../../services/ngo.service';
+import { toInputDate } from '../../../utils/campaignDate';
 import { StatusTabs } from '../../../components/shared/StatusTabs';
 import { DeleteConfirmModal } from '../../../components/shared/DeleteConfirmModal';
 import { EmptyStateCard } from '../../../components/shared/EmptyStateCard';
@@ -20,6 +21,7 @@ const emptyForm = {
   joinedAt: '',
   skills: '',
   availability: '',
+  hoursContributed: '0',
 };
 
 function NgoVolunteers() {
@@ -80,9 +82,12 @@ function NgoVolunteers() {
       phone: volunteer.phone || '',
       role: volunteer.role,
       status: volunteer.status,
-      joinedAt: volunteer.joinDate ? volunteer.joinDate.toISOString().split('T')[0] : '',
+      // toInputDate, not toISOString: the latter converts to UTC first and
+      // shifts the date a day earlier for UTC+ timezones such as IST.
+      joinedAt: volunteer.joinDate ? toInputDate(volunteer.joinDate) : '',
       skills: (volunteer.skills || []).join(', '),
       availability: volunteer.availability || '',
+      hoursContributed: String(volunteer.hoursContributed ?? 0),
     });
     setIsModalOpen(true);
   };
@@ -164,13 +169,16 @@ function NgoVolunteers() {
         skills,
         availability: form.availability,
         lastActiveAt: Timestamp.fromDate(new Date()),
-        hoursContributed: 0,
+        hoursContributed: Math.max(0, Number(form.hoursContributed) || 0),
         campaignsParticipated: 0,
         eventsOrganized: 0,
       };
 
       if (editingVolunteerId) {
-        const { hoursContributed, campaignsParticipated, eventsOrganized, ...updatePayload } = payload;
+        // hoursContributed is kept on edit: it is the only way to record
+        // volunteer hours, and stripping it left the "Top volunteer hours"
+        // analytics chart permanently empty.
+        const { campaignsParticipated, eventsOrganized, ...updatePayload } = payload;
         await updateVolunteer(editingVolunteerId, updatePayload);
         notify.success('Volunteer updated successfully.');
         await refreshData();
@@ -419,6 +427,24 @@ function NgoVolunteers() {
                   placeholder="e.g. Weekends, Evenings"
                   className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                 />
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-gray-700" htmlFor="volunteer-hours">
+                  Hours contributed
+                </label>
+                <input
+                  id="volunteer-hours"
+                  name="hoursContributed"
+                  type="number"
+                  min={0}
+                  value={form.hoursContributed}
+                  onChange={handleChange}
+                  className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Drives the Hours column and the &ldquo;Top volunteer hours&rdquo; analytics chart.
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">

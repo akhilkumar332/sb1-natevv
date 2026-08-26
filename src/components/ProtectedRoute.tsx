@@ -105,11 +105,16 @@ const ProtectedRoute = () => {
       }
     }
 
-    const userRole = activeRole;
+    // `hospital` is the legacy name for `bloodbank`. Normalise once here: the
+    // role-path loop below compares against the 'bloodbank' key, so an
+    // un-normalised hospital account was treated as a role mismatch on every
+    // /bloodbank/* route and bounced to the blood bank login -- which, being
+    // already authenticated, sent it straight back into the same check.
+    const userRole = activeRole === 'hospital' ? 'bloodbank' : activeRole;
 
     // Check for onboarding completion (only redirect if explicitly false/undefined and not already on onboarding page)
     if (!isSuperAdmin && !isImpersonating && userRole && user.onboardingCompleted !== true && !location.pathname.includes('/onboarding')) {
-      const onboardingRole = userRole === 'hospital' ? 'bloodbank' : userRole;
+      const onboardingRole = userRole;
       if (onboardingRole === 'donor' || onboardingRole === 'ngo' || onboardingRole === 'bloodbank' || onboardingRole === 'admin') {
         return <Navigate to={ROUTES.portal[onboardingRole].onboarding} replace />;
       }
@@ -127,7 +132,7 @@ const ProtectedRoute = () => {
         return <Navigate to={ROUTES.portal[key].login} replace />;
       }
     }
-    if (location.pathname.startsWith(LEGACY_ROUTE_PREFIXES.hospital) && userRole !== 'bloodbank' && userRole !== 'hospital') {
+    if (location.pathname.startsWith(LEGACY_ROUTE_PREFIXES.hospital) && userRole !== 'bloodbank') {
       return <Navigate to={ROUTES.portal.hospital.login} replace />;
     }
   }

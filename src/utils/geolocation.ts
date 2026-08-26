@@ -287,55 +287,6 @@ export const filterByRadius = <T extends { location?: Coordinates }>(
 // GEOCODING (PLACEHOLDER)
 // ============================================================================
 
-/**
- * Convert address to coordinates
- * Note: This is a placeholder. For production, integrate with:
- * - Google Maps Geocoding API
- * - Mapbox Geocoding API
- * - OpenStreetMap Nominatim
- */
-export const geocodeAddress = async (address: string): Promise<Coordinates | null> => {
-  // Check if it's a known city
-  const cityCoords = getCityCoordinates(address);
-  if (cityCoords) {
-    return cityCoords;
-  }
-
-  // For production, implement actual geocoding API call.
-  // Keep this as a dev diagnostic only to avoid noisy runtime logs.
-  if (import.meta.env.DEV && !(globalThis as any).__bhWarnedGeocodeNotImplemented) {
-    (globalThis as any).__bhWarnedGeocodeNotImplemented = true;
-    console.warn('Geocoding not implemented. Using city coordinates if available.');
-  }
-  return null;
-};
-
-/**
- * Convert coordinates to address (reverse geocoding)
- * Note: This is a placeholder. For production, integrate with geocoding API
- */
-export const reverseGeocode = async (
-  coords: Coordinates
-): Promise<{ city?: string; state?: string; address?: string } | null> => {
-  // Find nearest city as fallback
-  const nearestCity = findNearestCity(coords);
-
-  if (nearestCity) {
-    return {
-      city: nearestCity,
-      address: `Near ${nearestCity}`,
-    };
-  }
-
-  // For production, implement actual reverse geocoding API call.
-  // Keep this as a dev diagnostic only to avoid noisy runtime logs.
-  if (import.meta.env.DEV && !(globalThis as any).__bhWarnedReverseGeocodeNotImplemented) {
-    (globalThis as any).__bhWarnedReverseGeocodeNotImplemented = true;
-    console.warn('Reverse geocoding not implemented. Using nearest city.');
-  }
-  return null;
-};
-
 // ============================================================================
 // VALIDATION
 // ============================================================================

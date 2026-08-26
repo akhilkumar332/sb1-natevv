@@ -11,7 +11,16 @@ export const formatDateRange = (start: Date, end: Date) => {
   return `${startText} • ${endText}`;
 };
 
-export const toInputDate = (date: Date) => date.toISOString().split('T')[0];
+// Must round-trip with parseLocalDate, which builds a LOCAL midnight Date.
+// toISOString() converts to UTC first, so for any UTC+ timezone (IST included)
+// local midnight is the previous day in UTC and every edit shifted the campaign
+// one day earlier. Format from local parts instead.
+export const toInputDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export const validateCampaignDateRangeInput = (startInput: string, endInput: string): string | null => {
   const today = new Date();

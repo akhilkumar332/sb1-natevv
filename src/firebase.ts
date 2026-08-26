@@ -51,6 +51,13 @@ export const db = initializeFirestore(app, {
   ...(forceLongPolling
     ? { experimentalForceLongPolling: true, useFetchStreams: false }
     : { experimentalAutoDetectLongPolling: true }),
+  // Drop undefined fields instead of throwing. Optional form inputs (a blank
+  // partnership end date, a campaign without map coordinates, an approval with
+  // no review notes) all produced `undefined` in their payloads, and the SDK
+  // rejected the whole write before it reached the network -- surfacing as
+  // "Failed to save" with nothing persisted. Call sites still omit optional
+  // keys explicitly; this is the safety net, not the primary guard.
+  ignoreUndefinedProperties: true,
 });
 
 type FirestorePersistenceStatus = 'idle' | 'enabling' | 'enabled' | 'disabled' | 'failed';

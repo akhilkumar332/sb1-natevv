@@ -364,6 +364,14 @@ export const updateUserStatus = async (
     }
     const adminRole = adminDoc.data().role || 'admin';
 
+    // Read the target before mutating so the notification can carry the real
+    // role. Hard-coding 'donor' mislabelled every NGO/blood bank notification,
+    // which matters because role-scoped notification queries filter on it.
+    const targetDoc = await getDoc(doc(db, COLLECTIONS.USERS, userId));
+    const rawTargetRole = targetDoc.exists() ? targetDoc.data()?.role : null;
+    // 'hospital' is the legacy name for 'bloodbank'.
+    const targetRole = rawTargetRole === 'hospital' ? 'bloodbank' : (rawTargetRole || 'donor');
+
     await updateDoc(doc(db, COLLECTIONS.USERS, userId), {
       status,
       updatedAt: getServerTimestamp(),
@@ -372,7 +380,7 @@ export const updateUserStatus = async (
     // Create notification for user
     await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
       userId,
-      userRole: 'donor', // Will be updated based on actual user role
+      userRole: targetRole,
       type: 'verification_status',
       title: 'Account Status Updated',
       message: `Your account status has been changed to ${status}`,
@@ -414,6 +422,11 @@ export const verifyUserAccount = async (
     }
     const adminRole = adminDoc.data().role || 'admin';
 
+    // Same as updateUserStatus: carry the target's real role, not a literal.
+    const targetDoc = await getDoc(doc(db, COLLECTIONS.USERS, userId));
+    const rawTargetRole = targetDoc.exists() ? targetDoc.data()?.role : null;
+    const targetRole = rawTargetRole === 'hospital' ? 'bloodbank' : (rawTargetRole || 'donor');
+
     await updateDoc(doc(db, COLLECTIONS.USERS, userId), {
       verified: true,
       status: 'active',
@@ -423,7 +436,7 @@ export const verifyUserAccount = async (
     // Create notification for user
     await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
       userId,
-      userRole: 'donor', // Will be updated based on actual user role
+      userRole: targetRole,
       type: 'verification_status',
       title: 'Account Verified',
       message: 'Your account has been successfully verified',
@@ -635,7 +648,10 @@ export const approveVerificationRequest = async (
       status: 'approved',
       reviewedBy: adminId,
       reviewedAt: getServerTimestamp(),
-      reviewNotes,
+      // Review notes are optional: approving without typing a note used to send
+      // `undefined` and reject the whole write, so an admin could not approve an
+      // organization at all unless they wrote something.
+      ...(reviewNotes ? { reviewNotes } : {}),
       updatedAt: getServerTimestamp(),
     });
 

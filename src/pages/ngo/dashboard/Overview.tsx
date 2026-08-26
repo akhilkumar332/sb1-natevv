@@ -34,7 +34,11 @@ function NgoOverview() {
     referralSummary,
   } = useOutletContext<NgoDashboardContext>();
 
-  const spotlightCampaigns = campaigns.slice(0, 3);
+  // The panel is headed "Active campaigns", so filter before slicing -- taking
+  // the first three of any status showed completed and draft campaigns there.
+  const spotlightCampaigns = campaigns
+    .filter((campaign) => campaign.status === 'active' || campaign.status === 'upcoming')
+    .slice(0, 3);
   const activePartners = partnerships.filter((partner) => partner.status === 'active').length;
   const activeVolunteers = volunteers.filter((volunteer) => volunteer.status === 'active').length;
 

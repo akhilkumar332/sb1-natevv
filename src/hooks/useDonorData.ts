@@ -581,9 +581,13 @@ export const useDonorData = (userId: string, bloodType?: string, city?: string):
           id: doc.id,
           name: data.name || data.title || 'Blood Camp',
           organizerName: data.organizerName || data.ngoName || 'Organizer',
-          location: data.location || '',
-          city: data.city || '',
-          address: data.address || data.location || '',
+          // campaigns store location as a nested object ({address, city, state,
+          // venue}), not a string. Reading data.city / data.location directly
+          // yielded '' for city and an object for address, so every camp showed
+          // a blank location and the city filter never matched.
+          location: typeof data.location === 'string' ? data.location : (data.location?.venue || ''),
+          city: data.location?.city || data.city || '',
+          address: data.location?.address || data.address || '',
           date: data.startDate?.toDate() || data.date?.toDate() || new Date(),
           startTime: data.startTime || '10:00 AM',
           endTime: data.endTime || '4:00 PM',

@@ -211,7 +211,11 @@ export default function BlogPostPage() {
     authorName: post.authorName || undefined,
     publisherName: siteTitle,
   });
-  const featuredPosts = (allPostsQuery.data || [])
+  // Honour the CMS "Show featured posts" setting. It was fully plumbed through
+  // types, defaults, the admin editor and cms.service, but no public surface
+  // ever read it -- so turning it off changed nothing.
+  const showFeaturedOnBlog = settingsQuery.data?.showFeaturedOnBlog ?? CMS_DEFAULTS.showFeaturedOnBlog;
+  const featuredPosts = (showFeaturedOnBlog ? (allPostsQuery.data || []) : [])
     .filter((entry) => {
       if (entry.slug === post.slug || !entry.featured) return false;
       const expiry = toDateValue(entry.featuredUntil);

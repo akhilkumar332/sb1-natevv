@@ -380,12 +380,15 @@ export interface BloodRequest {
   unitsRequired: number;
 
   // Location
+  // Coordinates are optional: a request can be raised from a typed address with
+  // no map pin, exactly as campaigns allow. Requiring them here meant the only
+  // create path could not be type-checked without inventing 0,0.
   location: {
     address: string;
     city: string;
     state: string;
-    latitude: number;
-    longitude: number;
+    latitude?: number;
+    longitude?: number;
   };
 
   // Contact

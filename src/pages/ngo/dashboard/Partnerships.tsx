@@ -5,6 +5,7 @@ import { Handshake, Plus, X } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import type { NgoDashboardContext } from '../NgoDashboard';
 import { createPartnership, updatePartnership, archivePartnership, deletePartnership } from '../../../services/ngo.service';
+import { toInputDate } from '../../../utils/campaignDate';
 import { StatusTabs } from '../../../components/shared/StatusTabs';
 import { DeleteConfirmModal } from '../../../components/shared/DeleteConfirmModal';
 import { EmptyStateCard } from '../../../components/shared/EmptyStateCard';
@@ -84,12 +85,15 @@ function NgoPartnerships() {
       partnerName: partnership.organization,
       partnerType: partnership.type,
       status: partnership.status,
-      startDate: partnership.since ? partnership.since.toISOString().split('T')[0] : '',
-      endDate: '',
+      startDate: partnership.since ? toInputDate(partnership.since) : '',
+      // Pre-fill from the stored record. These used to be hardcoded empty, so
+      // saving an edit wrote '' over the existing terms and silently dropped
+      // the end date.
+      endDate: partnership.endDate ? toInputDate(partnership.endDate) : '',
       contactPerson: partnership.contactPerson || '',
       contactEmail: partnership.contactEmail || '',
       contactPhone: partnership.contactPhone || '',
-      terms: '',
+      terms: partnership.termsOfAgreement || '',
     });
     setIsModalOpen(true);
   };
@@ -161,7 +165,10 @@ function NgoPartnerships() {
         partnerType: form.partnerType as any,
         status: form.status as any,
         startDate: Timestamp.fromDate(new Date(form.startDate)),
-        endDate: form.endDate ? Timestamp.fromDate(new Date(form.endDate)) : undefined,
+        // End date is optional in the form. Omit the key rather than sending
+        // `undefined`, which used to reject the whole write and made the
+        // default "Add Partner" path fail every time.
+        ...(form.endDate ? { endDate: Timestamp.fromDate(new Date(form.endDate)) } : {}),
         termsOfAgreement: form.terms,
         totalDonations: 0,
         totalCampaigns: 0,

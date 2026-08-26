@@ -276,7 +276,11 @@ export default function CmsPageEditorPage() {
   ).slice(0, CMS_LIMITS.seoDescription);
   const previewSlug = toCmsSlug(slug || title) || 'untitled-page';
   const draftScopeKey = isNewPage ? `new_${toCmsSlug(slugParam || 'new') || 'new'}` : (normalizedParamSlug || previewSlug);
-  const previewPath = activePresetPath || (previewSlug === 'home' ? '/' : `/${previewSlug}`);
+  // Preset pages have their own top-level route; everything else is served by
+  // the generic CMS route at /p/:slug. Previewing generic pages as `/<slug>`
+  // pointed the SEO preview and canonical URL at the 404 screen.
+  const previewPath = activePresetPath
+    || (previewSlug === 'home' ? '/' : ROUTES.cmsPage.replace(':slug', previewSlug));
   const previewBaseUrl = (settingsQuery.data?.canonicalBaseUrl || CMS_DEFAULTS.canonicalBaseUrl).replace(/\/+$/, '');
   const previewUrl = `${previewBaseUrl}${previewPath}`;
   const seoAudit = runSeoAudit({
@@ -521,12 +525,29 @@ export default function CmsPageEditorPage() {
     setContentDraft((prev) => removeArrayIndexAtPath(prev || {}, path, index));
   };
 
+  // Build a blank item that keeps the sample's SHAPE. Collapsing an object
+  // sample to `{}` produced an item with no keys, which renderJsonField had
+  // nothing to render -- so "Add item" inserted a row the admin could not edit
+  // and publishing pushed an empty hero slide to the live page.
+  const buildBlankTemplate = (sample: JsonLike): JsonLike => {
+    if (sample === null || sample === undefined) return '';
+    if (Array.isArray(sample)) {
+      // Keep one blank entry so a nested list is still editable.
+      return sample.length ? [buildBlankTemplate(sample[0])] : [];
+    }
+    if (isPlainObject(sample)) {
+      return Object.fromEntries(
+        Object.entries(sample).map(([key, value]) => [key, buildBlankTemplate(value as JsonLike)]),
+      );
+    }
+    if (typeof sample === 'number') return 0;
+    if (typeof sample === 'boolean') return false;
+    return '';
+  };
+
   const addDraftArrayItem = (path: JsonPath, sample: JsonLike) => {
     setIsDirty(true);
-    const template = sample === null || sample === undefined
-      ? ''
-      : (Array.isArray(sample) ? [] : (isPlainObject(sample) ? {} : sample));
-    setContentDraft((prev) => addArrayItemAtPath(prev || {}, path, template));
+    setContentDraft((prev) => addArrayItemAtPath(prev || {}, path, buildBlankTemplate(sample)));
   };
 
   const moveTopLevelSection = (sourceKey: string, direction: 'up' | 'down') => {

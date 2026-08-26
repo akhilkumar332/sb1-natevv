@@ -996,6 +996,22 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // COLLECTION: cmsBlogPostRevisions
+    // ========================================================================
+
+    match /cmsBlogPostRevisions/{revisionId} {
+      // Revisions hold unpublished draft bodies, so they are never public --
+      // unlike cmsBlogPosts there is no isPublishedCmsDoc() read path here.
+      // Without this block the collection was deny-all, which made every blog
+      // post save report failure and left revision history permanently empty.
+      allow read: if isAdmin();
+      allow create, update: if isAdmin();
+
+      // Retained for auditability: history is pruned by tooling, not the editor.
+      allow delete: if isAdmin();
+    }
+
+    // ========================================================================
     // COLLECTION: cmsBlogCategories
     // ========================================================================
 
@@ -1249,6 +1265,27 @@ service cloud.firestore {
 
       // Allow users to maintain their own stats document, admins can manage all
       allow write: if isAuthenticated() && (isOwner(userId) || isAdmin());
+    }
+
+    // ========================================================================
+    // COLLECTION: pointTransactions
+    // ========================================================================
+
+    match /pointTransactions/{transactionId} {
+      // Ledger backing userStats.points. Owners may read their own history;
+      // admins may read all. Without this block the collection was deny-all,
+      // so awardPoints() would increment userStats and then fail on the ledger
+      // write, leaving points with no audit trail.
+      allow read: if isAuthenticated()
+        && (isOwner(resource.data.userId) || isAdmin());
+
+      // Append-only for the owner: the ledger must record who earned what, and
+      // history must not be rewritten after the fact.
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.points is number;
+
+      allow update, delete: if isAdmin();
     }
 
     // ========================================================================

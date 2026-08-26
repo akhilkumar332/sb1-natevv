@@ -33,7 +33,10 @@ export const useBloodRequest = () => {
     setError(null);
 
     try {
-      const { requestId, donorId, donorName, donorPhone, donorEmail } = params;
+      // donorPhone/donorEmail stay on the params type for callers, but are no
+      // longer written: respondedDonors holds UIDs only, and the blood bank
+      // resolves contact details from the donor profile.
+      const { requestId, donorId, donorName } = params;
 
       // Get the blood request
       const requestRef = doc(db, COLLECTIONS.BLOOD_REQUESTS, requestId);
@@ -45,36 +48,46 @@ export const useBloodRequest = () => {
 
       const requestData = requestSnap.data();
 
-      // Check if donor already responded
-      const respondedDonors = requestData.respondedDonors || [];
-      if (respondedDonors.some((d: any) => d.donorId === donorId)) {
+      // respondedDonors is a list of donor UID strings. That is what
+      // database.types.ts declares, what optimisticUpdates and donor.service
+      // write, and what firestore.rules enforces -- isSelfAppendOnly() checks
+      // `request.auth.uid in respondedDonors`. This hook used to append an
+      // object instead, which failed twice over: the Firestore SDK throws on a
+      // serverTimestamp() sentinel nested inside an array element before any
+      // request is sent, and even without that the rule could never match.
+      const respondedDonors: string[] = Array.isArray(requestData.respondedDonors)
+        ? requestData.respondedDonors
+        : [];
+      if (respondedDonors.includes(donorId)) {
         notify.error('You have already responded to this request');
         setResponding(false);
         return false;
       }
 
-      // Add donor to responded list
+      // Only respondedDonors and updatedAt may change here -- the rule pins the
+      // affected keys to exactly those two.
       await updateDoc(requestRef, {
-        respondedDonors: arrayUnion({
-          donorId,
-          donorName,
-          donorPhone,
-          donorEmail,
-          respondedAt: serverTimestamp(),
-          status: 'pending',
-        }),
+        respondedDonors: arrayUnion(donorId),
         updatedAt: serverTimestamp(),
       });
 
-      // Send notification to hospital
-      if (requestData.hospitalId) {
+      // Notify the requester. The shape is dictated by
+      // isBloodRequestNotificationForRequester() in firestore.rules: it requires
+      // relatedType 'blood_request', a relatedId pointing at an existing request,
+      // userId equal to that request's requesterId, and the caller's uid already
+      // present in respondedDonors -- which is why this runs after the update
+      // above. The previous payload targeted hospitalId with no relatedType or
+      // relatedId, so the rule could never pass.
+      if (requestData.requesterId) {
         try {
           const notificationRef = doc(collection(db, COLLECTIONS.NOTIFICATIONS));
           await setDoc(notificationRef, {
-            userId: requestData.hospitalId,
+            userId: requestData.requesterId,
             title: 'Donor Response',
             message: `${donorName} has responded to your blood request for ${requestData.bloodType}`,
             type: 'blood_request_response',
+            relatedType: 'blood_request',
+            relatedId: requestId,
             priority: 'high',
             read: false,
             createdAt: serverTimestamp(),
